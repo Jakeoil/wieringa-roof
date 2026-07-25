@@ -1,0 +1,16 @@
+{
+  "name": "wieringa-roof",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch"
+  },
+  "keywords": [],
+  "author": "Jeff Coyle",
+  "license": "ISC",
+  "description": "Interactive Wieringa roof net builder",
+  "devDependencies": {
+    "typescript": "^5.9.3"
+  }
+}

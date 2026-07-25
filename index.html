@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Wieringa Roof</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            margin: 20px;
+            background: #fafafa;
+        }
+        h1 { margin-bottom: 4px; }
+        h2 { color: #555; font-weight: normal; margin-top: 0; }
+        .workspace {
+            display: flex;
+            gap: 20px;
+            align-items: flex-start;
+        }
+        .panel {
+            display: flex;
+            flex-direction: column;
+        }
+        .panel h3 {
+            margin: 0 0 8px;
+            font-size: 15px;
+            color: #333;
+        }
+        canvas {
+            border: 1px solid #ccc;
+            background: white;
+            cursor: crosshair;
+        }
+        .controls {
+            display: flex;
+            gap: 16px;
+            align-items: center;
+            margin: 12px 0;
+            flex-wrap: wrap;
+        }
+        .controls button {
+            padding: 6px 16px;
+            font-size: 13px;
+            cursor: pointer;
+            border: 1px solid #ccc;
+            background: #fff;
+            border-radius: 4px;
+        }
+        .controls button:hover {
+            background: #eee;
+        }
+        .info {
+            font-size: 13px;
+            font-family: monospace;
+            color: #666;
+            margin: 4px 0;
+        }
+    </style>
+</head>
+<body>
+    <h1>Wieringa Roof</h1>
+    <h2>Golden Rhombus Net Builder</h2>
+    <div class="controls" id="controls">
+        <button id="btn-clear">Clear Net</button>
+        <span class="info" id="info">Click a rhomb in the tiling to begin</span>
+    </div>
+    <div class="workspace">
+        <div class="panel">
+            <h3>Penrose Tiling</h3>
+            <canvas id="tiling" width="500" height="500"></canvas>
+        </div>
+        <div class="panel">
+            <h3>Net (1:1 inches)</h3>
+            <canvas id="net" width="850" height="1000"></canvas>
+        </div>
+    </div>
+    <script type="module" src="./dist/main.js"></script>
+</body>
+</html>
