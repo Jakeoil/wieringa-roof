@@ -18,8 +18,33 @@ let currentSeedIdx = 3; // St5
 let currentIsHeads = true;
 let gen = 3;
 
+// Height flip — the dual roof, hills for dales. The tiling fixes the surface only
+// up to a reflection in the horizontal plane, so every vertex height can be read
+// either way round. Mirroring the index about the patch's observed range is the
+// same thing as negating z and renormalising the lowest level back to 1, which is
+// why it is a mirror rather than a negation.
+let flipHeight = false;
+let idxLo = 1;
+let idxHi = 4;
+
+function displayIndex(i: number): number {
+    if (i === -999) return i;
+    return flipHeight ? idxLo + idxHi - i : i;
+}
+
 function generate() {
     generatePatch(currentSeedIdx, currentIsHeads, gen);
+    idxLo = Infinity;
+    idxHi = -Infinity;
+    for (const v of vertexList) {
+        if (v.index === -999) continue;
+        if (v.index < idxLo) idxLo = v.index;
+        if (v.index > idxHi) idxHi = v.index;
+    }
+    if (!Number.isFinite(idxLo)) {
+        idxLo = 1;
+        idxHi = 4;
+    }
     console.log(
         `Generated ${allRhombs.length} rhombs, ${vertexList.length} vertices`,
     );
@@ -154,7 +179,7 @@ function drawTiling() {
     for (const v of vertexList) {
         if (v.index === -999) continue; // skip unassigned
         const sv = toScreen(v.pos);
-        ctx.fillStyle = indexColor(v.index);
+        ctx.fillStyle = indexColor(displayIndex(v.index));
         ctx.beginPath();
         ctx.arc(sv.x, sv.y, 2.5, 0, 2 * Math.PI);
         ctx.fill();
@@ -227,7 +252,7 @@ function drawNet() {
 
         // Vertex index labels (use per-rhomb vertIndices for accuracy)
         for (let i = 0; i < 4; i++) {
-            const idx = src.vertIndices[i];
+            const idx = displayIndex(src.vertIndices[i]);
             ctx.fillStyle = indexColor(idx);
             ctx.font = "10px monospace";
             ctx.textAlign = "center";
@@ -265,7 +290,7 @@ tilingCanvas.addEventListener("mousemove", (e) => {
         drawTiling();
         if (rid >= 0) {
             const r = allRhombs[rid];
-            infoSpan.textContent = `Rhomb ${rid} (${r.thick ? "thick" : "thin"}) idx=[${r.vertIndices}] isHeads=${r.isHeads}`;
+            infoSpan.textContent = `Rhomb ${rid} (${r.thick ? "thick" : "thin"}) idx=[${r.vertIndices.map(displayIndex)}]${flipHeight ? " flipped" : ""} isHeads=${r.isHeads}`;
         } else {
             infoSpan.textContent = "Click a rhomb to place on net";
         }
@@ -345,6 +370,20 @@ function buildControls() {
         regenerate();
     });
     controls.insertBefore(headsBtn, genLabel.nextSibling);
+
+    // height flip toggle — redraw only, no regeneration needed
+    const flipBtn = document.createElement("button");
+    const flipLabel = () => (flipHeight ? "Dales up" : "Hills up");
+    flipBtn.textContent = flipLabel();
+    flipBtn.title =
+        "Flip the roof vertically — the dual surface over the same tiling";
+    flipBtn.addEventListener("click", () => {
+        flipHeight = !flipHeight;
+        flipBtn.textContent = flipLabel();
+        drawTiling();
+        drawNet();
+    });
+    controls.insertBefore(flipBtn, headsBtn.nextSibling);
 }
 
 function regenerate() {
