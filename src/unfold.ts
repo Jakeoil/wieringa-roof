@@ -465,20 +465,20 @@ interface StripLink {
     b: number;
 }
 
-export function stripPatch(): UnfoldResult {
-    const faces = buildFaces();
-    const lift = computeLift();
-    const P: (V3 | null)[] = lift.n.map((nv) => (nv ? pos3D(nv) : null));
-    const byId = new Map(faces.map((f) => [f.id, f]));
-    const { creases, hist, interior } = computeCreases(faces, P);
+type Families = Array<Map<number, StripLink[]>>;
+type Run = { ids: number[]; links: (StripLink | null)[] };
 
-    // per-family face adjacency (degree <= 2, so each family is paths/cycles)
-    const fam: Array<Map<number, StripLink[]>> = [0, 1, 2, 3, 4].map(
+// Per-family face adjacency. Each face has exactly two edges parallel to each of
+// its two directions, so every family graph has degree <= 2 and decomposes into
+// paths and cycles. Family j only reaches the 2/5 of rhombi that have direction
+// j at all — which is why pure ribbons leave so much behind.
+function buildFamilies(n: (number[] | null)[]): Families {
+    const fam: Families = [0, 1, 2, 3, 4].map(
         () => new Map<number, StripLink[]>(),
     );
     for (const e of edgeMap.values()) {
         if (e.rhombIds.length !== 2) continue;
-        const j = edgeFamily(e.v1, e.v2, lift.n);
+        const j = edgeFamily(e.v1, e.v2, n);
         if (j === null) continue;
         const [x, y] = e.rhombIds;
         const g = fam[j];
@@ -487,11 +487,10 @@ export function stripPatch(): UnfoldResult {
         g.get(x)!.push({ other: y, a: e.v1, b: e.v2 });
         g.get(y)!.push({ other: x, a: e.v1, b: e.v2 });
     }
+    return fam;
+}
 
-    // greedy: longest remaining run in any family
-    const assigned = new Set<number>();
-    const strips: Array<{ ids: number[]; links: (StripLink | null)[] }> = [];
-
+function makeRunFinder(fam: Families, assigned: Set<number>) {
     const runFrom = (
         j: number,
         start: number,
@@ -525,8 +524,8 @@ export function stripPatch(): UnfoldResult {
         return { ids, links };
     };
 
-    while (assigned.size < faces.length) {
-        let best: { ids: number[]; links: (StripLink | null)[] } | null = null;
+    return function longestRun(faces: Face[]): Run {
+        let best: Run | null = null;
         for (let j = 0; j < 5; j++) {
             for (const fid of fam[j].keys()) {
                 if (assigned.has(fid)) continue;
@@ -538,6 +537,39 @@ export function stripPatch(): UnfoldResult {
             const solo = faces.find((f) => !assigned.has(f.id))!;
             best = { ids: [solo.id], links: [null] };
         }
+        return best;
+    };
+}
+
+// Measure a placed piece's bounding box in side units.
+function pieceBox(faceIds: number[], placed: Map<number, Placed>) {
+    let x0 = Infinity;
+    let y0 = Infinity;
+    let x1 = -Infinity;
+    let y1 = -Infinity;
+    for (const fid of faceIds)
+        for (const q of placed.get(fid)!.poly) {
+            if (q[0] < x0) x0 = q[0];
+            if (q[1] < y0) y0 = q[1];
+            if (q[0] > x1) x1 = q[0];
+            if (q[1] > y1) y1 = q[1];
+        }
+    return { w: x1 - x0, h: y1 - y0, minX: x0, minY: y0 };
+}
+
+export function stripPatch(): UnfoldResult {
+    const faces = buildFaces();
+    const lift = computeLift();
+    const P: (V3 | null)[] = lift.n.map((nv) => (nv ? pos3D(nv) : null));
+    const byId = new Map(faces.map((f) => [f.id, f]));
+    const { creases, hist, interior } = computeCreases(faces, P);
+
+    const assigned = new Set<number>();
+    const longestRun = makeRunFinder(buildFamilies(lift.n), assigned);
+    const strips: Run[] = [];
+
+    while (assigned.size < faces.length) {
+        const best = longestRun(faces);
         for (const id of best.ids) assigned.add(id);
         strips.push(best);
     }
@@ -581,20 +613,140 @@ export function stripPatch(): UnfoldResult {
         }
     });
 
-    const pieces: Piece[] = pieceFaces.map((faceIds, id) => {
-        let x0 = Infinity;
-        let y0 = Infinity;
-        let x1 = -Infinity;
-        let y1 = -Infinity;
-        for (const fid of faceIds)
-            for (const q of placed.get(fid)!.poly) {
-                if (q[0] < x0) x0 = q[0];
-                if (q[1] < y0) y0 = q[1];
-                if (q[0] > x1) x1 = q[0];
-                if (q[1] > y1) y1 = q[1];
+    const pieces: Piece[] = pieceFaces.map((faceIds, id) => ({
+        id,
+        faceIds,
+        ...pieceBox(faceIds, placed),
+    }));
+
+    return {
+        faces,
+        placed,
+        pieces,
+        creases,
+        hinges,
+        foldHistogram: hist,
+        interiorEdges: interior,
+        seedsTried: 0,
+    };
+}
+
+// ── widened ribbons ───────────────────────────────────────────────
+//
+// A pure ribbon is one rhomb wide, and family j only reaches the 2/5 of rhombi
+// that have direction j at all, so the plain strip decomposition leaves a lot of
+// orphans between bands. This takes the longest available ribbon as a *backbone*
+// and then accretes neighbouring rhombi onto it across any edge — not just the
+// j-parallel ones — largest backbone first, so the longest strip gets first claim
+// on the rhombi it could share.
+//
+// The backbone is still placed first and so is still guaranteed simple, but the
+// accreted rhombi break the all-creases-parallel property, so overlap must be
+// tested again. What is kept is the straight backbone, which packs well on a page
+// and gives a natural folding order. The result is patch-specific: unlike a pure
+// ribbon there is no clean rule for which rhomb belongs to which band.
+
+export function ribbonGrowPatch(): UnfoldResult {
+    const faces = buildFaces();
+    const lift = computeLift();
+    const P: (V3 | null)[] = lift.n.map((nv) => (nv ? pos3D(nv) : null));
+    const byId = new Map(faces.map((f) => [f.id, f]));
+    const { creases, hist, interior } = computeCreases(faces, P);
+    const links = faceLinks(faces);
+
+    const assigned = new Set<number>();
+    const longestRun = makeRunFinder(buildFamilies(lift.n), assigned);
+
+    const placed = new Map<number, Placed>();
+    const hinges = new Set<string>();
+    const pieceFaces: number[][] = [];
+
+    const fits = (poly: P2[], mine: number[], skip: number): boolean => {
+        const test = shrink(poly, 0.94);
+        for (const fid of mine) {
+            if (fid === skip) continue;
+            if (convexOverlap(test, shrink(placed.get(fid)!.poly, 0.94)))
+                return false;
+        }
+        return true;
+    };
+
+    while (assigned.size < faces.length) {
+        const backbone = longestRun(faces);
+        const pieceId = pieceFaces.length;
+        const mine: number[] = [];
+        pieceFaces.push(mine);
+
+        // 1. lay the backbone down as a chain
+        for (let i = 0; i < backbone.ids.length; i++) {
+            const fid = backbone.ids[i];
+            const face = byId.get(fid)!;
+            if (i === 0) {
+                placed.set(fid, {
+                    faceId: fid,
+                    thick: face.thick,
+                    poly: placeSeed(face, P),
+                    verts: face.v.slice(),
+                    piece: pieceId,
+                });
+            } else {
+                const link = backbone.links[i]!;
+                const host = placed.get(backbone.ids[i - 1])!;
+                const cand = placeAcross(face, P, link.a, link.b, host);
+                if (!cand) continue;
+                placed.set(fid, {
+                    faceId: fid,
+                    thick: face.thick,
+                    poly: cand.poly,
+                    verts: cand.verts,
+                    piece: pieceId,
+                });
+                hinges.add(ekey(link.a, link.b));
             }
-        return { id, faceIds, w: x1 - x0, h: y1 - y0, minX: x0, minY: y0 };
+            mine.push(fid);
+            assigned.add(fid);
+        }
+
+        // 2. accrete outward across any edge
+        const q = [...mine];
+        for (let h = 0; h < q.length; h++) {
+            const cur = q[h];
+            const host = placed.get(cur)!;
+            for (const link of links.get(cur) ?? []) {
+                if (assigned.has(link.other)) continue;
+                const cand = placeAcross(
+                    byId.get(link.other)!,
+                    P,
+                    link.a,
+                    link.b,
+                    host,
+                );
+                if (!cand) continue;
+                if (!fits(cand.poly, mine, cur)) continue;
+                placed.set(link.other, {
+                    faceId: link.other,
+                    thick: byId.get(link.other)!.thick,
+                    poly: cand.poly,
+                    verts: cand.verts,
+                    piece: pieceId,
+                });
+                hinges.add(ekey(link.a, link.b));
+                mine.push(link.other);
+                assigned.add(link.other);
+                q.push(link.other);
+            }
+        }
+    }
+
+    pieceFaces.sort((a, b) => b.length - a.length);
+    pieceFaces.forEach((ids, id) => {
+        for (const fid of ids) placed.get(fid)!.piece = id;
     });
+    const pieces: Piece[] = pieceFaces.map((faceIds, id) => ({
+        id,
+        faceIds,
+        ...pieceBox(faceIds, placed),
+    }));
 
     return {
         faces,

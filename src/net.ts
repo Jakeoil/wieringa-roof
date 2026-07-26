@@ -1,7 +1,7 @@
 // Net page — DOM wiring. Layout and SVG live in sheet.ts, unfolding in unfold.ts.
 
 import { seedTypes, generatePatch } from "./geometry.js";
-import { unfoldPatch, stripPatch } from "./unfold.js";
+import { unfoldPatch, stripPatch, ribbonGrowPatch } from "./unfold.js";
 import { PAGES, parseLength, layoutSheets, renderSheet } from "./sheet.js";
 
 const el = <T extends HTMLElement>(id: string) =>
@@ -61,7 +61,12 @@ function rebuild(): void {
 
     const t0 = performance.now();
     generatePatch(seedIdx, true, gen);
-    const res = modeSel.value === "strips" ? stripPatch() : unfoldPatch();
+    const res =
+        modeSel.value === "strips"
+            ? stripPatch()
+            : modeSel.value === "widened"
+              ? ribbonGrowPatch()
+              : unfoldPatch();
     const { sheets, oversize } = layoutSheets(
         res.pieces,
         side.mm,
