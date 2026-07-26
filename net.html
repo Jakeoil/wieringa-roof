@@ -13,7 +13,8 @@
     <a href="./index.html">Home</a>
     <a href="./net.html" aria-current="page">Net</a>
     <a href="./roof3d.html">3D</a>
-    <a href="./info.html">The Maths</a>
+    <a href="./info.html">Mathematics</a>
+    <a href="./polyhedra.html">Polyhedra</a>
     <a href="./legacy.html">Legacy</a>
 </nav>
 
@@ -21,35 +22,75 @@
 
 <h1>Net &amp; PDF</h1>
 <p class="lede">
-    Choose a patch, decompose it into ribbon strips, and print one sheet to cut and
-    fold. Each patch is an independent single-sheet model.
+    Choose a patch, unfold it flat, and print a sheet to cut and fold. Each patch
+    is an independent model, printable on its own whenever you want to build
+    another.
 </p>
 
 <div class="note">
-    <strong>Not built yet.</strong> This page is a placeholder. The geometry it
-    depends on is settled and documented on <a href="./info.html">The Maths</a>;
-    what remains is choosing the expansion generation for each seed against real
-    rhomb counts, then writing the strip decomposition and the print sheet.
+    <strong>Page not built yet</strong> — but the unfolding works and is committed.
+    Run <span class="mono">node tools/bfs-unfold.mjs</span> for the numbers below.
+    What remains is rendering the placed rhombi as printable SVG.
 </div>
 
-<h2>Agreed design</h2>
+<h2>Gen-2 results</h2>
 
-<dl style="font-size:14px">
-    <dt style="font-weight:600;margin-top:12px">Patches</dt>
-    <dd style="margin:2px 0 0">Star, boat and diamond seeds, each expanded and printed as its own one-sheet model. No cross-sheet edge matching.</dd>
+<p>
+    Breadth-first unfolding from a seed rhomb, spreading outward across shared
+    edges and rejecting any placement that would overlap. At a 20&nbsp;mm side,
+    on Letter with half-inch margins:
+</p>
 
-    <dt style="font-weight:600;margin-top:12px">Decomposition</dt>
-    <dd style="margin:2px 0 0">Greedy maximal ribbon strips — repeatedly take the longest dual-graph path whose consecutive shared edges are parallel. Provably free of overlap, so no overlap test is needed.</dd>
+<div class="tbl-scroll">
+<table>
+    <thead><tr><th>Patch</th><th class="num">Rhombi</th><th class="num">Pieces</th><th class="num">Largest piece</th><th>Fits a sheet</th></tr></thead>
+    <tbody>
+        <tr><td>Star <span class="mono">Pe5</span></td><td class="num">25</td><td class="num">2</td><td class="num">122 × 139 mm</td><td>yes</td></tr>
+        <tr><td>Boat <span class="mono">Pe3</span></td><td class="num">23</td><td class="num">1</td><td class="num">113 × 137 mm</td><td>yes</td></tr>
+        <tr><td>Diamond <span class="mono">Pe1</span></td><td class="num">21</td><td class="num">1</td><td class="num">113 × 121 mm</td><td>yes</td></tr>
+    </tbody>
+</table>
+</div>
 
-    <dt style="font-weight:600;margin-top:12px">Scale</dt>
-    <dd style="margin:2px 0 0">Side <span class="mono">s</span> = 20 mm. Strips advance 0.894&nbsp;<span class="mono">s</span> = 17.9 mm per face, so ten faces fit a Letter row.</dd>
+<p>
+    Boat and diamond unfold whole. The star always splits, and trying all 25
+    rhombi as the starting seed never avoids it — but the leftover is a
+    <em>single rhombus</em>, so in practice it is a scrap to cut separately rather
+    than a second net.
+</p>
 
-    <dt style="font-weight:600;margin-top:12px">Annotation</dt>
-    <dd style="margin:2px 0 0">Every crease labelled with its fold angle — 36°, 72° or 108°, never 0° — plus mountain or valley. Cut lines solid, creases dashed by angle.</dd>
+<p>
+    Generation 3 also works, at 138–140 rhombi and four pieces, with the largest
+    holding about 117 of them. It needs a smaller side — around 12&nbsp;mm — to fit
+    a sheet.
+</p>
 
-    <dt style="font-weight:600;margin-top:12px">Output</dt>
-    <dd style="margin:2px 0 0">SVG at exact physical units with a print stylesheet, then the browser's own Save&nbsp;as&nbsp;PDF. No PDF library, and reliable 1:1 scale.</dd>
-</dl>
+<h2>Scale</h2>
+
+<p>
+    Nothing is tied to a particular size. Side length is a free parameter, in
+    millimetres or inches, and page size and margin are options too:
+</p>
+
+<pre class="mono" style="background:var(--panel);border:1px solid var(--rule);border-radius:6px;padding:12px 14px;overflow-x:auto;font-size:13px">node tools/bfs-unfold.mjs
+node tools/bfs-unfold.mjs --side=1in --page=a4
+node tools/bfs-unfold.mjs --gen=3 --side=12mm</pre>
+
+<p>
+    A 20&nbsp;mm side folds crisply in ordinary 100–120&nbsp;gsm office paper and
+    is a reasonable default, but the geometry is scale-free — the only real limit
+    is that the 108° creases get fiddly below about 12&nbsp;mm.
+</p>
+
+<h2>Annotation</h2>
+
+<p>
+    Every interior edge of the surface is a genuine crease — there are no flat
+    joins — so each one gets its fold angle marked, always 36°, 72° or 108°, plus
+    mountain or valley. Cut lines solid, creases dashed by angle. Output will be
+    SVG at exact physical units with a print stylesheet, then the browser's own
+    Save&nbsp;as&nbsp;PDF: no PDF library, and reliable 1:1 scale.
+</p>
 
 <h2>Planned controls</h2>
 <div class="controls">
@@ -61,13 +102,16 @@
         </select>
     </label>
     <label>Generation:
-        <select disabled><option>—</option></select>
+        <select disabled><option>2</option><option>3</option></select>
     </label>
     <label>Side:
-        <select disabled><option>20 mm</option></select>
+        <input type="text" value="20 mm" size="7" disabled>
+    </label>
+    <label>Page:
+        <select disabled><option>Letter</option><option>A4</option></select>
     </label>
     <button disabled>Print sheet</button>
-    <span class="info">controls inert until the strip builder lands</span>
+    <span class="info">inert until the print sheet lands</span>
 </div>
 
 </div>

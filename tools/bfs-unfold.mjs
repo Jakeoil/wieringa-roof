@@ -1,16 +1,54 @@
 // BFS edge-unfolding of Wieringa roof patches.
 //
-// Does not use assignIndicesFromPentagrid — that formula is only valid at one
-// generation. Instead the lift is derived from first principles: each planar
-// edge is matched to one of the five directions ζ^j, every vertex gets an
-// integer vector n ∈ Z^5 by BFS, and the 3D position is Σ n_j E_j.
+// The lift comes from geometry.ts (computeLift / pos3D) so there is exactly one
+// implementation of the direction matching — it is easy to get wrong and hard to
+// notice, see the comments there.
 //
-//   node tools/bfs-unfold.mjs [--side=20] [--gen=2]
+//   node tools/bfs-unfold.mjs
+//   node tools/bfs-unfold.mjs --side=1in --page=a4
+//   node tools/bfs-unfold.mjs --gen=3 --side=12mm --unit=mm
+//
+// Options
+//   --side=<len>   golden rhombus side, e.g. 20mm, 0.75in, 1in  (default 20mm)
+//   --gen=<n>      expansion generation                          (default 2)
+//   --page=<name>  letter | a4 | none                            (default letter)
+//   --margin=<len> page margin                                   (default 0.5in)
+//   --unit=<u>     report in mm or in (default: follows --side)
 
-import { seedTypes, generatePatch, allRhombs } from "../dist/geometry.js";
+import {
+    seedTypes,
+    generatePatch,
+    allRhombs,
+    vertexList,
+    vertexMap,
+    edgeMap,
+    roundKey,
+    computeLift,
+    pos3D,
+} from "../dist/geometry.js";
 
-const SQRT5 = Math.sqrt(5);
-const EPS = 1e-6;
+// ── units ─────────────────────────────────────────────────────────
+
+const MM_PER_IN = 25.4;
+
+function parseLen(str, fallbackMm) {
+    if (str == null) return { mm: fallbackMm, unit: "mm" };
+    const m = String(str)
+        .trim()
+        .match(/^([0-9]*\.?[0-9]+)\s*(mm|cm|in|")?$/i);
+    if (!m) throw new Error(`cannot parse length "${str}"`);
+    const v = Number(m[1]);
+    const u = (m[2] ?? "mm").toLowerCase();
+    if (u === "mm") return { mm: v, unit: "mm" };
+    if (u === "cm") return { mm: v * 10, unit: "mm" };
+    return { mm: v * MM_PER_IN, unit: "in" };
+}
+
+const PAGES = {
+    letter: [215.9, 279.4],
+    a4: [210.0, 297.0],
+    none: [Infinity, Infinity],
+};
 
 const args = Object.fromEntries(
     process.argv.slice(2).map((a) => {
@@ -18,27 +56,23 @@ const args = Object.fromEntries(
         return [k, v ?? true];
     }),
 );
-const SIDE_MM = Number(args.side ?? 20);
+
+const side = parseLen(args.side, 20);
+const margin = parseLen(args.margin, 0.5 * MM_PER_IN);
 const GEN = Number(args.gen ?? 2);
+const pageName = String(args.page ?? "letter").toLowerCase();
+if (!(pageName in PAGES)) throw new Error(`unknown page "${pageName}"`);
+const [pw, ph] = PAGES[pageName];
+const PAGE_W = pw - 2 * margin.mm;
+const PAGE_H = ph - 2 * margin.mm;
 
-// Letter, 0.5" margins
-const PAGE_W = 190.5;
-const PAGE_H = 254.0;
+const UNIT = String(args.unit ?? side.unit).toLowerCase() === "in" ? "in" : "mm";
+const fromMm = (v) => (UNIT === "in" ? v / MM_PER_IN : v);
+const fmt = (v) => (UNIT === "in" ? fromMm(v).toFixed(2) : fromMm(v).toFixed(0));
 
-// ── the five icosahedral generators ───────────────────────────────
-
-const E = [];
-for (let j = 0; j < 5; j++) {
-    const t = (2 * Math.PI * j) / 5;
-    E.push([
-        (2 / SQRT5) * Math.cos(t),
-        (2 / SQRT5) * Math.sin(t),
-        1 / SQRT5,
-    ]);
-}
+// ── small vector helpers ──────────────────────────────────────────
 
 const v3 = {
-    add: (a, b) => [a[0] + b[0], a[1] + b[1], a[2] + b[2]],
     sub: (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]],
     mul: (a, s) => [a[0] * s, a[1] * s, a[2] * s],
     dot: (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2],
@@ -47,196 +81,69 @@ const v3 = {
         const l = this.len(a);
         return [a[0] / l, a[1] / l, a[2] / l];
     },
-    cross: (a, b) => [
-        a[1] * b[2] - a[2] * b[1],
-        a[2] * b[0] - a[0] * b[2],
-        a[0] * b[1] - a[1] * b[0],
-    ],
 };
 
-// ── planar topology ───────────────────────────────────────────────
+// ── faces with vertex ids, from the geometry registries ───────────
 
-function buildTopology(rhombs) {
-    const vkey = (pt) => `${Math.round(pt.x * 1e4)},${Math.round(pt.y * 1e4)}`;
-    const vid = new Map();
-    const vpos = [];
-    const getV = (pt) => {
-        const k = vkey(pt);
-        if (!vid.has(k)) {
-            vid.set(k, vpos.length);
-            vpos.push([pt.x, pt.y]);
-        }
-        return vid.get(k);
-    };
-
-    const faces = rhombs.map((r) => ({
+function buildFaces() {
+    return allRhombs.map((r) => ({
         id: r.id,
         thick: r.thick,
-        v: r.verts.map(getV),
+        v: r.verts.map((pt) => vertexMap.get(roundKey(pt)).id),
     }));
-
-    // edge -> faces
-    const edges = new Map();
-    const ekey = (a, b) => (a < b ? `${a}|${b}` : `${b}|${a}`);
-    for (const f of faces) {
-        for (let i = 0; i < 4; i++) {
-            const a = f.v[i];
-            const b = f.v[(i + 1) % 4];
-            const k = ekey(a, b);
-            if (!edges.has(k)) edges.set(k, { a, b, faces: [] });
-            edges.get(k).faces.push(f.id);
-        }
-    }
-    return { faces, vpos, edges, ekey };
 }
 
-// ── match planar edges to the five directions ─────────────────────
-
-function classifyDirections(vpos, edges) {
-    let L = 0;
-    for (const e of edges.values()) {
-        L += Math.hypot(
-            vpos[e.b][0] - vpos[e.a][0],
-            vpos[e.b][1] - vpos[e.a][1],
-        );
+function faceNeighbours(faces) {
+    const nb = new Map(faces.map((f) => [f.id, []]));
+    for (const e of edgeMap.values()) {
+        if (e.rhombIds.length !== 2) continue;
+        const [x, y] = e.rhombIds;
+        nb.get(x).push({ other: y, a: e.v1, b: e.v2 });
+        nb.get(y).push({ other: x, a: e.v1, b: e.v2 });
     }
-    L /= edges.size;
-
-    // collect distinct undirected directions
-    const dirs = [];
-    for (const e of edges.values()) {
-        let dx = vpos[e.b][0] - vpos[e.a][0];
-        let dy = vpos[e.b][1] - vpos[e.a][1];
-        const l = Math.hypot(dx, dy);
-        dx /= l;
-        dy /= l;
-        if (dy < -EPS || (Math.abs(dy) <= EPS && dx < 0)) {
-            dx = -dx;
-            dy = -dy;
-        }
-        let ang = Math.atan2(dy, dx);
-        if (!dirs.some((d) => Math.abs(d - ang) < 1e-3)) dirs.push(ang);
-    }
-    dirs.sort((a, b) => a - b);
-    if (dirs.length !== 5) {
-        throw new Error(`expected 5 edge directions, found ${dirs.length}`);
-    }
-
-    // The collected representatives are UNDIRECTED (forced to y >= 0), and as
-    // undirected lines they sit 36° apart, not 72°. Two of them are therefore
-    // the negatives of the true ζ^j — using them as-is silently negates two
-    // components of n. So rebuild the five DIRECTED generators as a 72°-spaced
-    // fan from one representative; edgeDirection then resolves ± itself.
-    //
-    // Which representative seeds the fan only relabels j (j -> j+c or -j),
-    // which is a rotation/reflection of the 3D frame: heights and dihedrals
-    // are unaffected because every E_j shares the same z.
-    const theta0 = dirs[0];
-    const directed = [];
-    for (let j = 0; j < 5; j++) directed.push(theta0 + (2 * Math.PI * j) / 5);
-    return { L, dirs: directed };
+    return nb;
 }
 
-function edgeDirection(vpos, a, b, L, dirs) {
-    const dx = vpos[b][0] - vpos[a][0];
-    const dy = vpos[b][1] - vpos[a][1];
-    const l = Math.hypot(dx, dy);
-    for (let j = 0; j < 5; j++) {
-        const ux = Math.cos(dirs[j]);
-        const uy = Math.sin(dirs[j]);
-        const d = (dx * ux + dy * uy) / l;
-        if (Math.abs(d - 1) < 1e-4) return { j, s: +1, L: l };
-        if (Math.abs(d + 1) < 1e-4) return { j, s: -1, L: l };
+// ── fold angles (the check that catches a broken lift) ────────────
+
+function foldAngles(faces, P) {
+    const byId = new Map(faces.map((f) => [f.id, f]));
+    const hist = new Map();
+    for (const e of edgeMap.values()) {
+        if (e.rhombIds.length !== 2) continue;
+        const A = P[e.v1];
+        const dir = v3.norm(v3.sub(P[e.v2], P[e.v1]));
+        const off = (f) => {
+            const o = f.v.find((v) => v !== e.v1 && v !== e.v2);
+            let w = v3.sub(P[o], A);
+            w = v3.sub(w, v3.mul(dir, v3.dot(w, dir)));
+            return v3.norm(w);
+        };
+        const w1 = off(byId.get(e.rhombIds[0]));
+        const w2 = off(byId.get(e.rhombIds[1]));
+        const dih =
+            (Math.acos(Math.max(-1, Math.min(1, v3.dot(w1, w2)))) * 180) /
+            Math.PI;
+        const k = Math.round(180 - dih);
+        hist.set(k, (hist.get(k) ?? 0) + 1);
     }
-    throw new Error("edge matches no direction");
-}
-
-// Guard the labelling: a thick rhomb must span generators |Δj| = 1, a thin
-// rhomb |Δj| = 2. If this trips, the direction→generator map is wrong.
-function checkLabelling(faces, vpos, L, dirs) {
-    let bad = 0;
-    for (const f of faces) {
-        const j0 = edgeDirection(vpos, f.v[0], f.v[1], L, dirs).j;
-        const j1 = edgeDirection(vpos, f.v[1], f.v[2], L, dirs).j;
-        const d = Math.min(Math.abs(j0 - j1), 5 - Math.abs(j0 - j1));
-        if (f.thick ? d !== 1 : d !== 2) bad++;
-    }
-    if (bad) throw new Error(`${bad}/${faces.length} rhombi mislabelled`);
-}
-
-// ── lift: assign n ∈ Z^5 per vertex, then Σ n_j E_j ───────────────
-
-function lift(vpos, edges, L, dirs) {
-    const adj = new Map();
-    for (const e of edges.values()) {
-        if (!adj.has(e.a)) adj.set(e.a, []);
-        if (!adj.has(e.b)) adj.set(e.b, []);
-        adj.get(e.a).push(e.b);
-        adj.get(e.b).push(e.a);
-    }
-
-    const n = new Array(vpos.length).fill(null);
-    let conflicts = 0;
-    const start = 0;
-    n[start] = [0, 0, 0, 0, 0];
-    const q = [start];
-    while (q.length) {
-        const v = q.shift();
-        for (const w of adj.get(v) ?? []) {
-            const { j, s } = edgeDirection(vpos, v, w, L, dirs);
-            const cand = n[v].slice();
-            cand[j] += s;
-            if (n[w] === null) {
-                n[w] = cand;
-                q.push(w);
-            } else if (n[w].some((x, i) => x !== cand[i])) {
-                conflicts++;
-            }
-        }
-    }
-    const unreached = n.filter((x) => x === null).length;
-
-    // consistency: does Σ n_j u_j reproduce the planar position?
-    let maxErr = 0;
-    for (let v = 0; v < vpos.length; v++) {
-        if (!n[v]) continue;
-        let x = 0;
-        let y = 0;
-        for (let j = 0; j < 5; j++) {
-            x += n[v][j] * Math.cos(dirs[j]) * L;
-            y += n[v][j] * Math.sin(dirs[j]) * L;
-        }
-        const dx = x - (vpos[v][0] - vpos[start][0]);
-        const dy = y - (vpos[v][1] - vpos[start][1]);
-        maxErr = Math.max(maxErr, Math.hypot(dx, dy) / L);
-    }
-
-    const P = n.map((nv) => {
-        if (!nv) return null;
-        let acc = [0, 0, 0];
-        for (let j = 0; j < 5; j++) acc = v3.add(acc, v3.mul(E[j], nv[j]));
-        return acc;
-    });
-    const index = n.map((nv) => (nv ? nv.reduce((a, b) => a + b, 0) : null));
-    return { n, P, index, conflicts, unreached, maxErr };
+    return hist;
 }
 
 // ── unfolding ─────────────────────────────────────────────────────
 
 function placeSeed(face, P) {
-    const [A, B, C, D] = face.v.map((i) => P[i]);
+    const [A, B, , D] = face.v.map((i) => P[i]);
     const ex = v3.norm(v3.sub(B, A));
     let ey = v3.sub(D, A);
     ey = v3.sub(ey, v3.mul(ex, v3.dot(ey, ex)));
     ey = v3.norm(ey);
-    const to2 = (X) => {
-        const d = v3.sub(X, A);
+    return face.v.map((i) => {
+        const d = v3.sub(P[i], A);
         return [v3.dot(d, ex), v3.dot(d, ey)];
-    };
-    return [to2(A), to2(B), to2(C), to2(D)];
+    });
 }
 
-// place P given |P-A|, |P-B| and net positions a,b; side chosen away from `ref`
 function trilaterate(a, b, dA, dB, ref) {
     const dx = b[0] - a[0];
     const dy = b[1] - a[1];
@@ -244,8 +151,7 @@ function trilaterate(a, b, dA, dB, ref) {
     const ex = [dx / d, dy / d];
     const ey = [-ex[1], ex[0]];
     const x = (dA * dA - dB * dB + d * d) / (2 * d);
-    const y2 = Math.max(0, dA * dA - x * x);
-    const y = Math.sqrt(y2);
+    const y = Math.sqrt(Math.max(0, dA * dA - x * x));
     const sideRef = (ref[0] - a[0]) * ey[0] + (ref[1] - a[1]) * ey[1];
     const sgn = sideRef > 0 ? -1 : +1;
     return [
@@ -271,74 +177,65 @@ function convexOverlap(p1, p2) {
             const b = poly[(i + 1) % poly.length];
             const ax = -(b[1] - a[1]);
             const ay = b[0] - a[0];
-            let min1 = Infinity;
-            let max1 = -Infinity;
-            let min2 = Infinity;
-            let max2 = -Infinity;
+            let lo1 = Infinity;
+            let hi1 = -Infinity;
+            let lo2 = Infinity;
+            let hi2 = -Infinity;
             for (const q of p1) {
                 const v = q[0] * ax + q[1] * ay;
-                min1 = Math.min(min1, v);
-                max1 = Math.max(max1, v);
+                lo1 = Math.min(lo1, v);
+                hi1 = Math.max(hi1, v);
             }
             for (const q of p2) {
                 const v = q[0] * ax + q[1] * ay;
-                min2 = Math.min(min2, v);
-                max2 = Math.max(max2, v);
+                lo2 = Math.min(lo2, v);
+                hi2 = Math.max(hi2, v);
             }
-            if (max1 < min2 || max2 < min1) return false;
+            if (hi1 < lo2 || hi2 < lo1) return false;
         }
     }
     return true;
 }
 
-// Place `face` across shared edge (ea,eb) already placed in `hostPoly`.
 function placeAcross(face, P, ea, eb, hostPoly, hostVerts) {
     const i = face.v.indexOf(ea);
-    const jj = face.v.indexOf(eb);
-    if (i < 0 || jj < 0) return null;
-    // walk the face cycle starting at ea so that eb is next
-    const order =
-        face.v[(i + 1) % 4] === eb
-            ? [0, 1, 2, 3].map((k) => face.v[(i + k) % 4])
-            : [0, 1, 2, 3].map((k) => face.v[(i - k + 4) % 4]);
+    if (i < 0 || face.v.indexOf(eb) < 0) return null;
+    const fwd = face.v[(i + 1) % 4] === eb;
+    const order = [0, 1, 2, 3].map(
+        (k) => face.v[fwd ? (i + k) % 4 : (i - k + 4) % 4],
+    );
     const [A, B, C, D] = order;
-
-    const hi = hostVerts.indexOf(A);
-    const hj = hostVerts.indexOf(B);
-    const a = hostPoly[hi];
-    const b = hostPoly[hj];
+    const a = hostPoly[hostVerts.indexOf(A)];
+    const b = hostPoly[hostVerts.indexOf(B)];
+    if (!a || !b) return null;
     const ref = centroid(hostPoly);
-
     const dist = (u, w) => v3.len(v3.sub(P[u], P[w]));
-    const c = trilaterate(a, b, dist(C, A), dist(C, B), ref);
-    const d = trilaterate(a, b, dist(D, A), dist(D, B), ref);
-    return { poly: [a, b, c, d], verts: [A, B, C, D] };
+    return {
+        poly: [
+            a,
+            b,
+            trilaterate(a, b, dist(C, A), dist(C, B), ref),
+            trilaterate(a, b, dist(D, A), dist(D, B), ref),
+        ],
+        verts: order,
+    };
 }
 
-function unfold(faces, edges, P, ekey, firstSeed = null) {
+function unfold(faces, P, firstSeed = null) {
     const byId = new Map(faces.map((f) => [f.id, f]));
-    const neighbours = new Map(faces.map((f) => [f.id, []]));
-    for (const e of edges.values()) {
-        if (e.faces.length !== 2) continue;
-        neighbours.get(e.faces[0]).push({ other: e.faces[1], a: e.a, b: e.b });
-        neighbours.get(e.faces[1]).push({ other: e.faces[0], a: e.a, b: e.b });
-    }
-
-    const placed = new Map(); // faceId -> {poly, verts, net}
+    const nb = faceNeighbours(faces);
+    const placed = new Map();
     const nets = [];
     const remaining = new Set(faces.map((f) => f.id));
 
     while (remaining.size) {
-        // seed: the remaining face with most already-unplaced neighbours is a
-        // poor heuristic; use the most central remaining face instead.
         let seedId = null;
         if (nets.length === 0 && firstSeed !== null && remaining.has(firstSeed)) {
             seedId = firstSeed;
         } else {
             let best = Infinity;
             for (const id of remaining) {
-                const f = byId.get(id);
-                const c = centroid(f.v.map((i) => [P[i][0], P[i][1]]));
+                const c = centroid(byId.get(id).v.map((i) => P[i]));
                 const r = Math.hypot(c[0], c[1]);
                 if (r < best) {
                     best = r;
@@ -348,27 +245,27 @@ function unfold(faces, edges, P, ekey, firstSeed = null) {
         }
 
         const netId = nets.length;
-        const net = { id: netId, faces: [] };
+        const net = { id: netId, faces: [seedId] };
         nets.push(net);
-
         const seed = byId.get(seedId);
-        const poly = placeSeed(seed, P);
-        placed.set(seedId, { poly, verts: seed.v.slice(), net: netId });
-        net.faces.push(seedId);
+        placed.set(seedId, {
+            poly: placeSeed(seed, P),
+            verts: seed.v.slice(),
+            net: netId,
+        });
         remaining.delete(seedId);
 
         const q = [seedId];
-        const rejected = [];
-        while (q.length) {
-            const cur = q.shift();
+        for (let h = 0; h < q.length; h++) {
+            const cur = q[h];
             const host = placed.get(cur);
-            for (const nb of neighbours.get(cur)) {
-                if (!remaining.has(nb.other)) continue;
+            for (const link of nb.get(cur)) {
+                if (!remaining.has(link.other)) continue;
                 const cand = placeAcross(
-                    byId.get(nb.other),
+                    byId.get(link.other),
                     P,
-                    nb.a,
-                    nb.b,
+                    link.a,
+                    link.b,
                     host.poly,
                     host.verts,
                 );
@@ -377,27 +274,23 @@ function unfold(faces, edges, P, ekey, firstSeed = null) {
                 let clash = false;
                 for (const fid of net.faces) {
                     if (fid === cur) continue;
-                    if (convexOverlap(test, shrink(placed.get(fid).poly, 0.94))) {
+                    if (
+                        convexOverlap(test, shrink(placed.get(fid).poly, 0.94))
+                    ) {
                         clash = true;
                         break;
                     }
                 }
-                if (clash) {
-                    rejected.push(nb.other);
-                    continue;
-                }
-                placed.set(nb.other, { ...cand, net: netId });
-                net.faces.push(nb.other);
-                remaining.delete(nb.other);
-                q.push(nb.other);
+                if (clash) continue;
+                placed.set(link.other, { ...cand, net: netId });
+                net.faces.push(link.other);
+                remaining.delete(link.other);
+                q.push(link.other);
             }
         }
-        net.rejected = rejected.filter((id) => remaining.has(id)).length;
     }
     return { placed, nets };
 }
-
-// ── report ────────────────────────────────────────────────────────
 
 function bbox(polys) {
     let x0 = Infinity;
@@ -414,31 +307,7 @@ function bbox(polys) {
     return { w: x1 - x0, h: y1 - y0 };
 }
 
-function foldAngles(faces, edges, P, placed) {
-    const hist = new Map();
-    const byId = new Map(faces.map((f) => [f.id, f]));
-    for (const e of edges.values()) {
-        if (e.faces.length !== 2) continue;
-        const [f1, f2] = e.faces.map((id) => byId.get(id));
-        const A = P[e.a];
-        const B = P[e.b];
-        const dir = v3.norm(v3.sub(B, A));
-        const off = (f) => {
-            const other = f.v.find((v) => v !== e.a && v !== e.b);
-            let w = v3.sub(P[other], A);
-            w = v3.sub(w, v3.mul(dir, v3.dot(w, dir)));
-            return v3.norm(w);
-        };
-        const w1 = off(f1);
-        const w2 = off(f2);
-        const dih =
-            (Math.acos(Math.max(-1, Math.min(1, v3.dot(w1, w2)))) * 180) /
-            Math.PI;
-        const key = Math.round(180 - dih);
-        hist.set(key, (hist.get(key) ?? 0) + 1);
-    }
-    return hist;
-}
+// ── run ───────────────────────────────────────────────────────────
 
 const TARGETS = [
     ["Pe5", "star"],
@@ -447,89 +316,92 @@ const TARGETS = [
 ];
 
 console.log(
-    `BFS edge-unfolding — gen ${GEN}, side ${SIDE_MM} mm, page ${PAGE_W}×${PAGE_H} mm\n`,
+    `BFS edge-unfolding — gen ${GEN}, side ${fmt(side.mm)} ${UNIT}, ` +
+        `page ${pageName}` +
+        (pageName === "none"
+            ? ""
+            : ` usable ${fmt(PAGE_W)}×${fmt(PAGE_H)} ${UNIT}`) +
+        `\n`,
 );
 
 for (const [label, nick] of TARGETS) {
     const idx = seedTypes.findIndex((s) => s.label === label);
+    const saved = console.log;
+    console.log = () => {};
     generatePatch(idx, true, GEN);
-    const rhombs = allRhombs.map((r) => ({
-        id: r.id,
-        thick: r.thick,
-        verts: r.verts,
-    }));
+    console.log = saved;
 
-    const { faces, vpos, edges, ekey } = buildTopology(rhombs);
-    const { L, dirs } = classifyDirections(vpos, edges);
-    checkLabelling(faces, vpos, L, dirs);
-    const { P, index, conflicts, unreached, maxErr } = lift(
-        vpos,
-        edges,
-        L,
-        dirs,
-    );
+    const faces = buildFaces();
+    const lift = computeLift();
+    const P = lift.n.map((nv) => (nv ? pos3D(nv) : null));
 
-    const interior = [...edges.values()].filter(
-        (e) => e.faces.length === 2,
+    const interior = [...edgeMap.values()].filter(
+        (e) => e.rhombIds.length === 2,
     ).length;
 
     console.log(`── ${label} (${nick}) ──`);
     console.log(
         `   ${faces.length} rhombi (${faces.filter((f) => f.thick).length}T/` +
-            `${faces.filter((f) => !f.thick).length}t), ` +
-            `${vpos.length} vertices, ${edges.size} edges (${interior} interior)`,
+            `${faces.filter((f) => !f.thick).length}t), ${vertexList.length} ` +
+            `vertices, ${edgeMap.size} edges (${interior} interior)`,
     );
 
-    const idxHist = {};
-    for (const i of index) if (i !== null) idxHist[i] = (idxHist[i] ?? 0) + 1;
-    const lo = Math.min(...Object.keys(idxHist).map(Number));
+    const hist = {};
+    for (const v of vertexList) hist[v.index] = (hist[v.index] ?? 0) + 1;
     console.log(
-        `   lift: conflicts=${conflicts} unreached=${unreached} ` +
-            `posErr=${maxErr.toExponential(1)}  ` +
-            `index levels ${JSON.stringify(
-                Object.fromEntries(
-                    Object.entries(idxHist).map(([k, v]) => [k - lo + 1, v]),
-                ),
-            )}`,
+        `   lift: conflicts=${lift.conflicts} unmatched=${lift.unmatched} ` +
+            `posErr=${lift.maxPosErr.toExponential(1)} ` +
+            `index ${JSON.stringify(hist)}`,
     );
 
-    const fh = foldAngles(faces, edges, P, null);
+    const fh = foldAngles(faces, P);
+    const folds = [...fh.entries()].sort((a, b) => a[0] - b[0]);
     console.log(
-        `   fold angles: ` +
-            [...fh.entries()]
-                .sort((a, b) => a[0] - b[0])
-                .map(([k, v]) => `${k}°×${v}`)
-                .join("  "),
+        `   folds: ${folds.map(([k, v]) => `${k}°×${v}`).join("  ")}`,
     );
+    const illegal = folds.filter(([k]) => ![36, 72, 108].includes(k));
+    if (illegal.length) {
+        throw new Error(
+            `illegal fold angles ${JSON.stringify(illegal)} — the lift is wrong`,
+        );
+    }
+    if (folds.reduce((s, [, v]) => s + v, 0) !== interior) {
+        throw new Error("fold count does not match interior edge count");
+    }
 
-    // Try every rhomb as the initial seed and keep the best outcome:
-    // fewest nets first, then the largest primary net.
-    let bestRun = null;
+    let best = null;
     for (const f of faces) {
-        const run = unfold(faces, edges, P, ekey, f.id);
+        const run = unfold(faces, P, f.id);
         const primary = Math.max(...run.nets.map((n) => n.faces.length));
         const score = [run.nets.length, -primary];
         if (
-            !bestRun ||
-            score[0] < bestRun.score[0] ||
-            (score[0] === bestRun.score[0] && score[1] < bestRun.score[1])
+            !best ||
+            score[0] < best.score[0] ||
+            (score[0] === best.score[0] && score[1] < best.score[1])
         ) {
-            bestRun = { ...run, score, seed: f.id };
+            best = { ...run, score, seed: f.id };
         }
     }
-    const { placed, nets } = bestRun;
-    console.log(`   nets: ${nets.length}  (best of ${faces.length} seeds, seed #${bestRun.seed})`);
-    for (const net of nets) {
-        const polys = net.faces.map((id) => placed.get(id).poly);
-        const bb = bbox(polys);
-        const wmm = bb.w * SIDE_MM;
-        const hmm = bb.h * SIDE_MM;
-        const fitsUp = wmm <= PAGE_W && hmm <= PAGE_H;
-        const fitsRot = hmm <= PAGE_W && wmm <= PAGE_H;
+
+    console.log(
+        `   nets: ${best.nets.length}  (best of ${faces.length} seeds)`,
+    );
+    for (const net of best.nets) {
+        const bb = bbox(net.faces.map((id) => best.placed.get(id).poly));
+        const w = bb.w * side.mm;
+        const h = bb.h * side.mm;
+        const fits = w <= PAGE_W && h <= PAGE_H;
+        const rot = h <= PAGE_W && w <= PAGE_H;
         console.log(
-            `     net ${net.id}: ${net.faces.length} rhombi, ` +
-                `${wmm.toFixed(0)}×${hmm.toFixed(0)} mm  ` +
-                `${fitsUp ? "fits" : fitsRot ? "fits (rotated)" : "TOO BIG"}`,
+            `     net ${net.id}: ${String(net.faces.length).padStart(3)} rhombi, ` +
+                `${fmt(w)}×${fmt(h)} ${UNIT}  ` +
+                (pageName === "none"
+                    ? ""
+                    : fits
+                      ? "fits"
+                      : rot
+                        ? "fits (rotated)"
+                        : "TOO BIG"),
         );
     }
     console.log("");

@@ -518,30 +518,27 @@ function expandStar(
     }
 }
 
-// ── Pentagrid index computation ───────────────────────────────────
+// ── The five icosahedral generators ───────────────────────────────
 
-// De Bruijn pentagrid: 5 grid directions at θⱼ = 54° + 72°j
-// Index I(x,y) = Σⱼ floor(dot(pt, eⱼ) / d) + 4
-// where d = edge length at gen 1 = |tWheel[1].w[0]|
+// Every E_j shares z = 1/√5, so a vertex's height is (Σ n_j) · s/√5 and the
+// de Bruijn index is simply Σ n_j. Because the z components are all equal,
+// heights and dihedral angles are invariant under relabelling of j.
+type V3 = [number, number, number];
 
-const GRID_DIRS: { x: number; y: number }[] = [];
+const E5: V3[] = [];
 for (let j = 0; j < 5; j++) {
-    const theta = (Math.PI * 3) / 10 + (2 * Math.PI * j) / 5; // 54° + 72°j
-    GRID_DIRS.push({ x: Math.cos(theta), y: Math.sin(theta) });
+    const t = (2 * Math.PI * j) / 5;
+    E5.push([(2 / SQRT5) * Math.cos(t), (2 / SQRT5) * Math.sin(t), 1 / SQRT5]);
 }
 
-let gridSpacing = 0; // set after wheels are built
-
-function computeIndex(pt: Pt): number {
-    let sum = 0;
+function pos3D(n: number[]): V3 {
+    const acc: V3 = [0, 0, 0];
     for (let j = 0; j < 5; j++) {
-        const dot = pt.x * GRID_DIRS[j].x + pt.y * GRID_DIRS[j].y;
-        const scaled = dot / gridSpacing;
-        // Vertices on grid boundaries need consistent rounding.
-        // Nudge by tiny epsilon toward the interior (floor side).
-        sum += Math.floor(scaled + 1e-9);
+        acc[0] += n[j] * E5[j][0];
+        acc[1] += n[j] * E5[j][1];
+        acc[2] += n[j] * E5[j][2];
     }
-    return sum + 4;
+    return acc;
 }
 
 // ── Vertex registry & index propagation ───────────────────────────
@@ -609,13 +606,167 @@ function buildRegistries() {
     }
 }
 
-function assignIndicesFromPentagrid() {
-    // Compute vertex indices directly from position using pentagrid formula
-    for (const v of vertexList) {
-        v.index = computeIndex(v.pos);
+// ── The lift: n ∈ Z⁵ per vertex ────────────────────────────────────
+
+// Match every planar edge to one of five DIRECTED generator directions.
+//
+// Two traps here. As *undirected* lines the five edge directions sit 36° apart,
+// not 72°. And normalising representatives to one half-plane makes two of the
+// five the negatives of the true ζ^j, which silently negates two components of
+// n. Both are avoided by building the generators as a 72°-spaced directed fan
+// from a single representative and resolving ± per edge. Which representative
+// seeds the fan only relabels j, which is harmless (see E5 above).
+function classifyDirections(): { L: number; dirs: number[] } {
+    let L = 0;
+    for (const e of edgeMap.values()) {
+        const a = vertexList[e.v1].pos;
+        const b = vertexList[e.v2].pos;
+        L += Math.hypot(b.x - a.x, b.y - a.y);
+    }
+    L /= edgeMap.size;
+
+    let theta0 = Infinity;
+    for (const e of edgeMap.values()) {
+        const a = vertexList[e.v1].pos;
+        const b = vertexList[e.v2].pos;
+        let dx = b.x - a.x;
+        let dy = b.y - a.y;
+        if (dy < 0 || (dy === 0 && dx < 0)) {
+            dx = -dx;
+            dy = -dy;
+        }
+        theta0 = Math.min(theta0, Math.atan2(dy, dx));
     }
 
-    // Also update per-rhomb vertIndices for net labels
+    const dirs: number[] = [];
+    for (let j = 0; j < 5; j++) dirs.push(theta0 + (2 * Math.PI * j) / 5);
+    return { L, dirs };
+}
+
+function edgeDir(
+    a: Pt,
+    b: Pt,
+    dirs: number[],
+): { j: number; s: number } | null {
+    const dx = b.x - a.x;
+    const dy = b.y - a.y;
+    const l = Math.hypot(dx, dy);
+    for (let j = 0; j < 5; j++) {
+        const d = (dx * Math.cos(dirs[j]) + dy * Math.sin(dirs[j])) / l;
+        if (Math.abs(d - 1) < 1e-4) return { j, s: +1 };
+        if (Math.abs(d + 1) < 1e-4) return { j, s: -1 };
+    }
+    return null;
+}
+
+interface Lift {
+    n: (number[] | null)[];
+    dirs: number[];
+    L: number;
+    conflicts: number;
+    unreached: number;
+    unmatched: number;
+    maxPosErr: number;
+}
+
+// Integrate n along edges by BFS. Exact at every generation — unlike the old
+// pentagrid formula, which could only ever be right at one scale because the
+// pentagrid and the tiling are dual spaces, not the same plane.
+function computeLift(): Lift {
+    const { L, dirs } = classifyDirections();
+
+    const adj: number[][] = vertexList.map(() => []);
+    for (const e of edgeMap.values()) {
+        adj[e.v1].push(e.v2);
+        adj[e.v2].push(e.v1);
+    }
+
+    const n: (number[] | null)[] = vertexList.map(() => null);
+    let conflicts = 0;
+    let unmatched = 0;
+
+    for (let seed = 0; seed < vertexList.length; seed++) {
+        if (n[seed] !== null) continue;
+        n[seed] = [0, 0, 0, 0, 0];
+        const q = [seed];
+        for (let h = 0; h < q.length; h++) {
+            const v = q[h];
+            for (const w of adj[v]) {
+                const d = edgeDir(vertexList[v].pos, vertexList[w].pos, dirs);
+                if (!d) {
+                    unmatched++;
+                    continue;
+                }
+                const cand = n[v]!.slice();
+                cand[d.j] += d.s;
+                if (n[w] === null) {
+                    n[w] = cand;
+                    q.push(w);
+                } else if (n[w]!.some((x, i) => x !== cand[i])) {
+                    conflicts++;
+                }
+            }
+        }
+    }
+
+    // Consistency: does Σ n_j u_j reproduce the planar position? This is a weak
+    // check — it holds even under the sign traps above — so it is reported
+    // alongside the index range rather than relied on alone.
+    let maxPosErr = 0;
+    const origin = vertexList[0]?.pos;
+    if (origin) {
+        for (let v = 0; v < vertexList.length; v++) {
+            const nv = n[v];
+            if (!nv) continue;
+            let x = 0;
+            let y = 0;
+            for (let j = 0; j < 5; j++) {
+                x += nv[j] * Math.cos(dirs[j]) * L;
+                y += nv[j] * Math.sin(dirs[j]) * L;
+            }
+            maxPosErr = Math.max(
+                maxPosErr,
+                Math.hypot(
+                    x - (vertexList[v].pos.x - origin.x),
+                    y - (vertexList[v].pos.y - origin.y),
+                ) / L,
+            );
+        }
+    }
+
+    return {
+        n,
+        dirs,
+        L,
+        conflicts,
+        unreached: n.filter((x) => x === null).length,
+        unmatched,
+        maxPosErr,
+    };
+}
+
+let lastLift: Lift | null = null;
+
+function assignIndices(): void {
+    if (vertexList.length === 0) {
+        lastLift = null;
+        return;
+    }
+    const lift = computeLift();
+    lastLift = lift;
+
+    // index = Σ n_j, shifted so the lowest level is 1 (de Bruijn's convention)
+    let lo = Infinity;
+    for (const nv of lift.n) {
+        if (nv) lo = Math.min(lo, nv.reduce((a, b) => a + b, 0));
+    }
+    for (let v = 0; v < vertexList.length; v++) {
+        const nv = lift.n[v];
+        vertexList[v].index = nv
+            ? nv.reduce((a, b) => a + b, 0) - lo + 1
+            : -999;
+    }
+
     for (const r of allRhombs) {
         for (let i = 0; i < 4; i++) {
             const v = vertexMap.get(roundKey(r.verts[i]));
@@ -623,21 +774,24 @@ function assignIndicesFromPentagrid() {
         }
     }
 
-    // Verify: every edge should have |diff| = 1
     let badEdges = 0;
     for (const e of edgeMap.values()) {
         const diff = Math.abs(vertexList[e.v1].index - vertexList[e.v2].index);
         if (diff !== 1) badEdges++;
     }
+    const hist: Record<number, number> = {};
+    for (const v of vertexList) hist[v.index] = (hist[v.index] || 0) + 1;
 
-    const indexHist: Record<number, number> = {};
-    for (const v of vertexList) {
-        indexHist[v.index] = (indexHist[v.index] || 0) + 1;
-    }
     console.log(
-        `assignIndicesFromPentagrid: ${vertexList.length} vertices, ${badEdges} bad edges (|diff|≠1)`,
+        `assignIndices: ${vertexList.length} vertices, ${badEdges} bad edges ` +
+            `(|diff|≠1), conflicts=${lift.conflicts}, unmatched=${lift.unmatched}, ` +
+            `posErr=${lift.maxPosErr.toExponential(1)}`,
     );
-    console.log("Index histogram:", indexHist);
+    console.log("Index histogram:", hist);
+}
+
+function getLift(): Lift | null {
+    return lastLift;
 }
 
 // ── Seed types ────────────────────────────────────────────────────
@@ -673,12 +827,8 @@ function generatePatch(seedIdx: number, isHeads: boolean, gen: number): void {
         expandStar(seed.type, angle, isHeads, p(0, 0), gen, initialCI);
     }
 
-    // Grid spacing = edge length at gen 1 = magnitude of tWheel[1].w[0]
-    const tw0 = wheels.t[1].w[0];
-    gridSpacing = Math.sqrt(tw0.x * tw0.x + tw0.y * tw0.y);
-
     buildRegistries();
-    assignIndicesFromPentagrid();
+    assignIndices();
 }
 
 // ── Exports ───────────────────────────────────────────────────────
@@ -699,5 +849,9 @@ export {
     edgeKey,
     seedTypes,
     generatePatch,
+    E5,
+    pos3D,
+    computeLift,
+    getLift,
 };
-export type { Rhomb, Vertex, Edge, TileType, SeedType };
+export type { Rhomb, Vertex, Edge, TileType, SeedType, Lift, V3 };

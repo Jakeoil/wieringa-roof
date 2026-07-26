@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Polyhedra — Wieringa Roof</title>
+<link rel="stylesheet" href="./site.css">
+<style>
+    .solids { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 18px; margin: 24px 0; }
+    .solid { background: var(--panel); border: 1px solid var(--rule); border-radius: 8px; padding: 14px; }
+    .solid svg { display: block; width: 100%; height: auto; }
+    .solid h3 { margin: 10px 0 2px; font-size: 15px; }
+    .solid p { margin: 0; font-size: 13px; color: var(--ink-soft); }
+    .big { max-width: 420px; margin: 0 auto; }
+</style>
+</head>
+<body>
+
+<nav>
+    <span class="brand">Wieringa Roof</span>
+    <a href="./index.html">Home</a>
+    <a href="./net.html">Net</a>
+    <a href="./roof3d.html">3D</a>
+    <a href="./info.html">Mathematics</a>
+    <a href="./polyhedra.html" aria-current="page">Polyhedra</a>
+    <a href="./legacy.html">Legacy</a>
+</nav>
+
+<div class="wrap">
+
+<h1>Polyhedra</h1>
+<p class="lede">
+    Three solids underlie the whole construction, and every face of all three is
+    the same golden rhombus. The diagrams below are generated from the real
+    geometry — the triacontahedron is built as a zonohedron on the six icosahedral
+    five-fold axes, so its faces come out golden rather than being drawn that way.
+</p>
+
+<div class="solids">
+    <div class="solid">
+        <div class="big">
+            <svg viewBox="0 0 260 260" role="img" aria-label="Rhombic triacontahedron">
+                <polygon points="113.70,119.74 185.39,121.73 151.16,183.44 79.47,181.46" fill="hsl(248 42% 34.0%)" stroke="hsl(248 30% 22%)" stroke-width="1" stroke-linejoin="round"/>
+                <polygon points="113.70,119.74 82.47,59.96 154.16,61.95 185.39,121.73" fill="hsl(248 42% 34.0%)" stroke="hsl(248 30% 22%)" stroke-width="1" stroke-linejoin="round"/>
+                <polygon points="113.70,119.74 82.47,59.96 48.23,121.68 79.47,181.46" fill="hsl(248 42% 34.0%)" stroke="hsl(248 30% 22%)" stroke-width="1" stroke-linejoin="round"/>
+                <polygon points="185.39,121.73 214.77,165.01 180.53,226.73 151.16,183.44" fill="hsl(248 42% 34.0%)" stroke="hsl(248 30% 22%)" stroke-width="1" stroke-linejoin="round"/>
+                <polygon points="79.47,181.46 108.84,224.74 180.53,226.73 151.16,183.44" fill="hsl(248 42% 34.0%)" stroke="hsl(248 30% 22%)" stroke-width="1" stroke-linejoin="round"/>
+                <polygon points="185.39,121.73 216.62,89.93 185.39,30.14 154.16,61.95" fill="hsl(248 42% 34.0%)" stroke="hsl(248 30% 22%)" stroke-width="1" stroke-linejoin="round"/>
+                <polygon points="82.47,59.96 113.70,28.16 185.39,30.14 154.16,61.95" fill="hsl(248 42% 34.0%)" stroke="hsl(248 30% 22%)" stroke-width="1" stroke-linejoin="round"/>
+                <polygon points="185.39,121.73 216.62,89.93 246.00,133.21 214.77,165.01" fill="hsl(248 42% 34.0%)" stroke="hsl(248 30% 22%)" stroke-width="1" stroke-linejoin="round"/>
+                <polygon points="79.47,181.46 48.23,121.68 14.00,126.79 45.23,186.57" fill="hsl(248 42% 34.0%)" stroke="hsl(248 30% 22%)" stroke-width="1" stroke-linejoin="round"/>
+                <polygon points="82.47,59.96 48.23,65.08 14.00,126.79 48.23,121.68" fill="hsl(248 42% 34.0%)" stroke="hsl(248 30% 22%)" stroke-width="1" stroke-linejoin="round"/>
+                <polygon points="79.47,181.46 108.84,224.74 74.61,229.86 45.23,186.57" fill="hsl(248 42% 34.0%)" stroke="hsl(248 30% 22%)" stroke-width="1" stroke-linejoin="round"/>
+                <polygon points="82.47,59.96 113.70,28.16 79.47,33.27 48.23,65.08" fill="hsl(248 42% 34.0%)" stroke="hsl(248 30% 22%)" stroke-width="1" stroke-linejoin="round"/>
+                <polygon points="214.77,165.01 246.00,133.21 211.77,194.92 180.53,226.73" fill="hsl(248 42% 34.0%)" stroke="hsl(248 30% 22%)" stroke-width="1" stroke-linejoin="round"/>
+                <polygon points="108.84,224.74 180.53,226.73 146.30,231.84 74.61,229.86" fill="hsl(248 42% 34.0%)" stroke="hsl(248 30% 22%)" stroke-width="1" stroke-linejoin="round"/>
+                <polygon points="216.62,89.93 185.39,30.14 214.77,73.43 246.00,133.21" fill="hsl(248 42% 43.1%)" stroke="hsl(248 30% 22%)" stroke-width="1" stroke-linejoin="round"/>
+            </svg>
+        </div>
+        <h3>Rhombic triacontahedron</h3>
+        <p>30 faces · 32 vertices · 60 edges</p>
+    </div>
+</div>
+
+<h2>The triacontahedron</h2>
+
+<p>
+    Thirty golden rhombi close up into a solid, and every one of its dihedral
+    angles is the same: <strong>144°</strong>. Its 32 vertices are the 12 of an
+    icosahedron together with the 20 of a dodecahedron, which is why it has two
+    kinds of corner:
+</p>
+
+<div class="tbl-scroll">
+<table>
+    <thead><tr><th>Corner</th><th class="num">Count</th><th class="num">Faces meeting</th><th class="num">Angular defect</th></tr></thead>
+    <tbody>
+        <tr><td>Acute (icosahedral)</td><td class="num">12</td><td class="num">5</td><td class="num">+42.825°</td></tr>
+        <tr><td>Obtuse (dodecahedral)</td><td class="num">20</td><td class="num">3</td><td class="num">+10.305°</td></tr>
+    </tbody>
+</table>
+</div>
+
+<p>
+    Descartes demands the defects sum to 720° for any convex solid, and they do:
+    <span class="mono">12(42.825°) + 20(10.305°) = 720°</span> exactly. Its volume
+    for edge <span class="mono">a</span> is
+    <span class="mono">4√(5+2√5) · a³ ≈ 12.31073 a³</span>.
+</p>
+
+<h2>The two rhombohedra</h2>
+
+<p>
+    Squash a cube until all six faces are golden rhombi and there are exactly two
+    ways to do it — depending on whether the three edges at the special corner
+    meet at the rhombus's acute or obtuse angle. These are the pieces the roof
+    surface actually sits on.
+</p>
+
+<div class="solids">
+    <div class="solid">
+        <svg viewBox="0 0 260 260" role="img" aria-label="Acute (prolate) rhombohedron">
+                <polygon points="130.00,246.00 197.12,171.36 168.42,64.76 101.30,139.40" fill="hsl(208 42% 34.0%)" stroke="hsl(208 30% 22%)" stroke-width="1" stroke-linejoin="round"/>
+                <polygon points="130.00,246.00 101.30,139.40 62.88,88.64 91.58,195.24" fill="hsl(208 42% 34.0%)" stroke="hsl(208 30% 22%)" stroke-width="1" stroke-linejoin="round"/>
+                <polygon points="101.30,139.40 62.88,88.64 130.00,14.00 168.42,64.76" fill="hsl(208 42% 34.0%)" stroke="hsl(208 30% 22%)" stroke-width="1" stroke-linejoin="round"/>
+            </svg>
+        <h3>Acute (prolate)</h3>
+        <p>Three 63.4349° corners at the apex. Every dihedral angle 72°.</p>
+    </div>
+    <div class="solid">
+        <svg viewBox="0 0 260 260" role="img" aria-label="Obtuse (oblate) rhombohedron">
+                <polygon points="130.00,159.25 246.00,144.41 196.40,74.33 80.40,89.17" fill="hsl(28 42% 34.0%)" stroke="hsl(28 30% 22%)" stroke-width="1" stroke-linejoin="round"/>
+                <polygon points="130.00,159.25 80.40,89.17 14.00,115.59 63.60,185.67" fill="hsl(28 42% 34.0%)" stroke="hsl(28 30% 22%)" stroke-width="1" stroke-linejoin="round"/>
+                <polygon points="130.00,159.25 63.60,185.67 179.60,170.83 246.00,144.41" fill="hsl(28 42% 34.0%)" stroke="hsl(28 30% 22%)" stroke-width="1" stroke-linejoin="round"/>
+            </svg>
+        <h3>Obtuse (oblate)</h3>
+        <p>Three 116.5651° corners at the apex. Every dihedral angle 144°.</p>
+    </div>
+</div>
+
+<div class="tbl-scroll">
+<table>
+    <thead><tr><th>Rhombohedron</th><th class="num">Volume</th><th class="num">Dihedral</th><th class="num">Three-fold diagonal</th></tr></thead>
+    <tbody>
+        <tr><td>Acute (prolate)</td><td class="num">0.76085 s³</td><td class="num">72°</td><td class="num">2.38396 s</td></tr>
+        <tr><td>Obtuse (oblate)</td><td class="num">0.47023 s³</td><td class="num">144°</td><td class="num">0.56278 s</td></tr>
+    </tbody>
+</table>
+</div>
+
+<p>
+    Each has a single dihedral angle throughout, which makes them unusually easy
+    to build. And their volumes stand in the ratio
+    <span class="mono">0.76085 / 0.47023 = 1.618034</span> — φ, inevitably.
+</p>
+
+<div class="note">
+    <strong>Ten of each make a triacontahedron.</strong>
+    <span class="mono">10(0.76085 + 0.47023) = 12.31073 = 4√(5+2√5)</span>, the
+    triacontahedron's volume exactly. The same two rhombohedra also fill space
+    aperiodically — they are the three-dimensional analogue of the thick and thin
+    Penrose rhombi, and it is the layer of them beneath the surface that gives the
+    Wieringa roof its shape.
+</div>
+
+<p>
+    For the golden rhombus itself, the lift that produces it, and the fold angles
+    of the surface, see <a href="./info.html">Mathematics</a>.
+</p>
+
+</div>
+</body>
+</html>

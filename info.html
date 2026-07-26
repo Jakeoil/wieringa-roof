@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>The Maths — Wieringa Roof</title>
+<title>Mathematics — Wieringa Roof</title>
 <link rel="stylesheet" href="./site.css">
 <style>
     .fig { background: var(--panel); border: 1px solid var(--rule); border-radius: 8px; padding: 18px; margin: 20px 0; }
@@ -21,13 +21,14 @@
     <a href="./index.html">Home</a>
     <a href="./net.html">Net</a>
     <a href="./roof3d.html">3D</a>
-    <a href="./info.html" aria-current="page">The Maths</a>
+    <a href="./info.html" aria-current="page">Mathematics</a>
+    <a href="./polyhedra.html">Polyhedra</a>
     <a href="./legacy.html">Legacy</a>
 </nav>
 
 <div class="wrap">
 
-<h1>The Maths</h1>
+<h1>Mathematics</h1>
 <p class="lede">
     Everything the net needs, and why the surface behaves the way it does. Every
     figure below has been verified numerically against a 349-rhomb patch.
@@ -115,12 +116,12 @@
 
 <div class="tbl-scroll">
 <table>
-    <thead><tr><th>Index</th><th class="num">Height</th><th class="num">at s = 20 mm</th></tr></thead>
+    <thead><tr><th>Index</th><th class="num">Height</th><th class="num">s = 20 mm</th><th class="num">s = 1 in</th></tr></thead>
     <tbody>
-        <tr><td>1</td><td class="num">0.4472 s</td><td class="num">8.9 mm</td></tr>
-        <tr><td>2</td><td class="num">0.8944 s</td><td class="num">17.9 mm</td></tr>
-        <tr><td>3</td><td class="num">1.3416 s</td><td class="num">26.8 mm</td></tr>
-        <tr><td>4</td><td class="num">1.7889 s</td><td class="num">35.8 mm</td></tr>
+        <tr><td>1</td><td class="num">0.4472 s</td><td class="num">8.9 mm</td><td class="num">0.45 in</td></tr>
+        <tr><td>2</td><td class="num">0.8944 s</td><td class="num">17.9 mm</td><td class="num">0.89 in</td></tr>
+        <tr><td>3</td><td class="num">1.3416 s</td><td class="num">26.8 mm</td><td class="num">1.34 in</td></tr>
+        <tr><td>4</td><td class="num">1.7889 s</td><td class="num">35.8 mm</td><td class="num">1.79 in</td></tr>
     </tbody>
 </table>
 </div>
@@ -232,35 +233,10 @@
 
 <h2>The solids behind it</h2>
 
-<dl class="defs">
-    <dt>Rhombic triacontahedron</dt>
-    <dd>
-        30 golden rhombi, 32 vertices, 60 edges. Every dihedral angle is 144°. The
-        12 five-valent vertices carry defect +42.825°, the 20 three-valent vertices
-        +10.305°, and 12(42.825) + 20(10.305) = 720° exactly, as Descartes requires.
-        Its 32 vertices are those of an icosahedron and a dodecahedron combined.
-    </dd>
-
-    <dt>Acute (prolate) golden rhombohedron</dt>
-    <dd>
-        Six golden rhombi with three acute corners meeting at the sharp apex.
-        Volume 0.76085&nbsp;<span class="mono">s³</span>.
-    </dd>
-
-    <dt>Obtuse (oblate) golden rhombohedron</dt>
-    <dd>
-        Six golden rhombi with three obtuse corners meeting at the flat apex.
-        Volume 0.47022&nbsp;<span class="mono">s³</span> — and the ratio of the two
-        volumes is, of course, φ.
-    </dd>
-</dl>
-
 <p>
-    Ten of each pack together into a single rhombic triacontahedron:
-    <span class="mono">10(0.76085 + 0.47022) = 12.3107 s³ = 4√(5+2√5) · s³</span>,
-    the triacontahedron's exact volume. The same two rhombohedra also fill space
-    aperiodically, and it is the layer of them sitting under the roof that gives
-    the surface its shape.
+    Three solids underlie all of this — the rhombic triacontahedron and the two
+    golden rhombohedra — and every face of all three is the same golden rhombus.
+    They have <a href="./polyhedra.html">their own page</a>, with diagrams.
 </p>
 
 </div>
