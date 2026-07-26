@@ -411,7 +411,8 @@ for (const [label, nick] of TARGETS) {
 if (args.svg) {
     const dir = args.svg === true ? "out" : String(args.svg);
     const { mkdirSync, writeFileSync } = await import("node:fs");
-    const { unfoldPatch } = await import("../dist/unfold.js");
+    const { unfoldPatch, stripPatch } = await import("../dist/unfold.js");
+    const useStrips = String(args.mode ?? "bfs") === "strips";
     const { layoutSheets, renderSheet } = await import("../dist/sheet.js");
     mkdirSync(dir, { recursive: true });
     let written = 0;
@@ -421,7 +422,7 @@ if (args.svg) {
         console.log = () => {};
         generatePatch(idx, true, GEN);
         console.log = saved;
-        const res = unfoldPatch();
+        const res = useStrips ? stripPatch() : unfoldPatch();
         const { sheets, oversize } = layoutSheets(
             res.pieces,
             side.mm,
@@ -439,7 +440,7 @@ if (args.svg) {
                 showAngles: Boolean(args.angles),
                 showLegend: true,
             });
-            const name = `${dir}/${nick}-gen${GEN}${sheets.length > 1 ? `-sheet${i + 1}` : ""}.svg`;
+            const name = `${dir}/${nick}-gen${GEN}${useStrips ? "-strips" : ""}${sheets.length > 1 ? `-sheet${i + 1}` : ""}.svg`;
             writeFileSync(name, svg + "\n");
             console.log(`wrote ${name}`);
             written++;

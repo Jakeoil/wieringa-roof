@@ -1,13 +1,14 @@
 // Net page — DOM wiring. Layout and SVG live in sheet.ts, unfolding in unfold.ts.
 
 import { seedTypes, generatePatch } from "./geometry.js";
-import { unfoldPatch } from "./unfold.js";
+import { unfoldPatch, stripPatch } from "./unfold.js";
 import { PAGES, parseLength, layoutSheets, renderSheet } from "./sheet.js";
 
 const el = <T extends HTMLElement>(id: string) =>
     document.getElementById(id) as T;
 
 const patchSel = el<HTMLSelectElement>("patch");
+const modeSel = el<HTMLSelectElement>("mode");
 const genSel = el<HTMLSelectElement>("gen");
 const sideInput = el<HTMLInputElement>("side");
 const pageSel = el<HTMLSelectElement>("page");
@@ -60,7 +61,7 @@ function rebuild(): void {
 
     const t0 = performance.now();
     generatePatch(seedIdx, true, gen);
-    const res = unfoldPatch();
+    const res = modeSel.value === "strips" ? stripPatch() : unfoldPatch();
     const { sheets, oversize } = layoutSheets(
         res.pieces,
         side.mm,
@@ -97,7 +98,8 @@ function rebuild(): void {
 
     statusEl.className = "info" + (oversize.length ? " bad" : "");
     statusEl.textContent =
-        `${res.faces.length} rhombi → ${res.pieces.length} piece${res.pieces.length === 1 ? "" : "s"} ` +
+        `${res.faces.length} rhombi → ${res.pieces.length} ` +
+        `${modeSel.value === "strips" ? "strip" : "piece"}${res.pieces.length === 1 ? "" : "s"} ` +
         `on ${sheets.length} sheet${sheets.length === 1 ? "" : "s"}, side ${side.label}. ` +
         `Folds ${folds}. Pieces: ${sizes}.` +
         (oversize.length
@@ -106,7 +108,7 @@ function rebuild(): void {
         ` (${ms} ms)`;
 }
 
-for (const c of [patchSel, genSel, pageSel, fillsChk, anglesChk]) {
+for (const c of [patchSel, modeSel, genSel, pageSel, fillsChk, anglesChk]) {
     c.addEventListener("change", rebuild);
 }
 for (const c of [sideInput, marginInput]) {

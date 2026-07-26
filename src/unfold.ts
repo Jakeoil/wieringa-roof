@@ -424,3 +424,186 @@ export function edgeRole(
 }
 
 export { ekey };
+
+// ── ribbon strips ─────────────────────────────────────────────────
+//
+// In a de Bruijn ribbon consecutive rhombi share an edge parallel to the same
+// generator, so every crease in the strip is parallel to every other. A
+// polyhedral surface whose creases are all parallel is a generalized cylinder,
+// and its development is a flat band with creases at cumulative cross-section
+// arc length. Each face contributes width sin 63.4349° = 2/√5, always positive,
+// so crease positions increase monotonically and the band cannot fold back on
+// itself — strips are overlap-free at any length, with no test required.
+//
+// Each rhomb belongs to two ribbons (one per edge direction), so no single
+// family partitions a patch. This takes the greedy route: repeatedly extract the
+// longest remaining run in any family.
+
+// Which generator is this edge parallel to? Recoverable straight from the lift:
+// n differs in exactly one component across an edge.
+function edgeFamily(
+    v1: number,
+    v2: number,
+    n: (number[] | null)[],
+): number | null {
+    const a = n[v1];
+    const b = n[v2];
+    if (!a || !b) return null;
+    let found = -1;
+    for (let j = 0; j < 5; j++) {
+        if (a[j] !== b[j]) {
+            if (found >= 0) return null; // more than one: not a single edge step
+            found = j;
+        }
+    }
+    return found < 0 ? null : found;
+}
+
+interface StripLink {
+    other: number;
+    a: number;
+    b: number;
+}
+
+export function stripPatch(): UnfoldResult {
+    const faces = buildFaces();
+    const lift = computeLift();
+    const P: (V3 | null)[] = lift.n.map((nv) => (nv ? pos3D(nv) : null));
+    const byId = new Map(faces.map((f) => [f.id, f]));
+    const { creases, hist, interior } = computeCreases(faces, P);
+
+    // per-family face adjacency (degree <= 2, so each family is paths/cycles)
+    const fam: Array<Map<number, StripLink[]>> = [0, 1, 2, 3, 4].map(
+        () => new Map<number, StripLink[]>(),
+    );
+    for (const e of edgeMap.values()) {
+        if (e.rhombIds.length !== 2) continue;
+        const j = edgeFamily(e.v1, e.v2, lift.n);
+        if (j === null) continue;
+        const [x, y] = e.rhombIds;
+        const g = fam[j];
+        if (!g.has(x)) g.set(x, []);
+        if (!g.has(y)) g.set(y, []);
+        g.get(x)!.push({ other: y, a: e.v1, b: e.v2 });
+        g.get(y)!.push({ other: x, a: e.v1, b: e.v2 });
+    }
+
+    // greedy: longest remaining run in any family
+    const assigned = new Set<number>();
+    const strips: Array<{ ids: number[]; links: (StripLink | null)[] }> = [];
+
+    const runFrom = (
+        j: number,
+        start: number,
+    ): { ids: number[]; links: (StripLink | null)[] } => {
+        const g = fam[j];
+        // walk back to an endpoint first
+        let head = start;
+        const seen = new Set<number>([start]);
+        for (;;) {
+            const nx = (g.get(head) ?? []).find(
+                (l) => !assigned.has(l.other) && !seen.has(l.other),
+            );
+            if (!nx) break;
+            head = nx.other;
+            seen.add(head);
+        }
+        // walk forward collecting the run
+        const ids = [head];
+        const links: (StripLink | null)[] = [null];
+        const used = new Set<number>([head]);
+        for (;;) {
+            const cur = ids[ids.length - 1];
+            const nx = (g.get(cur) ?? []).find(
+                (l) => !assigned.has(l.other) && !used.has(l.other),
+            );
+            if (!nx) break;
+            ids.push(nx.other);
+            links.push(nx);
+            used.add(nx.other);
+        }
+        return { ids, links };
+    };
+
+    while (assigned.size < faces.length) {
+        let best: { ids: number[]; links: (StripLink | null)[] } | null = null;
+        for (let j = 0; j < 5; j++) {
+            for (const fid of fam[j].keys()) {
+                if (assigned.has(fid)) continue;
+                const run = runFrom(j, fid);
+                if (!best || run.ids.length > best.ids.length) best = run;
+            }
+        }
+        if (!best) {
+            const solo = faces.find((f) => !assigned.has(f.id))!;
+            best = { ids: [solo.id], links: [null] };
+        }
+        for (const id of best.ids) assigned.add(id);
+        strips.push(best);
+    }
+
+    strips.sort((a, b) => b.ids.length - a.ids.length);
+
+    // develop each strip as a chain
+    const placed = new Map<number, Placed>();
+    const hinges = new Set<string>();
+    const pieceFaces: number[][] = [];
+
+    strips.forEach((strip, pieceId) => {
+        const mine: number[] = [];
+        pieceFaces.push(mine);
+        for (let i = 0; i < strip.ids.length; i++) {
+            const fid = strip.ids[i];
+            const face = byId.get(fid)!;
+            if (i === 0) {
+                placed.set(fid, {
+                    faceId: fid,
+                    thick: face.thick,
+                    poly: placeSeed(face, P),
+                    verts: face.v.slice(),
+                    piece: pieceId,
+                });
+            } else {
+                const link = strip.links[i]!;
+                const host = placed.get(strip.ids[i - 1])!;
+                const cand = placeAcross(face, P, link.a, link.b, host);
+                if (!cand) continue;
+                placed.set(fid, {
+                    faceId: fid,
+                    thick: face.thick,
+                    poly: cand.poly,
+                    verts: cand.verts,
+                    piece: pieceId,
+                });
+                hinges.add(ekey(link.a, link.b));
+            }
+            mine.push(fid);
+        }
+    });
+
+    const pieces: Piece[] = pieceFaces.map((faceIds, id) => {
+        let x0 = Infinity;
+        let y0 = Infinity;
+        let x1 = -Infinity;
+        let y1 = -Infinity;
+        for (const fid of faceIds)
+            for (const q of placed.get(fid)!.poly) {
+                if (q[0] < x0) x0 = q[0];
+                if (q[1] < y0) y0 = q[1];
+                if (q[0] > x1) x1 = q[0];
+                if (q[1] > y1) y1 = q[1];
+            }
+        return { id, faceIds, w: x1 - x0, h: y1 - y0, minX: x0, minY: y0 };
+    });
+
+    return {
+        faces,
+        placed,
+        pieces,
+        creases,
+        hinges,
+        foldHistogram: hist,
+        interiorEdges: interior,
+        seedsTried: 0,
+    };
+}
