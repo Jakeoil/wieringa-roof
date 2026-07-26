@@ -8,8 +8,8 @@ golden rhombi for physical models.
 | page | content | state |
 |---|---|---|
 | `index.html` | splash — what the surface is, links to everything | done |
-| `net.html` | patch selector → ribbon-strip decomposition → PDF | placeholder |
-| `roof3d.html` | three.js prototype of the surface | placeholder |
+| `net.html` | patch selector → unfolding → printable SVG sheets | done |
+| `roof3d.html` | three.js prototype of the surface | done |
 | `info.html` | the maths: golden rhombus, heights, fold angles, defects, solids | done |
 | `legacy.html` | original two-canvas explorer, kept for reference | done (as-is) |
 
@@ -109,10 +109,14 @@ shipped. `tools/bfs-unfold.mjs` deliberately does not use this function; it
 derives `n ∈ Z^5` per vertex by BFS over edge directions instead, which is exact
 at every generation (verified: 0 conflicts, position error ~1e-15).
 
+## Build
+
+`npm run build` runs `npm run vendor` (copies three.js out of `node_modules`
+into `vendor/`) then `tsc`. Both `dist/` and `vendor/` are gitignored, so a fresh
+clone needs `npm install && npm run build` before serving.
+
 ## Open
 
-- Wire the strip/BFS output into `net.html` as printable SVG sheets.
-- Vendor `three.module.js` + import map for `roof3d.html`.
-- Fix or delete `assignIndicesFromPentagrid`.
+- Nothing in this project has been opened in a real browser yet.
 - Six loose `test-*.mjs` probes from the vertex-index investigation are still in
   the tree; they are in git history and can be cleared out.

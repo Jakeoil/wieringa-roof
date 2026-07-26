@@ -7,3 +7,6 @@ deca-shape-expansion.png
 
 # generated net SVGs
 out/
+
+# vendored three.js (regenerate with: npm run vendor)
+vendor/

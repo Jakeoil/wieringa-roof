@@ -3,14 +3,19 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "build": "tsc",
-    "dev": "tsc --watch"
+    "build": "npm run vendor && tsc",
+    "dev": "tsc --watch",
+    "vendor": "mkdir -p vendor && cp node_modules/three/build/three.module.min.js vendor/three.module.js && cp node_modules/three/build/three.core.min.js vendor/three.core.min.js && cp node_modules/three/examples/jsm/controls/OrbitControls.js vendor/OrbitControls.js"
   },
   "keywords": [],
   "author": "Jeff Coyle",
   "license": "ISC",
   "description": "Interactive Wieringa roof net builder",
   "devDependencies": {
+    "@types/three": "^0.185.1",
     "typescript": "^5.9.3"
+  },
+  "dependencies": {
+    "three": "^0.185.1"
   }
 }

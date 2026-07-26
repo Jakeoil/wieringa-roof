@@ -5,6 +5,26 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>3D Prototype — Wieringa Roof</title>
 <link rel="stylesheet" href="./site.css">
+<style>
+    .bar {
+        display: flex; gap: 14px; align-items: flex-end; flex-wrap: wrap;
+        background: var(--panel); border: 1px solid var(--rule);
+        border-radius: 8px; padding: 12px 14px; margin: 18px 0 10px;
+    }
+    .bar label { display: flex; flex-direction: column; gap: 3px; font-size: 12px; color: var(--ink-soft); }
+    .bar select { font: inherit; font-size: 13px; padding: 5px 8px; border: 1px solid #ccc; border-radius: 4px; background: #fff; color: var(--ink); }
+    .bar input[type=range] { width: 150px; }
+    .bar .checks { display: flex; gap: 12px; align-items: center; }
+    .bar .checks label { flex-direction: row; align-items: center; gap: 5px; font-size: 13px; color: var(--ink); }
+    #view {
+        width: 100%; height: min(70vh, 620px);
+        border: 1px solid var(--rule); border-radius: 8px; overflow: hidden;
+        background: #f4f4f7;
+    }
+    #view canvas { display: block; width: 100%; height: 100%; cursor: grab; }
+    #view canvas:active { cursor: grabbing; }
+    #status { display: block; margin: 10px 0 0; line-height: 1.5; }
+</style>
 </head>
 <body>
 
@@ -22,36 +42,62 @@
 
 <h1>3D Prototype</h1>
 <p class="lede">
-    The roof surface in three dimensions — a prototype to look at before committing
-    paper to it.
+    The roof itself. Drag to orbit, scroll to zoom. Every face is the same golden
+    rhombus, and the whole surface is only 1.342 side lengths deep — so it needs
+    exaggerating before the hills and dales read at all.
 </p>
 
-<div class="note">
-    <strong>Not built yet.</strong> This page is a placeholder pending three.js
-    being vendored into the project.
+<div class="bar">
+    <label>Patch <select id="patch"></select></label>
+    <label>Generation <select id="gen"></select></label>
+    <label>Colour <select id="color">
+        <option value="index">Height (index)</option>
+        <option value="type">Thick / thin</option>
+        <option value="plain">Plain</option>
+    </select></label>
+    <label>Vertical exaggeration <span id="exagOut" class="mono"></span>
+        <input type="range" id="exag" min="1" max="8" step="0.5" value="3">
+    </label>
+    <span class="checks">
+        <label><input type="checkbox" id="edges" checked> edges</label>
+        <label><input type="checkbox" id="flat" checked> flat shading</label>
+    </span>
 </div>
 
-<h2>How it will work</h2>
+<div id="view"></div>
+<span class="info" id="status"></span>
 
+<h2>What you are looking at</h2>
 <p>
-    This page is close to free. The existing generator already computes a correct
-    vertex index for every rhomb corner, and height is nothing more than
-    <span class="mono">index · s/√5</span> — so the 3D surface is the same rhomb
-    data with one extra coordinate. No new geometry at all.
+    Colour by height shows the four index levels directly — every vertex of the
+    surface sits at <span class="mono">index · s/√5</span> for an index of 1, 2, 3
+    or 4, and nothing in between. Those four bands are the four tent-pole lengths
+    you would need to hold the roof up over a flat floor.
 </p>
-
 <p>
-    One thing to expect: total relief is only <span class="mono">1.342 s</span>, so
-    from a low camera angle the roof looks almost flat. A vertical-exaggeration
-    slider will be needed before the hills and dales read properly.
+    Colour by thick/thin shows the shadow: the tiles are all congruent golden
+    rhombi in space, and it is only their tilt that makes them project to the wide
+    or narrow Penrose rhomb. Turn the model until you are looking straight down the
+    vertical axis and the surface flattens into the Penrose tiling it came from.
 </p>
-
 <p>
-    three.js will be vendored locally as <span class="mono">vendor/three.module.js</span>
-    with an import map, rather than pulled from a CDN, so the site keeps working
-    offline like the rest of it.
+    Exaggeration scales only the vertical. That is an affine map, so faces stay
+    planar and the picture stays honest about which way each crease folds — but at
+    anything above 1× the rhombi are no longer golden. See
+    <a href="./info.html">Mathematics</a> for the lift, and
+    <a href="./net.html">Net</a> to flatten it back out for printing.
 </p>
 
 </div>
+
+<script type="importmap">
+{
+    "imports": {
+        "three": "./vendor/three.module.js",
+        "three/addons/controls/OrbitControls.js": "./vendor/OrbitControls.js"
+    }
+}
+</script>
+<script type="module" src="./dist/roof3d.js"></script>
 </body>
 </html>
