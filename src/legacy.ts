@@ -172,19 +172,32 @@ function drawTiling() {
         for (let i = 1; i < 4; i++) ctx.lineTo(sv[i].x, sv[i].y);
         ctx.closePath();
 
+        const hint = moveHints.get(r.id);
         if (placedRhombs.has(r.id)) {
             ctx.fillStyle = "rgba(255, 200, 0, 0.5)";
-        } else if (r.id === hoveredRhomb) {
-            ctx.fillStyle = makeGradient(ctx, r.fill, sv[0], sv[2], r.isHeads);
-            ctx.globalAlpha = 0.9;
         } else {
             ctx.fillStyle = makeGradient(ctx, r.fill, sv[0], sv[2], r.isHeads);
+            if (r.id === hoveredRhomb) ctx.globalAlpha = 0.9;
         }
         ctx.fill();
         ctx.globalAlpha = 1;
-        ctx.strokeStyle = "#555";
-        ctx.lineWidth = 0.5;
-        ctx.stroke();
+
+        // move preview: green = a route exists that does not overlap,
+        // red = every route from here collides with the net as it stands
+        if (hint) {
+            ctx.fillStyle =
+                hint === "clean"
+                    ? "rgba(46, 160, 67, 0.30)"
+                    : "rgba(192, 57, 43, 0.30)";
+            ctx.fill();
+            ctx.strokeStyle = hint === "clean" ? "#2ea043" : "#c0392b";
+            ctx.lineWidth = r.id === hoveredRhomb ? 2.5 : 1.5;
+            ctx.stroke();
+        } else {
+            ctx.strokeStyle = "#555";
+            ctx.lineWidth = 0.5;
+            ctx.stroke();
+        }
     }
 
     // Vertex dots
@@ -272,6 +285,74 @@ interface NetRhomb {
 
 const netRhombs: NetRhomb[] = [];
 const netHinges = new Set<string>();
+
+// Move preview. For every unplaced rhomb touching the net, try each hinge it
+// could arrive on: "clean" if at least one lands without overlapping, "overlap"
+// if every route collides. Showing this before the click is what turns the page
+// from guessing into exploring — you can watch the red spread as you work round
+// a saddle vertex, which is curvature appearing as a constraint on your choices.
+type MoveClass = "clean" | "overlap";
+const moveHints = new Map<number, MoveClass>();
+
+// Undo by snapshot rather than inverse operations: the state is small enough that
+// copying it is free, and it cannot drift out of step with the real thing.
+interface Snapshot {
+    rhombs: NetRhomb[];
+    hinges: string[];
+}
+const history: Snapshot[] = [];
+const HISTORY_LIMIT = 300;
+
+function snapshot(): Snapshot {
+    return {
+        rhombs: netRhombs.map((n) => ({
+            sourceId: n.sourceId,
+            poly: n.poly.map((q) => [q[0], q[1]] as [number, number]),
+            verts: [...n.verts],
+            overlapping: n.overlapping,
+        })),
+        hinges: [...netHinges],
+    };
+}
+
+function pushHistory(): void {
+    history.push(snapshot());
+    if (history.length > HISTORY_LIMIT) history.shift();
+}
+
+function restore(s: Snapshot): void {
+    netRhombs.length = 0;
+    netRhombs.push(...s.rhombs);
+    netHinges.clear();
+    for (const h of s.hinges) netHinges.add(h);
+    placedRhombs.clear();
+    for (const n of netRhombs) placedRhombs.add(n.sourceId);
+    recheckOverlaps();
+    recomputeMoveHints();
+}
+
+function undo(): string {
+    const s = history.pop();
+    if (!s) return "Nothing to undo.";
+    restore(s);
+    return `Undone. ${netRhombs.length} rhomb${netRhombs.length === 1 ? "" : "s"} on the net, ${history.length} step${history.length === 1 ? "" : "s"} back available.`;
+}
+
+function recomputeMoveHints(): void {
+    moveHints.clear();
+    if (!analysis || netRhombs.length === 0) return;
+    const { faces, P, links } = analysis;
+    for (const nr of netRhombs) {
+        for (const l of links.get(nr.sourceId) ?? []) {
+            if (placedRhombs.has(l.other)) continue;
+            const cand = placeAcross(faces[l.other], P, l.a, l.b, asPlaced(nr));
+            if (!cand) continue;
+            const clean = !netOverlaps(cand.poly as [number, number][], l.other);
+            if (clean) moveHints.set(l.other, "clean");
+            else if (!moveHints.has(l.other)) moveHints.set(l.other, "overlap");
+        }
+    }
+}
 let analysis: Analysis | null = null;
 const DPI = 96;
 const SEED_CENTRE: [number, number] = [4.25 / GOLDEN_SIDE, 4.6 / GOLDEN_SIDE];
@@ -306,6 +387,7 @@ function recheckOverlaps(): void {
 // Place `rid`, optionally across a named hinge edge. Returns a status message.
 function placeRhomb(rid: number, viaEdge?: { a: number; b: number }): string {
     if (placedRhombs.has(rid)) return `Rhomb ${rid} is already on the net.`;
+    pushHistory();
     if (!analysis) return "No patch.";
     const { faces, P, links } = analysis;
     const face = faces[rid];
@@ -335,6 +417,7 @@ function placeRhomb(rid: number, viaEdge?: { a: number; b: number }): string {
             placedRhombs.has(l.other),
         );
         if (cands.length === 0) {
+            history.pop();
             return `Rhomb ${rid} does not touch the net — click one adjacent to it, or Clear to start over.`;
         }
         let chosen = cands[cands.length - 1];
@@ -342,6 +425,7 @@ function placeRhomb(rid: number, viaEdge?: { a: number; b: number }): string {
             const want = ekey(viaEdge.a, viaEdge.b);
             const match = cands.find((l) => ekey(l.a, l.b) === want);
             if (!match) {
+                history.pop();
                 return `That edge does not join rhomb ${rid} to the net.`;
             }
             chosen = match;
@@ -357,7 +441,10 @@ function placeRhomb(rid: number, viaEdge?: { a: number; b: number }): string {
         }
         const host = netRhombs.find((n) => n.sourceId === chosen.other)!;
         const cand = placeAcross(face, P, chosen.a, chosen.b, asPlaced(host));
-        if (!cand) return `Could not unfold rhomb ${rid} across that edge.`;
+        if (!cand) {
+            history.pop();
+            return `Could not unfold rhomb ${rid} across that edge.`;
+        }
         poly = cand.poly as [number, number][];
         verts = cand.verts;
         netHinges.add(ekey(chosen.a, chosen.b));
@@ -371,6 +458,7 @@ function placeRhomb(rid: number, viaEdge?: { a: number; b: number }): string {
     netRhombs.push({ sourceId: rid, poly, verts, overlapping });
     placedRhombs.add(rid);
     recheckOverlaps();
+    recomputeMoveHints();
 
     const nOver = netRhombs.filter((n) => n.overlapping).length;
     if (overlapping) {
@@ -382,6 +470,7 @@ function placeRhomb(rid: number, viaEdge?: { a: number; b: number }): string {
 function removeRhomb(rid: number): string {
     const i = netRhombs.findIndex((n) => n.sourceId === rid);
     if (i < 0) return "";
+    pushHistory();
     netRhombs.splice(i, 1);
     placedRhombs.delete(rid);
     // a hinge only survives while both its rhombs are placed
@@ -393,6 +482,7 @@ function removeRhomb(rid: number): string {
         }
     }
     recheckOverlaps();
+    recomputeMoveHints();
     return `Removed rhomb ${rid}. ${netRhombs.length} left on the net.`;
 }
 
@@ -517,7 +607,15 @@ tilingCanvas.addEventListener("mousemove", (e) => {
             `Rhomb ${rid} (${r.thick ? "thick" : "thin"}) idx=[${r.vertIndices
                 .map(displayIndex)
                 .join(",")}]${flipHeight ? " flipped" : ""}` +
-                (placedRhombs.has(rid) ? " · already placed" : " · click to place"),
+                (placedRhombs.has(rid)
+                    ? " · already placed"
+                    : moveHints.get(rid) === "clean"
+                      ? " · click to place, no overlap"
+                      : moveHints.get(rid) === "overlap"
+                        ? " · every route from here overlaps"
+                        : netRhombs.length === 0
+                          ? " · click to seed"
+                          : " · does not touch the net"),
         );
     } else {
         say("Click a rhomb to place it; click an edge to choose the hinge");
@@ -577,9 +675,11 @@ netCanvas.addEventListener("click", (e) => {
 });
 
 document.getElementById("btn-clear")!.addEventListener("click", () => {
+    pushHistory();
     netRhombs.length = 0;
     netHinges.clear();
     placedRhombs.clear();
+    moveHints.clear();
     say("Cleared. Click a rhomb to seed a new net.");
     drawTiling();
     drawNet();
@@ -657,12 +757,33 @@ function buildControls() {
         drawNet();
     });
     controls.insertBefore(flipBtn, headsBtn.nextSibling);
+
+    const undoBtn = document.createElement("button");
+    undoBtn.textContent = "Undo";
+    undoBtn.title = "Step back one placement (⌘Z / Ctrl-Z)";
+    undoBtn.addEventListener("click", () => {
+        say(undo());
+        drawTiling();
+        drawNet();
+    });
+    controls.insertBefore(undoBtn, controls.firstChild?.nextSibling ?? null);
+
+    window.addEventListener("keydown", (e) => {
+        if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "z") {
+            e.preventDefault();
+            say(undo());
+            drawTiling();
+            drawNet();
+        }
+    });
 }
 
 function regenerate() {
     netRhombs.length = 0;
     netHinges.clear();
     placedRhombs.clear();
+    moveHints.clear();
+    history.length = 0;
     generate();
     fitView();
     drawTiling();
