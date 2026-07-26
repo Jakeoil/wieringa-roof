@@ -17,7 +17,7 @@ supplies nothing but the pattern of which rhombus joins which, and at what angle
 | `roof3d.html` | orbit the surface itself |
 | `info.html` | the mathematics — the lift, fold angles, curvature |
 | `polyhedra.html` | the triacontahedron and the two golden rhombohedra |
-| `unfold.html` | unfold a net by hand, choosing the route yourself |
+| `unfold.html` | unfold a net by hand, or replay an algorithm step by step |
 
 ## Running
 
@@ -35,6 +35,20 @@ Command-line net generation, if you would rather not use the browser:
 ```
 node tools/bfs-unfold.mjs --gen=3 --side=12mm --mode=widened --svg=out
 ```
+
+## The workbench
+
+`unfold.html` has two modes. **Build by hand**: seed a rhomb, then click rhombi
+touching the net and each is unfolded across the shared edge. Hovering shows every
+landing place a rhomb could take, green where it lands clean and red where every
+route from there overlaps, so the dead ends are visible before you commit; clicking
+an edge rather than the rhomb names the hinge. Overlaps are allowed anyway, alt-click
+removes, ⌘Z steps back, and the net is oriented and centred on the sheet
+automatically.
+
+**Watch an algorithm**: replay any of the three methods with transport controls.
+This is not a re-enactment — the algorithms emit a step log as they run and the
+player reads it back, so what you see is the run that produced the net.
 
 ## The geometry, briefly
 
@@ -67,6 +81,19 @@ Three, selectable on the net page:
   and spaced exactly `2/√5`, so a strip *provably* cannot overlap itself at any
   length. Elegant, but a ribbon only reaches the two fifths of rhombi sharing its
   direction, so you get many thin bands.
+
+Measured across generations 2 to 4, widened ribbons put 80–90% of a patch into one
+piece and leave the rest as slivers; BFS gets fewer pieces overall but more of them
+big enough to be real work to join.
+
+## Seeds
+
+The P1 tiles map onto rhomb clusters: `Pe5` a pentagon (5 thick), `Pe3` the boat
+(3 thick + 1 thin), `Pe1` the diamond (1 thick + 2 thin), plus `St5`/`St3`/`St1`
+and the composite `Deca`. The decagon is worth knowing: star-type pieces emit
+nothing at generation 1, so its first rhomb layer is a boat and two diamonds —
+5 thick + 5 thin, exactly the dissection of a regular decagon. It is also the only
+seed without five-fold symmetry, having instead a single mirror axis.
 
 ## Credit
 

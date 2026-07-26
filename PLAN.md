@@ -135,8 +135,31 @@ index range `{1,2,3,4}` and the fold-angle set `{36,72,108}`.
 into `vendor/`) then `tsc`. Both `dist/` and `vendor/` are gitignored, so a fresh
 clone needs `npm install && npm run build` before serving.
 
+## Deployment
+
+Live at https://jakeoil.github.io/wieringa-roof/, built from `main` by
+`.github/workflows/deploy.yml`. `deca-shape-expansion.png` is kept locally but is
+not in the repository; it was purged from history, taking `.git` from 11 MB to
+under 300 KB.
+
+## The workbench
+
+`unfold.html` (formerly `legacy.html`, entry point `src/workbench.ts`) does the
+hand-driven unfolding the original plan asked for, plus a replay player over the
+trace the algorithms emit. Placement goes through the same `placeSeed`/`placeAcross`
+primitives as the automatic methods, so its geometry is identical.
+
+The net is oriented and centred on the sheet by testing the net's own edge
+directions and their perpendiculars — a development only ever uses about nine, so
+this is an exhaustive check of a couple of dozen angles rather than a search,
+scored by the worst axis ratio `max(w/PW, h/PH)`.
+
 ## Open
 
-- Deployed to GitHub Pages from `main` by `.github/workflows/deploy.yml`.
-- `deca-shape-expansion.png` is kept locally but is not in the repository; it was
-  purged from history, taking `.git` from 11 MB to under 300 KB.
+- Nothing here has been exercised in a browser beyond loading and looking; the
+  transport controls and the two hit-tests are the least-tested parts.
+- Generation 5 is offered on the 3D page but not the net page: the unfolding
+  methods take 1.2–2.5 s at 5,719 rhombi, against 48–76 ms at gen 4.
+- `Pe3` and `Pe1` patch outlines converge to a limit that is not their seed shape
+  (distance plateaus at 0.16 and 0.21). Only `Pe5` closes the loop exactly, its
+  hull being a regular pentagon at every generation. Worth understanding why.

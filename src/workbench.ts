@@ -30,9 +30,24 @@ import { parseLength, layoutSheets, renderSheet, PAGES } from "./sheet.js";
 
 // ── UI State ──────────────────────────────────────────────────────
 
-let currentSeedIdx = 3; // St5
-let currentIsHeads = true;
-let gen = 3;
+let currentSeedIdx = 1; // Pe3, the boat — 23 rhombi at gen 2, a sane place to land
+const currentIsHeads = true;
+let gen = 2;
+
+// Which way the face gradients run. This used to be the Heads/Tails button, which
+// regenerated the patch to flip a per-rhomb flag — and regenerating clears the net,
+// so a cosmetic toggle silently destroyed whatever you had built. It only ever
+// affected shading, so it is a draw-time flip now and costs nothing.
+let shadeFlip = false;
+
+// Face colouring in the tiling view. "Coloured by type or by vertex index" was in
+// the original spec and never got built.
+type TileColour = "cluster" | "type" | "index";
+let tileColour: TileColour = "cluster";
+
+function faceIndexLow(r: Rhomb): number {
+    return Math.min(...r.vertIndices);
+}
 
 // Height flip — the dual roof, hills for dales. The tiling fixes the surface only
 // up to a reflection in the horizontal plane, so every vertex height can be read
@@ -177,10 +192,18 @@ function drawTiling() {
         for (let i = 1; i < 4; i++) ctx.lineTo(sv[i].x, sv[i].y);
         ctx.closePath();
 
+        const shade = r.isHeads !== shadeFlip;
+        const faceFill = (): string | CanvasGradient => {
+            if (tileColour === "type") return r.thick ? "#9292e3" : "#eec09b";
+            if (tileColour === "index") {
+                return indexColor(displayIndex(faceIndexLow(r)));
+            }
+            return makeGradient(ctx, r.fill, sv[0], sv[2], shade);
+        };
         const role = mode === "watch" ? traceRoles.get(r.id) : undefined;
         const hint = mode === "watch" ? undefined : moveHints.get(r.id);
         if (role) {
-            ctx.fillStyle = makeGradient(ctx, r.fill, sv[0], sv[2], r.isHeads);
+            ctx.fillStyle = faceFill();
             ctx.fill();
             ctx.fillStyle =
                 role === "current"
@@ -204,7 +227,7 @@ function drawTiling() {
                 ? "rgba(192, 57, 43, 0.45)"
                 : "rgba(255, 200, 0, 0.5)";
         } else {
-            ctx.fillStyle = makeGradient(ctx, r.fill, sv[0], sv[2], r.isHeads);
+            ctx.fillStyle = faceFill();
             if (r.id === hoveredRhomb) ctx.globalAlpha = 0.9;
         }
         ctx.fill();
@@ -633,6 +656,17 @@ function candidateAngles(): number[] {
 // actually available, at the paper's aspect ratio, and give it a device-pixel
 // backing store so the creases stay crisp. All the px maths reads netCanvas.width,
 // and the pointer conversion scales by width/clientWidth, so this is DPR-safe.
+function sizeTilingCanvas(): void {
+    const workspace = tilingCanvas.closest(".workspace") as HTMLElement | null;
+    const total = workspace?.clientWidth ?? 1120;
+    const cssW = Math.max(300, Math.min(Math.round(total * 0.42), 560));
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    tilingCanvas.style.width = `${cssW}px`;
+    tilingCanvas.style.height = `${cssW}px`;
+    tilingCanvas.width = Math.round(cssW * dpr);
+    tilingCanvas.height = Math.round(cssW * dpr);
+}
+
 function sizeNetCanvas(): void {
     const workspace = netCanvas.closest(".workspace") as HTMLElement | null;
     const avail = workspace
@@ -967,7 +1001,7 @@ function drawNet() {
             src.fill,
             { x: sv[0].x, y: sv[0].y },
             { x: sv[2].x, y: sv[2].y },
-            src.isHeads,
+            src.isHeads !== shadeFlip,
         );
         ctx.globalAlpha = nr.overlapping ? 0.65 : 1;
         ctx.fill();
@@ -1748,15 +1782,40 @@ function buildControls() {
     genLabel.appendChild(genSelect);
     controls.insertBefore(genLabel, typeLabel.nextSibling);
 
-    // isHeads toggle
+    // shading direction — draw-time, so it no longer clears the net
     const headsBtn = document.createElement("button");
-    headsBtn.textContent = currentIsHeads ? "Heads" : "Tails";
+    headsBtn.textContent = "Heads";
+    headsBtn.title = "Flip which way the face shading runs (display only)";
     headsBtn.addEventListener("click", () => {
-        currentIsHeads = !currentIsHeads;
-        headsBtn.textContent = currentIsHeads ? "Heads" : "Tails";
-        regenerate();
+        shadeFlip = !shadeFlip;
+        headsBtn.textContent = shadeFlip ? "Tails" : "Heads";
+        drawTiling();
+        drawNet();
     });
     controls.insertBefore(headsBtn, genLabel.nextSibling);
+
+    const colourSel = document.createElement("select");
+    colourSel.style.cssText = "padding:4px;font-size:13px;";
+    for (const [v, t] of [
+        ["cluster", "Cluster"],
+        ["type", "Thick / thin"],
+        ["index", "Height index"],
+    ] as Array<[TileColour, string]>) {
+        const opt = document.createElement("option");
+        opt.value = v;
+        opt.textContent = t;
+        colourSel.appendChild(opt);
+    }
+    colourSel.value = tileColour;
+    colourSel.addEventListener("change", () => {
+        tileColour = colourSel.value as TileColour;
+        drawTiling();
+    });
+    const colourLabel = document.createElement("label");
+    colourLabel.textContent = "Colour: ";
+    colourLabel.style.fontSize = "13px";
+    colourLabel.appendChild(colourSel);
+    controls.insertBefore(colourLabel, headsBtn.nextSibling);
 
     // height flip toggle — redraw only, no regeneration needed
     const flipBtn = document.createElement("button");
@@ -1880,6 +1939,7 @@ function regenerate() {
 
 buildModeBar();
 buildControls();
+sizeTilingCanvas();
 sizeNetCanvas();
 generate();
 fitView();
@@ -1888,6 +1948,7 @@ drawTiling();
 drawNet();
 
 window.addEventListener("resize", () => {
+    sizeTilingCanvas();
     sizeNetCanvas();
     fitView();
     refreshNetView();

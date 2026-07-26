@@ -34,7 +34,7 @@ for (const [code, nick] of PATCHES) {
 }
 patchSel.value = "Pe3";
 
-for (const g of [2, 3]) {
+for (const g of [2, 3, 4]) {
     const opt = document.createElement("option");
     opt.value = String(g);
     opt.textContent = `Generation ${g}`;
