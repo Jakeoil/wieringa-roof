@@ -10,14 +10,14 @@ golden rhombi for physical models.
 | `index.html` | splash — what the surface is, links to everything | done |
 | `net.html` | patch selector → unfolding → printable SVG sheets | done |
 | `roof3d.html` | three.js prototype of the surface | done |
-| `info.html` | the maths: golden rhombus, heights, fold angles, defects, solids | done |
+| `info.html` | "Mathematics" — golden rhombus, heights, fold angles, defects | done |
+| `polyhedra.html` | triacontahedron + the two rhombohedra, generated diagrams | done |
 | `legacy.html` | original two-canvas explorer, kept for reference | done (as-is) |
 
-`src/legacy.ts` (formerly `src/main.ts`) is the original explorer, untouched.
-`site.css` is the shared shell. `tsc` compiles all of `src/` → `dist/`.
-
-Planned additions: `src/geometry.ts` (shared lift + tiling), `src/net.ts`,
-`src/roof3d.ts`.
+`src/geometry.ts` holds the tiling and the lift; `src/unfold.ts` the three
+decomposition methods; `src/sheet.ts` layout and SVG; `src/net.ts`,
+`src/roof3d.ts`, `src/legacy.ts` are the per-page entry points. `site.css` is the
+shared shell. `tsc` compiles all of `src/` → `dist/`.
 
 ## Geometry
 
@@ -39,19 +39,45 @@ write-up lives on `info.html`; the essentials:
   decides whether the low corner is v0 or v2. (`emitRhomb` already does this
   correctly — an earlier note proposing `[0,±1,0,±1]` for thin rhombs was wrong.)
 
-## Net method
+## Net methods
 
-**Ribbon strips.** In a de Bruijn ribbon, consecutive rhombi share an edge
-parallel to the same `E_j`, so all creases in a strip are parallel; the strip is
-therefore a generalized cylinder and develops into a straight band with parallel
-creases at monotonically increasing positions.
+Three, all in `src/unfold.ts`, selectable on `net.html`.
 
-⇒ **Ribbon strips cannot self-overlap at any length**, with no test required.
-This replaces the earlier BFS-unfolding plan, which needed overlap detection.
+**Widened ribbons** (`ribbonGrowPatch`, the default). Takes the longest de Bruijn
+ribbon as a backbone, places it, then accretes neighbours across any edge —
+longest backbone first, so it gets first claim on contested rhombi. Gathers
+80–90% of a patch into one piece.
 
-Each rhomb belongs to two ribbons, so no single family partitions a patch. Use
-greedy maximal-strip extraction: repeatedly take the longest dual-graph path
-whose consecutive shared edges are parallel.
+**BFS unfolding** (`unfoldPatch`). Spreads outward in rings from a seed rhomb,
+rejecting overlapping placements; tries every rhomb as seed when the patch is
+small enough. Fewest pieces in total, but more evenly sized, so more real joins.
+
+**Ribbon strips** (`stripPatch`). Pure de Bruijn ribbons, one rhomb wide. All
+creases in a strip are parallel, so the strip is a generalized cylinder and
+develops into a straight band with creases at monotonically increasing positions
+spaced exactly `2/√5` — it **provably cannot self-overlap at any length**. But a
+ribbon only reaches the 2/5 of rhombi sharing its direction, so you get many thin
+bands: 8–9 pieces at gen 2 where the others need 1–2.
+
+**Crease vs cut is decided by the hinge set, not piece membership.** An unfolding
+keeps only `F − 1` hinges (a spanning tree of the face graph); every other
+interior edge is cut even when both its faces are in the same piece. Those are
+exactly the edges bounding the angular-defect wedges. `|hinges| = faces − pieces`
+is asserted.
+
+### Measured
+
+Pieces, and pieces of 5+ rhombi (the ones that are real work to join):
+
+| patch | rhombi | widened | BFS | strips |
+|---|---|---|---|---|
+| gen 2 | 21–25 | 1–2 (1 big) | 1–2 (1 big) | 8–9 |
+| gen 3 | 138–140 | 6–8 (1–2 big) | 4–6 (2–3 big) | 41–46 |
+| gen 4 | 835–921 | 57–64 (3–8 big) | 50–51 (9–10 big) | 242–284 |
+
+All three validated at generations 2–4: hinge counts balance, zero overlaps
+within a piece, developed edge lengths exactly `1.000000000`, corner angles
+exactly `63.4349°/116.5651°`.
 
 ## Patches
 
@@ -69,45 +95,39 @@ the `penrose-mosaic` reference showing four generations.
 
 ## Print
 
-Side `s` = 20 mm. Strips advance 17.9 mm per face, ten faces to a Letter row;
-rough estimate ~60 rhombi per sheet. Render as SVG at exact physical units with
-a print stylesheet and use the browser's Save as PDF — no PDF library, reliable
-1:1 scale. Annotate each crease with its fold angle and mountain/valley.
+Side length, page and margin are all free parameters, in mm, cm or inches —
+nothing is pinned to 20 mm. Sheets render as SVG at exact physical units with a
+print stylesheet; the browser's Save as PDF gives reliable 1:1 with no PDF
+library. Each crease carries its fold angle (36/72/108, dash length) and
+mountain or valley (colour).
 
-## Gen-2 BFS unfolding results
+20 mm is a sensible default: strips advance 17.9 mm per face, ten faces to a
+Letter row, and it folds crisply in 100–120 gsm office paper. Below about 12 mm
+the 108° creases get fiddly.
 
-`node tools/bfs-unfold.mjs` — BFS edge-unfolding at side 20 mm, Letter with 0.5"
-margins (190.5 × 254 mm usable):
+From the command line: `node tools/bfs-unfold.mjs [--gen=] [--side=] [--page=]
+[--margin=] [--mode=widened|bfs|strips] [--svg=DIR] [--angles]`.
 
-| patch | rhombi | nets | size | fits |
-|---|---|---|---|---|
-| Pe5 star | 25 (20T/5t) | **2** (24 + 1) | 122×139 mm | yes |
-| Pe3 boat | 23 (16T/7t) | **1** | 113×137 mm | yes |
-| Pe1 diamond | 21 (12T/9t) | **1** | 113×121 mm | yes |
+## Fixed: the pentagrid index formula is gone
 
-Boat and diamond unfold whole. The star always splits, and trying all 25 rhombi
-as the BFS seed never avoids it — the leftover is a single rhomb, so it can be
-cut separately or carried as a flap.
+`assignIndicesFromPentagrid` was unsalvageable, not merely misconfigured. The
+pentagrid and the tiling are **dual spaces**, so `Σ floor(x·u_j/d)` over tiling
+coordinates telescopes to a bounded quantity that is not `Σ n_j` at all — in fact
+`Σ_k (x·u_k/d) = 0` identically, so the sum of floors can only land in `{−4…0}`.
+No choice of `gridSpacing` fixes that; it merely happened to agree at gen 2.
+`legacy.html` defaults to gen 3, so its index display was wrong as shipped.
 
-Fold-angle counts sum exactly to the interior edge counts (40 / 37 / 34), and
-index levels come out exactly {1,2,3,4}, as the theory requires.
+Replaced by `computeLift()`, which integrates `n ∈ Z⁵` along edges by BFS. Exact
+everywhere: all 21 seed/generation combinations give 0 bad edges, 0 conflicts,
+index ⊂ {1,2,3,4}, up to 1380 rhombi.
 
-## Known bug: `assignIndicesFromPentagrid` is only valid at gen 2
-
-The formula uses `gridSpacing` from `wheels.t[1]` regardless of generation, so it
-only agrees with the tiling at one scale. Bad-edge counts (`|Δindex| ≠ 1`, which
-should always be 0):
-
-| seed | gen 1 | gen 2 | gen 3 |
-|---|---|---|---|
-| Pe5 | 15 | **0** | 175 |
-| Pe3 | 12 | **0** | 167 |
-| Pe1 | 9 | **0** | 159 |
-
-`legacy.html` defaults to gen 3, so its index colouring and labels are wrong as
-shipped. `tools/bfs-unfold.mjs` deliberately does not use this function; it
-derives `n ∈ Z^5` per vertex by BFS over edge directions instead, which is exact
-at every generation (verified: 0 conflicts, position error ~1e-15).
+Two traps when matching planar edges to generators, both of which bit once:
+as *undirected* lines the five directions sit 36° apart, not 72°; and
+representatives normalised to one half-plane make two of the five the negatives
+of the true `ζʲ`, silently negating two components of `n`. The fix is a directed
+72°-spaced fan with ± resolved per edge. Note the position-error check is
+self-consistent under both bugs and catches neither — what caught them was the
+index range `{1,2,3,4}` and the fold-angle set `{36,72,108}`.
 
 ## Build
 
