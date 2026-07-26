@@ -51,12 +51,12 @@
 
 <nav>
     <span class="brand">Wieringa Roof</span>
-    <a href="./index.html">Home</a>
-    <a href="./net.html" aria-current="page">Net</a>
-    <a href="./roof3d.html">3D</a>
-    <a href="./info.html">Mathematics</a>
-    <a href="./polyhedra.html">Polyhedra</a>
-    <a href="./legacy.html">Legacy</a>
+    <a href="./index.html" draggable="false">Home</a>
+    <a href="./net.html" draggable="false" aria-current="page">Net</a>
+    <a href="./roof3d.html" draggable="false">3D</a>
+    <a href="./info.html" draggable="false">Mathematics</a>
+    <a href="./polyhedra.html" draggable="false">Polyhedra</a>
+    <a href="./legacy.html" draggable="false">Legacy</a>
 </nav>
 
 <div class="wrap">
@@ -130,12 +130,13 @@
     Where a patch comes apart into more than one piece it is because the surface
     has saddle vertices — more than 360° of paper wants to meet at a point, so the
     faces around it cannot all stay joined. Join those pieces along their matching
-    cut edges when assembling. See <a href="./info.html">Mathematics</a> for why.
+    cut edges when assembling. See <a href="./info.html" draggable="false">Mathematics</a> for why.
 </p>
 </div>
 
 </div>
 
 <script type="module" src="./dist/net.js"></script>
+<script src="./site.js"></script>
 </body>
 </html>

@@ -49,6 +49,21 @@ nav a {
     text-decoration: none;
     font-size: 14px;
 }
+
+/* Anchors are implicitly draggable. On a Mac trackpad a 2-3px drift during a
+   click passes the drag threshold, so the browser starts a link drag — the dark
+   grey chip showing the page name — and cancels the click, so nothing navigates.
+   draggable="false" on the markup is the portable fix; -webkit-user-drag covers
+   Chrome/Safari belt-and-braces, and dragstart is blocked in site.js. */
+nav a,
+.card {
+    -webkit-user-drag: none;
+    user-drag: none;
+}
+nav a {
+    user-select: none;
+    -webkit-user-select: none;
+}
 nav a:hover { color: var(--accent); }
 nav a[aria-current="page"] {
     color: var(--accent);

@@ -27,12 +27,12 @@
 
 <nav>
     <span class="brand">Wieringa Roof</span>
-    <a href="./index.html">Home</a>
-    <a href="./net.html">Net</a>
-    <a href="./roof3d.html">3D</a>
-    <a href="./info.html">Mathematics</a>
-    <a href="./polyhedra.html">Polyhedra</a>
-    <a href="./legacy.html" aria-current="page">Legacy</a>
+    <a href="./index.html" draggable="false">Home</a>
+    <a href="./net.html" draggable="false">Net</a>
+    <a href="./roof3d.html" draggable="false">3D</a>
+    <a href="./info.html" draggable="false">Mathematics</a>
+    <a href="./polyhedra.html" draggable="false">Polyhedra</a>
+    <a href="./legacy.html" draggable="false" aria-current="page">Legacy</a>
 </nav>
 
 <div class="wrap-wide">
@@ -41,7 +41,7 @@
     <p class="lede" style="margin-bottom:16px">
         The original two-canvas net builder — click a rhomb in the tiling to unfold
         it onto the work canvas. Kept as reference; the
-        <a href="./net.html">Net page</a> supersedes it.
+        <a href="./net.html" draggable="false">Net page</a> supersedes it.
     </p>
 
     <div class="controls" id="controls">
@@ -63,5 +63,6 @@
 </div>
 
 <script type="module" src="./dist/legacy.js"></script>
+<script src="./site.js"></script>
 </body>
 </html>
