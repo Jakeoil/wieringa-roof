@@ -406,3 +406,47 @@ for (const [label, nick] of TARGETS) {
     }
     console.log("");
 }
+
+// ── optional SVG output: --svg=DIR writes one file per sheet ───────
+if (args.svg) {
+    const dir = args.svg === true ? "out" : String(args.svg);
+    const { mkdirSync, writeFileSync } = await import("node:fs");
+    const { unfoldPatch } = await import("../dist/unfold.js");
+    const { layoutSheets, renderSheet } = await import("../dist/sheet.js");
+    mkdirSync(dir, { recursive: true });
+    let written = 0;
+    for (const [label, nick] of TARGETS) {
+        const idx = seedTypes.findIndex((s) => s.label === label);
+        const saved = console.log;
+        console.log = () => {};
+        generatePatch(idx, true, GEN);
+        console.log = saved;
+        const res = unfoldPatch();
+        const { sheets, oversize } = layoutSheets(
+            res.pieces,
+            side.mm,
+            PAGE_W,
+            PAGE_H,
+            6,
+        );
+        sheets.forEach((sh, i) => {
+            const svg = renderSheet(sh, res.placed, res.creases, res.hinges, {
+                sideMm: side.mm,
+                pageW: pw,
+                pageH: ph,
+                margin: margin.mm,
+                showFills: true,
+                showAngles: Boolean(args.angles),
+                showLegend: true,
+            });
+            const name = `${dir}/${nick}-gen${GEN}${sheets.length > 1 ? `-sheet${i + 1}` : ""}.svg`;
+            writeFileSync(name, svg + "\n");
+            console.log(`wrote ${name}`);
+            written++;
+        });
+        if (oversize.length) {
+            console.log(`  !! ${oversize.length} piece(s) too big for the page`);
+        }
+    }
+    console.log(`\n${written} file(s) in ${dir}/`);
+}

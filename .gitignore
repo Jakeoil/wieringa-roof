@@ -4,3 +4,6 @@ dist/
 
 # large reference image from penrose-mosaic (kept locally, not tracked)
 deca-shape-expansion.png
+
+# generated net SVGs
+out/
