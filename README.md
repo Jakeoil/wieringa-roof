@@ -17,7 +17,7 @@ supplies nothing but the pattern of which rhombus joins which, and at what angle
 | `roof3d.html` | orbit the surface itself |
 | `info.html` | the mathematics — the lift, fold angles, curvature |
 | `polyhedra.html` | the triacontahedron and the two golden rhombohedra |
-| `legacy.html` | unfold a net by hand, choosing the route yourself |
+| `unfold.html` | unfold a net by hand, choosing the route yourself |
 
 ## Running
 

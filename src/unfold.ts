@@ -263,6 +263,7 @@ function runBFS(
     P: (V3 | null)[],
     links: Map<number, Link[]>,
     firstSeed: number | null,
+    trace?: TraceEvent[],
 ): { placed: Map<number, Placed>; pieceFaces: number[][]; hinges: Set<string> } {
     const byId = new Map(faces.map((f) => [f.id, f]));
     const placed = new Map<number, Placed>();
@@ -293,15 +294,25 @@ function runBFS(
         const mine: number[] = [seedId!];
         pieceFaces.push(mine);
         const seed = byId.get(seedId!)!;
+        const seedPoly = placeSeed(seed, P);
         placed.set(seedId!, {
             faceId: seedId!,
             thick: seed.thick,
-                    cluster: seed.cluster,
-            poly: placeSeed(seed, P),
+            cluster: seed.cluster,
+            poly: seedPoly,
             verts: seed.v.slice(),
             piece: pieceId,
         });
         remaining.delete(seedId!);
+        if (trace) {
+            if (pieceId > 0) trace.push({ kind: "newPiece", piece: pieceId });
+            trace.push({
+                kind: "seed",
+                face: seedId!,
+                piece: pieceId,
+                poly: seedPoly,
+            });
+        }
 
         const q = [seedId!];
         for (let h = 0; h < q.length; h++) {
@@ -316,7 +327,26 @@ function runBFS(
                     link.b,
                     host,
                 );
-                if (!cand) continue;
+                if (!cand) {
+                    trace?.push({
+                        kind: "reject",
+                        face: link.other,
+                        from: cur,
+                        a: link.a,
+                        b: link.b,
+                        reason: "no-hinge",
+                        poly: null,
+                    });
+                    continue;
+                }
+                trace?.push({
+                    kind: "consider",
+                    face: link.other,
+                    from: cur,
+                    a: link.a,
+                    b: link.b,
+                    poly: cand.poly,
+                });
                 const test = shrink(cand.poly, 0.94);
                 let clash = false;
                 for (const fid of mine) {
@@ -326,7 +356,18 @@ function runBFS(
                         break;
                     }
                 }
-                if (clash) continue;
+                if (clash) {
+                    trace?.push({
+                        kind: "reject",
+                        face: link.other,
+                        from: cur,
+                        a: link.a,
+                        b: link.b,
+                        reason: "overlap",
+                        poly: cand.poly,
+                    });
+                    continue;
+                }
                 placed.set(link.other, {
                     faceId: link.other,
                     thick: byId.get(link.other)!.thick,
@@ -339,6 +380,15 @@ function runBFS(
                 mine.push(link.other);
                 remaining.delete(link.other);
                 q.push(link.other);
+                trace?.push({
+                    kind: "place",
+                    face: link.other,
+                    from: cur,
+                    a: link.a,
+                    b: link.b,
+                    piece: pieceId,
+                    poly: cand.poly,
+                });
             }
         }
     }
@@ -347,6 +397,47 @@ function runBFS(
 
 // ── public entry point ────────────────────────────────────────────
 
+// ── trace ─────────────────────────────────────────────────────────
+//
+// Pass an array as `trace` and the run appends a flat log of what it did. The
+// point is that the animation replays the *same* code that produces real nets,
+// rather than a parallel animated copy that drifts out of step — and a recorded
+// log can be scrubbed backwards as easily as forwards, and diffed or tested.
+//
+// Five event kinds cover all three methods, because they all place faces through
+// the same placeAcross primitive. `piece` is the index in run order, which is
+// what a viewer wants; note ribbonGrowPatch re-sorts pieces by size afterwards,
+// so these are not the final Piece ids.
+export type TraceEvent =
+    | { kind: "seed"; face: number; piece: number; poly: P2[] }
+    | { kind: "newPiece"; piece: number }
+    | {
+          kind: "consider";
+          face: number;
+          from: number;
+          a: number;
+          b: number;
+          poly: P2[];
+      }
+    | {
+          kind: "reject";
+          face: number;
+          from: number;
+          a: number;
+          b: number;
+          reason: "overlap" | "no-hinge";
+          poly: P2[] | null;
+      }
+    | {
+          kind: "place";
+          face: number;
+          from: number;
+          a: number;
+          b: number;
+          piece: number;
+          poly: P2[];
+      };
+
 export interface UnfoldOptions {
     // Try every rhomb as the starting seed and keep the best result. O(F^3), so
     // it is skipped above this many faces.
@@ -354,6 +445,9 @@ export interface UnfoldOptions {
     // Reflect the surface vertically — the dual roof, with every mountain and
     // valley exchanged. Fold magnitudes are unchanged.
     flip?: boolean;
+    // If given, the run appends its step log here. Absent, nothing is recorded
+    // and there is no cost.
+    trace?: TraceEvent[];
 }
 
 export function unfoldPatch(opts: UnfoldOptions = {}): UnfoldResult {
@@ -372,6 +466,7 @@ export function unfoldPatch(opts: UnfoldOptions = {}): UnfoldResult {
         hinges: Set<string>;
     } | null = null;
     let bestScore: [number, number] = [Infinity, Infinity];
+    let bestSeedUsed: number | null = null;
     let seedsTried = 0;
 
     const seeds =
@@ -387,7 +482,14 @@ export function unfoldPatch(opts: UnfoldOptions = {}): UnfoldResult {
         ) {
             bestScore = score;
             best = run;
+            bestSeedUsed = s;
         }
+    }
+
+    // The seed search runs the whole thing up to F times; tracing all of those
+    // would be enormous and meaningless, so the winner is re-run with tracing on.
+    if (opts.trace) {
+        runBFS(faces, P, links, bestSeedUsed, opts.trace);
     }
 
     const { placed, pieceFaces, hinges } = best!;
@@ -439,7 +541,7 @@ export { ekey };
 
 // Everything a hand-driven unfolder needs, computed once per patch: the faces,
 // the lifted 3D corner positions, the face adjacency, and the fold angle plus
-// mountain/valley of every interior edge. legacy.ts drives placeSeed/placeAcross
+// mountain/valley of every interior edge. workbench.ts drives placeSeed/placeAcross
 // with these so its geometry is identical to the automatic methods'.
 export interface Analysis {
     faces: Face[];
@@ -623,17 +725,27 @@ export function stripPatch(opts: UnfoldOptions = {}): UnfoldResult {
     strips.forEach((strip, pieceId) => {
         const mine: number[] = [];
         pieceFaces.push(mine);
+        if (opts.trace && pieceId > 0) {
+            opts.trace.push({ kind: "newPiece", piece: pieceId });
+        }
         for (let i = 0; i < strip.ids.length; i++) {
             const fid = strip.ids[i];
             const face = byId.get(fid)!;
             if (i === 0) {
+                const seedPoly = placeSeed(face, P);
                 placed.set(fid, {
                     faceId: fid,
                     thick: face.thick,
                     cluster: face.cluster,
-                    poly: placeSeed(face, P),
+                    poly: seedPoly,
                     verts: face.v.slice(),
                     piece: pieceId,
+                });
+                opts.trace?.push({
+                    kind: "seed",
+                    face: fid,
+                    piece: pieceId,
+                    poly: seedPoly,
                 });
             } else {
                 const link = strip.links[i]!;
@@ -649,6 +761,15 @@ export function stripPatch(opts: UnfoldOptions = {}): UnfoldResult {
                     piece: pieceId,
                 });
                 hinges.add(ekey(link.a, link.b));
+                opts.trace?.push({
+                    kind: "place",
+                    face: fid,
+                    from: strip.ids[i - 1],
+                    a: link.a,
+                    b: link.b,
+                    piece: pieceId,
+                    poly: cand.poly,
+                });
             }
             mine.push(fid);
         }
@@ -720,18 +841,29 @@ export function ribbonGrowPatch(opts: UnfoldOptions = {}): UnfoldResult {
         const mine: number[] = [];
         pieceFaces.push(mine);
 
+        if (opts.trace && pieceId > 0) {
+            opts.trace.push({ kind: "newPiece", piece: pieceId });
+        }
+
         // 1. lay the backbone down as a chain
         for (let i = 0; i < backbone.ids.length; i++) {
             const fid = backbone.ids[i];
             const face = byId.get(fid)!;
             if (i === 0) {
+                const seedPoly = placeSeed(face, P);
                 placed.set(fid, {
                     faceId: fid,
                     thick: face.thick,
                     cluster: face.cluster,
-                    poly: placeSeed(face, P),
+                    poly: seedPoly,
                     verts: face.v.slice(),
                     piece: pieceId,
+                });
+                opts.trace?.push({
+                    kind: "seed",
+                    face: fid,
+                    piece: pieceId,
+                    poly: seedPoly,
                 });
             } else {
                 const link = backbone.links[i]!;
@@ -747,6 +879,15 @@ export function ribbonGrowPatch(opts: UnfoldOptions = {}): UnfoldResult {
                     piece: pieceId,
                 });
                 hinges.add(ekey(link.a, link.b));
+                opts.trace?.push({
+                    kind: "place",
+                    face: fid,
+                    from: backbone.ids[i - 1],
+                    a: link.a,
+                    b: link.b,
+                    piece: pieceId,
+                    poly: cand.poly,
+                });
             }
             mine.push(fid);
             assigned.add(fid);
@@ -766,8 +907,38 @@ export function ribbonGrowPatch(opts: UnfoldOptions = {}): UnfoldResult {
                     link.b,
                     host,
                 );
-                if (!cand) continue;
-                if (!fits(cand.poly, mine, cur)) continue;
+                if (!cand) {
+                    opts.trace?.push({
+                        kind: "reject",
+                        face: link.other,
+                        from: cur,
+                        a: link.a,
+                        b: link.b,
+                        reason: "no-hinge",
+                        poly: null,
+                    });
+                    continue;
+                }
+                opts.trace?.push({
+                    kind: "consider",
+                    face: link.other,
+                    from: cur,
+                    a: link.a,
+                    b: link.b,
+                    poly: cand.poly,
+                });
+                if (!fits(cand.poly, mine, cur)) {
+                    opts.trace?.push({
+                        kind: "reject",
+                        face: link.other,
+                        from: cur,
+                        a: link.a,
+                        b: link.b,
+                        reason: "overlap",
+                        poly: cand.poly,
+                    });
+                    continue;
+                }
                 placed.set(link.other, {
                     faceId: link.other,
                     thick: byId.get(link.other)!.thick,
@@ -780,6 +951,15 @@ export function ribbonGrowPatch(opts: UnfoldOptions = {}): UnfoldResult {
                 mine.push(link.other);
                 assigned.add(link.other);
                 q.push(link.other);
+                opts.trace?.push({
+                    kind: "place",
+                    face: link.other,
+                    from: cur,
+                    a: link.a,
+                    b: link.b,
+                    piece: pieceId,
+                    poly: cand.poly,
+                });
             }
         }
     }

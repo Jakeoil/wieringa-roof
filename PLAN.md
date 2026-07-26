@@ -12,11 +12,11 @@ golden rhombi for physical models.
 | `roof3d.html` | three.js prototype of the surface | done |
 | `info.html` | "Mathematics" — golden rhombus, heights, fold angles, defects | done |
 | `polyhedra.html` | triacontahedron + the two rhombohedra, generated diagrams | done |
-| `legacy.html` | original two-canvas explorer, kept for reference | done (as-is) |
+| `unfold.html` | original two-canvas explorer, kept for reference | done (as-is) |
 
 `src/geometry.ts` holds the tiling and the lift; `src/unfold.ts` the three
 decomposition methods; `src/sheet.ts` layout and SVG; `src/net.ts`,
-`src/roof3d.ts`, `src/legacy.ts` are the per-page entry points. `site.css` is the
+`src/roof3d.ts`, `src/workbench.ts` are the per-page entry points. `site.css` is the
 shared shell. `tsc` compiles all of `src/` → `dist/`.
 
 ## Geometry
@@ -115,7 +115,7 @@ pentagrid and the tiling are **dual spaces**, so `Σ floor(x·u_j/d)` over tilin
 coordinates telescopes to a bounded quantity that is not `Σ n_j` at all — in fact
 `Σ_k (x·u_k/d) = 0` identically, so the sum of floors can only land in `{−4…0}`.
 No choice of `gridSpacing` fixes that; it merely happened to agree at gen 2.
-`legacy.html` defaults to gen 3, so its index display was wrong as shipped.
+`unfold.html` defaults to gen 3, so its index display was wrong as shipped.
 
 Replaced by `computeLift()`, which integrates `n ∈ Z⁵` along edges by BFS. Exact
 everywhere: all 21 seed/generation combinations give 0 bad edges, 0 conflicts,
