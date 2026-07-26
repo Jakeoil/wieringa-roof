@@ -176,7 +176,9 @@ function drawTiling() {
 
         const hint = moveHints.get(r.id);
         if (placedRhombs.has(r.id)) {
-            ctx.fillStyle = "rgba(255, 200, 0, 0.5)";
+            ctx.fillStyle = altDown
+                ? "rgba(192, 57, 43, 0.45)"
+                : "rgba(255, 200, 0, 0.5)";
         } else {
             ctx.fillStyle = makeGradient(ctx, r.fill, sv[0], sv[2], r.isHeads);
             if (r.id === hoveredRhomb) ctx.globalAlpha = 0.9;
@@ -407,6 +409,40 @@ function netToTiling(nr: NetRhomb, x: number, y: number): Pt | null {
     );
 }
 
+// Alt is the modifier for removal. Not Ctrl: on macOS Ctrl-click is right-click,
+// so it would fight the context menu. Alt/Option is the conventional destructive
+// modifier and is free in both browsers.
+let altDown = false;
+
+// Hinges are what hold the net together, so removing an interior rhomb can leave
+// two islands that only look like one net. Worth saying so rather than letting it
+// pass silently.
+function netIsConnected(): boolean {
+    if (netRhombs.length < 2) return true;
+    const adj = new Map<number, number[]>();
+    for (const n of netRhombs) adj.set(n.sourceId, []);
+    for (const k of netHinges) {
+        const [a, b] = k.split("-").map(Number);
+        const e = edgeMap.get(ekey(a, b));
+        if (!e || e.rhombIds.length !== 2) continue;
+        const [x, y] = e.rhombIds;
+        if (!adj.has(x) || !adj.has(y)) continue;
+        adj.get(x)!.push(y);
+        adj.get(y)!.push(x);
+    }
+    const seen = new Set<number>([netRhombs[0].sourceId]);
+    const q = [netRhombs[0].sourceId];
+    for (let i = 0; i < q.length; i++) {
+        for (const w of adj.get(q[i]) ?? []) {
+            if (!seen.has(w)) {
+                seen.add(w);
+                q.push(w);
+            }
+        }
+    }
+    return seen.size === netRhombs.length;
+}
+
 function computeGhosts(rid: number): void {
     ghosts = [];
     if (!analysis || placedRhombs.has(rid) || netRhombs.length === 0) return;
@@ -616,7 +652,10 @@ function removeRhomb(rid: number): string {
     }
     recheckOverlaps();
     recomputeMoveHints();
-    return `Removed rhomb ${rid}. ${netRhombs.length} left on the net.`;
+    return (
+        `Removed rhomb ${rid}. ${netRhombs.length} left on the net.` +
+        (netIsConnected() ? "" : "  ⚠ the net is now in more than one piece.")
+    );
 }
 
 const FOLD_DASH: Record<number, number[]> = {
@@ -799,9 +838,14 @@ tilingCanvas.addEventListener("mousemove", (e) => {
     const rect = tilingCanvas.getBoundingClientRect();
     const sx = e.clientX - rect.left;
     const sy = e.clientY - rect.top;
+    if (e.altKey !== altDown) altDown = e.altKey;
     const edge = findEdgeAt(sx, sy);
     const rid = findRhombAt(sx, sy);
-    tilingCanvas.style.cursor = edge ? "col-resize" : "crosshair";
+    tilingCanvas.style.cursor = altDown
+        ? "pointer"
+        : edge
+          ? "col-resize"
+          : "crosshair";
 
     if (rid !== hoveredRhomb) {
         hoveredRhomb = rid;
@@ -833,7 +877,9 @@ tilingCanvas.addEventListener("mousemove", (e) => {
                 .map(displayIndex)
                 .join(",")}]${flipHeight ? " flipped" : ""}` +
                 (placedRhombs.has(rid)
-                    ? " · already placed"
+                    ? altDown
+                        ? " · alt-click to remove"
+                        : " · already placed, alt-click to remove"
                     : moveHints.get(rid) === "clean"
                       ? " · click to place, no overlap"
                       : moveHints.get(rid) === "overlap"
@@ -851,6 +897,20 @@ tilingCanvas.addEventListener("click", (e) => {
     const rect = tilingCanvas.getBoundingClientRect();
     const sx = e.clientX - rect.left;
     const sy = e.clientY - rect.top;
+    if (e.altKey) {
+        const rid = findRhombAt(sx, sy);
+        if (rid < 0) return;
+        if (!placedRhombs.has(rid)) {
+            say(`Rhomb ${rid} is not on the net, so there is nothing to remove.`);
+        } else {
+            say(removeRhomb(rid));
+            if (hoveredRhomb >= 0) computeGhosts(hoveredRhomb);
+        }
+        drawTiling();
+        drawNet();
+        return;
+    }
+
     const edge = findEdgeAt(sx, sy);
     if (edge) {
         // unfold whichever of the two rhombs is not yet on the net
@@ -918,22 +978,12 @@ netCanvas.addEventListener("click", (e) => {
         (netCanvas.width / rect.width);
     const my = ((e.clientY - rect.top) / (DPI * GOLDEN_SIDE)) *
         (netCanvas.height / rect.height);
-    for (let i = netRhombs.length - 1; i >= 0; i--) {
-        const q = netRhombs[i].poly;
-        if (
-            pointInQuad(p(mx, my), [
-                p(q[0][0], q[0][1]),
-                p(q[1][0], q[1][1]),
-                p(q[2][0], q[2][1]),
-                p(q[3][0], q[3][1]),
-            ])
-        ) {
-            say(removeRhomb(netRhombs[i].sourceId));
-            drawTiling();
-            drawNet();
-            return;
-        }
-    }
+    const nr = netRhombAt(mx, my);
+    if (!nr) return;
+    say(removeRhomb(nr.sourceId));
+    if (hoveredRhomb >= 0) computeGhosts(hoveredRhomb);
+    drawTiling();
+    drawNet();
 });
 
 document.getElementById("btn-clear")!.addEventListener("click", () => {
@@ -1031,11 +1081,31 @@ function buildControls() {
     controls.insertBefore(undoBtn, controls.firstChild?.nextSibling ?? null);
 
     window.addEventListener("keydown", (e) => {
+        if (e.altKey && !altDown) {
+            altDown = true;
+            tilingCanvas.style.cursor = "pointer";
+            scheduleRedraw();
+        }
         if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "z") {
             e.preventDefault();
             say(undo());
             drawTiling();
             drawNet();
+        }
+    });
+
+    window.addEventListener("keyup", (e) => {
+        if (!e.altKey && altDown) {
+            altDown = false;
+            tilingCanvas.style.cursor = "crosshair";
+            scheduleRedraw();
+        }
+    });
+    // a window blur while Alt is down would otherwise leave it stuck on
+    window.addEventListener("blur", () => {
+        if (altDown) {
+            altDown = false;
+            scheduleRedraw();
         }
     });
 }
