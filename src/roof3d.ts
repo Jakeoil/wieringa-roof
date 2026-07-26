@@ -2,8 +2,9 @@
 //
 // Almost free: geometry.ts already gives an exact integer vector n per vertex, so
 // a corner's position is just pos3D(n). Every generator shares z = 1/√5, so the
-// height is (Σ n_j)/√5 and the whole surface is only 1.342 side lengths deep —
-// hence the vertical exaggeration control, without which it reads as flat.
+// height is (Σ n_j)/√5 and the whole surface is 1.342 side lengths deep. Shallow
+// on paper, but distinctive enough on screen that no exaggeration is wanted — the
+// vertical scale control only ever flattens, down to the bare Penrose tiling.
 
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
@@ -27,10 +28,9 @@ const view = el<HTMLDivElement>("view");
 const patchSel = el<HTMLSelectElement>("patch");
 const genSel = el<HTMLSelectElement>("gen");
 const colorSel = el<HTMLSelectElement>("color");
-const exagInput = el<HTMLInputElement>("exag");
-const exagOut = el<HTMLElement>("exagOut");
+const vscaleInput = el<HTMLInputElement>("vscale");
+const vscaleOut = el<HTMLElement>("vscaleOut");
 const edgesChk = el<HTMLInputElement>("edges");
-const flatChk = el<HTMLInputElement>("flat");
 const flipChk = el<HTMLInputElement>("flip");
 const statusEl = el<HTMLElement>("status");
 
@@ -98,7 +98,7 @@ const CLUSTER_FALLBACK = new THREE.Color(0xbfc2ca);
 function build(reframe: boolean): void {
     const seedIdx = seedTypes.findIndex((s) => s.label === patchSel.value);
     const gen = Number(genSel.value);
-    const exag = Number(exagInput.value);
+    const vscale = Number(vscaleInput.value);
 
     const t0 = performance.now();
     const quiet = console.log;
@@ -130,7 +130,7 @@ function build(reframe: boolean): void {
 
     const push = (vid: number, c: THREE.Color) => {
         const p = P[vid]!;
-        pos.push(p[0], p[1], p[2] * exag);
+        pos.push(p[0], p[1], p[2] * vscale);
         col.push(c.r, c.g, c.b);
     };
 
@@ -167,8 +167,15 @@ function build(reframe: boolean): void {
         color: mode === "plain" ? 0xc9cbd4 : 0xffffff,
         roughness: 0.62,
         metalness: 0.04,
-        flatShading: flatChk.checked,
+        // The mesh is non-indexed, so computeVertexNormals already yields one
+        // normal per triangle — it is flat-shaded inherently and a smooth/flat
+        // toggle would do nothing. polygonOffset pushes the faces back so the
+        // edge overlay, which is exactly coplanar with them, stops z-fighting.
+        flatShading: true,
         side: THREE.DoubleSide,
+        polygonOffset: true,
+        polygonOffsetFactor: 1,
+        polygonOffsetUnits: 1,
     });
     surface = new THREE.Mesh(geo, mat);
     scene.add(surface);
@@ -183,27 +190,23 @@ function build(reframe: boolean): void {
             lp.push(
                 a[0] - c.x,
                 a[1] - c.y,
-                a[2] * exag - c.z,
+                a[2] * vscale - c.z,
                 b[0] - c.x,
                 b[1] - c.y,
-                b[2] * exag - c.z,
+                b[2] * vscale - c.z,
             );
         }
         const lg = new THREE.BufferGeometry();
         lg.setAttribute("position", new THREE.Float32BufferAttribute(lp, 3));
         wire = new THREE.LineSegments(
             lg,
-            new THREE.LineBasicMaterial({
-                color: 0x33363d,
-                transparent: true,
-                opacity: 0.5,
-            }),
+            new THREE.LineBasicMaterial({ color: 0x2b2e35 }),
         );
         scene.add(wire);
     }
 
     // Frame only when the patch itself changes — reframing on every rebuild
-    // would fight the user while they drag the exaggeration slider.
+    // would fight the user while they drag the vertical scale slider.
     if (reframe) {
         geo.computeBoundingSphere();
         const r = geo.boundingSphere!.radius;
@@ -219,12 +222,13 @@ function build(reframe: boolean): void {
     const cl: Record<string, number> = {};
     for (const r of allRhombs) cl[r.cluster] = (cl[r.cluster] ?? 0) + 1;
     const clText = `${cl.Pe5 ?? 0} in stars, ${cl.Pe3 ?? 0} in boats, ${cl.Pe1 ?? 0} in diamonds`;
-    const relief = (3 / Math.sqrt(5)) * exag;
+    const relief = (3 / Math.sqrt(5)) * vscale;
     statusEl.textContent =
         `${allRhombs.length} rhombi · ${vertexList.length} vertices · ` +
         `${clText} · index levels ${JSON.stringify(hist)} · ` +
-        `relief ${relief.toFixed(2)} side lengths at ${exag}×${flip ? ", flipped" : ""} ` +
-        `(${(3 / Math.sqrt(5)).toFixed(3)} true) · ${ms} ms`;
+        `relief ${relief.toFixed(3)} side lengths` +
+        `${vscale === 1 ? " (true)" : ` at ${vscale}× of ${(3 / Math.sqrt(5)).toFixed(3)}`}` +
+        `${flip ? ", flipped" : ""} · ${ms} ms`;
 }
 
 // ── controls ──────────────────────────────────────────────────────
@@ -243,7 +247,7 @@ for (const [code, nick] of [
 }
 patchSel.value = "Pe3";
 
-for (const g of [2, 3, 4]) {
+for (const g of [2, 3, 4, 5]) {
     const o = document.createElement("option");
     o.value = String(g);
     o.textContent = `Generation ${g}`;
@@ -252,7 +256,7 @@ for (const g of [2, 3, 4]) {
 genSel.value = "3";
 
 function rebuild(reframe: boolean): void {
-    exagOut.textContent = `${Number(exagInput.value).toFixed(1)}×`;
+    vscaleOut.textContent = `${Number(vscaleInput.value).toFixed(2)}×`;
     disposeOld();
     build(reframe);
 }
@@ -260,10 +264,10 @@ function rebuild(reframe: boolean): void {
 for (const c of [patchSel, genSel]) {
     c.addEventListener("change", () => rebuild(true));
 }
-for (const c of [colorSel, edgesChk, flatChk, flipChk]) {
+for (const c of [colorSel, edgesChk, flipChk]) {
     c.addEventListener("change", () => rebuild(false));
 }
-exagInput.addEventListener("input", () => rebuild(false));
+vscaleInput.addEventListener("input", () => rebuild(false));
 
 function resize(): void {
     const w = view.clientWidth;

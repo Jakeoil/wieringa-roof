@@ -43,8 +43,8 @@
 <h1>3D Prototype</h1>
 <p class="lede">
     The roof itself. Drag to orbit, scroll to zoom. Every face is the same golden
-    rhombus, and the whole surface is only 1.342 side lengths deep — so it needs
-    exaggerating before the hills and dales read at all.
+    rhombus, and the whole surface is only 1.342 side lengths deep — shallow in
+    numbers, but the hills and dales read unmistakably.
 </p>
 
 <div class="bar">
@@ -56,12 +56,11 @@
         <option value="type">Thick / thin</option>
         <option value="plain">Plain</option>
     </select></label>
-    <label>Vertical exaggeration <span id="exagOut" class="mono"></span>
-        <input type="range" id="exag" min="1" max="8" step="0.5" value="3">
+    <label>Vertical scale <span id="vscaleOut" class="mono"></span>
+        <input type="range" id="vscale" min="0" max="1" step="0.05" value="1">
     </label>
     <span class="checks">
         <label><input type="checkbox" id="edges" checked> edges</label>
-        <label><input type="checkbox" id="flat" checked> flat shading</label>
         <label><input type="checkbox" id="flip"> flip (hills &harr; dales)</label>
     </span>
 </div>
@@ -90,6 +89,18 @@
     vertical axis and the surface flattens into the Penrose tiling it came from.
 </p>
 <p>
+    <strong>Vertical scale</strong> runs from the true surface at 1 down to nothing
+    at 0, where the roof collapses into the flat Penrose tiling that is its own
+    shadow. Sliding it down is the projection happening in front of you. It only
+    ever flattens — the true shape needs no exaggerating to read, so 1 is the
+    default and there is nothing above it.
+</p>
+<p>
+    Scaling the vertical is an affine map, so faces stay planar all the way down
+    and fold directions stay honest. Below 1 the rhombi are no longer golden, and
+    at 0 they are the thick and thin Penrose rhombs exactly.
+</p>
+<p>
     <strong>Flip</strong> reflects the surface in the horizontal plane. That is not
     a trick of the rendering — it is a second, equally valid Wieringa roof over the
     same tiling, with every hill turned into a dale and every mountain crease into
@@ -98,11 +109,9 @@
     fold each crease the other way.
 </p>
 <p>
-    Exaggeration scales only the vertical. That is an affine map, so faces stay
-    planar and the picture stays honest about which way each crease folds — but at
-    anything above 1× the rhombi are no longer golden. See
-    <a href="./info.html" draggable="false">Mathematics</a> for the lift, and
-    <a href="./net.html" draggable="false">Net</a> to flatten it back out for printing.
+    See <a href="./info.html" draggable="false">Mathematics</a> for the lift, and
+    <a href="./net.html" draggable="false">Net</a> to flatten it back out for
+    printing.
 </p>
 
 </div>
