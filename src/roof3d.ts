@@ -17,6 +17,7 @@ import {
     roundKey,
     computeLift,
     pos3D,
+    CLUSTER_COLORS,
 } from "./geometry.js";
 
 const el = <T extends HTMLElement>(id: string) =>
@@ -84,6 +85,13 @@ const INDEX_COLORS = [
 const THICK_COLOR = new THREE.Color(0x8f8fdc);
 const THIN_COLOR = new THREE.Color(0xe2b184);
 
+// gen-1 P1 clusters, at the penrose-mosaic strengths: Pe5 blue star,
+// Pe3 yellow boat, Pe1 orange diamond
+const CLUSTER_3D: Record<string, THREE.Color> = Object.fromEntries(
+    Object.entries(CLUSTER_COLORS).map(([k, v]) => [k, new THREE.Color(v)]),
+);
+const CLUSTER_FALLBACK = new THREE.Color(0xbfc2ca);
+
 // ── build ─────────────────────────────────────────────────────────
 
 function build(reframe: boolean): void {
@@ -103,6 +111,7 @@ function build(reframe: boolean): void {
     // corner ids per rhomb, then two triangles each
     const faces = allRhombs.map((r) => ({
         thick: r.thick,
+        cluster: r.cluster,
         v: r.verts.map((pt) => vertexMap.get(roundKey(pt))!.id),
     }));
 
@@ -120,7 +129,9 @@ function build(reframe: boolean): void {
         const tri = [f.v[0], f.v[1], f.v[2], f.v[0], f.v[2], f.v[3]];
         for (const vid of tri) {
             let c: THREE.Color;
-            if (mode === "type") {
+            if (mode === "cluster") {
+                c = CLUSTER_3D[f.cluster] ?? CLUSTER_FALLBACK;
+            } else if (mode === "type") {
                 c = f.thick ? THICK_COLOR : THIN_COLOR;
             } else if (mode === "index") {
                 const idx = vertexList[vid].index;
@@ -195,10 +206,13 @@ function build(reframe: boolean): void {
     const ms = Math.round(performance.now() - t0);
     const hist: Record<number, number> = {};
     for (const v of vertexList) hist[v.index] = (hist[v.index] ?? 0) + 1;
+    const cl: Record<string, number> = {};
+    for (const r of allRhombs) cl[r.cluster] = (cl[r.cluster] ?? 0) + 1;
+    const clText = `${cl.Pe5 ?? 0} in stars, ${cl.Pe3 ?? 0} in boats, ${cl.Pe1 ?? 0} in diamonds`;
     const relief = (3 / Math.sqrt(5)) * exag;
     statusEl.textContent =
         `${allRhombs.length} rhombi · ${vertexList.length} vertices · ` +
-        `index levels ${JSON.stringify(hist)} · ` +
+        `${clText} · index levels ${JSON.stringify(hist)} · ` +
         `relief ${relief.toFixed(2)} side lengths at ${exag}× ` +
         `(${(3 / Math.sqrt(5)).toFixed(3)} true) · ${ms} ms`;
 }

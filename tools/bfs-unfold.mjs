@@ -444,7 +444,7 @@ if (args.svg) {
                 pageW: pw,
                 pageH: ph,
                 margin: margin.mm,
-                showFills: true,
+                fillMode: String(args.tint ?? "cluster"),
                 showAngles: Boolean(args.angles),
                 showLegend: true,
             });

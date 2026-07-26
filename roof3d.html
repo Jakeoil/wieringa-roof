@@ -51,6 +51,7 @@
     <label>Patch <select id="patch"></select></label>
     <label>Generation <select id="gen"></select></label>
     <label>Colour <select id="color">
+        <option value="cluster">Star / boat / diamond</option>
         <option value="index">Height (index)</option>
         <option value="type">Thick / thin</option>
         <option value="plain">Plain</option>
@@ -68,6 +69,13 @@
 <span class="info" id="status"></span>
 
 <h2>What you are looking at</h2>
+<p>
+    Colour by star / boat / diamond shows the gen-1 clusters the patch was built
+    from — blue stars, yellow boats, orange diamonds, the same palette as
+    <span class="mono">penrose-mosaic</span>. Every rhomb belongs to exactly one,
+    because the expansion always bottoms out at generation 1. It is the clearest
+    way to see the hierarchy survive the lift into three dimensions.
+</p>
 <p>
     Colour by height shows the four index levels directly — every vertex of the
     surface sits at <span class="mono">index · s/√5</span> for an index of 1, 2, 3

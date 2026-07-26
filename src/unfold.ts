@@ -34,12 +34,14 @@ const cross3 = (a: V3, b: V3): V3 => [
 export interface Face {
     id: number;
     thick: boolean;
+    cluster: string; // gen-1 P1 cluster: Pe5 star / Pe3 boat / Pe1 diamond
     v: number[]; // tiling vertex ids, cyclic
 }
 
 export interface Placed {
     faceId: number;
     thick: boolean;
+    cluster: string;
     poly: P2[]; // net-space corners, matching `verts` order
     verts: number[]; // tiling vertex ids in the same order
     piece: number;
@@ -82,6 +84,7 @@ export function buildFaces(): Face[] {
     return allRhombs.map((r) => ({
         id: r.id,
         thick: r.thick,
+        cluster: r.cluster,
         v: r.verts.map((pt) => vertexMap.get(roundKey(pt))!.id),
     }));
 }
@@ -293,6 +296,7 @@ function runBFS(
         placed.set(seedId!, {
             faceId: seedId!,
             thick: seed.thick,
+                    cluster: seed.cluster,
             poly: placeSeed(seed, P),
             verts: seed.v.slice(),
             piece: pieceId,
@@ -326,6 +330,7 @@ function runBFS(
                 placed.set(link.other, {
                     faceId: link.other,
                     thick: byId.get(link.other)!.thick,
+                    cluster: byId.get(link.other)!.cluster,
                     poly: cand.poly,
                     verts: cand.verts,
                     piece: pieceId,
@@ -591,6 +596,7 @@ export function stripPatch(): UnfoldResult {
                 placed.set(fid, {
                     faceId: fid,
                     thick: face.thick,
+                    cluster: face.cluster,
                     poly: placeSeed(face, P),
                     verts: face.v.slice(),
                     piece: pieceId,
@@ -603,6 +609,7 @@ export function stripPatch(): UnfoldResult {
                 placed.set(fid, {
                     faceId: fid,
                     thick: face.thick,
+                    cluster: face.cluster,
                     poly: cand.poly,
                     verts: cand.verts,
                     piece: pieceId,
@@ -685,6 +692,7 @@ export function ribbonGrowPatch(): UnfoldResult {
                 placed.set(fid, {
                     faceId: fid,
                     thick: face.thick,
+                    cluster: face.cluster,
                     poly: placeSeed(face, P),
                     verts: face.v.slice(),
                     piece: pieceId,
@@ -697,6 +705,7 @@ export function ribbonGrowPatch(): UnfoldResult {
                 placed.set(fid, {
                     faceId: fid,
                     thick: face.thick,
+                    cluster: face.cluster,
                     poly: cand.poly,
                     verts: cand.verts,
                     piece: pieceId,
@@ -726,6 +735,7 @@ export function ribbonGrowPatch(): UnfoldResult {
                 placed.set(link.other, {
                     faceId: link.other,
                     thick: byId.get(link.other)!.thick,
+                    cluster: byId.get(link.other)!.cluster,
                     poly: cand.poly,
                     verts: cand.verts,
                     piece: pieceId,

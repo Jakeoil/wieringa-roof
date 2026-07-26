@@ -13,7 +13,7 @@ const genSel = el<HTMLSelectElement>("gen");
 const sideInput = el<HTMLInputElement>("side");
 const pageSel = el<HTMLSelectElement>("page");
 const marginInput = el<HTMLInputElement>("margin");
-const fillsChk = el<HTMLInputElement>("fills");
+const fillsSel = el<HTMLSelectElement>("fills");
 const anglesChk = el<HTMLInputElement>("angles");
 const statusEl = el<HTMLElement>("status");
 const sheetsEl = el<HTMLElement>("sheets");
@@ -83,7 +83,7 @@ function rebuild(): void {
                 pageW,
                 pageH,
                 margin,
-                showFills: fillsChk.checked,
+                fillMode: fillsSel.value as "none" | "type" | "cluster",
                 showAngles: anglesChk.checked,
                 showLegend: true,
             }),
@@ -113,7 +113,7 @@ function rebuild(): void {
         ` (${ms} ms)`;
 }
 
-for (const c of [patchSel, modeSel, genSel, pageSel, fillsChk, anglesChk]) {
+for (const c of [patchSel, modeSel, genSel, pageSel, fillsSel, anglesChk]) {
     c.addEventListener("change", rebuild);
 }
 for (const c of [sideInput, marginInput]) {

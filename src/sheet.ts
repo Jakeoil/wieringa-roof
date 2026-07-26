@@ -4,6 +4,7 @@
 // tools/bfs-unfold.mjs (writes .svg files).
 
 import { edgeRole } from "./unfold.js";
+import { CLUSTER_COLORS } from "./geometry.js";
 import type { Placed, Piece, Crease } from "./unfold.js";
 
 type P2 = [number, number];
@@ -39,6 +40,23 @@ export const DASH: Record<number, string> = {
     108: "6 1.8",
 };
 export const M_COLOR = "#c0392b";
+
+// Cluster tints for print: the penrose-mosaic cluster colours mixed toward white
+// so a sheet does not soak ink and stays easy to draw on. Same hues as the 3D
+// page, which uses them at full strength.
+function lighten(hex: string, t: number): string {
+    const n = parseInt(hex.slice(1), 16);
+    const mix = (c: number) => Math.round(c + (255 - c) * t);
+    return (
+        "#" +
+        [(n >> 16) & 255, (n >> 8) & 255, n & 255]
+            .map((c) => mix(c).toString(16).padStart(2, "0"))
+            .join("")
+    );
+}
+export const CLUSTER_TINTS: Record<string, string> = Object.fromEntries(
+    Object.entries(CLUSTER_COLORS).map(([k, v]) => [k, lighten(v, 0.65)]),
+);
 export const V_COLOR = "#2469b8";
 
 // ── layout ────────────────────────────────────────────────────────
@@ -115,7 +133,7 @@ export interface RenderOpts {
     pageW: number;
     pageH: number;
     margin: number;
-    showFills: boolean;
+    fillMode: "none" | "type" | "cluster";
     showAngles: boolean;
     showLegend: boolean;
     standalone?: boolean; // emit xmlns (needed for a .svg file)
@@ -167,11 +185,17 @@ export function renderSheet(
             const p = placed.get(fid)!;
             const pts = p.poly.map(map);
 
-            if (o.showFills) {
+            if (o.fillMode !== "none") {
+                const fill =
+                    o.fillMode === "cluster"
+                        ? (CLUSTER_TINTS[p.cluster] ?? "#f4f4f4")
+                        : p.thick
+                          ? "#f2f2fa"
+                          : "#fdf4ea";
                 fills.push(
                     `<polygon points="${pts
                         .map((q) => `${n3(q[0])},${n3(q[1])}`)
-                        .join(" ")}" fill="${p.thick ? "#f2f2fa" : "#fdf4ea"}"/>`,
+                        .join(" ")}" fill="${fill}"/>`,
                 );
             }
 

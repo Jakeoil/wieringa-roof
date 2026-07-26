@@ -319,6 +319,10 @@ interface Rhomb {
     thick: boolean;
     isHeads: boolean;
     fill: string;
+    // Which gen-1 P1 cluster this rhomb came from: Pe5 star, Pe3 boat,
+    // Pe1 diamond. Expansion always bottoms out at gen 1, so every rhomb
+    // belongs to exactly one.
+    cluster: string;
 }
 
 // Cluster colors (matches penrose-mosaic custom palette)
@@ -337,6 +341,7 @@ function emitRhomb(
     thick: boolean,
     isHeads: boolean,
     fill: string,
+    cluster: string,
     ci: number,
 ) {
     const verts = shape.map((v) => loc.tr(v)) as [Pt, Pt, Pt, Pt];
@@ -352,7 +357,15 @@ function emitRhomb(
         ci + offsets[2],
         ci + offsets[3],
     ];
-    allRhombs.push({ id: rhombId++, verts, vertIndices, thick, isHeads, fill });
+    allRhombs.push({
+        id: rhombId++,
+        verts,
+        vertIndices,
+        thick,
+        isHeads,
+        fill,
+        cluster,
+    });
 }
 
 // ── Recursive expansion → rhombs ──────────────────────────────────
@@ -383,27 +396,27 @@ function emitRhombs(
 
         switch (type) {
             case Pe5:
-                emitRhomb(loc, thicks[t], true, isHeads, fill, ci);
+                emitRhomb(loc, thicks[t], true, isHeads, fill, type.name, ci);
                 break;
             case Pe3:
                 switch (i) {
                     case 0:
-                        emitRhomb(loc, thins[t], false, isHeads, fill, ci);
+                        emitRhomb(loc, thins[t], false, isHeads, fill, type.name, ci);
                     // fallthrough
                     case 1:
                     case 4:
-                        emitRhomb(loc, thicks[t], true, isHeads, fill, ci);
+                        emitRhomb(loc, thicks[t], true, isHeads, fill, type.name, ci);
                         break;
                 }
                 break;
             case Pe1:
                 switch (i) {
                     case 0:
-                        emitRhomb(loc, thicks[t], true, isHeads, fill, ci);
+                        emitRhomb(loc, thicks[t], true, isHeads, fill, type.name, ci);
                         break;
                     case 1:
                     case 4:
-                        emitRhomb(loc, thins[t], false, isHeads, fill, ci);
+                        emitRhomb(loc, thins[t], false, isHeads, fill, type.name, ci);
                         break;
                 }
                 break;
@@ -834,6 +847,7 @@ function generatePatch(seedIdx: number, isHeads: boolean, gen: number): void {
 // ── Exports ───────────────────────────────────────────────────────
 
 export {
+    CLUSTER_COLORS,
     SQRT5,
     PHI,
     GOLDEN_SIDE,
