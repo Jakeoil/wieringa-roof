@@ -15,6 +15,7 @@ const pageSel = el<HTMLSelectElement>("page");
 const marginInput = el<HTMLInputElement>("margin");
 const fillsSel = el<HTMLSelectElement>("fills");
 const anglesChk = el<HTMLInputElement>("angles");
+const flipChk = el<HTMLInputElement>("flip");
 const statusEl = el<HTMLElement>("status");
 const sheetsEl = el<HTMLElement>("sheets");
 
@@ -62,12 +63,13 @@ function rebuild(): void {
 
     const t0 = performance.now();
     generatePatch(seedIdx, true, gen);
+    const opts = { flip: flipChk.checked };
     const res =
         modeSel.value === "strips"
-            ? stripPatch()
+            ? stripPatch(opts)
             : modeSel.value === "widened"
-              ? ribbonGrowPatch()
-              : unfoldPatch();
+              ? ribbonGrowPatch(opts)
+              : unfoldPatch(opts);
     const { sheets, oversize } = layoutSheets(
         res.pieces,
         side.mm,
@@ -114,7 +116,7 @@ function rebuild(): void {
         ` (${ms} ms)`;
 }
 
-for (const c of [patchSel, modeSel, genSel, pageSel, fillsSel, anglesChk]) {
+for (const c of [patchSel, modeSel, genSel, pageSel, fillsSel, anglesChk, flipChk]) {
     c.addEventListener("change", rebuild);
 }
 for (const c of [sideInput, marginInput]) {

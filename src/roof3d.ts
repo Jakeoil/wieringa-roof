@@ -31,6 +31,7 @@ const exagInput = el<HTMLInputElement>("exag");
 const exagOut = el<HTMLElement>("exagOut");
 const edgesChk = el<HTMLInputElement>("edges");
 const flatChk = el<HTMLInputElement>("flat");
+const flipChk = el<HTMLInputElement>("flip");
 const statusEl = el<HTMLElement>("status");
 
 // ── scene ─────────────────────────────────────────────────────────
@@ -105,8 +106,9 @@ function build(reframe: boolean): void {
     generatePatch(seedIdx, true, gen);
     console.log = quiet;
 
+    const flip = flipChk.checked;
     const lift = computeLift();
-    const P = lift.n.map((nv) => (nv ? pos3D(nv) : null));
+    const P = lift.n.map((nv) => (nv ? pos3D(nv, flip) : null));
 
     // corner ids per rhomb, then two triangles each
     const faces = allRhombs.map((r) => ({
@@ -114,6 +116,13 @@ function build(reframe: boolean): void {
         cluster: r.cluster,
         v: r.verts.map((pt) => vertexMap.get(roundKey(pt))!.id),
     }));
+
+    let idxLo = Infinity;
+    let idxHi = -Infinity;
+    for (const v of vertexList) {
+        if (v.index < idxLo) idxLo = v.index;
+        if (v.index > idxHi) idxHi = v.index;
+    }
 
     const pos: number[] = [];
     const col: number[] = [];
@@ -134,7 +143,8 @@ function build(reframe: boolean): void {
             } else if (mode === "type") {
                 c = f.thick ? THICK_COLOR : THIN_COLOR;
             } else if (mode === "index") {
-                const idx = vertexList[vid].index;
+                // colour by actual height, so flipping recolours too
+                const idx = flip ? idxLo + idxHi - vertexList[vid].index : vertexList[vid].index;
                 c = INDEX_COLORS[Math.min(3, Math.max(0, idx - 1))];
             } else {
                 c = new THREE.Color(0xc9cbd4);
@@ -213,7 +223,7 @@ function build(reframe: boolean): void {
     statusEl.textContent =
         `${allRhombs.length} rhombi · ${vertexList.length} vertices · ` +
         `${clText} · index levels ${JSON.stringify(hist)} · ` +
-        `relief ${relief.toFixed(2)} side lengths at ${exag}× ` +
+        `relief ${relief.toFixed(2)} side lengths at ${exag}×${flip ? ", flipped" : ""} ` +
         `(${(3 / Math.sqrt(5)).toFixed(3)} true) · ${ms} ms`;
 }
 
@@ -250,7 +260,7 @@ function rebuild(reframe: boolean): void {
 for (const c of [patchSel, genSel]) {
     c.addEventListener("change", () => rebuild(true));
 }
-for (const c of [colorSel, edgesChk, flatChk]) {
+for (const c of [colorSel, edgesChk, flatChk, flipChk]) {
     c.addEventListener("change", () => rebuild(false));
 }
 exagInput.addEventListener("input", () => rebuild(false));

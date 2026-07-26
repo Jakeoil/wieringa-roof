@@ -624,13 +624,19 @@ for (let j = 0; j < 5; j++) {
     E5.push([(2 / SQRT5) * Math.cos(t), (2 / SQRT5) * Math.sin(t), 1 / SQRT5]);
 }
 
-function pos3D(n: number[]): V3 {
+// `flip` reflects the surface in the z = 0 plane: every hill becomes a dale.
+// That is a second, equally valid Wieringa roof over the same tiling — still
+// congruent golden rhombi, still unit edges, the same fold magnitudes — with
+// every mountain and valley exchanged. Note this is NOT n -> -n, which would
+// negate x and y as well and merely rotate the patch.
+function pos3D(n: number[], flip = false): V3 {
     const acc: V3 = [0, 0, 0];
     for (let j = 0; j < 5; j++) {
         acc[0] += n[j] * E5[j][0];
         acc[1] += n[j] * E5[j][1];
         acc[2] += n[j] * E5[j][2];
     }
+    if (flip) acc[2] = -acc[2];
     return acc;
 }
 

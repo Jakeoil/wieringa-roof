@@ -351,13 +351,18 @@ export interface UnfoldOptions {
     // Try every rhomb as the starting seed and keep the best result. O(F^3), so
     // it is skipped above this many faces.
     maxSeedSearch?: number;
+    // Reflect the surface vertically — the dual roof, with every mountain and
+    // valley exchanged. Fold magnitudes are unchanged.
+    flip?: boolean;
 }
 
 export function unfoldPatch(opts: UnfoldOptions = {}): UnfoldResult {
     const maxSeedSearch = opts.maxSeedSearch ?? 150;
     const faces = buildFaces();
     const lift = computeLift();
-    const P: (V3 | null)[] = lift.n.map((nv) => (nv ? pos3D(nv) : null));
+    const P: (V3 | null)[] = lift.n.map((nv) =>
+        nv ? pos3D(nv, opts.flip) : null,
+    );
     const links = faceLinks(faces);
     const { creases, hist, interior } = computeCreases(faces, P);
 
@@ -562,10 +567,12 @@ function pieceBox(faceIds: number[], placed: Map<number, Placed>) {
     return { w: x1 - x0, h: y1 - y0, minX: x0, minY: y0 };
 }
 
-export function stripPatch(): UnfoldResult {
+export function stripPatch(opts: UnfoldOptions = {}): UnfoldResult {
     const faces = buildFaces();
     const lift = computeLift();
-    const P: (V3 | null)[] = lift.n.map((nv) => (nv ? pos3D(nv) : null));
+    const P: (V3 | null)[] = lift.n.map((nv) =>
+        nv ? pos3D(nv, opts.flip) : null,
+    );
     const byId = new Map(faces.map((f) => [f.id, f]));
     const { creases, hist, interior } = computeCreases(faces, P);
 
@@ -653,10 +660,12 @@ export function stripPatch(): UnfoldResult {
 // and gives a natural folding order. The result is patch-specific: unlike a pure
 // ribbon there is no clean rule for which rhomb belongs to which band.
 
-export function ribbonGrowPatch(): UnfoldResult {
+export function ribbonGrowPatch(opts: UnfoldOptions = {}): UnfoldResult {
     const faces = buildFaces();
     const lift = computeLift();
-    const P: (V3 | null)[] = lift.n.map((nv) => (nv ? pos3D(nv) : null));
+    const P: (V3 | null)[] = lift.n.map((nv) =>
+        nv ? pos3D(nv, opts.flip) : null,
+    );
     const byId = new Map(faces.map((f) => [f.id, f]));
     const { creases, hist, interior } = computeCreases(faces, P);
     const links = faceLinks(faces);
