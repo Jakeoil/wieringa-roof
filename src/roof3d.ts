@@ -31,6 +31,8 @@ const colorSel = el<HTMLSelectElement>("color");
 const vscaleInput = el<HTMLInputElement>("vscale");
 const vscaleOut = el<HTMLElement>("vscaleOut");
 const edgesChk = el<HTMLInputElement>("edges");
+const isoChk = el<HTMLInputElement>("isogloss");
+const transpChk = el<HTMLInputElement>("transparent");
 const flipChk = el<HTMLInputElement>("flip");
 const statusEl = el<HTMLElement>("status");
 
@@ -61,9 +63,10 @@ scene.add(rim);
 
 let surface: THREE.Mesh | null = null;
 let wire: THREE.LineSegments | null = null;
+let iso: THREE.LineSegments | null = null;
 
 function disposeOld(): void {
-    for (const obj of [surface, wire]) {
+    for (const obj of [surface, wire, iso]) {
         if (!obj) continue;
         scene.remove(obj);
         obj.geometry.dispose();
@@ -73,6 +76,7 @@ function disposeOld(): void {
     }
     surface = null;
     wire = null;
+    iso = null;
 }
 
 // ── palettes ──────────────────────────────────────────────────────
@@ -167,6 +171,9 @@ function build(reframe: boolean): void {
         color: mode === "plain" ? 0xc9cbd4 : 0xffffff,
         roughness: 0.62,
         metalness: 0.04,
+        transparent: transpChk.checked,
+        opacity: transpChk.checked ? 0.5 : 1,
+        depthWrite: !transpChk.checked,
         // The mesh is non-indexed, so computeVertexNormals already yields one
         // normal per triangle — it is flat-shaded inherently and a smooth/flat
         // toggle would do nothing. polygonOffset pushes the faces back so the
@@ -203,6 +210,62 @@ function build(reframe: boolean): void {
             new THREE.LineBasicMaterial({ color: 0x2b2e35 }),
         );
         scene.add(wire);
+    }
+
+    // Isoglosses — contour lines. Seven per rhombus, dividing the long diagonal
+    // into eight, which puts them on quarter-index height steps. The long diagonal
+    // runs between the extreme corners (indices i and i+2) and a rhombus has
+    // perpendicular diagonals, so a line across it perpendicular to that axis is a
+    // level set of height. Heights match along shared edges, so the contours carry
+    // on unbroken from tile to tile.
+    if (isoChk.checked) {
+        const ip: number[] = [];
+        const at = (u: number, w: number, s: number): [number, number, number] => {
+            const a = P[u]!;
+            const b = P[w]!;
+            return [
+                a[0] + (b[0] - a[0]) * s - c.x,
+                a[1] + (b[1] - a[1]) * s - c.y,
+                (a[2] + (b[2] - a[2]) * s) * vscale - c.z,
+            ];
+        };
+        for (const f of faces) {
+            // rotate the cycle so k is the lowest corner
+            let k = 0;
+            for (let i = 1; i < 4; i++) {
+                if (vertexList[f.v[i]].index < vertexList[f.v[k]].index) k = i;
+            }
+            const lo = f.v[k];
+            const r1 = f.v[(k + 1) % 4];
+            const hi = f.v[(k + 2) % 4];
+            const r3 = f.v[(k + 3) % 4];
+            for (let i = 1; i <= 7; i++) {
+                const t = i / 8;
+                let L: [number, number, number];
+                let R: [number, number, number];
+                if (t <= 0.5) {
+                    const s = t * 2;
+                    L = at(lo, r3, s);
+                    R = at(lo, r1, s);
+                } else {
+                    const s = (t - 0.5) * 2;
+                    L = at(r3, hi, s);
+                    R = at(r1, hi, s);
+                }
+                ip.push(L[0], L[1], L[2], R[0], R[1], R[2]);
+            }
+        }
+        const ig = new THREE.BufferGeometry();
+        ig.setAttribute("position", new THREE.Float32BufferAttribute(ip, 3));
+        iso = new THREE.LineSegments(
+            ig,
+            new THREE.LineBasicMaterial({
+                color: 0x1d2026,
+                transparent: true,
+                opacity: 0.65,
+            }),
+        );
+        scene.add(iso);
     }
 
     // Frame only when the patch itself changes — reframing on every rebuild
@@ -264,7 +327,7 @@ function rebuild(reframe: boolean): void {
 for (const c of [patchSel, genSel]) {
     c.addEventListener("change", () => rebuild(true));
 }
-for (const c of [colorSel, edgesChk, flipChk]) {
+for (const c of [colorSel, edgesChk, isoChk, transpChk, flipChk]) {
     c.addEventListener("change", () => rebuild(false));
 }
 vscaleInput.addEventListener("input", () => rebuild(false));

@@ -61,6 +61,8 @@
     </label>
     <span class="checks">
         <label><input type="checkbox" id="edges" checked> edges</label>
+        <label><input type="checkbox" id="isogloss"> isoglosses</label>
+        <label><input type="checkbox" id="transparent"> transparent</label>
         <label><input type="checkbox" id="flip"> flip (hills &harr; dales)</label>
     </span>
 </div>
@@ -87,6 +89,22 @@
     rhombi in space, and it is only their tilt that makes them project to the wide
     or narrow Penrose rhomb. Turn the model until you are looking straight down the
     vertical axis and the surface flattens into the Penrose tiling it came from.
+</p>
+<p>
+    <strong>Isoglosses</strong> are contour lines — seven per rhombus, dividing its
+    long diagonal into eight. That diagonal is the height gradient, since a
+    rhombus's vertex heights run <span class="mono">i, i+1, i+2, i+1</span> around
+    the cycle; and because a rhombus has perpendicular diagonals, lines across it
+    perpendicular to that axis are exactly <em>level sets of height</em>. They land
+    on quarter-index steps and, since heights agree along every shared edge, they
+    run on unbroken from tile to tile across the whole surface. Drawn flat in 2D
+    they are what makes the corrugation visible; here they are simply the contours
+    they always were.
+</p>
+<p>
+    <strong>Transparent</strong> drops the surface to half opacity so you can see
+    the folds behind the ones facing you — useful with isoglosses on, since the
+    contours then read through the whole depth of the roof at once.
 </p>
 <p>
     <strong>Vertical scale</strong> runs from the true surface at 1 down to nothing
