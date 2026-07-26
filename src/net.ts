@@ -22,6 +22,7 @@ const PATCHES: Array<[string, string]> = [
     ["Pe5", "Star"],
     ["Pe3", "Boat"],
     ["Pe1", "Diamond"],
+    ["Deca", "Decagon"],
 ];
 
 for (const [code, nick] of PATCHES) {

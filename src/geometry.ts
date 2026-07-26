@@ -270,7 +270,7 @@ function makeRhombShapes(
 
 interface TileType {
     name: string;
-    kind: "penta" | "star";
+    kind: "penta" | "star" | "deca";
     twist?: number[];
     diamond?: number[];
     color?: (string | null)[];
@@ -308,6 +308,13 @@ const St1: TileType = {
     name: "St1",
     kind: "star",
     color: ["y", null, null, null, null],
+};
+// Composite seed: a yellow pentagon with diamonds, orange pentagons and a boat
+// packed round it. Bilaterally symmetric rather than five-fold — the only seed
+// with a preferred direction. Ported from penrose-mosaic's deca().
+const Deca: TileType = {
+    name: "Deca",
+    kind: "deca",
 };
 
 // ── Rhomb collection ──────────────────────────────────────────────
@@ -529,6 +536,79 @@ function expandStar(
             expandStar(St3, shift, !isHeads, locBoat, gen - 1, ci + boatDelta);
         }
     }
+}
+
+function expandDeca(
+    _type: TileType,
+    angle: Angle,
+    isHeads: boolean,
+    loc: Pt,
+    gen: number,
+    ci: number,
+) {
+    if (gen === 0) return;
+
+    const dWheel = wheels.d[gen].w;
+    const sWheel = wheels.s[gen].w;
+    const pWheel = wheels.p[gen].w;
+
+    // Two wheel-lookup patterns come over from penrose-mosaic and must not be
+    // mixed up:
+    //   isDown ? down[f] : up[f]   →  w[rot(k).tenths]
+    //   isDown ? up[f]   : down[f] →  w[rot(k).inv.tenths]   (inverted)
+    // The centring offset and both orange pentagons use the inverted form.
+    const base = loc.tr(dWheel[angle.inv.tenths]);
+
+    // central yellow pentagon — the boat, in rhomb terms
+    expandPenta(Pe3, angle, !isHeads, base, gen - 1, ci);
+
+    // two diamonds
+    expandStar(
+        St1,
+        angle.rot(3),
+        isHeads,
+        base.tr(sWheel[angle.rot(1).tenths]),
+        gen - 1,
+        ci,
+    );
+    expandStar(
+        St1,
+        angle.rot(2),
+        isHeads,
+        base.tr(sWheel[angle.rot(4).tenths]),
+        gen - 1,
+        ci,
+    );
+
+    // two orange pentagons — the diamonds, in rhomb terms
+    expandPenta(
+        Pe1,
+        angle.rot(2).inv,
+        !isHeads,
+        base.tr(pWheel[angle.rot(3).inv.tenths]),
+        gen - 1,
+        ci,
+    );
+    expandPenta(
+        Pe1,
+        angle.rot(3).inv,
+        !isHeads,
+        base.tr(pWheel[angle.rot(2).inv.tenths]),
+        gen - 1,
+        ci,
+    );
+
+    // and the boat
+    expandStar(
+        St3,
+        angle.inv,
+        isHeads,
+        base
+            .tr(pWheel[angle.rot(2).inv.tenths])
+            .tr(sWheel[angle.rot(3).inv.tenths]),
+        gen - 1,
+        ci,
+    );
 }
 
 // ── The five icosahedral generators ───────────────────────────────
@@ -811,13 +891,18 @@ function getLift(): Lift | null {
 
 type SeedType = "Pe5" | "Pe3" | "Pe1" | "St5" | "St3" | "St1";
 
-const seedTypes: { label: string; type: TileType; kind: "penta" | "star" }[] = [
+const seedTypes: {
+    label: string;
+    type: TileType;
+    kind: "penta" | "star" | "deca";
+}[] = [
     { label: "Pe5", type: Pe5, kind: "penta" },
     { label: "Pe3", type: Pe3, kind: "penta" },
     { label: "Pe1", type: Pe1, kind: "penta" },
     { label: "St5", type: St5, kind: "star" },
     { label: "St3", type: St3, kind: "star" },
     { label: "St1", type: St1, kind: "star" },
+    { label: "Deca", type: Deca, kind: "deca" },
 ];
 
 // ── Generate a patch ──────────────────────────────────────────────
@@ -836,6 +921,8 @@ function generatePatch(seedIdx: number, isHeads: boolean, gen: number): void {
 
     if (seed.kind === "penta") {
         expandPenta(seed.type, angle, isHeads, p(0, 0), gen, initialCI);
+    } else if (seed.kind === "deca") {
+        expandDeca(seed.type, angle, isHeads, p(0, 0), gen, initialCI);
     } else {
         expandStar(seed.type, angle, isHeads, p(0, 0), gen, initialCI);
     }

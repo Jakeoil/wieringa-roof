@@ -223,6 +223,7 @@ for (const [code, nick] of [
     ["Pe5", "Star"],
     ["Pe3", "Boat"],
     ["Pe1", "Diamond"],
+    ["Deca", "Decagon"],
     ["St5", "Star (St5)"],
 ] as Array<[string, string]>) {
     const o = document.createElement("option");
