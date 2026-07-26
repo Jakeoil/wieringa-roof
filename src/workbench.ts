@@ -5,6 +5,8 @@ import {
     GOLDEN_SIDE,
     PHI,
     edgeMap,
+    vertexMap,
+    roundKey,
     Pt,
     p,
     allRhombs,
@@ -198,9 +200,27 @@ function drawTiling() {
             ctx.lineWidth = 0.5;
             ctx.stroke();
         }
+
+        // brushed twin: this rhomb is the one under the pointer on the net canvas
+        if (r.id === hoveredNetId) {
+            ctx.strokeStyle = "#6a5acd";
+            ctx.lineWidth = 3;
+            ctx.stroke();
+        }
     }
 
     // Vertex dots
+    if (mirror.onTiling) {
+        const q = toScreen(mirror.onTiling);
+        ctx.beginPath();
+        ctx.arc(q.x, q.y, 4.5, 0, Math.PI * 2);
+        ctx.fillStyle = "rgba(106, 90, 205, 0.85)";
+        ctx.fill();
+        ctx.strokeStyle = "#fff";
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+    }
+
     for (const v of vertexList) {
         if (v.index === -999) continue; // skip unassigned
         const sv = toScreen(v.pos);
@@ -293,6 +313,119 @@ const netHinges = new Set<string>();
 // a saddle vertex, which is curvature appearing as a constraint on your choices.
 type MoveClass = "clean" | "overlap";
 const moveHints = new Map<number, MoveClass>();
+
+// Brushing and linking — the coordinated-views convention. Hovering either canvas
+// highlights the same rhomb in the other, and places a marker at the
+// *corresponding point* inside it. The two rhombi are not congruent (72° against
+// 63.43°), so there is no rigid mirror; instead the pointer is expressed in the
+// hovered rhomb's edge coordinates (s,t) and the same (s,t) is applied in its
+// twin. Exact, and it tracks corners and edges perfectly.
+let hoveredNetId = -1;
+let mirror: { onTiling: Pt | null; onNet: [number, number] | null } = {
+    onTiling: null,
+    onNet: null,
+};
+
+// Ghost previews — every placement a hovered rhomb could take, one per hinge it
+// shares with the net, green where it lands clean and red where it collides.
+interface Ghost {
+    poly: [number, number][];
+    clean: boolean;
+    a: number;
+    b: number;
+}
+let ghosts: Ghost[] = [];
+let ghostFocus: { a: number; b: number } | null = null;
+
+// Solve P = c0 + s·(c1−c0) + t·(c3−c0) for a parallelogram.
+function edgeCoords(
+    px: number,
+    py: number,
+    c0: [number, number],
+    c1: [number, number],
+    c3: [number, number],
+): [number, number] {
+    const ax = c1[0] - c0[0];
+    const ay = c1[1] - c0[1];
+    const bx = c3[0] - c0[0];
+    const by = c3[1] - c0[1];
+    const det = ax * by - ay * bx;
+    if (Math.abs(det) < 1e-12) return [0, 0];
+    const rx = px - c0[0];
+    const ry = py - c0[1];
+    return [(rx * by - ry * bx) / det, (ax * ry - ay * rx) / det];
+}
+
+// Line up the two corner orderings by tiling vertex id, so (s,t) means the same
+// thing in both: the net poly's order is whatever the unfolding produced.
+function cornerPermutation(rid: number, netVerts: number[]): number[] | null {
+    const r = allRhombs[rid];
+    const tids = r.verts.map((v) => vertexMap.get(roundKey(v))?.id ?? -1);
+    const perm = tids.map((id) => netVerts.indexOf(id));
+    return perm.some((k) => k < 0) ? null : perm;
+}
+
+function tilingToNet(rid: number, mp: Pt): [number, number] | null {
+    const nr = netRhombs.find((n) => n.sourceId === rid);
+    if (!nr) return null;
+    const perm = cornerPermutation(rid, nr.verts);
+    if (!perm) return null;
+    const r = allRhombs[rid];
+    const [st0, st1] = edgeCoords(
+        mp.x,
+        mp.y,
+        [r.verts[0].x, r.verts[0].y],
+        [r.verts[1].x, r.verts[1].y],
+        [r.verts[3].x, r.verts[3].y],
+    );
+    const n0 = nr.poly[perm[0]];
+    const n1 = nr.poly[perm[1]];
+    const n3 = nr.poly[perm[3]];
+    return [
+        n0[0] + st0 * (n1[0] - n0[0]) + st1 * (n3[0] - n0[0]),
+        n0[1] + st0 * (n1[1] - n0[1]) + st1 * (n3[1] - n0[1]),
+    ];
+}
+
+function netToTiling(nr: NetRhomb, x: number, y: number): Pt | null {
+    const perm = cornerPermutation(nr.sourceId, nr.verts);
+    if (!perm) return null;
+    const r = allRhombs[nr.sourceId];
+    const [st0, st1] = edgeCoords(
+        x,
+        y,
+        nr.poly[perm[0]],
+        nr.poly[perm[1]],
+        nr.poly[perm[3]],
+    );
+    const t0 = r.verts[0];
+    const t1 = r.verts[1];
+    const t3 = r.verts[3];
+    return p(
+        t0.x + st0 * (t1.x - t0.x) + st1 * (t3.x - t0.x),
+        t0.y + st0 * (t1.y - t0.y) + st1 * (t3.y - t0.y),
+    );
+}
+
+function computeGhosts(rid: number): void {
+    ghosts = [];
+    if (!analysis || placedRhombs.has(rid) || netRhombs.length === 0) return;
+    const { faces, P, links } = analysis;
+    for (const l of links.get(rid) ?? []) {
+        if (!placedRhombs.has(l.other)) continue;
+        const host = netRhombs.find((n) => n.sourceId === l.other);
+        if (!host) continue;
+        const cand = placeAcross(faces[rid], P, l.a, l.b, asPlaced(host));
+        if (!cand) continue;
+        const poly = cand.poly as [number, number][];
+        ghosts.push({
+            poly,
+            clean: !netOverlaps(poly, rid),
+            a: l.a,
+            b: l.b,
+        });
+    }
+}
 
 // Undo by snapshot rather than inverse operations: the state is small enough that
 // copying it is free, and it cannot drift out of step with the real thing.
@@ -506,6 +639,26 @@ function drawNet() {
     const toPx = (q: [number, number]) =>
         p(q[0] * GOLDEN_SIDE * DPI, q[1] * GOLDEN_SIDE * DPI);
 
+    // ghost placements for the rhomb under the pointer in the tiling view
+    for (const gh of ghosts) {
+        const focused =
+            !ghostFocus || (ghostFocus.a === gh.a && ghostFocus.b === gh.b);
+        const gv = gh.poly.map(toPx);
+        ctx.beginPath();
+        ctx.moveTo(gv[0].x, gv[0].y);
+        for (let i = 1; i < 4; i++) ctx.lineTo(gv[i].x, gv[i].y);
+        ctx.closePath();
+        ctx.fillStyle = gh.clean
+            ? `rgba(46, 160, 67, ${focused ? 0.28 : 0.1})`
+            : `rgba(192, 57, 43, ${focused ? 0.28 : 0.1})`;
+        ctx.fill();
+        ctx.strokeStyle = gh.clean ? "#2ea043" : "#c0392b";
+        ctx.lineWidth = focused ? 2 : 1;
+        ctx.setLineDash(focused ? [] : [4, 3]);
+        ctx.stroke();
+        ctx.setLineDash([]);
+    }
+
     for (const nr of netRhombs) {
         const sv = nr.poly.map(toPx);
         ctx.beginPath();
@@ -563,6 +716,17 @@ function drawNet() {
             ctx.setLineDash([]);
         }
 
+        // brushed twin: this is the rhomb under the pointer in the tiling view
+        if (nr.sourceId === hoveredRhomb) {
+            ctx.beginPath();
+            ctx.moveTo(sv[0].x, sv[0].y);
+            for (let i = 1; i < 4; i++) ctx.lineTo(sv[i].x, sv[i].y);
+            ctx.closePath();
+            ctx.strokeStyle = "#6a5acd";
+            ctx.lineWidth = 3;
+            ctx.stroke();
+        }
+
         // Vertex index labels
         for (let i = 0; i < 4; i++) {
             const idx = displayIndex(vertexList[nr.verts[i]].index);
@@ -572,12 +736,63 @@ function drawNet() {
             ctx.fillText(String(idx), sv[i].x, sv[i].y - 4);
         }
     }
+
+    if (mirror.onNet) {
+        const q = toPx(mirror.onNet);
+        ctx.beginPath();
+        ctx.arc(q.x, q.y, 4.5, 0, Math.PI * 2);
+        ctx.fillStyle = "rgba(106, 90, 205, 0.85)";
+        ctx.fill();
+        ctx.strokeStyle = "#fff";
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+    }
 }
 
 // ── Events ────────────────────────────────────────────────────────
 
 function say(msg: string): void {
     infoSpan.textContent = msg;
+}
+
+// The mirrored cursor has to follow continuous motion, so redraws are coalesced
+// to one per animation frame. At gen 5 a full repaint is not cheap.
+let redrawQueued = false;
+function scheduleRedraw(): void {
+    if (redrawQueued) return;
+    redrawQueued = true;
+    requestAnimationFrame(() => {
+        redrawQueued = false;
+        drawTiling();
+        drawNet();
+    });
+}
+
+function netPointFromEvent(e: MouseEvent): [number, number] {
+    const rect = netCanvas.getBoundingClientRect();
+    return [
+        ((e.clientX - rect.left) / (DPI * GOLDEN_SIDE)) *
+            (netCanvas.width / rect.width),
+        ((e.clientY - rect.top) / (DPI * GOLDEN_SIDE)) *
+            (netCanvas.height / rect.height),
+    ];
+}
+
+function netRhombAt(x: number, y: number): NetRhomb | null {
+    for (let i = netRhombs.length - 1; i >= 0; i--) {
+        const q = netRhombs[i].poly;
+        if (
+            pointInQuad(p(x, y), [
+                p(q[0][0], q[0][1]),
+                p(q[1][0], q[1][1]),
+                p(q[2][0], q[2][1]),
+                p(q[3][0], q[3][1]),
+            ])
+        ) {
+            return netRhombs[i];
+        }
+    }
+    return null;
 }
 
 tilingCanvas.addEventListener("mousemove", (e) => {
@@ -587,10 +802,20 @@ tilingCanvas.addEventListener("mousemove", (e) => {
     const edge = findEdgeAt(sx, sy);
     const rid = findRhombAt(sx, sy);
     tilingCanvas.style.cursor = edge ? "col-resize" : "crosshair";
+
     if (rid !== hoveredRhomb) {
         hoveredRhomb = rid;
-        drawTiling();
+        if (rid >= 0) computeGhosts(rid);
+        else ghosts = [];
     }
+    // hovering an edge narrows the ghosts to that one hinge
+    ghostFocus = edge ? { a: edge.a, b: edge.b } : null;
+    hoveredNetId = -1;
+    mirror = {
+        onTiling: null,
+        onNet: rid >= 0 ? tilingToNet(rid, fromScreen(sx, sy)) : null,
+    };
+    scheduleRedraw();
     if (edge) {
         const [x, y] = edge.rhombIds;
         const cr = analysis?.creases.get(ekey(edge.a, edge.b));
@@ -645,8 +870,45 @@ tilingCanvas.addEventListener("click", (e) => {
         if (rid < 0) return;
         say(placeRhomb(rid));
     }
+    if (hoveredRhomb >= 0) computeGhosts(hoveredRhomb);
     drawTiling();
     drawNet();
+});
+
+netCanvas.addEventListener("mousemove", (e) => {
+    const [mx, my] = netPointFromEvent(e);
+    const nr = netRhombAt(mx, my);
+    hoveredNetId = nr ? nr.sourceId : -1;
+    hoveredRhomb = -1;
+    ghosts = [];
+    ghostFocus = null;
+    mirror = {
+        onTiling: nr ? netToTiling(nr, mx, my) : null,
+        onNet: null,
+    };
+    netCanvas.style.cursor = nr ? "pointer" : "default";
+    if (nr) {
+        const r = allRhombs[nr.sourceId];
+        say(
+            `Rhomb ${nr.sourceId} (${r.thick ? "thick" : "thin"})` +
+                `${nr.overlapping ? " · overlapping" : ""} — click to remove`,
+        );
+    }
+    scheduleRedraw();
+});
+
+netCanvas.addEventListener("mouseleave", () => {
+    hoveredNetId = -1;
+    mirror = { onTiling: null, onNet: null };
+    scheduleRedraw();
+});
+
+tilingCanvas.addEventListener("mouseleave", () => {
+    hoveredRhomb = -1;
+    ghosts = [];
+    ghostFocus = null;
+    mirror = { onTiling: null, onNet: null };
+    scheduleRedraw();
 });
 
 // Click a placed rhomb on the work canvas to take it off again.

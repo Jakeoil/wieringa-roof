@@ -51,23 +51,30 @@
     </div>
 
     <div class="note" style="margin:0 0 14px;max-width:900px">
-        <strong>Clicking an edge picks the hinge.</strong> When a rhomb touches the
-        net along more than one edge, which edge you unfold across decides where it
-        lands — clicking the rhomb takes the most recent neighbour, clicking the
-        edge names the one you want. The pointer changes shape over an edge.
+        <strong>Green means a route lands clean; red means every route from there
+        overlaps.</strong> The preview runs each hinge a rhomb could arrive on and
+        tests it before you commit, so the dead ends are visible in advance. Watch
+        the red spread as you work round a saddle vertex — that is the surface's
+        curvature showing up as a constraint on what you are allowed to do next.
         <br><br>
-        <strong>Overlaps are allowed and flagged.</strong> A placement that lands on
-        top of something already there is still made, but drawn faded with a red
-        dashed outline. That is the whole point: routes that overlap are how the
-        surface's curvature shows itself, and a naive route can overlap a dozen
-        times where a good one never does.
+        <strong>Hover shows the ghosts.</strong> A rhomb touching the net on more
+        than one edge has more than one possible landing place, and they can
+        disagree — one hinge clean, another overlapping. Hovering draws all of them;
+        hovering the edge you want narrows it to that one, and clicking the edge
+        commits it. Clicking the rhomb instead takes its most recent neighbour.
+        <br><br>
+        <strong>Hovering either canvas highlights the twin in the other</strong>,
+        with a marker at the corresponding point inside it. The two rhombi are not
+        the same shape — 72° against 63.43° — so the pointer is carried across in
+        the rhombus's own edge coordinates, which tracks corners and edges exactly.
         <br><br>
         Creases are dashed by fold angle — 36°, 72°, 108° — and coloured red for
-        mountain, blue for valley. Solid black edges are cuts. Click a rhomb on the
-        work canvas to take it off again.
-        <strong>Hills up / Dales up</strong> flips the roof vertically, reversing
-        every height and every crease. All seven seeds are here, including
-        <span class="mono">Deca</span>.
+        mountain, blue for valley. Solid black edges are cuts. Overlapping
+        placements are still allowed: they go down faded with a red dashed outline.
+        Click a rhomb on the work canvas to remove it, <strong>Undo</strong> or
+        ⌘Z steps back. <strong>Hills up / Dales up</strong> flips the roof
+        vertically, reversing every height and every crease. All seven seeds are
+        here, including <span class="mono">Deca</span>.
     </div>
 
     <div class="workspace">
