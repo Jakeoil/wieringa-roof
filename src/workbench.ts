@@ -3,7 +3,6 @@
 
 import {
     GOLDEN_SIDE,
-    PHI,
     edgeMap,
     vertexMap,
     roundKey,
@@ -27,7 +26,7 @@ import {
     stripPatch,
 } from "./unfold.js";
 import type { Analysis, Placed, TraceEvent } from "./unfold.js";
-import { parseLength } from "./sheet.js";
+import { parseLength, layoutSheets, renderSheet, PAGES } from "./sheet.js";
 
 // ── UI State ──────────────────────────────────────────────────────
 
@@ -745,7 +744,6 @@ function refreshNetView(): void {
         sizeIn: [best.w, best.h],
     };
 }
-const SEED_CENTRE: [number, number] = [0, 0];
 
 function asPlaced(nr: NetRhomb): Placed {
     const src = allRhombs[nr.sourceId];
@@ -1374,6 +1372,122 @@ document.getElementById("btn-clear")!.addEventListener("click", () => {
     drawNet();
 });
 
+// ── Print ─────────────────────────────────────────────────────────
+//
+// Printing goes through sheet.ts, the same renderer the Net page uses, so a
+// hand-built net comes out as crisp vector at true size rather than a screenshot
+// of the canvas. Only the hinges the user actually unfolded across count as
+// creases; every other edge is a cut, exactly as on screen.
+
+function printNet(): void {
+    if (netRhombs.length === 0) {
+        say("Nothing on the net to print yet.");
+        return;
+    }
+    if (!analysis) return;
+
+    const placed = new Map<number, Placed>();
+    for (const nr of netRhombs) placed.set(nr.sourceId, asPlaced(nr));
+
+    // one piece per connected group of hinges, so a net in two islands prints as
+    // two pieces rather than one bounding box with a hole
+    const groups = new Map<number, number>();
+    let gi = 0;
+    for (const nr of netRhombs) {
+        if (groups.has(nr.sourceId)) continue;
+        const g = gi++;
+        const q = [nr.sourceId];
+        groups.set(nr.sourceId, g);
+        for (let i = 0; i < q.length; i++) {
+            for (const k of netHinges) {
+                const [a, b] = k.split("-").map(Number);
+                const e = edgeMap.get(ekey(a, b));
+                if (!e || e.rhombIds.length !== 2) continue;
+                if (!e.rhombIds.includes(q[i])) continue;
+                for (const other of e.rhombIds) {
+                    if (!placed.has(other) || groups.has(other)) continue;
+                    groups.set(other, g);
+                    q.push(other);
+                }
+            }
+        }
+    }
+    const byGroup = new Map<number, number[]>();
+    for (const [fid, g] of groups) {
+        if (!byGroup.has(g)) byGroup.set(g, []);
+        byGroup.get(g)!.push(fid);
+    }
+    for (const [, ids] of byGroup) {
+        for (const fid of ids) placed.get(fid)!.piece = 0;
+    }
+
+    const pieces = [...byGroup.values()].map((faceIds, id) => {
+        let x0 = Infinity;
+        let y0 = Infinity;
+        let x1 = -Infinity;
+        let y1 = -Infinity;
+        for (const fid of faceIds)
+            for (const q of placed.get(fid)!.poly) {
+                if (q[0] < x0) x0 = q[0];
+                if (q[1] < y0) y0 = q[1];
+                if (q[0] > x1) x1 = q[0];
+                if (q[1] > y1) y1 = q[1];
+            }
+        for (const fid of faceIds) placed.get(fid)!.piece = id;
+        return { id, faceIds, w: x1 - x0, h: y1 - y0, minX: x0, minY: y0 };
+    });
+    pieces.sort((a, b) => b.faceIds.length - a.faceIds.length);
+    pieces.forEach((pc, id) => {
+        pc.id = id;
+        for (const fid of pc.faceIds) placed.get(fid)!.piece = id;
+    });
+
+    const sideMm = sideIn * 25.4;
+    const marginMm = MARGIN_IN * 25.4;
+    const [pw, ph] = PAGES.letter;
+    const { sheets, oversize } = layoutSheets(
+        pieces,
+        sideMm,
+        pw - 2 * marginMm,
+        ph - 2 * marginMm,
+        6,
+    );
+
+    // Every piece too big for the page means layoutSheets returns nothing, and
+    // printing that would spool a blank sheet. Say so instead.
+    if (sheets.length === 0) {
+        say(
+            `Nothing fits: ${oversize.length} piece(s) exceed the printable area at ` +
+                `${(sideIn * 25.4).toFixed(1)} mm side. Reduce the side and try again.`,
+        );
+        return;
+    }
+
+    const host = document.getElementById("printout")!;
+    host.innerHTML = sheets
+        .map((sh) =>
+            renderSheet(sh, placed, analysis!.creases, netHinges, {
+                sideMm,
+                pageW: pw,
+                pageH: ph,
+                margin: marginMm,
+                fillMode: "cluster",
+                showAngles: false,
+                showLegend: true,
+            }),
+        )
+        .join("\n");
+
+    say(
+        `Printing ${netRhombs.length} rhombi as ${pieces.length} piece${pieces.length === 1 ? "" : "s"} ` +
+            `on ${sheets.length} sheet${sheets.length === 1 ? "" : "s"} at ${(sideIn * 25.4).toFixed(1)} mm side.` +
+            (oversize.length
+                ? `  ⚠ ${oversize.length} piece(s) too big — reduce the side.`
+                : ""),
+    );
+    window.print();
+}
+
 // ── Transport ─────────────────────────────────────────────────────
 
 let lastFrame = 0;
@@ -1686,6 +1800,12 @@ function buildControls() {
     sideLabel.style.fontSize = "13px";
     sideLabel.appendChild(sideInput);
     controls.appendChild(sideLabel);
+
+    const printBtn = document.createElement("button");
+    printBtn.textContent = "Print / PDF";
+    printBtn.title = "Print what you have built, at true size";
+    printBtn.addEventListener("click", printNet);
+    controls.appendChild(printBtn);
 
     const undoBtn = document.createElement("button");
     undoBtn.textContent = "Undo";

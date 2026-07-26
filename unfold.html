@@ -21,6 +21,20 @@
         cursor: crosshair;
         max-width: 100%;
     }
+    #printout { display: none; }
+
+    @media print {
+        nav, .wrap-wide, .note, #modebar, #controls, #transport { display: none !important; }
+        body { background: #fff; }
+        #printout { display: block; }
+        #printout svg {
+            display: block;
+            break-after: page;
+            page-break-after: always;
+        }
+        #printout svg:last-child { break-after: auto; page-break-after: auto; }
+    }
+    @page { margin: 0; }
 </style>
 </head>
 <body>
@@ -119,6 +133,8 @@ Two ways to work. <strong>Build by hand</strong>: click any rhomb to seed a
 </div>
 
 <script type="module" src="./dist/workbench.js"></script>
+<div id="printout"></div>
+
 <script src="./site.js"></script>
 </body>
 </html>
