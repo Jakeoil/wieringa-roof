@@ -1,3 +1,6 @@
 node_modules/
 dist/
 .DS_Store
+
+# large reference image from penrose-mosaic (kept locally, not tracked)
+deca-shape-expansion.png
