@@ -137,6 +137,6 @@ clone needs `npm install && npm run build` before serving.
 
 ## Open
 
-- Nothing in this project has been opened in a real browser yet.
-- Six loose `test-*.mjs` probes from the vertex-index investigation are still in
-  the tree; they are in git history and can be cleared out.
+- Deployed to GitHub Pages from `main` by `.github/workflows/deploy.yml`.
+- `deca-shape-expansion.png` is kept locally but is not in the repository; it was
+  purged from history, taking `.git` from 11 MB to under 300 KB.
