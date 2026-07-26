@@ -89,13 +89,13 @@ export function buildFaces(): Face[] {
     }));
 }
 
-interface Link {
+export interface Link {
     other: number;
     a: number;
     b: number;
 }
 
-function faceLinks(faces: Face[]): Map<number, Link[]> {
+export function faceLinks(faces: Face[]): Map<number, Link[]> {
     const nb = new Map<number, Link[]>(faces.map((f) => [f.id, []]));
     for (const e of edgeMap.values()) {
         if (e.rhombIds.length !== 2) continue;
@@ -155,7 +155,7 @@ function computeCreases(
 
 // ── planar placement ──────────────────────────────────────────────
 
-function placeSeed(face: Face, P: (V3 | null)[]): P2[] {
+export function placeSeed(face: Face, P: (V3 | null)[]): P2[] {
     const A = P[face.v[0]]!;
     const B = P[face.v[1]]!;
     const D = P[face.v[3]]!;
@@ -190,14 +190,14 @@ const centroid2 = (poly: P2[]): P2 => [
     poly.reduce((s, q) => s + q[1], 0) / poly.length,
 ];
 
-function shrink(poly: P2[], f: number): P2[] {
+export function shrink(poly: P2[], f: number): P2[] {
     const c = centroid2(poly);
     return poly.map(
         (q) => [c[0] + (q[0] - c[0]) * f, c[1] + (q[1] - c[1]) * f] as P2,
     );
 }
 
-function convexOverlap(p1: P2[], p2: P2[]): boolean {
+export function convexOverlap(p1: P2[], p2: P2[]): boolean {
     for (const poly of [p1, p2]) {
         for (let i = 0; i < poly.length; i++) {
             const a = poly[i];
@@ -224,7 +224,7 @@ function convexOverlap(p1: P2[], p2: P2[]): boolean {
     return true;
 }
 
-function placeAcross(
+export function placeAcross(
     face: Face,
     P: (V3 | null)[],
     ea: number,
@@ -434,6 +434,33 @@ export function edgeRole(
 }
 
 export { ekey };
+
+// ── interactive unfolding support ─────────────────────────────────
+
+// Everything a hand-driven unfolder needs, computed once per patch: the faces,
+// the lifted 3D corner positions, the face adjacency, and the fold angle plus
+// mountain/valley of every interior edge. legacy.ts drives placeSeed/placeAcross
+// with these so its geometry is identical to the automatic methods'.
+export interface Analysis {
+    faces: Face[];
+    P: (V3 | null)[];
+    links: Map<number, Link[]>;
+    creases: Map<string, Crease>;
+}
+
+export function analysePatch(flip = false): Analysis {
+    const faces = buildFaces();
+    const lift = computeLift();
+    const P: (V3 | null)[] = lift.n.map((nv) => (nv ? pos3D(nv, flip) : null));
+    return {
+        faces,
+        P,
+        links: faceLinks(faces),
+        creases: computeCreases(faces, P).creases,
+    };
+}
+
+export type { P2 };
 
 // ── ribbon strips ─────────────────────────────────────────────────
 //

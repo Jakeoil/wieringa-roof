@@ -39,21 +39,35 @@
 
     <h1>Legacy Explorer</h1>
     <p class="lede" style="margin-bottom:16px">
-        The original two-canvas net builder — click a rhomb in the tiling to unfold
-        it onto the work canvas. Kept as reference; the
-        <a href="./net.html" draggable="false">Net page</a> supersedes it.
-        <br>
-        <span style="font-size:14px">
-        <strong>Hills up / Dales up</strong> flips the roof vertically — the dual
-        surface over the same tiling — which reverses every vertex height. All seven
-        seeds are available, including the composite
-        <span class="mono">Deca</span>.
-        </span>
+        Unfold a net by hand. Click any rhomb to seed it, then click rhombs
+        touching the net and each is unfolded across the shared edge. You choose the
+        route; <a href="./net.html" draggable="false">Net</a> does the same search
+        automatically.
     </p>
 
     <div class="controls" id="controls">
         <button id="btn-clear">Clear Net</button>
-        <span class="info" id="info">Click a rhomb in the tiling to begin</span>
+        <span class="info" id="info">Click a rhomb to place it; click an edge to choose the hinge</span>
+    </div>
+
+    <div class="note" style="margin:0 0 14px;max-width:900px">
+        <strong>Clicking an edge picks the hinge.</strong> When a rhomb touches the
+        net along more than one edge, which edge you unfold across decides where it
+        lands — clicking the rhomb takes the most recent neighbour, clicking the
+        edge names the one you want. The pointer changes shape over an edge.
+        <br><br>
+        <strong>Overlaps are allowed and flagged.</strong> A placement that lands on
+        top of something already there is still made, but drawn faded with a red
+        dashed outline. That is the whole point: routes that overlap are how the
+        surface's curvature shows itself, and a naive route can overlap a dozen
+        times where a good one never does.
+        <br><br>
+        Creases are dashed by fold angle — 36°, 72°, 108° — and coloured red for
+        mountain, blue for valley. Solid black edges are cuts. Click a rhomb on the
+        work canvas to take it off again.
+        <strong>Hills up / Dales up</strong> flips the roof vertically, reversing
+        every height and every crease. All seven seeds are here, including
+        <span class="mono">Deca</span>.
     </div>
 
     <div class="workspace">
