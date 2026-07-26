@@ -22,8 +22,11 @@ import {
     convexOverlap,
     shrink,
     ekey,
+    unfoldPatch,
+    ribbonGrowPatch,
+    stripPatch,
 } from "./unfold.js";
-import type { Analysis, Placed } from "./unfold.js";
+import type { Analysis, Placed, TraceEvent } from "./unfold.js";
 import { parseLength } from "./sheet.js";
 
 // ── UI State ──────────────────────────────────────────────────────
@@ -175,7 +178,28 @@ function drawTiling() {
         for (let i = 1; i < 4; i++) ctx.lineTo(sv[i].x, sv[i].y);
         ctx.closePath();
 
-        const hint = moveHints.get(r.id);
+        const role = mode === "watch" ? traceRoles.get(r.id) : undefined;
+        const hint = mode === "watch" ? undefined : moveHints.get(r.id);
+        if (role) {
+            ctx.fillStyle = makeGradient(ctx, r.fill, sv[0], sv[2], r.isHeads);
+            ctx.fill();
+            ctx.fillStyle =
+                role === "current"
+                    ? "rgba(106, 90, 205, 0.55)"
+                    : role === "rejected"
+                      ? "rgba(192, 57, 43, 0.35)"
+                      : "rgba(255, 200, 0, 0.45)";
+            ctx.fill();
+            ctx.strokeStyle =
+                role === "current"
+                    ? "#6a5acd"
+                    : role === "rejected"
+                      ? "#c0392b"
+                      : "#c9a227";
+            ctx.lineWidth = role === "current" ? 3 : 1.2;
+            ctx.stroke();
+            continue;
+        }
         if (placedRhombs.has(r.id)) {
             ctx.fillStyle = altDown
                 ? "rgba(192, 57, 43, 0.45)"
@@ -891,6 +915,27 @@ function drawNet() {
 
     const toPx = viewToPx;
 
+    if (traceGhost) {
+        const gv = traceGhost.poly.map(toPx);
+        ctx.beginPath();
+        ctx.moveTo(gv[0].x, gv[0].y);
+        for (let i = 1; i < 4; i++) ctx.lineTo(gv[i].x, gv[i].y);
+        ctx.closePath();
+        const col =
+            traceGhost.kind === "reject"
+                ? "#c0392b"
+                : traceGhost.kind === "consider"
+                  ? "#c9a227"
+                  : "#6a5acd";
+        ctx.fillStyle = col + "44";
+        ctx.fill();
+        ctx.strokeStyle = col;
+        ctx.lineWidth = 2.5;
+        ctx.setLineDash(traceGhost.kind === "reject" ? [5, 3] : []);
+        ctx.stroke();
+        ctx.setLineDash([]);
+    }
+
     // ghost placements for the rhomb under the pointer in the tiling view
     for (const gh of ghosts) {
         const focused =
@@ -1001,6 +1046,125 @@ function drawNet() {
     }
 }
 
+// ── Trace player ──────────────────────────────────────────────────
+//
+// Replay works by rebuilding the net from a prefix of the trace, so the ordinary
+// renderer draws it exactly as if it had been built by hand — one renderer, two
+// drivers. Nothing here re-implements the algorithms; it reads their step log.
+//
+// The view is deliberately fitted once, to the *final* net, and then held. Letting
+// it re-fit each frame makes the whole picture lurch about and is unwatchable.
+
+type Mode = "build" | "watch";
+let mode: Mode = "build";
+
+let traceEvents: TraceEvent[] = [];
+let traceIndex = 0; // number of events applied
+let tracePlaying = false;
+let traceSpeed = 15; // events per second, 0 = uncapped
+let traceMethod = "widened";
+
+// roles for the tiling view at the current step
+const traceRoles = new Map<number, "placed" | "rejected" | "current">();
+let traceGhost: { poly: [number, number][]; kind: TraceEvent["kind"] } | null =
+    null;
+
+function runTrace(): void {
+    traceEvents = [];
+    const fn =
+        traceMethod === "bfs"
+            ? unfoldPatch
+            : traceMethod === "strips"
+              ? stripPatch
+              : ribbonGrowPatch;
+    const res = fn({ flip: flipHeight, trace: traceEvents });
+
+    // fit to the finished net once, then hold it for the whole replay
+    netRhombs.length = 0;
+    netHinges.clear();
+    placedRhombs.clear();
+    for (const pl of res.placed.values()) {
+        netRhombs.push({
+            sourceId: pl.faceId,
+            poly: pl.poly as [number, number][],
+            verts: pl.verts,
+            overlapping: false,
+        });
+        placedRhombs.add(pl.faceId);
+    }
+    refreshNetView();
+
+    traceIndex = 0;
+    applyPrefix(0);
+}
+
+// Rebuild rather than undo: a prefix is only a few thousand array pushes, and
+// rebuilding cannot drift the way incremental undo can.
+function applyPrefix(k: number): void {
+    traceIndex = Math.max(0, Math.min(k, traceEvents.length));
+    netRhombs.length = 0;
+    netHinges.clear();
+    placedRhombs.clear();
+    traceRoles.clear();
+    traceGhost = null;
+
+    const rejected = new Set<number>();
+    for (let i = 0; i < traceIndex; i++) {
+        const e = traceEvents[i];
+        if (e.kind === "seed" || e.kind === "place") {
+            netRhombs.push({
+                sourceId: e.face,
+                poly: e.poly as [number, number][],
+                verts: e.verts.slice(),
+                overlapping: false,
+            });
+            placedRhombs.add(e.face);
+            rejected.delete(e.face);
+            if (e.kind === "place") netHinges.add(ekey(e.a, e.b));
+        } else if (e.kind === "reject") {
+            rejected.add(e.face);
+        }
+    }
+    for (const id of placedRhombs) traceRoles.set(id, "placed");
+    for (const id of rejected) {
+        if (!placedRhombs.has(id)) traceRoles.set(id, "rejected");
+    }
+
+    const cur = traceEvents[traceIndex - 1];
+    if (cur && cur.kind !== "newPiece") {
+        traceRoles.set(cur.face, "current");
+        if (cur.poly) {
+            traceGhost = {
+                poly: cur.poly as [number, number][],
+                kind: cur.kind,
+            };
+        }
+    }
+}
+
+function traceLabel(): string {
+    if (traceEvents.length === 0) return "No trace yet.";
+    const e = traceEvents[traceIndex - 1];
+    const at = `${traceIndex} / ${traceEvents.length}`;
+    if (!e) return `${at} — start`;
+    const what =
+        e.kind === "newPiece"
+            ? `new piece ${e.piece}`
+            : e.kind === "reject"
+              ? `reject ${e.face} (${e.reason})`
+              : e.kind === "seed"
+                ? `seed ${e.face}`
+                : e.kind === "consider"
+                  ? `consider ${e.face} from ${e.from}`
+                  : `place ${e.face} from ${e.from}`;
+    const counts = { seed: 0, place: 0, consider: 0, reject: 0 };
+    for (let i = 0; i < traceIndex; i++) {
+        const k = traceEvents[i].kind;
+        if (k in counts) counts[k as keyof typeof counts]++;
+    }
+    return `${at} · ${what} · placed ${counts.place + counts.seed}, considered ${counts.consider}, rejected ${counts.reject}`;
+}
+
 // ── Events ────────────────────────────────────────────────────────
 
 function say(msg: string): void {
@@ -1105,6 +1269,10 @@ tilingCanvas.addEventListener("mousemove", (e) => {
 });
 
 tilingCanvas.addEventListener("click", (e) => {
+    if (mode === "watch") {
+        say("Watching a replay — switch to Build to place rhombi yourself.");
+        return;
+    }
     const rect = tilingCanvas.getBoundingClientRect();
     const sx = e.clientX - rect.left;
     const sy = e.clientY - rect.top;
@@ -1184,6 +1352,7 @@ tilingCanvas.addEventListener("mouseleave", () => {
 
 // Click a placed rhomb on the work canvas to take it off again.
 netCanvas.addEventListener("click", (e) => {
+    if (mode === "watch") return;
     const [mx, my] = netPointFromEvent(e);
     const nr = netRhombAt(mx, my);
     if (!nr) return;
@@ -1205,7 +1374,220 @@ document.getElementById("btn-clear")!.addEventListener("click", () => {
     drawNet();
 });
 
+// ── Transport ─────────────────────────────────────────────────────
+
+let lastFrame = 0;
+let stepDebt = 0;
+
+function tick(now: number): void {
+    if (!tracePlaying) return;
+    const dt = lastFrame ? (now - lastFrame) / 1000 : 0;
+    lastFrame = now;
+    if (traceSpeed === 0) {
+        applyPrefix(traceEvents.length);
+    } else {
+        stepDebt += dt * traceSpeed;
+        const whole = Math.floor(stepDebt);
+        if (whole > 0) {
+            stepDebt -= whole;
+            applyPrefix(traceIndex + whole);
+        }
+    }
+    if (traceIndex >= traceEvents.length) {
+        tracePlaying = false;
+        syncTransport();
+    }
+    drawTiling();
+    drawNet();
+    if (tracePlaying) requestAnimationFrame(tick);
+}
+
+function startPlay(): void {
+    if (traceEvents.length === 0) return;
+    if (traceIndex >= traceEvents.length) applyPrefix(0);
+    tracePlaying = true;
+    lastFrame = 0;
+    stepDebt = 0;
+    syncTransport();
+    requestAnimationFrame(tick);
+}
+
+function stopPlay(): void {
+    tracePlaying = false;
+    syncTransport();
+}
+
+let syncTransport: () => void = () => {};
+
+function buildTransport(): void {
+    const bar = document.getElementById("transport")!;
+    bar.innerHTML = "";
+
+    const mk = <K extends keyof HTMLElementTagNameMap>(
+        tag: K,
+    ): HTMLElementTagNameMap[K] => document.createElement(tag);
+
+    const methodSel = mk("select");
+    for (const [v, t] of [
+        ["widened", "Widened ribbons"],
+        ["bfs", "BFS"],
+        ["strips", "Ribbon strips"],
+    ]) {
+        const o = mk("option");
+        o.value = v;
+        o.textContent = t;
+        methodSel.appendChild(o);
+    }
+    methodSel.value = traceMethod;
+    methodSel.addEventListener("change", () => {
+        traceMethod = methodSel.value;
+        stopPlay();
+        runTrace();
+        syncTransport();
+        drawTiling();
+        drawNet();
+    });
+    const methodLabel = mk("label");
+    methodLabel.style.fontSize = "13px";
+    methodLabel.textContent = "Method: ";
+    methodLabel.appendChild(methodSel);
+    bar.appendChild(methodLabel);
+
+    const back = mk("button");
+    back.textContent = "◀";
+    back.title = "Step back (←)";
+    back.addEventListener("click", () => {
+        stopPlay();
+        applyPrefix(traceIndex - 1);
+        syncTransport();
+        drawTiling();
+        drawNet();
+    });
+    bar.appendChild(back);
+
+    const playBtn = mk("button");
+    playBtn.addEventListener("click", () => {
+        if (tracePlaying) stopPlay();
+        else startPlay();
+    });
+    bar.appendChild(playBtn);
+
+    const fwd = mk("button");
+    fwd.textContent = "▶|";
+    fwd.title = "Step forward (→)";
+    fwd.addEventListener("click", () => {
+        stopPlay();
+        applyPrefix(traceIndex + 1);
+        syncTransport();
+        drawTiling();
+        drawNet();
+    });
+    bar.appendChild(fwd);
+
+    const scrub = mk("input");
+    scrub.type = "range";
+    scrub.min = "0";
+    scrub.step = "1";
+    scrub.style.width = "260px";
+    scrub.addEventListener("input", () => {
+        stopPlay();
+        applyPrefix(Number(scrub.value));
+        syncTransport();
+        drawTiling();
+        drawNet();
+    });
+    bar.appendChild(scrub);
+
+    const speedSel = mk("select");
+    for (const [v, t] of [
+        ["4", "4 / sec"],
+        ["15", "15 / sec"],
+        ["60", "60 / sec"],
+        ["240", "240 / sec"],
+        ["0", "all at once"],
+    ]) {
+        const o = mk("option");
+        o.value = v;
+        o.textContent = t;
+        speedSel.appendChild(o);
+    }
+    speedSel.value = String(traceSpeed);
+    speedSel.addEventListener("change", () => {
+        traceSpeed = Number(speedSel.value);
+    });
+    const speedLabel = mk("label");
+    speedLabel.style.fontSize = "13px";
+    speedLabel.textContent = "Speed: ";
+    speedLabel.appendChild(speedSel);
+    bar.appendChild(speedLabel);
+
+    const readout = mk("span");
+    readout.className = "info";
+    bar.appendChild(readout);
+
+    syncTransport = () => {
+        playBtn.textContent = tracePlaying ? "❚❚ Pause" : "▶ Play";
+        scrub.max = String(traceEvents.length);
+        scrub.value = String(traceIndex);
+        readout.textContent = traceLabel();
+    };
+    syncTransport();
+}
+
+function setMode(next: Mode): void {
+    mode = next;
+    const transport = document.getElementById("transport")!;
+    const buildBar = document.getElementById("controls")!;
+    transport.style.display = next === "watch" ? "flex" : "none";
+    buildBar.style.opacity = next === "watch" ? "0.45" : "1";
+    buildBar.style.pointerEvents = next === "watch" ? "none" : "auto";
+    stopPlay();
+    if (next === "watch") {
+        runTrace();
+        buildTransport();
+        say("Replaying — Play, or step with the arrow keys.");
+    } else {
+        netRhombs.length = 0;
+        netHinges.clear();
+        placedRhombs.clear();
+        traceRoles.clear();
+        traceGhost = null;
+        traceEvents = [];
+        moveHints.clear();
+        history.length = 0;
+        refreshNetView();
+        say("Build mode. Click a rhomb to seed a net.");
+    }
+    drawTiling();
+    drawNet();
+}
+
 // ── Control panel ─────────────────────────────────────────────────
+
+function buildModeBar(): void {
+    const bar = document.getElementById("modebar")!;
+    for (const [v, t] of [
+        ["build", "Build by hand"],
+        ["watch", "Watch an algorithm"],
+    ] as Array<[Mode, string]>) {
+        const btn = document.createElement("button");
+        btn.textContent = t;
+        btn.addEventListener("click", () => {
+            for (const b of Array.from(bar.querySelectorAll("button"))) {
+                b.style.fontWeight = "400";
+                b.style.borderColor = "#ccc";
+            }
+            btn.style.fontWeight = "600";
+            btn.style.borderColor = "#6a5acd";
+            setMode(v);
+        });
+        if (v === mode) {
+            btn.style.fontWeight = "600";
+            btn.style.borderColor = "#6a5acd";
+        }
+        bar.appendChild(btn);
+    }
+}
 
 function buildControls() {
     const controls = document.getElementById("controls")!;
@@ -1329,6 +1711,22 @@ function buildControls() {
         }
     });
 
+    window.addEventListener("keydown", (e) => {
+        if (mode !== "watch") return;
+        if (e.key === " ") {
+            e.preventDefault();
+            if (tracePlaying) stopPlay();
+            else startPlay();
+        } else if (e.key === "ArrowRight" || e.key === "ArrowLeft") {
+            e.preventDefault();
+            stopPlay();
+            applyPrefix(traceIndex + (e.key === "ArrowRight" ? 1 : -1));
+            syncTransport();
+            drawTiling();
+            drawNet();
+        }
+    });
+
     window.addEventListener("keyup", (e) => {
         if (!e.altKey && altDown) {
             altDown = false;
@@ -1360,6 +1758,7 @@ function regenerate() {
 
 // ── Init ──────────────────────────────────────────────────────────
 
+buildModeBar();
 buildControls();
 sizeNetCanvas();
 generate();

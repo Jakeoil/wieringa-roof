@@ -39,11 +39,14 @@
 
     <h1>Unfolding Workbench</h1>
     <p class="lede" style="margin-bottom:16px">
-        Unfold a net by hand. Click any rhomb to seed it, then click rhombs
-        touching the net and each is unfolded across the shared edge. You choose the
-        route; <a href="./net.html" draggable="false">Net</a> does the same search
-        automatically.
+Two ways to work. <strong>Build by hand</strong>: click any rhomb to seed a
+        net, then click rhombs touching it and each is unfolded across the shared
+        edge — you choose the route. <strong>Watch an algorithm</strong>: replay one
+        of the automatic methods step by step and see the same choices being made
+        for you.
     </p>
+
+    <div class="controls" id="modebar"></div>
 
     <div class="controls" id="controls">
         <button id="btn-clear">Clear Net</button>
@@ -78,6 +81,15 @@
         snip along it. The <strong>Side</strong> box sets the rhombus edge, which is
         the real lever — at the default 1.118" a sheet holds about twenty rhombi.
         <br><br>
+        <strong>Watching a replay.</strong> Play, or step with ← and →, or drag the
+        scrubber; space toggles play. The tiling shows the search's own state —
+        yellow placed, red tried and rejected for overlap, violet the move being
+        made right now, with its candidate ghosted on the sheet. The replay is not a
+        re-enactment: the algorithms emit a step log as they run, and this reads it
+        back, so what you see is the very run that produced the net. The view is
+        fitted once to the finished net and then held, since re-fitting each frame
+        makes the picture lurch.
+        <br><br>
         Creases are dashed by fold angle — 36°, 72°, 108° — and coloured red for
         mountain, blue for valley. Solid black edges are cuts. Overlapping
         placements are still allowed: they go down faded with a red dashed outline.
@@ -90,6 +102,8 @@
         vertically, reversing every height and every crease. All seven seeds are
         here, including <span class="mono">Deca</span>.
     </div>
+
+    <div class="controls" id="transport" style="display:none"></div>
 
     <div class="workspace">
         <div class="panel">

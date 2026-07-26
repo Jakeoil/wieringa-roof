@@ -311,6 +311,7 @@ function runBFS(
                 face: seedId!,
                 piece: pieceId,
                 poly: seedPoly,
+                verts: seed.v.slice(),
             });
         }
 
@@ -388,6 +389,7 @@ function runBFS(
                     b: link.b,
                     piece: pieceId,
                     poly: cand.poly,
+                    verts: cand.verts,
                 });
             }
         }
@@ -409,7 +411,7 @@ function runBFS(
 // what a viewer wants; note ribbonGrowPatch re-sorts pieces by size afterwards,
 // so these are not the final Piece ids.
 export type TraceEvent =
-    | { kind: "seed"; face: number; piece: number; poly: P2[] }
+    | { kind: "seed"; face: number; piece: number; poly: P2[]; verts: number[] }
     | { kind: "newPiece"; piece: number }
     | {
           kind: "consider";
@@ -436,6 +438,7 @@ export type TraceEvent =
           b: number;
           piece: number;
           poly: P2[];
+          verts: number[];
       };
 
 export interface UnfoldOptions {
@@ -746,6 +749,7 @@ export function stripPatch(opts: UnfoldOptions = {}): UnfoldResult {
                     face: fid,
                     piece: pieceId,
                     poly: seedPoly,
+                    verts: face.v.slice(),
                 });
             } else {
                 const link = strip.links[i]!;
@@ -769,6 +773,7 @@ export function stripPatch(opts: UnfoldOptions = {}): UnfoldResult {
                     b: link.b,
                     piece: pieceId,
                     poly: cand.poly,
+                    verts: cand.verts,
                 });
             }
             mine.push(fid);
@@ -864,6 +869,7 @@ export function ribbonGrowPatch(opts: UnfoldOptions = {}): UnfoldResult {
                     face: fid,
                     piece: pieceId,
                     poly: seedPoly,
+                    verts: face.v.slice(),
                 });
             } else {
                 const link = backbone.links[i]!;
@@ -887,6 +893,7 @@ export function ribbonGrowPatch(opts: UnfoldOptions = {}): UnfoldResult {
                     b: link.b,
                     piece: pieceId,
                     poly: cand.poly,
+                    verts: cand.verts,
                 });
             }
             mine.push(fid);
@@ -959,6 +966,7 @@ export function ribbonGrowPatch(opts: UnfoldOptions = {}): UnfoldResult {
                     b: link.b,
                     piece: pieceId,
                     poly: cand.poly,
+                    verts: cand.verts,
                 });
             }
         }
