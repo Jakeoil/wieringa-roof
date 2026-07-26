@@ -24,6 +24,7 @@ import {
     ekey,
 } from "./unfold.js";
 import type { Analysis, Placed } from "./unfold.js";
+import { parseLength } from "./sheet.js";
 
 // ── UI State ──────────────────────────────────────────────────────
 
@@ -498,6 +499,7 @@ function restore(s: Snapshot): void {
     for (const n of netRhombs) placedRhombs.add(n.sourceId);
     recheckOverlaps();
     recomputeMoveHints();
+    refreshNetView();
 }
 
 function undo(): string {
@@ -524,7 +526,202 @@ function recomputeMoveHints(): void {
 }
 let analysis: Analysis | null = null;
 const DPI = 96;
-const SEED_CENTRE: [number, number] = [4.25 / GOLDEN_SIDE, 4.6 / GOLDEN_SIDE];
+
+// Paper, in inches. The net is oriented and centred against the printable area;
+// the sheet edge is drawn too, and a net is allowed to spill past both — that is
+// the point, since a net a little too big is one you snip in two rather than one
+// you cannot have.
+// Rhombus side, in inches. Fixed at φ−½ ≈ 1.118" originally, which is a fine size
+// to fold but caps a sheet at roughly twenty rhombi — so the orientation search
+// alone cannot make a large net fit. Adjustable.
+let sideIn = GOLDEN_SIDE;
+
+const PAPER: [number, number] = [8.5, 11];
+const MARGIN_IN = 0.5;
+const PRINTABLE: [number, number] = [
+    PAPER[0] - 2 * MARGIN_IN,
+    PAPER[1] - 2 * MARGIN_IN,
+];
+
+// The view maps net space (side units) to canvas pixels: rotate, scale, offset.
+interface NetView {
+    angle: number; // radians applied to net space before scaling
+    scale: number; // px per side unit
+    ox: number;
+    oy: number;
+    fits: boolean;
+    overIn: [number, number]; // inches past the printable area, per axis
+    sizeIn: [number, number]; // the net's own footprint, oriented
+}
+let netView: NetView = {
+    angle: 0,
+    scale: DPI * sideIn,
+    ox: 0,
+    oy: 0,
+    fits: true,
+    overIn: [0, 0],
+    sizeIn: [0, 0],
+};
+
+function rot2(q: [number, number], a: number): [number, number] {
+    const c = Math.cos(a);
+    const sn = Math.sin(a);
+    return [q[0] * c - q[1] * sn, q[0] * sn + q[1] * c];
+}
+
+const viewToPx = (q: [number, number]): Pt => {
+    const r = rot2(q, netView.angle);
+    return p(netView.ox + r[0] * netView.scale, netView.oy + r[1] * netView.scale);
+};
+
+const viewFromPx = (x: number, y: number): [number, number] => {
+    const r: [number, number] = [
+        (x - netView.ox) / netView.scale,
+        (y - netView.oy) / netView.scale,
+    ];
+    return rot2(r, -netView.angle);
+};
+
+// Candidate orientations. The minimum-area enclosing rectangle has a side flush
+// with a convex-hull edge, and the development only ever uses about nine edge
+// directions (the golden rhombus angles together with the angular defects, since
+// unfolding round a vertex rotates by its defect). So this is not an optimisation
+// at all — enumerate the directions, add their perpendiculars, test each.
+function candidateAngles(): number[] {
+    const set = new Set<number>([0]);
+    for (const nr of netRhombs) {
+        for (let i = 0; i < 4; i++) {
+            const a = nr.poly[i];
+            const b = nr.poly[(i + 1) % 4];
+            let t = Math.atan2(b[1] - a[1], b[0] - a[0]);
+            t = ((t % Math.PI) + Math.PI) % Math.PI;
+            set.add(Math.round(t * 1e6) / 1e6);
+        }
+    }
+    const out: number[] = [];
+    for (const t of set) {
+        out.push(-t);
+        out.push(-t + Math.PI / 2);
+    }
+    return out;
+}
+
+// The work canvas has no business being a fixed 850x1000. Size it from the space
+// actually available, at the paper's aspect ratio, and give it a device-pixel
+// backing store so the creases stay crisp. All the px maths reads netCanvas.width,
+// and the pointer conversion scales by width/clientWidth, so this is DPR-safe.
+function sizeNetCanvas(): void {
+    const workspace = netCanvas.closest(".workspace") as HTMLElement | null;
+    const avail = workspace
+        ? workspace.clientWidth - tilingCanvas.offsetWidth - 24
+        : 620;
+    const cssW = Math.max(320, Math.min(avail, 780));
+    const cssH = Math.round(cssW * (PAPER[1] / PAPER[0]));
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    netCanvas.style.width = `${cssW}px`;
+    netCanvas.style.height = `${cssH}px`;
+    netCanvas.width = Math.round(cssW * dpr);
+    netCanvas.height = Math.round(cssH * dpr);
+}
+
+function refreshNetView(): void {
+    const pts: [number, number][] = [];
+    for (const nr of netRhombs) for (const q of nr.poly) pts.push(q);
+
+    const canvasW = netCanvas.width;
+    const canvasH = netCanvas.height;
+    const pad = 14;
+
+    if (pts.length === 0) {
+        const sc = Math.min(
+            (canvasW - 2 * pad) / (PAPER[0] * DPI),
+            (canvasH - 2 * pad) / (PAPER[1] * DPI),
+        );
+        netView = {
+            angle: 0,
+            scale: sc * DPI * sideIn,
+            ox: canvasW / 2 - (sc * PAPER[0] * DPI) / 2,
+            oy: canvasH / 2 - (sc * PAPER[1] * DPI) / 2,
+            fits: true,
+            overIn: [0, 0],
+            sizeIn: [0, 0],
+        };
+        return;
+    }
+
+    // Score by the worst axis ratio, max(w/PW, h/PH): scale-invariant, ≤1 exactly
+    // when it fits, and it picks the orientation that comes closest when it does
+    // not. Summing the two overflows instead would trade a small excess on one
+    // axis against a large one on the other. Ties go to the tighter box.
+    let best = {
+        angle: 0,
+        w: Infinity,
+        h: Infinity,
+        over: Infinity,
+        area: Infinity,
+    };
+    for (const a of candidateAngles()) {
+        let x0 = Infinity;
+        let y0 = Infinity;
+        let x1 = -Infinity;
+        let y1 = -Infinity;
+        for (const q of pts) {
+            const r = rot2(q, a);
+            if (r[0] < x0) x0 = r[0];
+            if (r[1] < y0) y0 = r[1];
+            if (r[0] > x1) x1 = r[0];
+            if (r[1] > y1) y1 = r[1];
+        }
+        const wIn = (x1 - x0) * sideIn;
+        const hIn = (y1 - y0) * sideIn;
+        const over = Math.max(wIn / PRINTABLE[0], hIn / PRINTABLE[1]);
+        const area = wIn * hIn;
+        if (
+            over < best.over - 1e-9 ||
+            (Math.abs(over - best.over) < 1e-9 && area < best.area)
+        ) {
+            best = { angle: a, w: wIn, h: hIn, over, area };
+        }
+    }
+
+    // centre the oriented net on the sheet
+    let x0 = Infinity;
+    let y0 = Infinity;
+    let x1 = -Infinity;
+    let y1 = -Infinity;
+    for (const q of pts) {
+        const r = rot2(q, best.angle);
+        if (r[0] < x0) x0 = r[0];
+        if (r[1] < y0) y0 = r[1];
+        if (r[0] > x1) x1 = r[0];
+        if (r[1] > y1) y1 = r[1];
+    }
+    const netCx = ((x0 + x1) / 2) * sideIn;
+    const netCy = ((y0 + y1) / 2) * sideIn;
+
+    // fit sheet and net together into the canvas, so spill stays visible
+    const halfW = Math.max(PAPER[0] / 2, best.w / 2);
+    const halfH = Math.max(PAPER[1] / 2, best.h / 2);
+    const sc = Math.min(
+        (canvasW - 2 * pad) / (2 * halfW * DPI),
+        (canvasH - 2 * pad) / (2 * halfH * DPI),
+    );
+    const pxPerIn = sc * DPI;
+
+    netView = {
+        angle: best.angle,
+        scale: pxPerIn * sideIn,
+        ox: canvasW / 2 - netCx * pxPerIn,
+        oy: canvasH / 2 - netCy * pxPerIn,
+        fits: best.over <= 1 + 1e-9,
+        overIn: [
+            Math.max(0, best.w - PRINTABLE[0]),
+            Math.max(0, best.h - PRINTABLE[1]),
+        ],
+        sizeIn: [best.w, best.h],
+    };
+}
+const SEED_CENTRE: [number, number] = [0, 0];
 
 function asPlaced(nr: NetRhomb): Placed {
     const src = allRhombs[nr.sourceId];
@@ -569,16 +766,7 @@ function placeRhomb(rid: number, viaEdge?: { a: number; b: number }): string {
     if (netRhombs.length === 0) {
         poly = placeSeed(face, P) as [number, number][];
         verts = face.v.slice();
-        // drop the seed near the middle of the page
-        const cx = poly.reduce((t, q) => t + q[0], 0) / 4;
-        const cy = poly.reduce((t, q) => t + q[1], 0) / 4;
-        poly = poly.map(
-            (q) =>
-                [
-                    q[0] - cx + SEED_CENTRE[0],
-                    q[1] - cy + SEED_CENTRE[1],
-                ] as [number, number],
-        );
+        // no need to position it: refreshNetView centres whatever is there
         note = `Seeded with rhomb ${rid}.`;
     } else {
         // candidate hinges: edges to rhombs already placed
@@ -628,12 +816,27 @@ function placeRhomb(rid: number, viaEdge?: { a: number; b: number }): string {
     placedRhombs.add(rid);
     recheckOverlaps();
     recomputeMoveHints();
+    refreshNetView();
 
     const nOver = netRhombs.filter((n) => n.overlapping).length;
     if (overlapping) {
         note += `  ⚠ overlaps — placed anyway (${nOver} overlapping in the net).`;
     }
+    note += `  ${fitReport()}`;
     return note;
+}
+
+// A short account of how the net sits on the sheet, including the orientation the
+// fit chose and how far it spills if it does.
+function fitReport(): string {
+    const [w, h] = netView.sizeIn;
+    const deg = ((-netView.angle * 180) / Math.PI + 360) % 180;
+    const size = `${w.toFixed(1)}×${h.toFixed(1)}"`;
+    if (netView.fits) {
+        return `Fits the printable area at ${deg.toFixed(1)}° (${size}).`;
+    }
+    const [ow, oh] = netView.overIn;
+    return `${size} at ${deg.toFixed(1)}° — over by ${ow.toFixed(1)}" × ${oh.toFixed(1)}", snip along the frame.`;
 }
 
 function removeRhomb(rid: number): string {
@@ -652,6 +855,7 @@ function removeRhomb(rid: number): string {
     }
     recheckOverlaps();
     recomputeMoveHints();
+    refreshNetView();
     return (
         `Removed rhomb ${rid}. ${netRhombs.length} left on the net.` +
         (netIsConnected() ? "" : "  ⚠ the net is now in more than one piece.")
@@ -668,15 +872,24 @@ function drawNet() {
     const ctx = netCtx;
     ctx.clearRect(0, 0, netCanvas.width, netCanvas.height);
 
-    // Page boundary
-    ctx.strokeStyle = "#ddd";
+    // Sheet and printable area, drawn axis-aligned in canvas space: the net is
+    // rotated to meet the paper, not the other way round.
+    const pxPerIn = netView.scale / sideIn;
+    const cx = netCanvas.width / 2;
+    const cy = netCanvas.height / 2;
+    const sheet = [PAPER[0] * pxPerIn, PAPER[1] * pxPerIn];
+    const inner = [PRINTABLE[0] * pxPerIn, PRINTABLE[1] * pxPerIn];
+    ctx.fillStyle = "#fff";
+    ctx.fillRect(cx - sheet[0] / 2, cy - sheet[1] / 2, sheet[0], sheet[1]);
+    ctx.strokeStyle = "#bbb";
     ctx.lineWidth = 1;
+    ctx.strokeRect(cx - sheet[0] / 2, cy - sheet[1] / 2, sheet[0], sheet[1]);
+    ctx.strokeStyle = netView.fits ? "#ddd" : "#e8b4ae";
     ctx.setLineDash([4, 4]);
-    ctx.strokeRect(0, 0, 8.5 * DPI, 10 * DPI);
+    ctx.strokeRect(cx - inner[0] / 2, cy - inner[1] / 2, inner[0], inner[1]);
     ctx.setLineDash([]);
 
-    const toPx = (q: [number, number]) =>
-        p(q[0] * GOLDEN_SIDE * DPI, q[1] * GOLDEN_SIDE * DPI);
+    const toPx = viewToPx;
 
     // ghost placements for the rhomb under the pointer in the tiling view
     for (const gh of ghosts) {
@@ -809,12 +1022,10 @@ function scheduleRedraw(): void {
 
 function netPointFromEvent(e: MouseEvent): [number, number] {
     const rect = netCanvas.getBoundingClientRect();
-    return [
-        ((e.clientX - rect.left) / (DPI * GOLDEN_SIDE)) *
-            (netCanvas.width / rect.width),
-        ((e.clientY - rect.top) / (DPI * GOLDEN_SIDE)) *
-            (netCanvas.height / rect.height),
-    ];
+    return viewFromPx(
+        (e.clientX - rect.left) * (netCanvas.width / rect.width),
+        (e.clientY - rect.top) * (netCanvas.height / rect.height),
+    );
 }
 
 function netRhombAt(x: number, y: number): NetRhomb | null {
@@ -973,11 +1184,7 @@ tilingCanvas.addEventListener("mouseleave", () => {
 
 // Click a placed rhomb on the work canvas to take it off again.
 netCanvas.addEventListener("click", (e) => {
-    const rect = netCanvas.getBoundingClientRect();
-    const mx = ((e.clientX - rect.left) / (DPI * GOLDEN_SIDE)) *
-        (netCanvas.width / rect.width);
-    const my = ((e.clientY - rect.top) / (DPI * GOLDEN_SIDE)) *
-        (netCanvas.height / rect.height);
+    const [mx, my] = netPointFromEvent(e);
     const nr = netRhombAt(mx, my);
     if (!nr) return;
     say(removeRhomb(nr.sourceId));
@@ -992,6 +1199,7 @@ document.getElementById("btn-clear")!.addEventListener("click", () => {
     netHinges.clear();
     placedRhombs.clear();
     moveHints.clear();
+    refreshNetView();
     say("Cleared. Click a rhomb to seed a new net.");
     drawTiling();
     drawNet();
@@ -1070,6 +1278,33 @@ function buildControls() {
     });
     controls.insertBefore(flipBtn, headsBtn.nextSibling);
 
+    const sideInput = document.createElement("input");
+    sideInput.type = "text";
+    sideInput.value = `${GOLDEN_SIDE.toFixed(3)}in`;
+    sideInput.size = 8;
+    sideInput.style.cssText =
+        "padding:4px;font-size:13px;border:1px solid #ccc;border-radius:4px;";
+    const applySide = () => {
+        const parsed = parseLength(sideInput.value);
+        if (!parsed) {
+            say(`Cannot read "${sideInput.value}" as a length — try 20mm or 0.75in.`);
+            return;
+        }
+        sideIn = parsed.mm / 25.4;
+        refreshNetView();
+        drawNet();
+        say(`Rhombus side ${parsed.label}. ${fitReport()}`);
+    };
+    sideInput.addEventListener("change", applySide);
+    sideInput.addEventListener("keydown", (ev) => {
+        if ((ev as KeyboardEvent).key === "Enter") applySide();
+    });
+    const sideLabel = document.createElement("label");
+    sideLabel.textContent = "Side: ";
+    sideLabel.style.fontSize = "13px";
+    sideLabel.appendChild(sideInput);
+    controls.appendChild(sideLabel);
+
     const undoBtn = document.createElement("button");
     undoBtn.textContent = "Undo";
     undoBtn.title = "Step back one placement (⌘Z / Ctrl-Z)";
@@ -1118,6 +1353,7 @@ function regenerate() {
     history.length = 0;
     generate();
     fitView();
+    refreshNetView();
     drawTiling();
     drawNet();
 }
@@ -1125,7 +1361,16 @@ function regenerate() {
 // ── Init ──────────────────────────────────────────────────────────
 
 buildControls();
+sizeNetCanvas();
 generate();
 fitView();
+refreshNetView();
 drawTiling();
 drawNet();
+
+window.addEventListener("resize", () => {
+    sizeNetCanvas();
+    fitView();
+    refreshNetView();
+    scheduleRedraw();
+});

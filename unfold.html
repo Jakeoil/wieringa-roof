@@ -68,6 +68,16 @@
         the same shape — 72° against 63.43° — so the pointer is carried across in
         the rhombus's own edge coordinates, which tracks corners and edges exactly.
         <br><br>
+        <strong>The net is oriented and centred on the sheet automatically.</strong>
+        The best orientation is found by testing the net's own edge directions and
+        their perpendiculars — the minimum enclosing rectangle always has a side
+        flush with a hull edge, and a development only ever uses about nine
+        directions, so this is an exhaustive check of a couple of dozen angles
+        rather than a search. A net too big for the printable frame is still drawn,
+        spilling past it, with the frame turning pink and telling you how far over:
+        snip along it. The <strong>Side</strong> box sets the rhombus edge, which is
+        the real lever — at the default 1.118" a sheet holds about twenty rhombi.
+        <br><br>
         Creases are dashed by fold angle — 36°, 72°, 108° — and coloured red for
         mountain, blue for valley. Solid black edges are cuts. Overlapping
         placements are still allowed: they go down faded with a red dashed outline.
@@ -87,8 +97,8 @@
             <canvas id="tiling" width="500" height="500"></canvas>
         </div>
         <div class="panel">
-            <h3>Net (1:1 inches)</h3>
-            <canvas id="net" width="850" height="1000"></canvas>
+            <h3>Net (true size on the sheet)</h3>
+            <canvas id="net" width="620" height="802"></canvas>
         </div>
     </div>
 
