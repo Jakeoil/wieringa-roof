@@ -1,131 +1,82 @@
-# Wieringa Roof — Interactive Golden Rhombus Net Builder
+# Wieringa Roof
 
-## Goal
+A small site for exploring the Wieringa roof and producing printable nets of
+golden rhombi for physical models.
 
-An interactive tool for exploring the Wieringa roof. The screen shows a Penrose
-rhomb tiling (gen-3 deflation) with colored tiles. A separate work canvas shows
-the net being built. The user clicks a tile or tile edge in the tiling to place
-the corresponding golden rhombus (side φ−½ ≈ 1.118") on the work canvas.
-Overlaps are allowed. Tiles can be removed. The user explores different unfolding
-routes manually.
+## Pages
 
-## Two-Canvas Layout
+| page | content | state |
+|---|---|---|
+| `index.html` | splash — what the surface is, links to everything | done |
+| `net.html` | patch selector → ribbon-strip decomposition → PDF | placeholder |
+| `roof3d.html` | three.js prototype of the surface | placeholder |
+| `info.html` | the maths: golden rhombus, heights, fold angles, defects, solids | done |
+| `legacy.html` | original two-canvas explorer, kept for reference | done (as-is) |
 
-**Left: Tiling view**
-- Gen-3 Penrose rhomb tiling (thick 72° / thin 36°)
-- Colored by type (thick/thin) or by vertex index
-- Click a rhomb → adds it to the work canvas
-- Click an edge → adds the neighbor across that edge
-- Highlight placed rhombs (so you can see what's already in the net)
+`src/legacy.ts` (formerly `src/main.ts`) is the original explorer, untouched.
+`site.css` is the shared shell. `tsc` compiles all of `src/` → `dist/`.
 
-**Right: Work canvas (net)**
-- Golden rhombi laid flat, unfolded from the tiling
-- Each new rhomb is reflected across the shared edge of the last placement
-- Shows fold lines (ridge/valley), vertex index labels
-- Click a placed rhomb to remove it
-- The net represents what will be printed/cut
+Planned additions: `src/geometry.ts` (shared lift + tiling), `src/net.ts`,
+`src/roof3d.ts`.
 
-## Golden Rhombus Dimensions
+## Geometry
 
-All rhombi are identical golden rhombi:
-- Side: φ − ½ = √5/2 ≈ 1.118"
-- Short diagonal: √(3−φ) ≈ 1.176"
-- Long diagonal: √(2+φ) ≈ 1.902"
-- Acute angle: arctan(2) ≈ 63.43°
+Settled and verified numerically against a 349-rhomb de Bruijn patch. Full
+write-up lives on `info.html`; the essentials:
 
-The work canvas is scaled 1:1 to inches for print fidelity.
+- Lift: `E_j = (2/√5·cos 72j°, 2/√5·sin 72j°, 1/√5)`, j = 0…4. A planar vertex
+  `Σ n_j ζ^j` lifts to `Σ n_j E_j`.
+- All ten face orientations are the **same golden rhombus** (63.4349° /
+  116.5651°, diagonals φ:1). Thick vs thin is only which corner meets the shared
+  vertex. One cut shape for the whole model.
+- For side `s`: short diagonal `1.0515 s`, long diagonal `1.7013 s`.
+- Every edge rises or falls by exactly `s/√5`, inclined `arctan(½) = 26.565°`.
+  Vertex height = `index · s/√5`, index ∈ {1,2,3,4} only. Total relief `1.342 s`.
+- Fold angles are **36°, 72° or 108°** — never 0°. Every interior edge is a real
+  crease. thick|thick → 36°; thick|thin → 36° or 72°; thin|thin → 108°.
+  Mountain/valley is per-edge, not derivable from the tile pair.
+- Rhomb index offsets are `(0, 1, 2, 1)` for **both** rhomb types. `isHeads` only
+  decides whether the low corner is v0 or v2. (`emitRhomb` already does this
+  correctly — an earlier note proposing `[0,±1,0,±1]` for thin rhombs was wrong.)
 
-## Data Model
+## Net method
 
-### Rhomb (from tiling)
+**Ribbon strips.** In a de Bruijn ribbon, consecutive rhombi share an edge
+parallel to the same `E_j`, so all creases in a strip are parallel; the strip is
+therefore a generalized cylinder and develops into a straight band with parallel
+creases at monotonically increasing positions.
 
-```
-Rhomb {
-    id: number
-    vertices: [v0, v1, v2, v3]   // 2D Penrose coordinates
-    thick: boolean
-    isHeads: boolean              // v0 high or v0 low
-    edges: [Edge, Edge, Edge, Edge]
-}
-```
+⇒ **Ribbon strips cannot self-overlap at any length**, with no test required.
+This replaces the earlier BFS-unfolding plan, which needed overlap detection.
 
-### Vertex
+Each rhomb belongs to two ribbons, so no single family partitions a patch. Use
+greedy maximal-strip extraction: repeatedly take the longest dual-graph path
+whose consecutive shared edges are parallel.
 
-```
-Vertex {
-    id: number
-    pos: Point
-    index: number                 // 1–4 (Wieringa height)
-}
-```
+## Patches
 
-### Edge
+The P1 tiles map onto rhomb clusters (confirmed in `emitRhombs`):
 
-```
-Edge {
-    v1: Vertex, v2: Vertex
-    rhombs: [Rhomb, Rhomb | null] // the two rhombs sharing this edge
-    foldType: 'ridge' | 'valley' | 'boundary'
-}
-```
+| shape | cluster | rhombi |
+|---|---|---|
+| star | `Pe5` | 5 thick |
+| boat | `Pe3` | 3 thick + 1 thin |
+| diamond | `Pe1` | 1 thick + 2 thin |
 
-### NetRhomb (on work canvas)
+Each seed is expanded a generation or two and printed as an **independent
+one-sheet model** — no cross-sheet edge matching. `deca-shape-expansion.png` is
+the `penrose-mosaic` reference showing four generations.
 
-```
-NetRhomb {
-    sourceRhomb: Rhomb            // link back to tiling
-    flatVertices: [P, P, P, P]    // 2D positions on the work canvas (inches)
-    foldEdges: FoldInfo[]         // which edges are folds, ridge/valley
-}
-```
+## Print
 
-## Vertex Index Propagation
+Side `s` = 20 mm. Strips advance 17.9 mm per face, ten faces to a Letter row;
+rough estimate ~60 rhombi per sheet. Render as SVG at exact physical units with
+a print stylesheet and use the browser's Save as PDF — no PDF library, reliable
+1:1 scale. Annotate each crease with its fold angle and mountain/valley.
 
-1. Generate all rhombs from gen-3 deflation
-2. Build vertex/edge adjacency from positions
-3. Seed: star center → index 4
-4. BFS: across each edge, index changes by ±1
-5. `isHeads` gives direction: v0 high → index(v0) > index(v2)
+## Open
 
-## Unfolding Mechanics
-
-When the user clicks a tiling rhomb adjacent to the current net:
-
-1. Find the shared edge E between the new rhomb and an existing net rhomb
-2. In the work canvas, reflect the golden rhombus template across E
-3. Place it (even if overlapping — the user decides)
-4. Mark fold type on the shared edge (ridge or valley, from vertex indices)
-
-When no shared edge exists (first rhomb, or disconnected placement):
-- Place the golden rhombus at a default position on the work canvas
-
-## Implementation Phases
-
-### Phase 1: Project setup + tiling display
-- npm + TypeScript (same structure as pentagrid)
-- Generate gen-3 rhomb tiling via deflation
-- Render colored rhombs on left canvas
-- Vertex index computation and display
-
-### Phase 2: Interaction + work canvas
-- Click detection (which rhomb / which edge was clicked)
-- Work canvas with golden rhombus template
-- Place first rhomb, unfold neighbors across edges
-- Remove rhombs on click
-
-### Phase 3: Annotations
-- Fold lines (ridge/valley) on work canvas
-- Vertex index labels at corners
-- Highlight placed rhombs in the tiling view
-
-### Phase 4: Print
-- Export work canvas as SVG for clean printing
-- 8.5 × 10" page bounds shown on work canvas
-- Cut lines, fold lines, labels
-
-## Tech
-
-- TypeScript + Canvas 2D
-- npm project (like pentagrid)
-- `src/` → `dist/` via tsc
-- Static HTML served locally
+- Expansion generation per seed, to be picked against real rhomb counts.
+- Vendor `three.module.js` + import map for `roof3d.html`.
+- Six loose `test-*.mjs` probes from the vertex-index investigation are still in
+  the tree; they are in git history and can be cleared out.

@@ -1,79 +1,87 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Wieringa Roof</title>
-    <style>
-        body {
-            font-family: sans-serif;
-            margin: 20px;
-            background: #fafafa;
-        }
-        h1 { margin-bottom: 4px; }
-        h2 { color: #555; font-weight: normal; margin-top: 0; }
-        .workspace {
-            display: flex;
-            gap: 20px;
-            align-items: flex-start;
-        }
-        .panel {
-            display: flex;
-            flex-direction: column;
-        }
-        .panel h3 {
-            margin: 0 0 8px;
-            font-size: 15px;
-            color: #333;
-        }
-        canvas {
-            border: 1px solid #ccc;
-            background: white;
-            cursor: crosshair;
-        }
-        .controls {
-            display: flex;
-            gap: 16px;
-            align-items: center;
-            margin: 12px 0;
-            flex-wrap: wrap;
-        }
-        .controls button {
-            padding: 6px 16px;
-            font-size: 13px;
-            cursor: pointer;
-            border: 1px solid #ccc;
-            background: #fff;
-            border-radius: 4px;
-        }
-        .controls button:hover {
-            background: #eee;
-        }
-        .info {
-            font-size: 13px;
-            font-family: monospace;
-            color: #666;
-            margin: 4px 0;
-        }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Wieringa Roof</title>
+<link rel="stylesheet" href="./site.css">
 </head>
 <body>
-    <h1>Wieringa Roof</h1>
-    <h2>Golden Rhombus Net Builder</h2>
-    <div class="controls" id="controls">
-        <button id="btn-clear">Clear Net</button>
-        <span class="info" id="info">Click a rhomb in the tiling to begin</span>
-    </div>
-    <div class="workspace">
-        <div class="panel">
-            <h3>Penrose Tiling</h3>
-            <canvas id="tiling" width="500" height="500"></canvas>
-        </div>
-        <div class="panel">
-            <h3>Net (1:1 inches)</h3>
-            <canvas id="net" width="850" height="1000"></canvas>
-        </div>
-    </div>
-    <script type="module" src="./dist/main.js"></script>
+
+<nav>
+    <span class="brand">Wieringa Roof</span>
+    <a href="./index.html" aria-current="page">Home</a>
+    <a href="./net.html">Net</a>
+    <a href="./roof3d.html">3D</a>
+    <a href="./info.html">The Maths</a>
+    <a href="./legacy.html">Legacy</a>
+</nav>
+
+<div class="wrap">
+
+<h1>The Wieringa Roof</h1>
+<p class="lede">
+    Lift every rhombus of a Penrose tiling out of the plane and it becomes a
+    <em>golden</em> rhombus — one single shape, thirty of which close up into a
+    rhombic triacontahedron. The result is a folded, non-repeating surface of
+    hills and dales whose shadow is the tiling you started with.
+</p>
+
+<p>
+    This site builds printable nets for that surface. Because every face is the
+    same golden rhombus, a physical model needs only one cut shape; the Penrose
+    tiling supplies nothing but the pattern of <em>which</em> rhombus joins which,
+    and at what angle.
+</p>
+
+<div class="cards">
+    <a class="card" href="./net.html">
+        <h3>Net &amp; PDF</h3>
+        <p>Pick a patch, decompose it into ribbon strips, print a sheet to cut and fold.</p>
+        <span class="tag">In progress</span>
+    </a>
+    <a class="card" href="./roof3d.html">
+        <h3>3D Prototype</h3>
+        <p>The roof surface in three dimensions, before you commit paper to it.</p>
+        <span class="tag">In progress</span>
+    </a>
+    <a class="card" href="./info.html">
+        <h3>The Maths</h3>
+        <p>The golden rhombus, the triacontahedron, the two rhombohedra, and every fold angle.</p>
+    </a>
+    <a class="card" href="./legacy.html">
+        <h3>Legacy Explorer</h3>
+        <p>The original two-canvas tiling &amp; net builder. Kept for reference.</p>
+        <span class="tag">Archived</span>
+    </a>
+</div>
+
+<h2>The three patches</h2>
+<p>
+    Penrose's original tiling is pentagons interspersed with three other shapes —
+    the <strong>star</strong>, the <strong>boat</strong> and the
+    <strong>diamond</strong>. Each maps exactly onto a small group of rhombi, and
+    each seeds a patch that can be expanded a generation at a time:
+</p>
+
+<div class="tbl-scroll">
+<table>
+    <thead>
+        <tr><th>Shape</th><th>Cluster</th><th>Rhombi</th></tr>
+    </thead>
+    <tbody>
+        <tr><td>Star</td><td class="mono">Pe5</td><td>5 thick</td></tr>
+        <tr><td>Boat</td><td class="mono">Pe3</td><td>3 thick + 1 thin</td></tr>
+        <tr><td>Diamond</td><td class="mono">Pe1</td><td>1 thick + 2 thin</td></tr>
+    </tbody>
+</table>
+</div>
+
+<p>
+    Each of the three prints as an independent single-sheet model, so any one of
+    them can be run off on its own whenever you want to build another.
+</p>
+
+</div>
 </body>
 </html>

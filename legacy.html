@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Legacy Explorer — Wieringa Roof</title>
+<link rel="stylesheet" href="./site.css">
+<style>
+    .wrap-wide { max-width: 1440px; margin: 0 auto; padding: 20px 20px 48px; }
+    .workspace {
+        display: flex;
+        gap: 20px;
+        align-items: flex-start;
+        flex-wrap: wrap;
+    }
+    .panel { display: flex; flex-direction: column; }
+    .panel h3 { margin: 0 0 8px; font-size: 15px; color: #333; }
+    canvas {
+        border: 1px solid #ccc;
+        background: #fff;
+        cursor: crosshair;
+        max-width: 100%;
+    }
+</style>
+</head>
+<body>
+
+<nav>
+    <span class="brand">Wieringa Roof</span>
+    <a href="./index.html">Home</a>
+    <a href="./net.html">Net</a>
+    <a href="./roof3d.html">3D</a>
+    <a href="./info.html">The Maths</a>
+    <a href="./legacy.html" aria-current="page">Legacy</a>
+</nav>
+
+<div class="wrap-wide">
+
+    <h1>Legacy Explorer</h1>
+    <p class="lede" style="margin-bottom:16px">
+        The original two-canvas net builder — click a rhomb in the tiling to unfold
+        it onto the work canvas. Kept as reference; the
+        <a href="./net.html">Net page</a> supersedes it.
+    </p>
+
+    <div class="controls" id="controls">
+        <button id="btn-clear">Clear Net</button>
+        <span class="info" id="info">Click a rhomb in the tiling to begin</span>
+    </div>
+
+    <div class="workspace">
+        <div class="panel">
+            <h3>Penrose Tiling</h3>
+            <canvas id="tiling" width="500" height="500"></canvas>
+        </div>
+        <div class="panel">
+            <h3>Net (1:1 inches)</h3>
+            <canvas id="net" width="850" height="1000"></canvas>
+        </div>
+    </div>
+
+</div>
+
+<script type="module" src="./dist/legacy.js"></script>
+</body>
+</html>

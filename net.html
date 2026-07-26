@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Net &amp; PDF — Wieringa Roof</title>
+<link rel="stylesheet" href="./site.css">
+</head>
+<body>
+
+<nav>
+    <span class="brand">Wieringa Roof</span>
+    <a href="./index.html">Home</a>
+    <a href="./net.html" aria-current="page">Net</a>
+    <a href="./roof3d.html">3D</a>
+    <a href="./info.html">The Maths</a>
+    <a href="./legacy.html">Legacy</a>
+</nav>
+
+<div class="wrap">
+
+<h1>Net &amp; PDF</h1>
+<p class="lede">
+    Choose a patch, decompose it into ribbon strips, and print one sheet to cut and
+    fold. Each patch is an independent single-sheet model.
+</p>
+
+<div class="note">
+    <strong>Not built yet.</strong> This page is a placeholder. The geometry it
+    depends on is settled and documented on <a href="./info.html">The Maths</a>;
+    what remains is choosing the expansion generation for each seed against real
+    rhomb counts, then writing the strip decomposition and the print sheet.
+</div>
+
+<h2>Agreed design</h2>
+
+<dl style="font-size:14px">
+    <dt style="font-weight:600;margin-top:12px">Patches</dt>
+    <dd style="margin:2px 0 0">Star, boat and diamond seeds, each expanded and printed as its own one-sheet model. No cross-sheet edge matching.</dd>
+
+    <dt style="font-weight:600;margin-top:12px">Decomposition</dt>
+    <dd style="margin:2px 0 0">Greedy maximal ribbon strips — repeatedly take the longest dual-graph path whose consecutive shared edges are parallel. Provably free of overlap, so no overlap test is needed.</dd>
+
+    <dt style="font-weight:600;margin-top:12px">Scale</dt>
+    <dd style="margin:2px 0 0">Side <span class="mono">s</span> = 20 mm. Strips advance 0.894&nbsp;<span class="mono">s</span> = 17.9 mm per face, so ten faces fit a Letter row.</dd>
+
+    <dt style="font-weight:600;margin-top:12px">Annotation</dt>
+    <dd style="margin:2px 0 0">Every crease labelled with its fold angle — 36°, 72° or 108°, never 0° — plus mountain or valley. Cut lines solid, creases dashed by angle.</dd>
+
+    <dt style="font-weight:600;margin-top:12px">Output</dt>
+    <dd style="margin:2px 0 0">SVG at exact physical units with a print stylesheet, then the browser's own Save&nbsp;as&nbsp;PDF. No PDF library, and reliable 1:1 scale.</dd>
+</dl>
+
+<h2>Planned controls</h2>
+<div class="controls">
+    <label>Patch:
+        <select disabled>
+            <option>Star (Pe5)</option>
+            <option>Boat (Pe3)</option>
+            <option>Diamond (Pe1)</option>
+        </select>
+    </label>
+    <label>Generation:
+        <select disabled><option>—</option></select>
+    </label>
+    <label>Side:
+        <select disabled><option>20 mm</option></select>
+    </label>
+    <button disabled>Print sheet</button>
+    <span class="info">controls inert until the strip builder lands</span>
+</div>
+
+</div>
+</body>
+</html>

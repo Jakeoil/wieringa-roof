@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>3D Prototype — Wieringa Roof</title>
+<link rel="stylesheet" href="./site.css">
+</head>
+<body>
+
+<nav>
+    <span class="brand">Wieringa Roof</span>
+    <a href="./index.html">Home</a>
+    <a href="./net.html">Net</a>
+    <a href="./roof3d.html" aria-current="page">3D</a>
+    <a href="./info.html">The Maths</a>
+    <a href="./legacy.html">Legacy</a>
+</nav>
+
+<div class="wrap">
+
+<h1>3D Prototype</h1>
+<p class="lede">
+    The roof surface in three dimensions — a prototype to look at before committing
+    paper to it.
+</p>
+
+<div class="note">
+    <strong>Not built yet.</strong> This page is a placeholder pending three.js
+    being vendored into the project.
+</div>
+
+<h2>How it will work</h2>
+
+<p>
+    This page is close to free. The existing generator already computes a correct
+    vertex index for every rhomb corner, and height is nothing more than
+    <span class="mono">index · s/√5</span> — so the 3D surface is the same rhomb
+    data with one extra coordinate. No new geometry at all.
+</p>
+
+<p>
+    One thing to expect: total relief is only <span class="mono">1.342 s</span>, so
+    from a low camera angle the roof looks almost flat. A vertical-exaggeration
+    slider will be needed before the hills and dales read properly.
+</p>
+
+<p>
+    three.js will be vendored locally as <span class="mono">vendor/three.module.js</span>
+    with an import map, rather than pulled from a CDN, so the site keeps working
+    offline like the rest of it.
+</p>
+
+</div>
+</body>
+</html>

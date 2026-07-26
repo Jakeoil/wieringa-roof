@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Maths — Wieringa Roof</title>
+<link rel="stylesheet" href="./site.css">
+<style>
+    .fig { background: var(--panel); border: 1px solid var(--rule); border-radius: 8px; padding: 18px; margin: 20px 0; }
+    .fig svg { display: block; max-width: 100%; height: auto; margin: 0 auto; }
+    .fig figcaption { font-size: 13px; color: var(--ink-soft); margin-top: 10px; text-align: center; }
+    dl.defs { margin: 16px 0; }
+    dl.defs dt { font-weight: 600; margin-top: 12px; }
+    dl.defs dd { margin: 2px 0 0 0; color: var(--ink-soft); font-size: 14px; }
+</style>
+</head>
+<body>
+
+<nav>
+    <span class="brand">Wieringa Roof</span>
+    <a href="./index.html">Home</a>
+    <a href="./net.html">Net</a>
+    <a href="./roof3d.html">3D</a>
+    <a href="./info.html" aria-current="page">The Maths</a>
+    <a href="./legacy.html">Legacy</a>
+</nav>
+
+<div class="wrap">
+
+<h1>The Maths</h1>
+<p class="lede">
+    Everything the net needs, and why the surface behaves the way it does. Every
+    figure below has been verified numerically against a 349-rhomb patch.
+</p>
+
+<h2>The golden rhombus</h2>
+
+<p>
+    One shape does all the work. A golden rhombus is the rhombus whose diagonals
+    stand in the ratio&nbsp;φ&nbsp;:&nbsp;1 — so the rectangle you get by drawing
+    both diagonals is a <strong>golden rectangle</strong>. Its acute angle is
+</p>
+
+<p class="mono" style="margin-left:1.5em">
+    θ = arctan 2 = arccos(1/√5) = 63.4349°,&nbsp;&nbsp; and 116.5651° obtuse.
+</p>
+
+<div class="fig">
+<svg viewBox="0 0 380 230" role="img" aria-label="A golden rhombus with its two diagonals marked">
+    <g transform="translate(190,115)">
+        <polygon points="0,-85 52.5,0 0,85 -52.5,0"
+                 fill="#9292e3" fill-opacity="0.28" stroke="#5b5bb0" stroke-width="1.5"/>
+        <line x1="0" y1="-85" x2="0" y2="85" stroke="#5b5bb0" stroke-width="1" stroke-dasharray="4 3"/>
+        <line x1="-52.5" y1="0" x2="52.5" y2="0" stroke="#5b5bb0" stroke-width="1" stroke-dasharray="4 3"/>
+        <text x="8" y="-40" font-size="12" fill="#444" font-family="monospace">1.7013 s</text>
+        <text x="-46" y="-8" font-size="12" fill="#444" font-family="monospace">1.0515 s</text>
+        <text x="4" y="76" font-size="12" fill="#444">63.43°</text>
+        <text x="26" y="4" font-size="12" fill="#444">116.57°</text>
+    </g>
+</svg>
+<figcaption>For side <span class="mono">s</span>: long diagonal 1.7013&nbsp;<span class="mono">s</span>, short diagonal 1.0515&nbsp;<span class="mono">s</span>. Their ratio is exactly φ.</figcaption>
+</div>
+
+<h2>Why one shape suffices</h2>
+
+<p>
+    Take the six five-fold axes of an icosahedron. Put one on the vertical and the
+    other five form a cone around it:
+</p>
+
+<p class="mono" style="margin-left:1.5em">
+    E<sub>j</sub> = ( 2/√5 · cos 72j° ,&nbsp; 2/√5 · sin 72j° ,&nbsp; 1/√5 ),&nbsp;&nbsp; j = 0…4
+</p>
+
+<p>
+    A Penrose vertex <span class="mono">Σ n<sub>j</sub> ζ<sup>j</sup></span> in the
+    plane lifts to <span class="mono">Σ n<sub>j</sub> E<sub>j</sub></span> in space.
+    Because <span class="mono">E<sub>j</sub> · E<sub>k</sub> = ±1/√5</span> for
+    <em>every</em> pair, all ten face orientations are the same golden rhombus.
+    The thick and thin Penrose rhombi are not two shapes — they are one shape
+    seen from two angles:
+</p>
+
+<div class="tbl-scroll">
+<table>
+    <thead><tr><th>Generator pair</th><th>3D corner angle</th><th>Shadow in the plane</th></tr></thead>
+    <tbody>
+        <tr><td class="mono">|Δj| = 1</td><td class="num">63.4349°</td><td>thick rhomb (72°)</td></tr>
+        <tr><td class="mono">|Δj| = 2</td><td class="num">116.5651°</td><td>thin rhomb (144°)</td></tr>
+    </tbody>
+</table>
+</div>
+
+<p>
+    So whether a tile looks thick or thin depends only on <em>which corner of the
+    golden rhombus</em> lands at the shared vertex.
+</p>
+
+<h2>Four tent poles</h2>
+
+<p>
+    All five generators share the same height, <span class="mono">z = 1/√5</span>.
+    Every edge of the roof therefore rises or falls by exactly
+    <span class="mono">s/√5</span>, inclined <span class="mono">arctan(½) =
+    26.565°</span> to the horizontal — there is no other slope anywhere on the
+    surface.
+</p>
+
+<p>
+    A vertex's height is <span class="mono">index · s/√5</span>, where the index is
+    <span class="mono">Σ n<sub>j</sub></span>. That index only ever takes the
+    values <strong>1, 2, 3, 4</strong>. If you built this as a real roof, you
+    would need exactly four lengths of tent pole:
+</p>
+
+<div class="tbl-scroll">
+<table>
+    <thead><tr><th>Index</th><th class="num">Height</th><th class="num">at s = 20 mm</th></tr></thead>
+    <tbody>
+        <tr><td>1</td><td class="num">0.4472 s</td><td class="num">8.9 mm</td></tr>
+        <tr><td>2</td><td class="num">0.8944 s</td><td class="num">17.9 mm</td></tr>
+        <tr><td>3</td><td class="num">1.3416 s</td><td class="num">26.8 mm</td></tr>
+        <tr><td>4</td><td class="num">1.7889 s</td><td class="num">35.8 mm</td></tr>
+    </tbody>
+</table>
+</div>
+
+<p>
+    The whole roof, however far it extends, is trapped between two parallel planes
+    just <span class="mono">3s/√5 ≈ 1.342 s</span> apart. It is a shallow surface —
+    hills and dales, not peaks and canyons.
+</p>
+
+<h2>Fold angles</h2>
+
+<p>
+    Every dihedral angle on the surface is one of three values, and every fold is a
+    multiple of 36°:
+</p>
+
+<div class="tbl-scroll">
+<table>
+    <thead><tr><th>Neighbours</th><th class="num">Dihedral</th><th class="num">Fold</th></tr></thead>
+    <tbody>
+        <tr><td>thick | thick</td><td class="num">144°</td><td class="num">36° always</td></tr>
+        <tr><td>thick | thin</td><td class="num">144° or 108°</td><td class="num">36° or 72°</td></tr>
+        <tr><td>thin | thin</td><td class="num">72°</td><td class="num">108° always</td></tr>
+    </tbody>
+</table>
+</div>
+
+<div class="note">
+    <strong>There is no flat edge.</strong> A coplanar (0°) join looks possible if
+    you enumerate local configurations in the abstract, but it would require two
+    consecutive rhombi in a de Bruijn ribbon to reuse the same second direction.
+    Lines of family <span class="mono">j±1</span> cross a ribbon at spacing 1.051
+    and family <span class="mono">j±2</span> at 1.701, so each gap of one family
+    always contains a crossing of the other. The second index can never repeat, and
+    <strong>every interior edge of a Wieringa roof is a genuine crease.</strong>
+</div>
+
+<p>
+    Mountain and valley divide roughly evenly within each row above, so which way a
+    crease folds is a property of that particular edge — it cannot be read off the
+    pair of tiles. Flipping an entire strip over does swap all of its folds at
+    once, so orientation stays a choice you make at assembly time.
+</p>
+
+<h2>Curvature, and why nets must be cut</h2>
+
+<p>
+    Sum the face angles meeting at a vertex and subtract from 360°. What is left is
+    the <strong>angular defect</strong>: positive means a cone pointing up or down,
+    negative means a saddle.
+</p>
+
+<div class="tbl-scroll">
+<table>
+    <thead><tr><th>Configuration</th><th class="num">Valence</th><th class="num">Angle sum</th><th class="num">Defect</th></tr></thead>
+    <tbody>
+        <tr><td>3 acute + 1 obtuse</td><td class="num">4</td><td class="num">306.870°</td><td class="num">+53.130°</td></tr>
+        <tr><td>5 acute</td><td class="num">5</td><td class="num">317.175°</td><td class="num">+42.825°</td></tr>
+        <tr><td>3 obtuse</td><td class="num">3</td><td class="num">349.695°</td><td class="num">+10.305°</td></tr>
+        <tr><td>2 acute + 2 obtuse</td><td class="num">4</td><td class="num">360.000°</td><td class="num">0</td></tr>
+        <tr><td>4 acute + 1 obtuse</td><td class="num">5</td><td class="num">370.305°</td><td class="num">−10.305°</td></tr>
+        <tr><td>6 acute</td><td class="num">6</td><td class="num">380.610°</td><td class="num">−20.610°</td></tr>
+        <tr><td>1 acute + 3 obtuse</td><td class="num">4</td><td class="num">413.130°</td><td class="num">−53.130°</td></tr>
+    </tbody>
+</table>
+</div>
+
+<p>
+    The negative rows are the saddles, and they are the entire difficulty of
+    net-making: more than 360° of paper wants to meet at one point, so the faces
+    around such a vertex <em>cannot</em> all stay joined. Every saddle forces at
+    least one cut.
+</p>
+
+<h2>Ribbon strips</h2>
+
+<p>
+    There is a way to sidestep the problem completely. Follow one de Bruijn line
+    through the tiling and the rhombi it crosses form a <strong>ribbon</strong>;
+    consecutive rhombi share an edge parallel to the same direction
+    <span class="mono">E<sub>j</sub></span>. So <em>every crease in a ribbon is
+    parallel to every other</em> — and a polyhedral surface whose creases are all
+    parallel is a generalized cylinder, which flattens into a straight band with
+    parallel creases spaced at cumulative arc length.
+</p>
+
+<p>
+    Each face contributes width <span class="mono">sin 63.4349° = 2/√5 ≈ 0.894 s</span>,
+    always positive, so crease positions increase monotonically and the band can
+    never fold back on itself:
+</p>
+
+<div class="note">
+    <strong>Ribbon strips cannot self-overlap, at any length.</strong> Not
+    "usually" — never, and with no test required. That is why this site builds
+    nets from strips rather than by unfolding outward from a seed tile.
+</div>
+
+<p>
+    The sequence of thick and thin along a ribbon is Sturmian in the ratio
+    φ&nbsp;:&nbsp;1 (crossing densities sin&nbsp;72° against sin&nbsp;144°, which is
+    also the source of the tiling's overall φ&nbsp;:&nbsp;1 tile ratio). Each face
+    shifts the band sideways by <span class="mono">±s/√5</span>, and because
+    Sturmian sequences have <em>bounded</em> discrepancy, a strip stays inside a
+    fixed band around a straight mean axis however long it grows. It veers left and
+    right forever without ever wandering off.
+</p>
+
+<h2>The solids behind it</h2>
+
+<dl class="defs">
+    <dt>Rhombic triacontahedron</dt>
+    <dd>
+        30 golden rhombi, 32 vertices, 60 edges. Every dihedral angle is 144°. The
+        12 five-valent vertices carry defect +42.825°, the 20 three-valent vertices
+        +10.305°, and 12(42.825) + 20(10.305) = 720° exactly, as Descartes requires.
+        Its 32 vertices are those of an icosahedron and a dodecahedron combined.
+    </dd>
+
+    <dt>Acute (prolate) golden rhombohedron</dt>
+    <dd>
+        Six golden rhombi with three acute corners meeting at the sharp apex.
+        Volume 0.76085&nbsp;<span class="mono">s³</span>.
+    </dd>
+
+    <dt>Obtuse (oblate) golden rhombohedron</dt>
+    <dd>
+        Six golden rhombi with three obtuse corners meeting at the flat apex.
+        Volume 0.47022&nbsp;<span class="mono">s³</span> — and the ratio of the two
+        volumes is, of course, φ.
+    </dd>
+</dl>
+
+<p>
+    Ten of each pack together into a single rhombic triacontahedron:
+    <span class="mono">10(0.76085 + 0.47022) = 12.3107 s³ = 4√(5+2√5) · s³</span>,
+    the triacontahedron's exact volume. The same two rhombohedra also fill space
+    aperiodically, and it is the layer of them sitting under the roof that gives
+    the surface its shape.
+</p>
+
+</div>
+</body>
+</html>
