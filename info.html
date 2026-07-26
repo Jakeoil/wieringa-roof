@@ -34,6 +34,78 @@
     figure below has been verified numerically against a 349-rhomb patch.
 </p>
 
+<h2>The three Penrose tilings</h2>
+
+<div class="tbl-scroll">
+<table>
+    <thead><tr><th></th><th>Tiles</th><th></th></tr></thead>
+    <tbody>
+        <tr><td><strong>P1</strong></td><td>pentagon, star, boat, diamond</td><td>the original, 1974</td></tr>
+        <tr><td><strong>P2</strong></td><td>kite, dart</td><td></td></tr>
+        <tr><td><strong>P3</strong></td><td>thick rhomb, thin rhomb</td><td></td></tr>
+    </tbody>
+</table>
+</div>
+
+<p>
+    A mnemonic, since the numbering is easy to get backwards:
+    <strong>P</strong>entagons, <strong>P</strong>ointy,
+    <strong>P</strong>arallelograms — 1, 2, 3. Tile-count will not help you, since
+    P2 and P3 both have exactly two; only kite-and-dart versus rhombs will.
+</p>
+
+<p>
+    P1's pentagons are often counted as three separate prototiles, differently
+    marked to carry the matching rules, so you will also see "P1 has six tiles".
+    Its <strong>diamond</strong> is the thin rhomb, 36°/144°. All three sets are
+    mutually locally derivable — the same tilings in different clothing, with the
+    same φ inflation. This site uses P1 to generate and P3 to build: the seeds are
+    P1 clusters, the paper is golden rhombi.
+</p>
+
+<h2>The P1 hierarchy</h2>
+
+<p>
+    The prettiest fact in the whole construction is that the P1 tiles map onto
+    small groups of rhombs, and the entire tiling can be built from the rhomb
+    versions of the pentagons — and nothing else:
+</p>
+
+<div class="tbl-scroll">
+<table>
+    <thead><tr><th>P1 tile</th><th>Cluster</th><th>Rhombs</th></tr></thead>
+    <tbody>
+        <tr><td>Star</td><td class="mono">Pe5</td><td>5 thick</td></tr>
+        <tr><td>Boat</td><td class="mono">Pe3</td><td>3 thick + 1 thin</td></tr>
+        <tr><td>Diamond</td><td class="mono">Pe1</td><td>1 thick + 2 thin</td></tr>
+    </tbody>
+</table>
+</div>
+
+<p>
+    And the hierarchy closes on itself. Expand any one of those three rhomb groups
+    four generations and the resulting patch takes on the outline of the P1 tile it
+    came from — a star expands into a star, a boat into a boat, a diamond into a
+    diamond. Obvious in hindsight: that outline is the fixed point the substitution
+    is converging to. But it is satisfying to watch it happen.
+</p>
+
+<p>
+    Of the uncountably many Penrose tilings, <strong>exactly two have exact
+    five-fold symmetry</strong> — the ones seeded by <span class="mono">Pe5</span>
+    and <span class="mono">St5</span>, traditionally the <em>sun</em> and the
+    <em>star</em>. They stand opposite each other: everywhere one has a five-fold
+    rosette of tiles the other has a five-fold gap, and vice versa.
+</p>
+
+<p>
+    There is also a composite seed worth knowing: the <strong>decagon</strong>, a
+    boat with diamonds packed around it. Unlike the other six it has no five-fold
+    symmetry at all — instead its two halves mirror each other, each side the
+    reflection of the other across a single axis. It is the one seed that grows a
+    patch with a preferred direction.
+</p>
+
 <h2>The golden rhombus</h2>
 
 <p>
