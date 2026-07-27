@@ -306,6 +306,9 @@ function findRhombAt(sx: number, sy: number): number {
 // Nearest interior tiling edge within a few pixels of the pointer. Clicking an
 // edge names the hinge to unfold across, which is the only way to choose when a
 // rhomb touches the net along more than one edge.
+// In screen pixels; scaled to canvas pixels at use, since the backing store is
+// devicePixelRatio times larger and an unscaled threshold would be that much
+// stingier on a retina display.
 const EDGE_PICK_PX = 7;
 
 function findEdgeAt(
@@ -313,7 +316,8 @@ function findEdgeAt(
     sy: number,
 ): { a: number; b: number; rhombIds: number[] } | null {
     let best: { a: number; b: number; rhombIds: number[] } | null = null;
-    let bestD = EDGE_PICK_PX;
+    const cssW = tilingCanvas.getBoundingClientRect().width || tilingCanvas.width;
+    let bestD = EDGE_PICK_PX * (tilingCanvas.width / cssW);
     for (const e of edgeMap.values()) {
         if (e.rhombIds.length !== 2) continue;
         const A = toScreen(vertexList[e.v1].pos);
@@ -1224,6 +1228,17 @@ function netPointFromEvent(e: MouseEvent): [number, number] {
     );
 }
 
+// Pointer to backing-store pixels. The canvas is sized at devicePixelRatio, so
+// CSS pixels and canvas pixels are not the same thing and everything drawn is in
+// the latter. Getting this wrong offsets every hit test by the DPR.
+function tilingPointFromEvent(e: MouseEvent): [number, number] {
+    const rect = tilingCanvas.getBoundingClientRect();
+    return [
+        (e.clientX - rect.left) * (tilingCanvas.width / rect.width),
+        (e.clientY - rect.top) * (tilingCanvas.height / rect.height),
+    ];
+}
+
 function netRhombAt(x: number, y: number): NetRhomb | null {
     for (let i = netRhombs.length - 1; i >= 0; i--) {
         const q = netRhombs[i].poly;
@@ -1242,9 +1257,7 @@ function netRhombAt(x: number, y: number): NetRhomb | null {
 }
 
 tilingCanvas.addEventListener("mousemove", (e) => {
-    const rect = tilingCanvas.getBoundingClientRect();
-    const sx = e.clientX - rect.left;
-    const sy = e.clientY - rect.top;
+    const [sx, sy] = tilingPointFromEvent(e);
     if (e.altKey !== altDown) altDown = e.altKey;
     const edge = findEdgeAt(sx, sy);
     const rid = findRhombAt(sx, sy);
@@ -1305,9 +1318,7 @@ tilingCanvas.addEventListener("click", (e) => {
         say("Watching a replay — switch to Build to place rhombi yourself.");
         return;
     }
-    const rect = tilingCanvas.getBoundingClientRect();
-    const sx = e.clientX - rect.left;
-    const sy = e.clientY - rect.top;
+    const [sx, sy] = tilingPointFromEvent(e);
     if (e.altKey) {
         const rid = findRhombAt(sx, sy);
         if (rid < 0) return;
