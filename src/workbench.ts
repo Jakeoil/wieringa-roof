@@ -1948,6 +1948,15 @@ function regenerate() {
 
 // ── Init ──────────────────────────────────────────────────────────
 
+// Remember whether the instructions were left open.
+const help = document.getElementById("help") as HTMLDetailsElement | null;
+if (help) {
+    help.open = localStorage.getItem("wr-help-open") === "1";
+    help.addEventListener("toggle", () => {
+        localStorage.setItem("wr-help-open", help.open ? "1" : "0");
+    });
+}
+
 buildModeBar();
 buildControls();
 sizeTilingCanvas();
