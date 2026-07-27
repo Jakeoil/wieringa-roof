@@ -1,5 +1,8 @@
 # Wieringa Roof
 
+Decisions, arguments and open questions live in [NOTES.md](NOTES.md); this file
+describes what the project is.
+
 A small site for exploring the Wieringa roof and producing printable nets of
 golden rhombi for physical models.
 
@@ -12,7 +15,7 @@ golden rhombi for physical models.
 | `roof3d.html` | three.js prototype of the surface | done |
 | `info.html` | "Mathematics" — golden rhombus, heights, fold angles, defects | done |
 | `polyhedra.html` | triacontahedron + the two rhombohedra, generated diagrams | done |
-| `unfold.html` | original two-canvas explorer, kept for reference | done (as-is) |
+| `unfold.html` | hand-driven unfolding, plus an algorithm replay player | done |
 
 `src/geometry.ts` holds the tiling and the lift; `src/unfold.ts` the three
 decomposition methods; `src/sheet.ts` layout and SVG; `src/net.ts`,
@@ -115,7 +118,7 @@ pentagrid and the tiling are **dual spaces**, so `Σ floor(x·u_j/d)` over tilin
 coordinates telescopes to a bounded quantity that is not `Σ n_j` at all — in fact
 `Σ_k (x·u_k/d) = 0` identically, so the sum of floors can only land in `{−4…0}`.
 No choice of `gridSpacing` fixes that; it merely happened to agree at gen 2.
-`unfold.html` defaults to gen 3, so its index display was wrong as shipped.
+The workbench defaulted to gen 3 at the time, so its index display was wrong as shipped.
 
 Replaced by `computeLift()`, which integrates `n ∈ Z⁵` along edges by BFS. Exact
 everywhere: all 21 seed/generation combinations give 0 bad edges, 0 conflicts,
