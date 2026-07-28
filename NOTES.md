@@ -8,14 +8,21 @@ the project *is*; this is what we have argued about and what is still unsettled.
 ## Naming and vocabulary
 
 **Penrose vertex figures.** Conway named the seven vertex figures of the P2
-(kite-and-dart) tiling. The usual list:
+(kite-and-dart) tiling: sun · star · ace · deuce · jack · queen · king. (The ace is
+sometimes the *fool's kite*; naming varies between sources.)
 
-> sun · star · ace · deuce · jack · queen · king
+**The three symmetric tilings** — Jeff's, after research, and it corrects an
+earlier claim of mine that there were two:
 
-Only **sun** and **star** have five-fold symmetry — there is no third. That is the
-same fact as "exactly two Penrose tilings have global five-fold symmetry". The card
-ranks belong to this one list, not to a separate scheme. (The ace is sometimes
-called the *fool's kite*; naming varies slightly between sources.)
+- **Sun** and **Star**, each with five mirror axes. They are complementary: there
+  is an involution **T** exchanging the `St*` and `Pe*` families, `T(T(x)) = x`.
+- **Queen**, the **deca**. Symmetric about the vertical axis only, and its mirror
+  is not a plain reflection — the left side melds to the right as Sun does to Star.
+  The involution simply reverses the roles.
+
+"Exactly two have global *five-fold* symmetry" is still right; the deca's symmetry
+is bilateral. Measured and agrees: the deca has one mirror axis at generations 2, 3
+and 4 and no 72° rotation, where Pe5 and St5 have both.
 
 **Spelling.** Use **color**, not colour, in UI labels and prose. (US English.)
 
@@ -54,32 +61,50 @@ heights take **four** absolute levels across the whole patch, and within a rhomb
 the isoglosses divide its 2-level span into **eight** steps at quarter-index
 intervals.
 
-**Agreed direction.**
+**Done.** Both pages now carry a single **−1 … +1** height slider: sign is the
+flip, magnitude the depth, biased `sign(u)·|u|^1.6` so the middle of the travel is
+spread out. On 3D the magnitude flattens the surface; on the workbench it sets how
+strongly height is shaded, zero leaving flat color. `Heads/Tails` and
+`Hills up / Dales up` are both gone.
 
-- Shading becomes a function of **absolute height**, not a per-tile ramp.
-- Four levels is the floor; the isogloss subdivision (quarter-index, eight steps
-  across a face) is the natural continuous version and matches the 3D page.
-- **Color** and **shading** separate cleanly: color is a constant property of a
-  tile (cluster, thick/thin, index band); shading is a yes/no depiction of height.
-- **One** heads/tails control, flipping the surface — shading follows from it.
+Shading is now keyed to **absolute** height: one ramp across the patch's whole
+index range, with each face drawing the segment its own corners span. Two stops
+suffice because height varies affinely along the v0→v2 diagonal — the old third
+stop at 2/3 was what encoded the wrong thing. Verified on Pe3 gen 3, which
+contains faces spanning 1→3 and 2→4: those two used to render identically and now
+differ (luminance 208.6→128.2 against 168.8→88.4).
 
-Still to settle: whether shading is stepped into four bands or ramped continuously
-with the isogloss contours drawn over it.
+Color and shading are separate, as they should be: color is the constant tile
+property, shading the height layer over it.
+
+Still open: isogloss contours on the workbench canvas, which would give the finer
+quarter-index guide the 3D page already has.
 
 ---
 
-## Open: is `Pe5` a star or a pentagon?
+## Settled: `Pe*` are pentagons; use proper names
 
-The tables on `info.html` and `PLAN.md` call `Pe5` the **star**. But
-`penrose-mosaic/penrose.js` names the same constant `BLUE_PENTA`, and the
-measurement above says its convex hull is a **regular pentagon** at every
-generation, exactly. Meanwhile `St5` is `BLUE_STAR` there.
+`gen0-P1-tiles--rhomb-mappings.png` in this directory shows all five tile types
+with their rhombs overlaid, and settles it. **`Pe5`, `Pe3` and `Pe1` are
+pentagons** — the marked pentagons of P1. `St5`, `St3`, `St1` are the actual star,
+boat and diamond.
 
-So the P1-tile column may be mislabelled: the `Pe*` family look like the pentagons
-and the `St*` family the star/boat/diamond. The rhomb counts (5 thick / 3 thick +
-1 thin / 1 thick + 2 thin) are confirmed from `emitRhombs` and are not in doubt —
-only what to *call* them. Worth settling, because it appears in three places and
-the hull result now argues for one reading.
+What confused it: the rhombs a `Pe` tile carries at generation 1 *resemble* the
+`St` tiles — `Pe5`'s make a star outline, `Pe3`'s a boat, `Pe1`'s a diamond — so
+the cluster colours were named for the shapes they look like. Formally they are
+`Pe*`. The measurement agrees and now makes sense: `Pe5`'s convex hull is a regular
+pentagon at every generation because `Pe5` *is* a pentagon; its star look comes
+from the rhomb overlay reaching past the hull.
+
+**Use the proper names throughout, appearance notwithstanding.** All seven seeds
+are offered on every page: `Pe5`/`Pe3`/`Pe1` pentagons, `St5` star, `St3` boat,
+`St1` diamond, and `Deca`.
+
+Two further facts from Jeff worth keeping: the `St*` tiles emit **no rhombs at
+generation 1** and first contribute a generation later; and the three `Pe` groups
+constitute three new shapes that tile the plane periodically, a colouring he
+doubts he was first to find. Mapping the full correspondence needs the gen-3 rhombs
+of `St*` as well as of `Pe*` — the `Pe*` alone are not sufficient.
 
 ---
 
@@ -99,18 +124,17 @@ Options:
 | **C** | Keep √5/2 in and just label it honestly. |
 | **D** | Presets (15 / 20 / 25 mm, ½ / ¾ / 1 in) plus free entry. |
 
-Recommendation: **A**, with the box continuing to accept mm/cm/in. The two pages
-disagreeing on default size is the only real problem here, and √5/2 inches is a
-coincidence rather than a reason.
+**Decided: 1 inch.** Round, and the workbench stays inch-native as it was designed
+to be. The box still accepts mm, cm or in, and is labelled so.
 
 ---
 
-## Open: Type is disabled during Watch
+## Done: patch controls stay live during Watch
 
-`setMode("watch")` sets `pointerEvents: none` on the whole control bar, which
-includes Type, Generation, Color and Side. Only Clear, Undo and Print are
-build-specific. Fix: disable those three, leave the rest live, so you can change
-patch and generation while watching.
+`setMode` used to set `pointerEvents: none` on the whole control bar. Now only
+`Clear` and `Undo` are disabled — Print stays, since printing the algorithm's
+output is the point — and changing seed or generation mid-replay re-runs the
+trace.
 
 ---
 
@@ -131,9 +155,20 @@ already drifting (Net offers generations 2–4, the 3D page 2–5).
 Unfold is the "show me why" page. Merging risks one page that does both jobs
 worse.
 
-Recommendation: give Unfold *print all pieces across sheets* so it is
-self-sufficient, then decide whether Net still earns its keep. That is a small step
-— `printNet` already groups pieces and calls `layoutSheets`. Deferred, not decided.
+**Decided: Unfold absorbs Net.** What Net has that Unfold lacked was printing a
+whole decomposition; what Unfold has that Net lacks is the tiling panel showing
+which region the output covers.
+
+Step 1 is **done, and turned out to be free**: `printNet` groups by hinge
+components, and those are exactly the pieces — checked against `widened`, `bfs` and
+`strips` at gen 3, where component counts and sizes match the decomposition
+exactly (8/8, 4/4, 28/28). So Print in Watch mode already lays a whole
+decomposition across sheets. The only thing blocking it was that Print had been
+marked build-only.
+
+Remaining: page and margin controls on the workbench (reusing `PAGES` and
+`parseLength` from `sheet.ts`, which `refreshNetView` and `printNet` currently
+hardcode), then retire `net.html`. Both wait on browser confirmation.
 
 ---
 

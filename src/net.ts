@@ -20,10 +20,13 @@ const statusEl = el<HTMLElement>("status");
 const sheetsEl = el<HTMLElement>("sheets");
 
 const PATCHES: Array<[string, string]> = [
-    ["Pe5", "Star"],
-    ["Pe3", "Boat"],
-    ["Pe1", "Diamond"],
-    ["Deca", "Decagon"],
+    ["Pe5", "Pe5 pentagon"],
+    ["Pe3", "Pe3 pentagon"],
+    ["Pe1", "Pe1 pentagon"],
+    ["St5", "St5 star"],
+    ["St3", "St3 boat"],
+    ["St1", "St1 diamond"],
+    ["Deca", "Deca"],
 ];
 
 for (const [code, nick] of PATCHES) {

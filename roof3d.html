@@ -57,13 +57,12 @@
         <option value="plain">Plain</option>
     </select></label>
     <label>Vertical scale <span id="vscaleOut" class="mono"></span>
-        <input type="range" id="vscale" min="0" max="1" step="0.05" value="1">
+        <input type="range" id="vscale" min="-1" max="1" step="0.02" value="1">
     </label>
     <span class="checks">
         <label><input type="checkbox" id="edges" checked> edges</label>
         <label><input type="checkbox" id="isogloss"> isoglosses</label>
         <label><input type="checkbox" id="transparent"> transparent</label>
-        <label><input type="checkbox" id="flip"> flip (hills &harr; dales)</label>
     </span>
 </div>
 
@@ -107,24 +106,20 @@
     contours then read through the whole depth of the roof at once.
 </p>
 <p>
-    <strong>Vertical scale</strong> runs from the true surface at 1 down to nothing
-    at 0, where the roof collapses into the flat Penrose tiling that is its own
-    shadow. Sliding it down is the projection happening in front of you. It only
-    ever flattens — the true shape needs no exaggerating to read, so 1 is the
-    default and there is nothing above it.
+    <strong>Vertical scale</strong> runs from +1, the true surface, down through 0
+    where the roof collapses into the flat Penrose tiling that is its own shadow,
+    and on to −1, which is the same roof reflected: every hill a dale, every
+    mountain crease a valley. That is not a trick of the rendering — it is a second,
+    equally valid Wieringa roof over the same tiling. The tiling fixes the surface
+    only up to this one choice, so passing through zero really does take you from
+    one to the other.
 </p>
 <p>
-    Scaling the vertical is an affine map, so faces stay planar all the way down
-    and fold directions stay honest. Below 1 the rhombi are no longer golden, and
-    at 0 they are the thick and thin Penrose rhombs exactly.
-</p>
-<p>
-    <strong>Flip</strong> reflects the surface in the horizontal plane. That is not
-    a trick of the rendering — it is a second, equally valid Wieringa roof over the
-    same tiling, with every hill turned into a dale and every mountain crease into
-    a valley. The tiling determines the roof only up to this one choice. Fold
-    magnitudes are untouched, so the same cut pieces build either version; you just
-    fold each crease the other way.
+    The slider is biased toward the middle, giving finer control near flat where the
+    interesting part is. Scaling the vertical is an affine map, so faces stay planar
+    the whole way and fold directions stay honest; only at exactly ±1 are the rhombi
+    golden. Fold magnitudes never change, so the same cut pieces build either roof —
+    you just fold each crease the other way.
 </p>
 <p>
     See <a href="./info.html" draggable="false">Mathematics</a> for the lift, and

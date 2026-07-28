@@ -2,7 +2,6 @@
 // Tiling generation lives in geometry.ts.
 
 import {
-    GOLDEN_SIDE,
     edgeMap,
     vertexMap,
     roundKey,
@@ -34,11 +33,20 @@ let currentSeedIdx = 1; // Pe3, the boat — 23 rhombi at gen 2, a sane place to
 const currentIsHeads = true;
 let gen = 2;
 
-// Which way the face gradients run. This used to be the Heads/Tails button, which
-// regenerated the patch to flip a per-rhomb flag — and regenerating clears the net,
-// so a cosmetic toggle silently destroyed whatever you had built. It only ever
-// affected shading, so it is a draw-time flip now and costs nothing.
-let shadeFlip = false;
+// One control for height, matching the 3D page. Sign is the flip — real geometry,
+// the dual roof, every hill a dale. Magnitude is how strongly height is shaded,
+// 0 leaving the tiles flat colour. Biased so the middle of the travel is spread
+// out, which is where small differences are worth seeing.
+//
+// This replaces two buttons that did one job badly: Hills up/Dales up flipped the
+// lift while Heads/Tails flipped only the gradient direction, and since shading
+// depicts height they cannot be independent.
+let heightU = 1; // slider position, −1 … +1
+let shadeDepth = 1; // |biased(heightU)|
+
+function biasedHeight(u: number): number {
+    return Math.sign(u) * Math.pow(Math.abs(u), 1.6);
+}
 
 // Face colouring in the tiling view. "Coloured by type or by vertex index" was in
 // the original spec and never got built.
@@ -107,29 +115,58 @@ function hexToRGB(h: string): [number, number, number] {
 
 function lerpColor(start: string, end: string, alpha: number): string {
     const a = Math.max(0, Math.min(1, alpha));
-    const [r1, g1, b1] = hexToRGB(start);
-    const [r2, g2, b2] = hexToRGB(end);
+    const [r1, g1, b1] = hexToRGB(toHex(start));
+    const [r2, g2, b2] = hexToRGB(toHex(end));
     return `rgb(${r1 * (1 - a) + r2 * a},${g1 * (1 - a) + g2 * a},${b1 * (1 - a) + b2 * a})`;
+}
+
+// Shading is a depiction of HEIGHT, and height has four absolute levels across a
+// patch. The old version ran white → fill → dark along each face's own diagonal,
+// which meant a rhomb spanning levels 1→3 was drawn exactly like one spanning
+// 2→4: the shading carried no height information at all, only which way the face
+// tilted.
+//
+// Now the ramp is absolute. shadeOf maps a level to a colour once, for the whole
+// patch, and a face simply draws the segment of that ramp between its own two
+// extreme corners. Height varies affinely along the v0→v2 diagonal, so two stops
+// are exact — the old third stop at 2/3 was what encoded the wrong thing.
+//
+// Colour and shading stay separate: colour is the constant tile property, shading
+// is the height layer over it.
+function shadeOf(fill: string, index: number): string {
+    const span = idxHi - idxLo || 1;
+    const t = Math.max(0, Math.min(1, (index - idxLo) / span));
+    // shadeDepth 0 leaves the tile flat; 1 is the full light-to-dark range
+    const lo = lerpColor(fill, "#ffffff", 0.55 * shadeDepth);
+    const hi = lerpColor(fill, "#000000", 0.42 * shadeDepth);
+    return lerpColor(lo, hi, t);
 }
 
 function makeGradient(
     ctx: CanvasRenderingContext2D,
     fill: string,
-    s0: { x: number; y: number },
-    s2: { x: number; y: number },
-    isHeads: boolean,
+    pLow: { x: number; y: number },
+    pHigh: { x: number; y: number },
+    iLow: number,
+    iHigh: number,
 ): CanvasGradient {
-    const grad = ctx.createLinearGradient(s0.x, s0.y, s2.x, s2.y);
-    if (isHeads) {
-        grad.addColorStop(0, "#fff");
-        grad.addColorStop(2 / 3, fill);
-        grad.addColorStop(1, lerpColor(fill, "#000", 1 / 3));
-    } else {
-        grad.addColorStop(0, lerpColor(fill, "#000", 1 / 3));
-        grad.addColorStop(1 / 3, fill);
-        grad.addColorStop(1, "#fff");
-    }
+    const grad = ctx.createLinearGradient(pLow.x, pLow.y, pHigh.x, pHigh.y);
+    grad.addColorStop(0, shadeOf(fill, iLow));
+    grad.addColorStop(1, shadeOf(fill, iHigh));
     return grad;
+}
+
+// lerpColor needs hex on both sides; shadeOf feeds it its own rgb() output, so
+// accept that too.
+function toHex(c: string): string {
+    if (c.startsWith("#")) return c;
+    const m = c.match(/rgb\(([-\d.]+),\s*([-\d.]+),\s*([-\d.]+)\)/);
+    if (!m) return "#888888";
+    const h = (v: string) =>
+        Math.max(0, Math.min(255, Math.round(Number(v))))
+            .toString(16)
+            .padStart(2, "0");
+    return `#${h(m[1])}${h(m[2])}${h(m[3])}`;
 }
 
 const tilingCanvas = document.getElementById("tiling") as HTMLCanvasElement;
@@ -192,13 +229,16 @@ function drawTiling() {
         for (let i = 1; i < 4; i++) ctx.lineTo(sv[i].x, sv[i].y);
         ctx.closePath();
 
-        const shade = r.isHeads !== shadeFlip;
+        // the two extreme corners: index runs i, i+1, i+2, i+1 round the cycle,
+        // so v0 and v2 are the low and high ends of this face's height range
+        const iA = displayIndex(r.vertIndices[0]);
+        const iC = displayIndex(r.vertIndices[2]);
         const faceFill = (): string | CanvasGradient => {
             if (tileColour === "type") return r.thick ? "#9292e3" : "#eec09b";
             if (tileColour === "index") {
-                return indexColor(displayIndex(faceIndexLow(r)));
+                return indexColor(Math.min(iA, iC));
             }
-            return makeGradient(ctx, r.fill, sv[0], sv[2], shade);
+            return makeGradient(ctx, r.fill, sv[0], sv[2], iA, iC);
         };
         const role = mode === "watch" ? traceRoles.get(r.id) : undefined;
         const hint = mode === "watch" ? undefined : moveHints.get(r.id);
@@ -584,7 +624,7 @@ const DPI = 96;
 // Rhombus side, in inches. Fixed at φ−½ ≈ 1.118" originally, which is a fine size
 // to fold but caps a sheet at roughly twenty rhombi — so the orientation search
 // alone cannot make a large net fit. Adjustable.
-let sideIn = GOLDEN_SIDE;
+let sideIn = 1; // inches
 
 const PAPER: [number, number] = [8.5, 11];
 const MARGIN_IN = 0.5;
@@ -1005,7 +1045,8 @@ function drawNet() {
             src.fill,
             { x: sv[0].x, y: sv[0].y },
             { x: sv[2].x, y: sv[2].y },
-            src.isHeads !== shadeFlip,
+            displayIndex(vertexList[nr.verts[0]].index),
+            displayIndex(vertexList[nr.verts[2]].index),
         );
         ctx.globalAlpha = nr.overlapping ? 0.65 : 1;
         ctx.fill();
@@ -1093,6 +1134,12 @@ function drawNet() {
 
 type Mode = "build" | "watch";
 let mode: Mode = "build";
+
+// Buttons that only make sense while building by hand. Print is deliberately not
+// among them: in Watch mode the canvas holds a complete decomposition, and its
+// hinge components are exactly the pieces, so printing there gives what the Net
+// page gives.
+const buildOnly: HTMLButtonElement[] = [];
 
 let traceEvents: TraceEvent[] = [];
 let traceIndex = 0; // number of events applied
@@ -1696,10 +1743,14 @@ function buildTransport(): void {
 function setMode(next: Mode): void {
     mode = next;
     const transport = document.getElementById("transport")!;
-    const buildBar = document.getElementById("controls")!;
     transport.style.display = next === "watch" ? "flex" : "none";
-    buildBar.style.opacity = next === "watch" ? "0.45" : "1";
-    buildBar.style.pointerEvents = next === "watch" ? "none" : "auto";
+    // Only Clear, Undo and Print are build-specific. Patch, generation, color,
+    // height and side all still mean something while watching, so disabling the
+    // whole bar — as this used to — took away controls for no reason.
+    for (const b of buildOnly) {
+        b.disabled = next === "watch";
+        b.style.opacity = next === "watch" ? "0.45" : "1";
+    }
     stopPlay();
     if (next === "watch") {
         runTrace();
@@ -1750,6 +1801,8 @@ function buildModeBar(): void {
 
 function buildControls() {
     const controls = document.getElementById("controls")!;
+    const clearBtn = document.getElementById("btn-clear") as HTMLButtonElement;
+    if (clearBtn) buildOnly.push(clearBtn);
 
     // Type selector
     const typeSelect = document.createElement("select");
@@ -1764,6 +1817,12 @@ function buildControls() {
     typeSelect.addEventListener("change", () => {
         currentSeedIdx = parseInt(typeSelect.value);
         regenerate();
+        if (mode === "watch") {
+            runTrace();
+            syncTransport();
+            drawTiling();
+            drawNet();
+        }
     });
 
     const typeLabel = document.createElement("label");
@@ -1785,6 +1844,12 @@ function buildControls() {
     genSelect.addEventListener("change", () => {
         gen = parseInt(genSelect.value);
         regenerate();
+        if (mode === "watch") {
+            runTrace();
+            syncTransport();
+            drawTiling();
+            drawNet();
+        }
     });
 
     const genLabel = document.createElement("label");
@@ -1793,17 +1858,42 @@ function buildControls() {
     genLabel.appendChild(genSelect);
     controls.insertBefore(genLabel, typeLabel.nextSibling);
 
-    // shading direction — draw-time, so it no longer clears the net
-    const headsBtn = document.createElement("button");
-    headsBtn.textContent = "Heads";
-    headsBtn.title = "Flip which way the face shading runs (display only)";
-    headsBtn.addEventListener("click", () => {
-        shadeFlip = !shadeFlip;
-        headsBtn.textContent = shadeFlip ? "Tails" : "Heads";
+    // one height control: sign flips the roof, magnitude sets shading depth
+    const heightWrap = document.createElement("label");
+    heightWrap.style.cssText = "font-size:13px;display:flex;align-items:center;gap:6px;";
+    const heightOut = document.createElement("span");
+    heightOut.className = "mono";
+    heightOut.style.minWidth = "5.5em";
+    const heightSlider = document.createElement("input");
+    heightSlider.type = "range";
+    heightSlider.min = "-1";
+    heightSlider.max = "1";
+    heightSlider.step = "0.02";
+    heightSlider.value = "1";
+    heightSlider.style.width = "130px";
+    heightSlider.title =
+        "Height: sign flips hills and dales, magnitude sets how strongly height is shaded";
+    const syncHeight = (regen: boolean) => {
+        heightU = Number(heightSlider.value);
+        const v = biasedHeight(heightU);
+        shadeDepth = Math.abs(v);
+        const wasFlipped = flipHeight;
+        flipHeight = v < 0;
+        heightOut.textContent =
+            shadeDepth < 0.005
+                ? "flat"
+                : `${v < 0 ? "dales" : "hills"} ${shadeDepth.toFixed(2)}`;
+        // creases follow the lift, so a change of sign needs the analysis rebuilt
+        if (regen && flipHeight !== wasFlipped && allRhombs.length) {
+            analysis = analysePatch(flipHeight);
+        }
         drawTiling();
         drawNet();
-    });
-    controls.insertBefore(headsBtn, genLabel.nextSibling);
+    };
+    heightSlider.addEventListener("input", () => syncHeight(true));
+    heightWrap.append(document.createTextNode("Height "), heightSlider, heightOut);
+    controls.insertBefore(heightWrap, genLabel.nextSibling);
+    syncHeight(false);
 
     const colourSel = document.createElement("select");
     colourSel.style.cssText = "padding:4px;font-size:13px;";
@@ -1823,30 +1913,14 @@ function buildControls() {
         drawTiling();
     });
     const colourLabel = document.createElement("label");
-    colourLabel.textContent = "Colour: ";
+    colourLabel.textContent = "Color: ";
     colourLabel.style.fontSize = "13px";
     colourLabel.appendChild(colourSel);
-    controls.insertBefore(colourLabel, headsBtn.nextSibling);
-
-    // height flip toggle — redraw only, no regeneration needed
-    const flipBtn = document.createElement("button");
-    const flipLabel = () => (flipHeight ? "Dales up" : "Hills up");
-    flipBtn.textContent = flipLabel();
-    flipBtn.title =
-        "Flip the roof vertically — the dual surface over the same tiling";
-    flipBtn.addEventListener("click", () => {
-        flipHeight = !flipHeight;
-        flipBtn.textContent = flipLabel();
-        // creases depend on the lift, so the analysis is rebuilt
-        if (allRhombs.length) analysis = analysePatch(flipHeight);
-        drawTiling();
-        drawNet();
-    });
-    controls.insertBefore(flipBtn, headsBtn.nextSibling);
+    controls.insertBefore(colourLabel, heightWrap.nextSibling);
 
     const sideInput = document.createElement("input");
     sideInput.type = "text";
-    sideInput.value = `${GOLDEN_SIDE.toFixed(3)}in`;
+    sideInput.value = "1in";
     sideInput.size = 8;
     sideInput.style.cssText =
         "padding:4px;font-size:13px;border:1px solid #ccc;border-radius:4px;";
@@ -1866,7 +1940,7 @@ function buildControls() {
         if ((ev as KeyboardEvent).key === "Enter") applySide();
     });
     const sideLabel = document.createElement("label");
-    sideLabel.textContent = "Side: ";
+    sideLabel.textContent = "Side (mm/cm/in): ";
     sideLabel.style.fontSize = "13px";
     sideLabel.appendChild(sideInput);
     controls.appendChild(sideLabel);
@@ -1886,6 +1960,7 @@ function buildControls() {
         drawNet();
     });
     controls.insertBefore(undoBtn, controls.firstChild?.nextSibling ?? null);
+    buildOnly.push(undoBtn);
 
     window.addEventListener("keydown", (e) => {
         if (e.altKey && !altDown) {

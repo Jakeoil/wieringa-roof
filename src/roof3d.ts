@@ -33,7 +33,6 @@ const vscaleOut = el<HTMLElement>("vscaleOut");
 const edgesChk = el<HTMLInputElement>("edges");
 const isoChk = el<HTMLInputElement>("isogloss");
 const transpChk = el<HTMLInputElement>("transparent");
-const flipChk = el<HTMLInputElement>("flip");
 const statusEl = el<HTMLElement>("status");
 
 // ── scene ─────────────────────────────────────────────────────────
@@ -102,7 +101,6 @@ const CLUSTER_FALLBACK = new THREE.Color(0xbfc2ca);
 function build(reframe: boolean): void {
     const seedIdx = seedTypes.findIndex((s) => s.label === patchSel.value);
     const gen = Number(genSel.value);
-    const vscale = Number(vscaleInput.value);
 
     const t0 = performance.now();
     const quiet = console.log;
@@ -110,7 +108,12 @@ function build(reframe: boolean): void {
     generatePatch(seedIdx, true, gen);
     console.log = quiet;
 
-    const flip = flipChk.checked;
+    // The slider is one control doing two jobs: sign is the flip, magnitude is the
+    // flattening. Biased so the middle of the travel is spread out, since near-flat
+    // is where the shape is worth studying.
+    const u = Number(vscaleInput.value);
+    const flip = u < 0;
+    const vscale = Math.sign(u) * Math.pow(Math.abs(u), 1.6);
     const lift = computeLift();
     const P = lift.n.map((nv) => (nv ? pos3D(nv, flip) : null));
 
@@ -134,7 +137,7 @@ function build(reframe: boolean): void {
 
     const push = (vid: number, c: THREE.Color) => {
         const p = P[vid]!;
-        pos.push(p[0], p[1], p[2] * vscale);
+        pos.push(p[0], p[1], p[2] * Math.abs(vscale));
         col.push(c.r, c.g, c.b);
     };
 
@@ -197,10 +200,10 @@ function build(reframe: boolean): void {
             lp.push(
                 a[0] - c.x,
                 a[1] - c.y,
-                a[2] * vscale - c.z,
+                a[2] * Math.abs(vscale) - c.z,
                 b[0] - c.x,
                 b[1] - c.y,
-                b[2] * vscale - c.z,
+                b[2] * Math.abs(vscale) - c.z,
             );
         }
         const lg = new THREE.BufferGeometry();
@@ -226,7 +229,7 @@ function build(reframe: boolean): void {
             return [
                 a[0] + (b[0] - a[0]) * s - c.x,
                 a[1] + (b[1] - a[1]) * s - c.y,
-                (a[2] + (b[2] - a[2]) * s) * vscale - c.z,
+                (a[2] + (b[2] - a[2]) * s) * Math.abs(vscale) - c.z,
             ];
         };
         for (const f of faces) {
@@ -285,23 +288,25 @@ function build(reframe: boolean): void {
     const cl: Record<string, number> = {};
     for (const r of allRhombs) cl[r.cluster] = (cl[r.cluster] ?? 0) + 1;
     const clText = `${cl.Pe5 ?? 0} in stars, ${cl.Pe3 ?? 0} in boats, ${cl.Pe1 ?? 0} in diamonds`;
-    const relief = (3 / Math.sqrt(5)) * vscale;
+    const relief = (3 / Math.sqrt(5)) * Math.abs(vscale);
     statusEl.textContent =
         `${allRhombs.length} rhombi · ${vertexList.length} vertices · ` +
         `${clText} · index levels ${JSON.stringify(hist)} · ` +
         `relief ${relief.toFixed(3)} side lengths` +
-        `${vscale === 1 ? " (true)" : ` at ${vscale}× of ${(3 / Math.sqrt(5)).toFixed(3)}`}` +
-        `${flip ? ", flipped" : ""} · ${ms} ms`;
+        `${Math.abs(vscale) > 0.999 ? " (true)" : ` at ${Math.abs(vscale).toFixed(2)}× of ${(3 / Math.sqrt(5)).toFixed(3)}`}` +
+        `${flip ? ", dales up" : ""} · ${ms} ms`;
 }
 
 // ── controls ──────────────────────────────────────────────────────
 
 for (const [code, nick] of [
-    ["Pe5", "Star"],
-    ["Pe3", "Boat"],
-    ["Pe1", "Diamond"],
-    ["Deca", "Decagon"],
-    ["St5", "Star (St5)"],
+    ["Pe5", "Pe5 pentagon"],
+    ["Pe3", "Pe3 pentagon"],
+    ["Pe1", "Pe1 pentagon"],
+    ["St5", "St5 star"],
+    ["St3", "St3 boat"],
+    ["St1", "St1 diamond"],
+    ["Deca", "Deca"],
 ] as Array<[string, string]>) {
     const o = document.createElement("option");
     o.value = code;
@@ -319,7 +324,9 @@ for (const g of [2, 3, 4, 5]) {
 genSel.value = "3";
 
 function rebuild(reframe: boolean): void {
-    vscaleOut.textContent = `${Number(vscaleInput.value).toFixed(2)}×`;
+    const uu = Number(vscaleInput.value);
+    const vv = Math.sign(uu) * Math.pow(Math.abs(uu), 1.6);
+    vscaleOut.textContent = `${vv.toFixed(2)}×`;
     disposeOld();
     build(reframe);
 }
@@ -327,7 +334,7 @@ function rebuild(reframe: boolean): void {
 for (const c of [patchSel, genSel]) {
     c.addEventListener("change", () => rebuild(true));
 }
-for (const c of [colorSel, edgesChk, isoChk, transpChk, flipChk]) {
+for (const c of [colorSel, edgesChk, isoChk, transpChk]) {
     c.addEventListener("change", () => rebuild(false));
 }
 vscaleInput.addEventListener("input", () => rebuild(false));
