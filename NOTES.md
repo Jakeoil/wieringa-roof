@@ -213,6 +213,11 @@ Remaining: page and margin controls on the workbench (reusing `PAGES` and
 `parseLength` from `sheet.ts`, which `refreshNetView` and `printNet` currently
 hardcode), then retire `net.html`. Both wait on browser confirmation.
 
+**Settled:** `net.html` is gone. The layer selector moved to `unfold.html` first, so
+nothing was lost in the move. Page, margin, tint and multi-sheet layout went with
+it and belong to Stage B, which is where paring giant sheets down to office size
+lives anyway.
+
 ---
 
 ## Plan: cut forests and branch cuts

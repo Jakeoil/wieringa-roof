@@ -11,15 +11,15 @@ golden rhombi for physical models.
 | page | content | state |
 |---|---|---|
 | `index.html` | splash — what the surface is, links to everything | done |
-| `net.html` | patch selector → unfolding → printable SVG sheets | done |
 | `roof3d.html` | three.js prototype of the surface | done |
 | `info.html` | "Mathematics" — golden rhombus, heights, fold angles, defects | done |
 | `polyhedra.html` | triacontahedron + the two rhombohedra, generated diagrams | done |
-| `unfold.html` | hand-driven unfolding, plus an algorithm replay player | done |
+| `unfold.html` | build or replay a net, layer selector, print at true size | done |
+| `tools.html` | true-size templates, fold gauges, forming jigs, kit list | done |
 
 `src/geometry.ts` holds the tiling and the lift; `src/unfold.ts` the two
-region-growing methods and `src/cuttree.ts` the branch-cut routing; `src/sheet.ts` layout and SVG; `src/net.ts`,
-`src/roof3d.ts`, `src/workbench.ts` are the per-page entry points. `site.css` is the
+region-growing methods and `src/cuttree.ts` the branch-cut routing; `src/sheet.ts` layout and SVG;
+`src/roof3d.ts` and `src/workbench.ts` are the per-page entry points. `site.css` is the
 shared shell. `tsc` compiles all of `src/` → `dist/`.
 
 ## Geometry
@@ -44,7 +44,7 @@ write-up lives on `info.html`; the essentials:
 
 ## Net methods
 
-Three, selectable on `net.html` and replayable on `unfold.html`.
+Three, selectable and replayable on `unfold.html`.
 
 **Branch cuts** (`cutTreeUnfold`, `src/cuttree.ts`, the default). Does not grow a
 region at all. `E_int = V_int + F − 1` holds exactly on every patch, so a one-piece

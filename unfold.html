@@ -77,7 +77,6 @@
 <nav>
     <span class="brand">Wieringa Roof</span>
     <a href="./index.html" draggable="false">Home</a>
-    <a href="./net.html" draggable="false">Net</a>
     <a href="./roof3d.html" draggable="false">3D</a>
     <a href="./info.html" draggable="false">Mathematics</a>
     <a href="./polyhedra.html" draggable="false">Polyhedra</a>
@@ -132,12 +131,22 @@
         fitted once to the finished net and then held, since re-fitting each frame
         makes the picture lurch.
         <br><br>
+        <strong>Layer</strong> appears only when a net needs more than one sheet.
+        Where the surface wraps over itself it need not be cut — the offending part
+        continues on the next layer, which is the next sheet of paper, and every
+        layer is flat by construction. Choosing one draws it solid and ghosts the
+        rest, so you can see where the sheet you are about to print sits inside the
+        whole net. All layers share one coordinate frame, so the printed sheets
+        register against each other and the surface visibly continues across the
+        seam. Up to generation 3 every patch is a single layer and the control stays
+        hidden.
+        <br><br>
         <strong>Colour</strong> switches the tiling between the gen-1 clusters,
         thick against thin, and height index. <strong>Heads / Tails</strong> flips
         which way the face shading runs and is display only — it no longer rebuilds
         the patch, so it will not throw away the net you are working on.
         <strong>Print / PDF</strong> outputs what you have built, as vector at true
-        size, through the same renderer the Net page uses.
+        size, through the sheet renderer in <span class="mono">sheet.ts</span>.
         <br><br>
         Creases are dashed by fold angle — 36°, 72°, 108° — and coloured red for
         mountain, blue for valley. Solid black edges are cuts. Overlapping

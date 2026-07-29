@@ -13,7 +13,6 @@ supplies nothing but the pattern of which rhombus joins which, and at what angle
 | | |
 |---|---|
 | `index.html` | what the surface is |
-| `net.html` | pick a patch, unfold it, print a sheet at true size |
 | `roof3d.html` | orbit the surface itself |
 | `info.html` | the mathematics — the lift, fold angles, curvature |
 | `polyhedra.html` | the triacontahedron and the two golden rhombohedra |

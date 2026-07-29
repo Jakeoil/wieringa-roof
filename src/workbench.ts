@@ -1415,7 +1415,7 @@ let mode: Mode = "build";
 
 // Buttons that only make sense while building by hand. Print is deliberately not
 // among them: in Watch mode the canvas holds a complete decomposition, and its
-// hinge components are exactly the pieces, so printing there gives what the Net
+// hinge components are exactly the pieces, so printing there gives what the sheet
 // page gives.
 const buildOnly: HTMLButtonElement[] = [];
 
@@ -1747,7 +1747,7 @@ document.getElementById("btn-clear")!.addEventListener("click", () => {
 
 // ── Print ─────────────────────────────────────────────────────────
 //
-// Printing goes through sheet.ts, the same renderer the Net page uses, so a
+// Printing goes through sheet.ts, the shared sheet renderer, so a
 // hand-built net comes out as crisp vector at true size rather than a screenshot
 // of the canvas. Only the hinges the user actually unfolded across count as
 // creases; every other edge is a cut, exactly as on screen.
