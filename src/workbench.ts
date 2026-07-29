@@ -22,8 +22,8 @@ import {
     ekey,
     unfoldPatch,
     ribbonGrowPatch,
-    stripPatch,
 } from "./unfold.js";
+import { cutTreeUnfold } from "./cuttree.js";
 import type { Analysis, Placed, TraceEvent } from "./unfold.js";
 import { parseLength, layoutSheets, renderSheet, PAGES } from "./sheet.js";
 import { BUILD_ID } from "./build-id.js";
@@ -1330,8 +1330,8 @@ function runTrace(): void {
     const fn =
         traceMethod === "bfs"
             ? unfoldPatch
-            : traceMethod === "strips"
-              ? stripPatch
+            : traceMethod === "cuttree"
+              ? cutTreeUnfold
               : ribbonGrowPatch;
     const res = fn({ flip: flipHeight, trace: traceEvents });
 
@@ -1808,9 +1808,9 @@ function buildTransport(): void {
 
     const methodSel = mk("select");
     for (const [v, t] of [
+        ["cuttree", "Branch cuts"],
         ["widened", "Widened ribbons"],
         ["bfs", "BFS"],
-        ["strips", "Ribbon strips"],
     ]) {
         const o = mk("option");
         o.value = v;

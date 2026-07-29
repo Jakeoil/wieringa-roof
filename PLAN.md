@@ -17,8 +17,8 @@ golden rhombi for physical models.
 | `polyhedra.html` | triacontahedron + the two rhombohedra, generated diagrams | done |
 | `unfold.html` | hand-driven unfolding, plus an algorithm replay player | done |
 
-`src/geometry.ts` holds the tiling and the lift; `src/unfold.ts` the three
-decomposition methods; `src/sheet.ts` layout and SVG; `src/net.ts`,
+`src/geometry.ts` holds the tiling and the lift; `src/unfold.ts` the two
+region-growing methods and `src/cuttree.ts` the branch-cut routing; `src/sheet.ts` layout and SVG; `src/net.ts`,
 `src/roof3d.ts`, `src/workbench.ts` are the per-page entry points. `site.css` is the
 shared shell. `tsc` compiles all of `src/` → `dist/`.
 
@@ -44,23 +44,28 @@ write-up lives on `info.html`; the essentials:
 
 ## Net methods
 
-Three, all in `src/unfold.ts`, selectable on `net.html`.
+Three, selectable on `net.html` and replayable on `unfold.html`.
 
-**Widened ribbons** (`ribbonGrowPatch`, the default). Takes the longest de Bruijn
-ribbon as a backbone, places it, then accretes neighbours across any edge —
-longest backbone first, so it gets first claim on contested rhombi. Gathers
-80–90% of a patch into one piece.
+**Branch cuts** (`cutTreeUnfold`, `src/cuttree.ts`, the default). Does not grow a
+region at all. `E_int = V_int + F − 1` holds exactly on every patch, so a one-piece
+net cuts precisely one edge per interior vertex; contract the boundary to a point
+and such a cut set is a **spanning tree of the vertex graph**, its branches running
+from interior vertices out to the edge — branch cuts in the sense of `log` and `√`.
+Connectivity is therefore guaranteed by construction and only overlap remains to be
+searched for, by spanning-tree edge swaps aimed at the dual path between an
+overlapping pair. **One piece with no overlaps on every patch through generation 3**,
+in well under a second. Reports both answers: the one-piece net with its residual
+overlap count, and `result.flat`, a fully flat variant costing one extra piece per
+added cut.
+
+**Widened ribbons** (`ribbonGrowPatch`). Takes the longest de Bruijn ribbon as a
+backbone, places it, then accretes neighbours across any edge — longest backbone
+first, so it gets first claim on contested rhombi. Gathers 80–90% of a patch into
+one piece.
 
 **BFS unfolding** (`unfoldPatch`). Spreads outward in rings from a seed rhomb,
 rejecting overlapping placements; tries every rhomb as seed when the patch is
-small enough. Fewest pieces in total, but more evenly sized, so more real joins.
-
-**Ribbon strips** (`stripPatch`). Pure de Bruijn ribbons, one rhomb wide. All
-creases in a strip are parallel, so the strip is a generalized cylinder and
-develops into a straight band with creases at monotonically increasing positions
-spaced exactly `2/√5` — it **provably cannot self-overlap at any length**. But a
-ribbon only reaches the 2/5 of rhombi sharing its direction, so you get many thin
-bands: 8–9 pieces at gen 2 where the others need 1–2.
+small enough. Fewer pieces than widened, but more evenly sized, so more real joins.
 
 **Crease vs cut is decided by the hinge set, not piece membership.** An unfolding
 keeps only `F − 1` hinges (a spanning tree of the face graph); every other
@@ -68,19 +73,25 @@ interior edge is cut even when both its faces are in the same piece. Those are
 exactly the edges bounding the angular-defect wedges. `|hinges| = faces − pieces`
 is asserted.
 
+**Ribbon strips are retired.** They were provably overlap-free at any length —
+every crease in a ribbon is parallel, so it is a generalized cylinder — but a
+ribbon reaches only the 2/5 of rhombi sharing its direction, costing ~5× the
+pieces. The theorem is kept on `info.html` and in `NOTES.md`.
+
 ### Measured
 
-Pieces, and pieces of 5+ rhombi (the ones that are real work to join):
+Pieces (and overlaps for the one-piece branch-cut result):
 
-| patch | rhombi | widened | BFS | strips |
+| patch | rhombi | branch cuts | widened | BFS |
 |---|---|---|---|---|
-| gen 2 | 21–25 | 1–2 (1 big) | 1–2 (1 big) | 8–9 |
-| gen 3 | 138–140 | 6–8 (1–2 big) | 4–6 (2–3 big) | 41–46 |
-| gen 4 | 835–921 | 57–64 (3–8 big) | 50–51 (9–10 big) | 242–284 |
+| gen 2 | 3–25 | **1 piece, 0 overlaps** | 1–2 | 1–2 |
+| gen 3 | 45–165 | **1 piece, 0 overlaps** | 2–8 | 1–6 |
+| gen 4 | 408–1380 | 1 piece, 0–5 overlaps | 19–73 | 21–73 |
 
-All three validated at generations 2–4: hinge counts balance, zero overlaps
-within a piece, developed edge lengths exactly `1.000000000`, corner angles
-exactly `63.4349°/116.5651°`.
+All validated at generations 2–4: cut sets acyclic and spanning, hinge counts
+balance, developed edge lengths exactly `1.000000000`, corner angles exactly
+`63.4349°/116.5651°`, grid overlap counts identical to the O(n²) sweep, and traces
+replaying with zero deviation.
 
 ## Patches
 
@@ -109,7 +120,7 @@ Letter row, and it folds crisply in 100–120 gsm office paper. Below about 12 m
 the 108° creases get fiddly.
 
 From the command line: `node tools/bfs-unfold.mjs [--gen=] [--side=] [--page=]
-[--margin=] [--mode=widened|bfs|strips] [--svg=DIR] [--angles]`.
+[--margin=] [--mode=cuttree|widened|bfs] [--budget=ms] [--svg=DIR] [--angles]`.
 
 ## Fixed: the pentagrid index formula is gone
 
@@ -163,6 +174,9 @@ scored by the worst axis ratio `max(w/PW, h/PH)`.
   transport controls and the two hit-tests are the least-tested parts.
 - Generation 5 is offered on the 3D page but not the net page: the unfolding
   methods take 1.2–2.5 s at 5,719 rhombi, against 48–76 ms at gen 4.
+- **Stage B — fitting paper.** Branch cuts give one piece, but a gen-3 net is
+  336×391 mm at 20 mm side against Letter's usable 191×254. Splitting a finished
+  net to fit, and packing the rectangles onto sheets, is the next work.
 - `Pe3` and `Pe1` patch outlines converge to a limit that is not their seed shape
   (distance plateaus at 0.16 and 0.21). Only `Pe5` closes the loop exactly, its
   hull being a regular pentagon at every generation. Worth understanding why.

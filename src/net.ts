@@ -1,7 +1,8 @@
 // Net page — DOM wiring. Layout and SVG live in sheet.ts, unfolding in unfold.ts.
 
 import { seedTypes, generatePatch } from "./geometry.js";
-import { unfoldPatch, stripPatch, ribbonGrowPatch } from "./unfold.js";
+import { unfoldPatch, ribbonGrowPatch } from "./unfold.js";
+import { cutTreeUnfold } from "./cuttree.js";
 import { PAGES, parseLength, layoutSheets, renderSheet } from "./sheet.js";
 
 const el = <T extends HTMLElement>(id: string) =>
@@ -68,8 +69,8 @@ function rebuild(): void {
     generatePatch(seedIdx, true, gen);
     const opts = { flip: flipChk.checked };
     const res =
-        modeSel.value === "strips"
-            ? stripPatch(opts)
+        modeSel.value === "cuttree"
+            ? cutTreeUnfold(opts)
             : modeSel.value === "widened"
               ? ribbonGrowPatch(opts)
               : unfoldPatch(opts);
@@ -110,7 +111,7 @@ function rebuild(): void {
     statusEl.className = "info" + (oversize.length ? " bad" : "");
     statusEl.textContent =
         `${res.faces.length} rhombi → ${res.pieces.length} ` +
-        `${modeSel.value === "strips" ? "strip" : "piece"}${res.pieces.length === 1 ? "" : "s"} ` +
+        `piece${res.pieces.length === 1 ? "" : "s"} ` +
         `on ${sheets.length} sheet${sheets.length === 1 ? "" : "s"}, side ${side.label}. ` +
         `Folds ${folds}. Pieces: ${sizes}.` +
         (oversize.length

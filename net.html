@@ -72,9 +72,9 @@
 <div class="bar">
     <label>Patch <select id="patch"></select></label>
     <label>Method <select id="mode">
+        <option value="cuttree">Branch cuts</option>
         <option value="widened">Widened ribbons</option>
         <option value="bfs">BFS unfolding</option>
-        <option value="strips">Ribbon strips</option>
     </select></label>
     <label>Generation <select id="gen"></select></label>
     <label>Rhombus side <input type="text" id="side" value="20mm"></label>
@@ -112,22 +112,28 @@
 </p>
 <h2>Methods</h2>
 <p>
+    <strong>Branch cuts</strong> does not grow a region at all. Counted over every
+    patch, <span class="mono">E<sub>int</sub> = V<sub>int</sub> + F − 1</span>
+    exactly, which means a one-piece net cuts precisely one edge per interior
+    vertex. Contract the whole boundary to a single point and such a cut set is a
+    <em>spanning tree</em> of the vertex graph — its branches running from interior
+    vertices out to the edge of the patch, exactly the branch cuts of
+    <span class="mono">log</span> and <span class="mono">√</span> that make a
+    multivalued thing single-valued. Connectivity is then guaranteed rather than
+    hoped for, and the only thing left to search for is a routing that does not
+    overlap. Every patch here through generation 3 comes out as a single
+    overlap-free sheet. The default.
+</p>
+<p>
     <strong>Widened ribbons</strong> takes the longest de Bruijn ribbon as a
     backbone and then accretes neighbouring rhombi onto it. It gathers the most
     into one piece — 80–90% of the patch — leaving the rest as small slivers, so
-    there are fewer substantial joins than the alternatives. The default.
+    there are fewer substantial joins than the alternatives.
 </p>
 <p>
     <strong>BFS unfolding</strong> spreads outward in rings from a single seed
     rhomb. Fewer pieces in total, but they are more evenly sized, which means more
     real nets to fold and join.
-</p>
-<p>
-    <strong>Ribbon strips</strong> are pure de Bruijn ribbons, one rhomb wide.
-    Every crease in a strip is parallel and the spacing is exactly 2/√5, so a
-    strip provably cannot overlap itself at any length. Lovely to fold, but a
-    ribbon only reaches the two fifths of rhombi sharing its direction, so you get
-    many thin bands.
 </p>
 <p>
     Where a patch comes apart into more than one piece it is because the surface

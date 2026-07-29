@@ -14,6 +14,7 @@
 //   --page=<name>  letter | a4 | none                            (default letter)
 //   --margin=<len> page margin                                   (default 0.5in)
 //   --unit=<u>     report in mm or in (default: follows --side)
+//   --mode=<m>     cuttree | widened | bfs                      (default cuttree)
 
 import {
     seedTypes,
@@ -60,6 +61,8 @@ const args = Object.fromEntries(
 const side = parseLen(args.side, 20);
 const margin = parseLen(args.margin, 0.5 * MM_PER_IN);
 const GEN = Number(args.gen ?? 2);
+const MODE = String(args.mode ?? "cuttree");
+const BUDGET = Number(args.budget ?? 4000);
 const pageName = String(args.page ?? "letter").toLowerCase();
 if (!(pageName in PAGES)) throw new Error(`unknown page "${pageName}"`);
 const [pw, ph] = PAGES[pageName];
@@ -316,7 +319,7 @@ const TARGETS = [
 ];
 
 console.log(
-    `BFS edge-unfolding — gen ${GEN}, side ${fmt(side.mm)} ${UNIT}, ` +
+    `Unfolding (${MODE}) — gen ${GEN}, side ${fmt(side.mm)} ${UNIT}, ` +
         `page ${pageName}` +
         (pageName === "none"
             ? ""
@@ -370,30 +373,49 @@ for (const [label, nick] of TARGETS) {
     }
 
     let best = null;
-    for (const f of faces) {
-        const run = unfold(faces, P, f.id);
-        const primary = Math.max(...run.nets.map((n) => n.faces.length));
-        const score = [run.nets.length, -primary];
-        if (
-            !best ||
-            score[0] < best.score[0] ||
-            (score[0] === best.score[0] && score[1] < best.score[1])
-        ) {
-            best = { ...run, score, seed: f.id };
+    let how;
+    if (MODE === "bfs") {
+        for (const f of faces) {
+            const run = unfold(faces, P, f.id);
+            const primary = Math.max(...run.nets.map((n) => n.faces.length));
+            const score = [run.nets.length, -primary];
+            if (
+                !best ||
+                score[0] < best.score[0] ||
+                (score[0] === best.score[0] && score[1] < best.score[1])
+            ) {
+                best = { ...run, score, seed: f.id };
+            }
         }
+        how = `best of ${faces.length} seeds`;
+    } else {
+        // The library methods, on the patch generatePatch has already built.
+        const res =
+            MODE === "widened"
+                ? (await import("../dist/unfold.js")).ribbonGrowPatch({})
+                : (await import("../dist/cuttree.js")).cutTreeUnfold({
+                      budgetMs: BUDGET,
+                  });
+        best = {
+            placed: res.placed,
+            nets: res.pieces.map((p) => ({ id: p.id, faces: p.faceIds })),
+        };
+        how =
+            MODE === "cuttree"
+                ? `branch cuts, ${res.cuts.size} cuts, ${res.overlaps} overlap(s)` +
+                  (res.overlaps ? `; flat variant ${res.flat.pieces.length} pieces` : "")
+                : "widened ribbons";
     }
 
-    console.log(
-        `   nets: ${best.nets.length}  (best of ${faces.length} seeds)`,
-    );
-    for (const net of best.nets) {
+    console.log(`   nets: ${best.nets.length}  (${how})`);
+    for (const [netIdx, net] of best.nets.entries()) {
         const bb = bbox(net.faces.map((id) => best.placed.get(id).poly));
         const w = bb.w * side.mm;
         const h = bb.h * side.mm;
         const fits = w <= PAGE_W && h <= PAGE_H;
         const rot = h <= PAGE_W && w <= PAGE_H;
         console.log(
-            `     net ${net.id}: ${String(net.faces.length).padStart(3)} rhombi, ` +
+            `     net ${net.id ?? netIdx}: ${String(net.faces.length).padStart(3)} rhombi, ` +
                 `${fmt(w)}×${fmt(h)} ${UNIT}  ` +
                 (pageName === "none"
                     ? ""
@@ -411,13 +433,14 @@ for (const [label, nick] of TARGETS) {
 if (args.svg) {
     const dir = args.svg === true ? "out" : String(args.svg);
     const { mkdirSync, writeFileSync } = await import("node:fs");
-    const { unfoldPatch, stripPatch, ribbonGrowPatch } = await import(
+    const { unfoldPatch, ribbonGrowPatch } = await import(
         "../dist/unfold.js"
     );
-    const mode = String(args.mode ?? "bfs");
+    const { cutTreeUnfold } = await import("../dist/cuttree.js");
+    const mode = String(args.mode ?? "cuttree");
     const build =
-        mode === "strips"
-            ? stripPatch
+        mode === "cuttree"
+            ? cutTreeUnfold
             : mode === "widened"
               ? ribbonGrowPatch
               : unfoldPatch;

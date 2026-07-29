@@ -220,6 +220,9 @@ hardcode), then retire `net.html`. Both wait on browser confirmation.
 *Written down deliberately, so it survives a cleared session. This is the next
 substantial piece of work and it changes how sheets are handled.*
 
+**Stage A is done — see "Done: branch-cut routing" below. Stage B (paper packing)
+is still open.**
+
 ### The reframing
 
 Watching a patch unfold, the overlaps are **branch points**, and the cuts that
@@ -326,6 +329,114 @@ numbers are not even proportional.
 - Is there a lower bound on component count from the defect structure alone?
 - Should Stage B's paper cuts be preferred along ribbon boundaries, where the
   geometry is already straight and a join is easy to align?
+
+## Done: branch-cut routing
+
+Stage A of the plan above, implemented in `src/cuttree.ts` as `cutTreeUnfold`.
+It replaces guessing with a construction.
+
+### The idea
+
+The three older methods grow a region greedily and start a new piece whenever a
+placement collides, so the number of pieces is an *outcome* rather than a choice.
+It need not be. Measured across every patch, with no deviation:
+
+```
+E_int = V_int + F − 1          so a one-piece net cuts exactly V_int edges
+```
+
+which is the classical cut-tree duality. Contract the whole patch boundary to a
+single node R, and **a one-piece net is exactly a spanning tree of the vertex
+graph rooted at R**. Every interior vertex must carry an incident cut — the faces
+around it form a cycle in the dual, and a forest has none — and the tree's
+branches run from interior vertices out to the boundary. They are branch cuts in
+the sense of `log` and `√`.
+
+So connectivity stops being something to optimise: it is guaranteed by
+construction, and the only remaining problem is overlap. That is a far better
+shaped search, because *every* candidate is already a valid one-piece net and can
+be graded by a count rather than a yes/no.
+
+### How it searches
+
+1. **Candidates.** Shortest-route tree from R (each interior vertex cuts along its
+   shortest path to the boundary — literally "branch cuts to the edge"), plus
+   jittered and randomised weights through Kruskal, for diversity.
+2. **Develop.** The hinges are the interior edges *not* cut; they form a spanning
+   tree of the dual by construction, walked with the same `placeSeed`/`placeAcross`
+   as every other method. No greedy choices survive — the cut set determines the
+   net completely, which is why the trace replays bit-exactly.
+3. **Local search.** Take an overlapping pair, find the hinges on the dual-tree
+   path *between* them — cutting anything off that path cannot change how those two
+   sit relative to each other — and swap one in: adding a hinge to the cut set
+   closes exactly one cycle in the vertex graph, so removing any other edge of that
+   cycle restores a spanning tree. Six drop candidates are tried per swap and the
+   best kept; sideways moves are accepted about a third of the time, which is what
+   gets off the plateaus. The cut set stays valid throughout, so every intermediate
+   state is still a one-piece net.
+
+An interior edge with *both* ends on the boundary becomes a self-loop at R and can
+never be chosen — correctly, since cutting it would sever the patch.
+
+### Results
+
+One piece, zero overlaps, on **every** patch through generation 3 — in under half
+a second. Against the older methods:
+
+| patch | rhombi | branch cuts | flat variant | widened | BFS |
+|---|---|---|---|---|---|
+| any seed, gen 2 | 3–25 | **1 piece, 0 overlaps** | 1 | 1–2 | 1–2 |
+| any seed, gen 3 | 45–165 | **1 piece, 0 overlaps** | 1 | 2–8 | 1–6 |
+| Pe5 gen 4 | 835 | 1 piece, 5 overlaps | 3 | 57 | 50 |
+| Pe3 gen 4 | 878 | **1 piece, 0 overlaps** | 1 | 61 | 51 |
+| Pe1 gen 4 | 921 | 1 piece, 2 overlaps | 2 | 64 | 50 |
+| Deca gen 4 | 610 | **1 piece, 0 overlaps** | 1 | 31 | 28 |
+| St5 gen 4 | 1380 | 1 piece, 1 overlap | 3 | 73 | 73 |
+| St3 gen 4 | 894 | **1 piece, 0 overlaps** | 1 | 47 | 40 |
+| St1 gen 4 | 408 | **1 piece, 0 overlaps** | 1 | 19 | 21 |
+
+Gen 4 runs to a 20 s budget; it converges steadily rather than stalling (Pe5:
+405 → 124 → 18 → 5 overlaps at 3/6/12/25 s), so the remainder is throughput, not a
+dead end.
+
+**Both answers are reported**, as agreed. The one-piece result carries its residual
+overlap count — those are the places that would go up a z coordinate onto another
+physical sheet — and `result.flat` is the fully-flat alternative, obtained by
+adding hinges to the cut set without removing anything, which severs the dual tree
+and buys one extra piece per cut. Free when the one-piece net is already clean.
+
+### Saddles force cuts, not pieces
+
+Worth restating, because it is what made the old methods look inevitable: Pe3 gen 2
+has 4 saddle vertices and unfolds whole; Pe3 gen 4 has 239 saddles against BFS's 51
+pieces, and now unfolds whole too. Negative curvature demands a *cut*. It never
+demanded a second piece.
+
+### Verified
+
+All 14 seed/generation combinations through gen 3, zero failures: `cuts == V_int`;
+`hinges == F − pieces`; `cuts + hinges == E_int`; the cut set acyclic *and* spanning
+in the boundary-contracted graph; developed edge lengths within 1e-9 of 1 and every
+corner angle within 1e-4 of 63.4349°/116.5651°; the grid overlap count equal to the
+O(n²) sweep exactly, not merely agreeing on the verdict; the flat variant actually
+flat; and the trace replaying every net with **0.0 deviation**.
+
+### Retired: ribbon strips
+
+`stripPatch` is gone, along with `--mode=strips` and the two UI options. The
+theorem stands and is kept on `info.html`: every crease in a de Bruijn ribbon is
+parallel, so a strip is a generalized cylinder and **provably cannot self-overlap
+at any length**, with crease spacing exactly `2/√5`. But a ribbon only reaches the
+two fifths of rhombi sharing its direction, so strips cost about five times the
+pieces — 41–46 at gen 3 where branch cuts need 1. It is still the reason a widened
+ribbon makes a good backbone. `makeRunFinder` and the `Run`/`StripLink` machinery
+stay, because `ribbonGrowPatch` uses them.
+
+### Still open
+
+The gen-3 nets are one piece but far too big for one sheet — 336×391 mm at 20 mm
+side against Letter's usable 191×254. That is precisely Stage B, untouched: cutting
+a finished net down to paper, and packing the rectangles onto sheets.
 
 ## The rhombohedra are the real components
 
