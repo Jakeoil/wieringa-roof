@@ -9,6 +9,14 @@
     .solids { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 18px; margin: 24px 0; }
     .solid { background: var(--panel); border: 1px solid var(--rule); border-radius: 8px; padding: 14px; }
     .solid svg { display: block; width: 100%; height: auto; }
+    .viewer {
+        width: 100%; aspect-ratio: 1 / 1;
+        border-radius: 6px; background: #f6f6f9;
+        cursor: grab; touch-action: none;
+    }
+    .viewer:active { cursor: grabbing; }
+    .viewer canvas { display: block; width: 100%; height: 100%; }
+    .hint { font-size: 12px; color: var(--ink-faint); margin-top: 6px; }
     .solid h3 { margin: 10px 0 2px; font-size: 15px; }
     .solid p { margin: 0; font-size: 13px; color: var(--ink-soft); }
     .big { max-width: 420px; margin: 0 auto; }
@@ -31,34 +39,25 @@
 <h1>Polyhedra</h1>
 <p class="lede">
     Three solids underlie the whole construction, and every face of all three is
-    the same golden rhombus. The diagrams below are generated from the real
-    geometry — the triacontahedron is built as a zonohedron on the six icosahedral
-    five-fold axes, so its faces come out golden rather than being drawn that way.
+    the same golden rhombus. Drag any of them to turn it. They are built from the
+    real geometry — the triacontahedron as a zonohedron on the six icosahedral
+    five-fold axes, so its faces come out golden rather than being drawn that way —
+    and they carry the same colours and isogloss contours as the roof itself, so
+    the family resemblance can do the explaining.
 </p>
 
 <div class="solids">
     <div class="solid">
         <div class="big">
-            <svg viewBox="0 0 260 260" role="img" aria-label="Rhombic triacontahedron">
-                <polygon points="113.70,119.74 185.39,121.73 151.16,183.44 79.47,181.46" fill="hsl(248 42% 34.0%)" stroke="hsl(248 30% 22%)" stroke-width="1" stroke-linejoin="round"/>
-                <polygon points="113.70,119.74 82.47,59.96 154.16,61.95 185.39,121.73" fill="hsl(248 42% 34.0%)" stroke="hsl(248 30% 22%)" stroke-width="1" stroke-linejoin="round"/>
-                <polygon points="113.70,119.74 82.47,59.96 48.23,121.68 79.47,181.46" fill="hsl(248 42% 34.0%)" stroke="hsl(248 30% 22%)" stroke-width="1" stroke-linejoin="round"/>
-                <polygon points="185.39,121.73 214.77,165.01 180.53,226.73 151.16,183.44" fill="hsl(248 42% 34.0%)" stroke="hsl(248 30% 22%)" stroke-width="1" stroke-linejoin="round"/>
-                <polygon points="79.47,181.46 108.84,224.74 180.53,226.73 151.16,183.44" fill="hsl(248 42% 34.0%)" stroke="hsl(248 30% 22%)" stroke-width="1" stroke-linejoin="round"/>
-                <polygon points="185.39,121.73 216.62,89.93 185.39,30.14 154.16,61.95" fill="hsl(248 42% 34.0%)" stroke="hsl(248 30% 22%)" stroke-width="1" stroke-linejoin="round"/>
-                <polygon points="82.47,59.96 113.70,28.16 185.39,30.14 154.16,61.95" fill="hsl(248 42% 34.0%)" stroke="hsl(248 30% 22%)" stroke-width="1" stroke-linejoin="round"/>
-                <polygon points="185.39,121.73 216.62,89.93 246.00,133.21 214.77,165.01" fill="hsl(248 42% 34.0%)" stroke="hsl(248 30% 22%)" stroke-width="1" stroke-linejoin="round"/>
-                <polygon points="79.47,181.46 48.23,121.68 14.00,126.79 45.23,186.57" fill="hsl(248 42% 34.0%)" stroke="hsl(248 30% 22%)" stroke-width="1" stroke-linejoin="round"/>
-                <polygon points="82.47,59.96 48.23,65.08 14.00,126.79 48.23,121.68" fill="hsl(248 42% 34.0%)" stroke="hsl(248 30% 22%)" stroke-width="1" stroke-linejoin="round"/>
-                <polygon points="79.47,181.46 108.84,224.74 74.61,229.86 45.23,186.57" fill="hsl(248 42% 34.0%)" stroke="hsl(248 30% 22%)" stroke-width="1" stroke-linejoin="round"/>
-                <polygon points="82.47,59.96 113.70,28.16 79.47,33.27 48.23,65.08" fill="hsl(248 42% 34.0%)" stroke="hsl(248 30% 22%)" stroke-width="1" stroke-linejoin="round"/>
-                <polygon points="214.77,165.01 246.00,133.21 211.77,194.92 180.53,226.73" fill="hsl(248 42% 34.0%)" stroke="hsl(248 30% 22%)" stroke-width="1" stroke-linejoin="round"/>
-                <polygon points="108.84,224.74 180.53,226.73 146.30,231.84 74.61,229.86" fill="hsl(248 42% 34.0%)" stroke="hsl(248 30% 22%)" stroke-width="1" stroke-linejoin="round"/>
-                <polygon points="216.62,89.93 185.39,30.14 214.77,73.43 246.00,133.21" fill="hsl(248 42% 43.1%)" stroke="hsl(248 30% 22%)" stroke-width="1" stroke-linejoin="round"/>
-            </svg>
+            <div class="viewer" id="v-rt"></div>
         </div>
         <h3>Rhombic triacontahedron</h3>
         <p>30 faces · 32 vertices · 60 edges</p>
+        <p class="hint">Drag to turn it. Stood on a five-fold axis: five blue at each
+        pole, five yellow in each temperate band, ten orange round the equator. Each
+        blue cap is a <span class="mono">Pe5</span> rosette in all but name. The
+        contours are level sets of height, sliced pole to pole, so they close into
+        rings of latitude the way the roof's run on from tile to tile.</p>
     </div>
 </div>
 
@@ -99,22 +98,16 @@
 
 <div class="solids">
     <div class="solid">
-        <svg viewBox="0 0 260 260" role="img" aria-label="Acute (prolate) rhombohedron">
-                <polygon points="130.00,246.00 197.12,171.36 168.42,64.76 101.30,139.40" fill="hsl(208 42% 34.0%)" stroke="hsl(208 30% 22%)" stroke-width="1" stroke-linejoin="round"/>
-                <polygon points="130.00,246.00 101.30,139.40 62.88,88.64 91.58,195.24" fill="hsl(208 42% 34.0%)" stroke="hsl(208 30% 22%)" stroke-width="1" stroke-linejoin="round"/>
-                <polygon points="101.30,139.40 62.88,88.64 130.00,14.00 168.42,64.76" fill="hsl(208 42% 34.0%)" stroke="hsl(208 30% 22%)" stroke-width="1" stroke-linejoin="round"/>
-            </svg>
+        <div class="viewer" id="v-acute"></div>
         <h3>Acute (prolate)</h3>
         <p>Three 63.4349° corners at the apex. Every dihedral angle 72°.</p>
+        <p class="hint">Blue at the apexes, yellow round the waist.</p>
     </div>
     <div class="solid">
-        <svg viewBox="0 0 260 260" role="img" aria-label="Obtuse (oblate) rhombohedron">
-                <polygon points="130.00,159.25 246.00,144.41 196.40,74.33 80.40,89.17" fill="hsl(28 42% 34.0%)" stroke="hsl(28 30% 22%)" stroke-width="1" stroke-linejoin="round"/>
-                <polygon points="130.00,159.25 80.40,89.17 14.00,115.59 63.60,185.67" fill="hsl(28 42% 34.0%)" stroke="hsl(28 30% 22%)" stroke-width="1" stroke-linejoin="round"/>
-                <polygon points="130.00,159.25 63.60,185.67 179.60,170.83 246.00,144.41" fill="hsl(28 42% 34.0%)" stroke="hsl(28 30% 22%)" stroke-width="1" stroke-linejoin="round"/>
-            </svg>
+        <div class="viewer" id="v-obtuse"></div>
         <h3>Obtuse (oblate)</h3>
         <p>Three 116.5651° corners at the apex. Every dihedral angle 144°.</p>
+        <p class="hint">The same, in orange.</p>
     </div>
 </div>
 
@@ -149,6 +142,15 @@
 </p>
 
 </div>
+<script type="importmap">
+{
+    "imports": {
+        "three": "./vendor/three.module.js",
+        "three/addons/controls/OrbitControls.js": "./vendor/OrbitControls.js"
+    }
+}
+</script>
+<script type="module" src="./dist/polyhedra3d.js"></script>
 <script src="./site.js"></script>
 </body>
 </html>

@@ -219,10 +219,24 @@ hardcode), then retire `net.html`. Both wait on browser confirmation.
 
 - **Gen 5 is on the 3D page but not Net.** The unfolding methods take 1.2–2.5 s at
   5,719 rhombi against 48–76 ms at gen 4.
-- **`Pe5` closes the loop exactly; `Pe3` and `Pe1` do not.** Pe5's hull is a regular
-  pentagon at every generation (support-function differences ~1e-16, ratio
-  1.236068 = 1/cos 36°). The other two converge to limits 0.16 and 0.21 away from
-  their seeds. Why the pentagon and not the others is genuinely open.
+- **`Pe5` closes the loop exactly; `Pe3` and `Pe1` do not — and the reason is the
+  substitution's symmetry.** Each pentagon expands to a blue centre with five
+  petals, but only Pe5's petals are all alike: blue + 5 yellow, against Pe3's
+  3 yellow + 2 orange and Pe1's 1 yellow + 4 orange. The rules say the same thing —
+  `Pe5` has `twist [0,0,0,0,0]` and no diamonds, so its substitution is unchanged
+  by a 72° turn, while `Pe3` and `Pe1` have twists that differ position to
+  position.
+
+  So a Pe5 patch is five-fold symmetric at *every* generation (measured: 72°
+  rotational symmetry yes for Pe5, no for Pe3/Pe1), and a five-fold-symmetric
+  convex hull on a tiling with five edge directions can only be a regular pentagon.
+  Hence the support-function differences of ~1e-16 and the ratio
+  1.236068 = 1/cos 36°. The other two break the symmetry and their outlines drift
+  toward the substitution's own attractor, 0.16 and 0.21 from their seeds.
+
+  Recorded because it was listed as an open question for a while: the two
+  measurements — exact pentagon hull, and exact 72° symmetry — were two faces of
+  one fact, and were taken separately without noticing.
 - **Canvas pixels are not CSS pixels.** Both canvases size at `devicePixelRatio`;
   every hit test must scale by `canvas.width / rect.width`. This bit once and is
   invisible at dpr 1.
