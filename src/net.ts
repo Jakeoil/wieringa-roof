@@ -1,6 +1,6 @@
 // Net page — DOM wiring. Layout and SVG live in sheet.ts, unfolding in unfold.ts.
 
-import { seedTypes, generatePatch } from "./geometry.js";
+import { seedTypes, generatePatch, allRhombs } from "./geometry.js";
 import { unfoldPatch, ribbonGrowPatch } from "./unfold.js";
 import { cutTreeUnfold } from "./cuttree.js";
 import { PAGES, parseLength, layoutSheets, renderSheet } from "./sheet.js";
@@ -181,17 +181,37 @@ function rebuild(): void {
     const seedIdx = seedTypes.findIndex((s) => s.label === patchSel.value);
     const gen = Number(genSel.value);
 
-    const t0 = performance.now();
     generatePatch(seedIdx, true, gen);
-    const opts = { flip: flipChk.checked };
-    const res =
-        modeSel.value === "cuttree"
-            ? cutTreeUnfold(opts)
-            : modeSel.value === "widened"
-              ? ribbonGrowPatch(opts)
-              : unfoldPatch(opts);
-    const ms = Math.round(performance.now() - t0);
+    const nFaces = allRhombs.length;
 
+    // The overlap search is the whole method, and it needs time proportional to
+    // the patch: gen 3 converges to zero in well under a second, gen 4 does not.
+    // At the old flat 900 ms an 835-rhomb patch finished with 781 overlaps and
+    // seven layers, which made the layer view look like a failure when it was
+    // really just a search cut off early.
+    const budgetMs = Math.min(8000, Math.max(900, Math.round(nFaces * 8)));
+    const searching = modeSel.value === "cuttree" && budgetMs > 1500;
+    if (searching) {
+        statusEl.className = "info";
+        statusEl.textContent =
+            `${nFaces} rhombi — routing branch cuts, up to ${(budgetMs / 1000).toFixed(0)} s…`;
+    }
+
+    // Yield once so that message actually paints before the search blocks.
+    const run = () => {
+        const t0 = performance.now();
+        const opts = { flip: flipChk.checked };
+        const res =
+            modeSel.value === "cuttree"
+                ? cutTreeUnfold({ ...opts, budgetMs })
+                : modeSel.value === "widened"
+                  ? ribbonGrowPatch(opts)
+                  : unfoldPatch(opts);
+        const ms = Math.round(performance.now() - t0);
+        finish(res, ms);
+    };
+
+    const finish = (res: Built["res"], ms: number) => {
     built = {
         res,
         sideMm: side.mm,
@@ -203,6 +223,10 @@ function rebuild(): void {
     };
     syncLayerSel();
     draw();
+    };
+
+    if (searching) setTimeout(run, 0);
+    else run();
 }
 
 // Only the first group changes the net; the rest are pure presentation and must
