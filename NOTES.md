@@ -215,6 +215,33 @@ hardcode), then retire `net.html`. Both wait on browser confirmation.
 
 ---
 
+## The rhombohedra are the real components
+
+Worth keeping in mind, because the site presents the roof as a surface and it is
+easy to forget what it is the surface *of*.
+
+The two golden rhombohedra — **acute** (prolate) and **obtuse** (oblate) — are the
+actual three-dimensional components. They tile space aperiodically, and the
+Wieringa roof is the boundary of a layer of them: every rhomb you fold is a face of
+one, and the fold angles are the dihedral angles where two of them meet. The
+surface is the visible part; the solids are the thing.
+
+**Equal numbers of the two build a rhombic triacontahedron** — ten of each. This is
+classical, not something found here. Confirmed numerically along the way:
+
+| | volume | dihedral |
+|---|---|---|
+| acute (prolate) | 0.76085 s³ | 72° throughout |
+| obtuse (oblate) | 0.47023 s³ | 144° throughout |
+
+`10 × (0.76085 + 0.47023) = 12.31073 = 4√(5+2√5) · s³`, which is the
+triacontahedron's volume exactly. Their volumes stand in the ratio φ, and each
+solid has a single dihedral angle throughout — unusual, and what makes them so
+easy to build.
+
+Both are on `polyhedra.html`, turnable, in the same colours and contours as the
+roof.
+
 ## Known and deliberate
 
 - **Gen 5 is on the 3D page but not Net.** The unfolding methods take 1.2–2.5 s at
