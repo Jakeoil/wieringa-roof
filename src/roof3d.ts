@@ -21,8 +21,13 @@ import {
     CLUSTER_COLORS,
 } from "./geometry.js";
 
-const el = <T extends HTMLElement>(id: string) =>
-    document.getElementById(id) as T;
+// Naming the missing id turns a silent null-dereference three frames later into
+// an immediate, readable failure.
+const el = <T extends HTMLElement>(id: string): T => {
+    const found = document.getElementById(id);
+    if (!found) throw new Error(`missing element #${id} (stale cached script?)`);
+    return found as T;
+};
 
 const view = el<HTMLDivElement>("view");
 const patchSel = el<HTMLSelectElement>("patch");

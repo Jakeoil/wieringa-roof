@@ -16,3 +16,31 @@ document.addEventListener(
     },
     true,
 );
+
+// A module that throws during start-up leaves the page looking merely empty —
+// a canvas that never draws, with the reason only in the console. Surface it.
+(function () {
+    let shown = false;
+    function banner(msg) {
+        if (shown) return;
+        shown = true;
+        const d = document.createElement("div");
+        d.setAttribute("role", "alert");
+        d.style.cssText =
+            "position:fixed;left:0;right:0;top:0;z-index:9999;padding:10px 16px;" +
+            "background:#c0392b;color:#fff;font:13px/1.4 ui-monospace,Menlo,monospace;" +
+            "white-space:pre-wrap;box-shadow:0 1px 6px rgba(0,0,0,.3)";
+        d.textContent =
+            "Script error — the page did not finish loading:\n" +
+            msg +
+            "\n\nIf this mentions an element that no longer exists, the browser is " +
+            "probably running a cached copy of the script. Reload with \u2318\u21e7R.";
+        (document.body || document.documentElement).appendChild(d);
+    }
+    window.addEventListener("error", (e) => {
+        banner((e.message || "error") + (e.filename ? "\n" + e.filename + ":" + e.lineno : ""));
+    });
+    window.addEventListener("unhandledrejection", (e) => {
+        banner(String((e.reason && e.reason.message) || e.reason || "unhandled rejection"));
+    });
+})();

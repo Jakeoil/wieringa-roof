@@ -5,7 +5,8 @@
   "scripts": {
     "build": "npm run vendor && tsc",
     "dev": "tsc --watch",
-    "vendor": "mkdir -p vendor && cp node_modules/three/build/three.module.min.js vendor/three.module.js && cp node_modules/three/build/three.core.min.js vendor/three.core.min.js && cp node_modules/three/examples/jsm/controls/OrbitControls.js vendor/OrbitControls.js"
+    "vendor": "mkdir -p vendor && cp node_modules/three/build/three.module.min.js vendor/three.module.js && cp node_modules/three/build/three.core.min.js vendor/three.core.min.js && cp node_modules/three/examples/jsm/controls/OrbitControls.js vendor/OrbitControls.js",
+    "serve": "python3 tools/serve.py"
   },
   "keywords": [],
   "author": "Jeff Coyle",
