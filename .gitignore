@@ -10,3 +10,6 @@ out/
 
 # vendored three.js (regenerate with: npm run vendor)
 vendor/
+
+# generated each build so the page can report which build it is running
+src/build-id.ts

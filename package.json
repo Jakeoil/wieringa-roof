@@ -3,10 +3,11 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "build": "npm run vendor && tsc",
+    "build": "npm run vendor && npm run stamp && tsc",
     "dev": "tsc --watch",
     "vendor": "mkdir -p vendor && cp node_modules/three/build/three.module.min.js vendor/three.module.js && cp node_modules/three/build/three.core.min.js vendor/three.core.min.js && cp node_modules/three/examples/jsm/controls/OrbitControls.js vendor/OrbitControls.js",
-    "serve": "python3 tools/serve.py"
+    "serve": "python3 tools/serve.py",
+    "stamp": "node tools/stamp.mjs"
   },
   "keywords": [],
   "author": "Jeff Coyle",

@@ -26,6 +26,7 @@ import {
 } from "./unfold.js";
 import type { Analysis, Placed, TraceEvent } from "./unfold.js";
 import { parseLength, layoutSheets, renderSheet, PAGES } from "./sheet.js";
+import { BUILD_ID } from "./build-id.js";
 
 // ── UI State ──────────────────────────────────────────────────────
 
@@ -85,6 +86,33 @@ function generate() {
         idxHi = 4;
     }
     analysis = allRhombs.length ? analysePatch(flipHeight) : null;
+
+    // Reports what the shading path actually computes, so a flat-looking tile can
+    // be traced without guessing. Two wrong diagnoses have already been paid for.
+    if (allRhombs.length) {
+        let distinct = 0;
+        const pairs = new Map<string, number>();
+        for (const r of allRhombs) {
+            const a = displayIndex(r.vertIndices[0]);
+            const c = displayIndex(r.vertIndices[2]);
+            pairs.set(`${a}->${c}`, (pairs.get(`${a}->${c}`) ?? 0) + 1);
+            if (shadeOf(r.fill, a) !== shadeOf(r.fill, c)) distinct++;
+        }
+        console.log(
+            `shading: color=${tileColour} depth=${shadeDepth.toFixed(2)} ` +
+                `range ${idxLo}..${idxHi} · ${distinct}/${allRhombs.length} tiles ` +
+                `get two different stops · spans ${JSON.stringify(Object.fromEntries(pairs))}`,
+        );
+        let netFlat = 0;
+        for (const nr of netRhombs) {
+            const q = nr.verts.map((v) => displayIndex(vertexList[v].index));
+            const [a, b] = extremeCorners(q);
+            if (shadeOf("#9292e3", q[a]) === shadeOf("#9292e3", q[b])) netFlat++;
+        }
+        console.log(
+            `  net canvas: ${netRhombs.length} placed, ${netFlat} with equal stops`,
+        );
+    }
     console.log(
         `Generated ${allRhombs.length} rhombs, ${vertexList.length} vertices`,
     );
@@ -113,11 +141,20 @@ function hexToRGB(h: string): [number, number, number] {
     return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
 }
 
+// Emit integer hex rather than rgb() with fractional components. Canvas parses
+// colour strings through CSS, and a value like rgb(205.95,205.95,242.39999999999998)
+// is at the mercy of that parser; a stop it rejects throws out of addColorStop and
+// takes the whole draw with it. Hex has no such ambiguity, and the values were
+// never meaningfully fractional anyway.
 function lerpColor(start: string, end: string, alpha: number): string {
     const a = Math.max(0, Math.min(1, alpha));
     const [r1, g1, b1] = hexToRGB(toHex(start));
     const [r2, g2, b2] = hexToRGB(toHex(end));
-    return `rgb(${r1 * (1 - a) + r2 * a},${g1 * (1 - a) + g2 * a},${b1 * (1 - a) + b2 * a})`;
+    const ch = (x: number, y: number) =>
+        Math.max(0, Math.min(255, Math.round(x * (1 - a) + y * a)))
+            .toString(16)
+            .padStart(2, "0");
+    return `#${ch(r1, r2)}${ch(g1, g2)}${ch(b1, b2)}`;
 }
 
 // Shading is a depiction of HEIGHT, and height has four absolute levels across a
@@ -133,6 +170,22 @@ function lerpColor(start: string, end: string, alpha: number): string {
 //
 // Colour and shading stay separate: colour is the constant tile property, shading
 // is the height layer over it.
+// Which corners are the height extremes. NOT positions 0 and 2 in general: the
+// generator emits them that way, but placeAcross re-orders each rhomb to start at
+// the edge it arrived across, so on the net canvas the extremes land wherever they
+// land — and assuming 0/2 there gave two identical stops, hence a flat fill, on
+// slightly over half the tiles. In a rhombus the extremes are always opposite, so
+// argmin and argmax are enough.
+function extremeCorners(idx: number[]): [number, number] {
+    let lo = 0;
+    let hi = 0;
+    for (let i = 1; i < 4; i++) {
+        if (idx[i] < idx[lo]) lo = i;
+        if (idx[i] > idx[hi]) hi = i;
+    }
+    return [lo, hi];
+}
+
 function shadeOf(fill: string, index: number): string {
     const span = idxHi - idxLo || 1;
     const t = Math.max(0, Math.min(1, (index - idxLo) / span));
@@ -229,16 +282,19 @@ function drawTiling() {
         for (let i = 1; i < 4; i++) ctx.lineTo(sv[i].x, sv[i].y);
         ctx.closePath();
 
-        // the two extreme corners: index runs i, i+1, i+2, i+1 round the cycle,
-        // so v0 and v2 are the low and high ends of this face's height range
-        const iA = displayIndex(r.vertIndices[0]);
-        const iC = displayIndex(r.vertIndices[2]);
+        const vi = r.vertIndices.map(displayIndex);
+        const [cLo, cHi] = extremeCorners(vi);
         const faceFill = (): string | CanvasGradient => {
             if (tileColour === "type") return r.thick ? "#9292e3" : "#eec09b";
-            if (tileColour === "index") {
-                return indexColor(Math.min(iA, iC));
-            }
-            return makeGradient(ctx, r.fill, sv[0], sv[2], iA, iC);
+            if (tileColour === "index") return indexColor(vi[cLo]);
+            return makeGradient(
+                ctx,
+                r.fill,
+                sv[cLo],
+                sv[cHi],
+                vi[cLo],
+                vi[cHi],
+            );
         };
         const role = mode === "watch" ? traceRoles.get(r.id) : undefined;
         const hint = mode === "watch" ? undefined : moveHints.get(r.id);
@@ -262,16 +318,20 @@ function drawTiling() {
             ctx.stroke();
             continue;
         }
+        // Placed tiles used to be painted solid yellow *instead of* their fill,
+        // which threw away their shading — on a five-rhomb patch with four placed
+        // you saw four flat tiles and one shaded. Paint the fill first and wash the
+        // marker over it, exactly as the watch-mode roles above do.
+        ctx.fillStyle = faceFill();
+        if (r.id === hoveredRhomb) ctx.globalAlpha = 0.9;
+        ctx.fill();
+        ctx.globalAlpha = 1;
         if (placedRhombs.has(r.id)) {
             ctx.fillStyle = altDown
                 ? "rgba(192, 57, 43, 0.45)"
-                : "rgba(255, 200, 0, 0.5)";
-        } else {
-            ctx.fillStyle = faceFill();
-            if (r.id === hoveredRhomb) ctx.globalAlpha = 0.9;
+                : "rgba(255, 200, 0, 0.45)";
+            ctx.fill();
         }
-        ctx.fill();
-        ctx.globalAlpha = 1;
 
         // move preview: green = a route exists that does not overlap,
         // red = every route from here collides with the net as it stands
@@ -290,8 +350,30 @@ function drawTiling() {
             ctx.stroke();
         }
 
-        // brushed twin: this rhomb is the one under the pointer on the net canvas
+        if (showIsogloss) {
+            ctx.strokeStyle = r.thick
+                ? "rgba(30,32,38,0.55)"
+                : "rgba(30,32,38,0.38)";
+            ctx.lineWidth = r.thick ? 1 : 0.7;
+            for (const [a, b] of isoglossSegments(
+                sv.map((q) => [q.x, q.y] as [number, number]),
+                r.vertIndices,
+            )) {
+                ctx.beginPath();
+                ctx.moveTo(a[0], a[1]);
+                ctx.lineTo(b[0], b[1]);
+                ctx.stroke();
+            }
+        }
+
+        // brushed twin: this rhomb is the one under the pointer on the net canvas.
+        // The path has to be rebuilt — the isogloss loop above calls beginPath per
+        // segment, so by here the current path is a contour line, not the tile.
         if (r.id === hoveredNetId) {
+            ctx.beginPath();
+            ctx.moveTo(sv[0].x, sv[0].y);
+            for (let i = 1; i < 4; i++) ctx.lineTo(sv[i].x, sv[i].y);
+            ctx.closePath();
             ctx.strokeStyle = "#6a5acd";
             ctx.lineWidth = 3;
             ctx.stroke();
@@ -318,6 +400,79 @@ function drawTiling() {
         ctx.arc(sv.x, sv.y, 2.5, 0, 2 * Math.PI);
         ctx.fill();
     }
+}
+
+// ── Isoglosses ────────────────────────────────────────────────────
+//
+// Contour lines: seven per rhombus dividing its long diagonal into eight, which
+// puts them on quarter-index height steps. Index runs i, i+1, i+2, i+1 around the
+// cycle, so the long diagonal is the height gradient, and a rhombus has
+// perpendicular diagonals — so a line across it perpendicular to that axis is a
+// level set of height. Heights agree along shared edges, so they run on unbroken
+// from tile to tile. Same construction as the 3D page, in two dimensions.
+//
+// Flipping does not change them: reversing heights reverses which end is low, and
+// seven lines dividing a diagonal into eight are the same seven either way.
+type Seg = [[number, number], [number, number]];
+
+function isoglossSegments(
+    pts: Array<[number, number]>,
+    idx: number[],
+): Seg[] {
+    let k = 0;
+    for (let i = 1; i < 4; i++) if (idx[i] < idx[k]) k = i;
+    const lo = pts[k];
+    const r1 = pts[(k + 1) % 4];
+    const hi = pts[(k + 2) % 4];
+    const r3 = pts[(k + 3) % 4];
+    const mix = (
+        a: [number, number],
+        b: [number, number],
+        s: number,
+    ): [number, number] => [a[0] + (b[0] - a[0]) * s, a[1] + (b[1] - a[1]) * s];
+
+    const out: Seg[] = [];
+    for (let i = 1; i <= 7; i++) {
+        const t = i / 8;
+        if (t <= 0.5) {
+            const s = t * 2;
+            out.push([mix(lo, r3, s), mix(lo, r1, s)]);
+        } else {
+            const s = (t - 0.5) * 2;
+            out.push([mix(r3, hi, s), mix(r1, hi, s)]);
+        }
+    }
+    return out;
+}
+
+let showIsogloss = false;
+
+// Ease a range input from one value to another, calling back each frame. Used to
+// snap the height sliders to their meaningful settings on release rather than
+// letting them stop at an arbitrary 0.34.
+let sliderAnim = 0;
+function animateSlider(
+    input: HTMLInputElement,
+    from: number,
+    to: number,
+    onFrame: () => void,
+    ms = 260,
+): void {
+    cancelAnimationFrame(sliderAnim);
+    if (Math.abs(from - to) < 1e-3) {
+        input.value = String(to);
+        onFrame();
+        return;
+    }
+    const t0 = performance.now();
+    const step = (now: number) => {
+        const k = Math.min(1, (now - t0) / ms);
+        const e = 1 - Math.pow(1 - k, 3); // ease out
+        input.value = String(from + (to - from) * e);
+        onFrame();
+        if (k < 1) sliderAnim = requestAnimationFrame(step);
+    };
+    sliderAnim = requestAnimationFrame(step);
 }
 
 // ── Hit testing ───────────────────────────────────────────────────
@@ -1040,13 +1195,15 @@ function drawNet() {
         ctx.closePath();
 
         const src = allRhombs[nr.sourceId];
+        const nvi = nr.verts.map((v) => displayIndex(vertexList[v].index));
+        const [nLo, nHi] = extremeCorners(nvi);
         ctx.fillStyle = makeGradient(
             ctx,
             src.fill,
-            { x: sv[0].x, y: sv[0].y },
-            { x: sv[2].x, y: sv[2].y },
-            displayIndex(vertexList[nr.verts[0]].index),
-            displayIndex(vertexList[nr.verts[2]].index),
+            { x: sv[nLo].x, y: sv[nLo].y },
+            { x: sv[nHi].x, y: sv[nHi].y },
+            nvi[nLo],
+            nvi[nHi],
         );
         ctx.globalAlpha = nr.overlapping ? 0.65 : 1;
         ctx.fill();
@@ -1088,6 +1245,22 @@ function drawNet() {
             ctx.setLineDash([5, 3]);
             ctx.stroke();
             ctx.setLineDash([]);
+        }
+
+        if (showIsogloss) {
+            ctx.strokeStyle = src.thick
+                ? "rgba(30,32,38,0.55)"
+                : "rgba(30,32,38,0.38)";
+            ctx.lineWidth = src.thick ? 1 : 0.7;
+            for (const [a, b] of isoglossSegments(
+                sv.map((q) => [q.x, q.y] as [number, number]),
+                nr.verts.map((v) => vertexList[v].index),
+            )) {
+                ctx.beginPath();
+                ctx.moveTo(a[0], a[1]);
+                ctx.lineTo(b[0], b[1]);
+                ctx.stroke();
+            }
         }
 
         // brushed twin: this is the rhomb under the pointer in the tiling view
@@ -1891,9 +2064,34 @@ function buildControls() {
         drawNet();
     };
     heightSlider.addEventListener("input", () => syncHeight(true));
+
+    // Released, the slider eases to the nearest of −1, 0, +1: dales, flat, hills.
+    // The three settings are the ones that mean something, but sliding between
+    // them is how you see the surface come up out of the plane, so the travel is
+    // free and only the landing is snapped.
+    heightSlider.addEventListener("change", () => {
+        const from = Number(heightSlider.value);
+        const to = from < -0.5 ? -1 : from > 0.5 ? 1 : 0;
+        animateSlider(heightSlider, from, to, () => syncHeight(true));
+    });
+
     heightWrap.append(document.createTextNode("Height "), heightSlider, heightOut);
     controls.insertBefore(heightWrap, genLabel.nextSibling);
     syncHeight(false);
+
+    const isoWrap = document.createElement("label");
+    isoWrap.style.cssText = "font-size:13px;display:flex;align-items:center;gap:5px;";
+    const isoChk = document.createElement("input");
+    isoChk.type = "checkbox";
+    isoChk.title =
+        "Contour lines of constant height — seven per rhombus, on quarter-index steps";
+    isoChk.addEventListener("change", () => {
+        showIsogloss = isoChk.checked;
+        drawTiling();
+        drawNet();
+    });
+    isoWrap.append(isoChk, document.createTextNode("isoglosses"));
+    controls.insertBefore(isoWrap, heightWrap.nextSibling);
 
     const colourSel = document.createElement("select");
     colourSel.style.cssText = "padding:4px;font-size:13px;";
@@ -2031,6 +2229,10 @@ if (help) {
         localStorage.setItem("wr-help-open", help.open ? "1" : "0");
     });
 }
+
+// Stamped at build time. If this does not match what was just built, the browser
+// is running a cached script — which has now cost us two debugging sessions.
+console.log(`workbench build ${BUILD_ID}`);
 
 buildModeBar();
 buildControls();

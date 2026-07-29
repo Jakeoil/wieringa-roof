@@ -77,8 +77,17 @@ differ (luminance 208.6→128.2 against 168.8→88.4).
 Color and shading are separate, as they should be: color is the constant tile
 property, shading the height layer over it.
 
-Still open: isogloss contours on the workbench canvas, which would give the finer
-quarter-index guide the 3D page already has.
+**Done:** isogloss contours are on the workbench too, drawn on both canvases and
+switchable at any time — on a finished net as readily as an empty one. Same
+construction as 3D: seven per rhombus dividing the long diagonal into eight, which
+lands them on quarter-index steps. Verified against Pe3 gen 3, where every
+rhombus shows the corner pattern 0,1,2,1, a segment's two endpoints differ in
+index by exactly 0, and the eleven levels 1.25 … 3.75 are all quarter steps.
+
+Both height sliders now ease to the nearest of −1, 0, +1 when released. Those
+three are the settings that mean anything; the travel between them is how the
+surface is seen coming out of the plane, so it stays free and only the landing
+snaps.
 
 ---
 

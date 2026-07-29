@@ -344,6 +344,30 @@ for (const c of [colorSel, edgesChk, isoChk, transpChk]) {
 }
 vscaleInput.addEventListener("input", () => rebuild(false));
 
+// Released, the slider eases to the nearest of −1, 0, +1 — dales up, flat, hills
+// up. Those three are the settings that mean anything; the travel between them is
+// worth having, so it is free and only the landing snaps.
+let snapAnim = 0;
+vscaleInput.addEventListener("change", () => {
+    const from = Number(vscaleInput.value);
+    const to = from < -0.5 ? -1 : from > 0.5 ? 1 : 0;
+    cancelAnimationFrame(snapAnim);
+    if (Math.abs(from - to) < 1e-3) {
+        vscaleInput.value = String(to);
+        rebuild(false);
+        return;
+    }
+    const t0 = performance.now();
+    const step = (now: number) => {
+        const k = Math.min(1, (now - t0) / 260);
+        const e = 1 - Math.pow(1 - k, 3);
+        vscaleInput.value = String(from + (to - from) * e);
+        rebuild(false);
+        if (k < 1) snapAnim = requestAnimationFrame(step);
+    };
+    snapAnim = requestAnimationFrame(step);
+});
+
 function resize(): void {
     const w = view.clientWidth;
     const h = view.clientHeight;
