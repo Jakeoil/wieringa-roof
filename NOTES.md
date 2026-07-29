@@ -479,6 +479,43 @@ The saddle vertices are resolved the way the theory says they must be: such a
 vertex receives **two or more cuts**, splitting the fan, which a spanning tree is
 perfectly free to do.
 
+### Saddles force two cuts — and the move that was missing
+
+Reported from the browser again: a ghastly collision of two boats on Pe5 gen 3.
+Real, and this time not a blind test — a genuinely un-converged search. The page
+gave gen 3 a 1120 ms cap and Pe5 failed to reach zero about **half the time**; the
+8 s budgets used for measurement had hidden that completely. Measuring the
+algorithm at a budget the product never uses is worth nothing.
+
+Three fixes, in increasing order of interest.
+
+**1. The developed angle sum is intrinsic.** It comes from the lift, not from how
+you cut — identical across every cut set, verified to 4e-13. So the saddle
+vertices can be found once, up front, before any searching.
+
+**2. A saddle needs at least two cuts, and that is forced.** With a single incident
+cut its faces form one fan spanning more than a full turn, so the ends of the fan
+must lap over each other. Measured: in every overlap-free solution, all 35 saddles
+of Pe5 gen 3 have degree ≥ 2 in the cut tree, none below. This is now enforced when
+candidates are built (`enforceSaddles`) rather than left for the search to
+rediscover by luck.
+
+**3. The move set was one-sided.** Every move added a cut. But when two overlapping
+faces are neighbours in the tiling across an edge that is currently *cut*, they got
+where they are by different routes and collided — and the sharp fix is the
+opposite move: make that edge a **hinge**, which removes the overlap by
+construction, since hinged faces cannot overlap. Removing an edge from a spanning
+tree splits it, so a reconnecting arc is added in its place. That reverse move was
+simply absent.
+
+**Budget.** The cap is not a cost — the search stops the instant it reaches zero,
+and Pe5 gen 3 has a mean of ~0.9 s against a 4 s cap. Raising the cap is therefore
+almost free and buys the tail. Page budget is now `35 ms × rhombi`, floor 5 s, cap
+12 s.
+
+Result at the page's own settings: **0 failures in 210 runs** across all seven
+seeds at generations 2 and 3, worst case 1.9 s, most patches under 300 ms.
+
 ### Layers: the z coordinate, taken literally
 
 Interim step before Stage B, and the visualization asked for. Where the net wraps

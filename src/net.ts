@@ -184,17 +184,19 @@ function rebuild(): void {
     generatePatch(seedIdx, true, gen);
     const nFaces = allRhombs.length;
 
-    // The overlap search is the whole method, and it needs time proportional to
-    // the patch: gen 3 converges to zero in well under a second, gen 4 does not.
-    // At the old flat 900 ms an 835-rhomb patch finished with 781 overlaps and
-    // seven layers, which made the layer view look like a failure when it was
-    // really just a search cut off early.
-    const budgetMs = Math.min(8000, Math.max(900, Math.round(nFaces * 8)));
-    const searching = modeSel.value === "cuttree" && budgetMs > 1500;
+    // This is a *cap*, not a cost: the search stops the moment it reaches zero
+    // overlaps, and almost every patch does so in a fraction of it. Pe5 gen 3 is
+    // the outlier — mean 0.9 s, but an unlucky start needs several, and at the old
+    // 1120 ms cap it failed to converge about half the time, which is what put a
+    // visible collision on the page. At a 4 s cap it converged 16 times out of 16
+    // with the mean unchanged, so the headroom costs nothing and buys reliability.
+    // A browser is slower than the machine this was measured on, hence more again.
+    const budgetMs = Math.min(12000, Math.max(5000, Math.round(nFaces * 35)));
+    const searching = modeSel.value === "cuttree" && nFaces > 100;
     if (searching) {
         statusEl.className = "info";
         statusEl.textContent =
-            `${nFaces} rhombi — routing branch cuts, up to ${(budgetMs / 1000).toFixed(0)} s…`;
+            `${nFaces} rhombi — routing branch cuts…`;
     }
 
     // Yield once so that message actually paints before the search blocks.

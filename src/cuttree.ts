@@ -388,6 +388,105 @@ function cycleInCutTree(
     return path;
 }
 
+// ── saddles: the one structural constraint ────────────────────────
+//
+// The developed angle around a vertex is intrinsic — it comes from the lift, not
+// from how you cut, and is identical across every cut set (verified to 4e-13). So
+// the vertices whose angles sum to more than 360° can be found once, up front.
+//
+// Such a vertex is a saddle, and it forces something exact: with a single incident
+// cut its faces form one fan spanning more than a full turn, so the two ends of
+// that fan must lap over each other. **Every saddle needs at least two cuts.** In
+// every overlap-free solution measured, all 35 saddles of Pe5 gen 3 have degree ≥ 2
+// in the cut tree, with none below.
+//
+// A spanning tree is free to give a node any degree, so this costs nothing — but
+// leaving the search to discover it by chance was costing a great deal.
+
+function saddleNodes(A: Analysis, g: CutGraph): Set<number> {
+    const sum = new Map<number, number>();
+    for (const f of A.faces) {
+        for (let k = 0; k < 4; k++) {
+            const a = A.P[f.v[k]];
+            const b = A.P[f.v[(k + 1) % 4]];
+            const c = A.P[f.v[(k + 3) % 4]];
+            if (!a || !b || !c) continue;
+            const u1 = [b[0] - a[0], b[1] - a[1], b[2] - a[2]];
+            const u2 = [c[0] - a[0], c[1] - a[1], c[2] - a[2]];
+            const dot = u1[0] * u2[0] + u1[1] * u2[1] + u1[2] * u2[2];
+            const n1 = Math.hypot(u1[0], u1[1], u1[2]);
+            const n2 = Math.hypot(u2[0], u2[1], u2[2]);
+            const ang = (Math.acos(Math.max(-1, Math.min(1, dot / (n1 * n2)))) * 180) / Math.PI;
+            sum.set(f.v[k], (sum.get(f.v[k]) ?? 0) + ang);
+        }
+    }
+    const out = new Set<number>();
+    for (const [v, s] of sum) {
+        const node = g.node.get(v);
+        if (node != null && node !== 0 && s > 360 + 1e-6) out.add(node);
+    }
+    return out;
+}
+
+// Force every saddle to at least two cuts, by spanning-tree swaps that never drop
+// another saddle below two. Keeps the cut set a spanning tree throughout.
+function enforceSaddles(
+    g: CutGraph,
+    cuts: Set<string>,
+    saddles: Set<number>,
+): Set<string> {
+    if (!saddles.size) return cuts;
+    const incident = new Map<number, typeof g.arcs>();
+    for (const arc of g.arcs) {
+        if (!incident.has(arc.u)) incident.set(arc.u, []);
+        if (!incident.has(arc.v)) incident.set(arc.v, []);
+        incident.get(arc.u)!.push(arc);
+        incident.get(arc.v)!.push(arc);
+    }
+    const deg = new Map<number, number>();
+    const byKey = new Map(g.arcs.map((a) => [a.key, a]));
+    for (const k of cuts) {
+        const a = byKey.get(k);
+        if (!a) continue;
+        deg.set(a.u, (deg.get(a.u) ?? 0) + 1);
+        deg.set(a.v, (deg.get(a.v) ?? 0) + 1);
+    }
+
+    for (const v of saddles) {
+        let guard = 0;
+        while ((deg.get(v) ?? 0) < 2 && guard++ < 30) {
+            let done = false;
+            for (const arc of incident.get(v) ?? []) {
+                if (cuts.has(arc.key)) continue;
+                const cycle = cycleInCutTree(g, cuts, arc.u, arc.v);
+                for (const dropKey of cycle) {
+                    const d = byKey.get(dropKey)!;
+                    // never rob another saddle, nor v itself
+                    const after = (n: number) =>
+                        (deg.get(n) ?? 0) - 1 + (n === arc.u || n === arc.v ? 1 : 0);
+                    if (
+                        (saddles.has(d.u) && after(d.u) < 2) ||
+                        (saddles.has(d.v) && after(d.v) < 2)
+                    ) {
+                        continue;
+                    }
+                    cuts.delete(dropKey);
+                    cuts.add(arc.key);
+                    deg.set(d.u, (deg.get(d.u) ?? 0) - 1);
+                    deg.set(d.v, (deg.get(d.v) ?? 0) - 1);
+                    deg.set(arc.u, (deg.get(arc.u) ?? 0) + 1);
+                    deg.set(arc.v, (deg.get(arc.v) ?? 0) + 1);
+                    done = true;
+                    break;
+                }
+                if (done) break;
+            }
+            if (!done) break;
+        }
+    }
+    return cuts;
+}
+
 // ── layers ────────────────────────────────────────────────────────
 //
 // The branch-cut picture taken literally. Where the development wants to wrap over
@@ -474,6 +573,46 @@ function flattenByCutting(
     return { cuts: flat, dev, overlaps: pairs.length };
 }
 
+// The reverse move, and the one that was missing. When two overlapping faces are
+// neighbours in the tiling across an edge that is currently *cut*, they reached
+// their positions by different routes and collided. Forcing that edge to be a
+// hinge makes overlap between them impossible — they become rigidly adjacent.
+//
+// Removing an edge from a spanning tree splits it in two, so a replacement arc
+// spanning the split must be added. These are the arcs to try.
+function reconnectOptions(
+    g: CutGraph,
+    cuts: Set<string>,
+    dropKey: string,
+): Array<{ key: string }> {
+    const byKey = new Map(g.arcs.map((a) => [a.key, a]));
+    const gone = byKey.get(dropKey);
+    if (!gone) return [];
+    const adj = new Map<number, Array<[number, string]>>();
+    for (const arc of g.arcs) {
+        if (!cuts.has(arc.key) || arc.key === dropKey) continue;
+        if (!adj.has(arc.u)) adj.set(arc.u, []);
+        if (!adj.has(arc.v)) adj.set(arc.v, []);
+        adj.get(arc.u)!.push([arc.v, arc.key]);
+        adj.get(arc.v)!.push([arc.u, arc.key]);
+    }
+    const side = new Set<number>([gone.u]);
+    const q = [gone.u];
+    for (let h = 0; h < q.length; h++) {
+        for (const [w] of adj.get(q[h]) ?? []) {
+            if (side.has(w)) continue;
+            side.add(w);
+            q.push(w);
+        }
+    }
+    const out: Array<{ key: string }> = [];
+    for (const arc of g.arcs) {
+        if (cuts.has(arc.key)) continue;
+        if (side.has(arc.u) !== side.has(arc.v)) out.push({ key: arc.key });
+    }
+    return out;
+}
+
 // ── entry point ───────────────────────────────────────────────────
 
 export interface CutTreeOptions {
@@ -517,12 +656,18 @@ export function cutTreeUnfold(opts: CutTreeOptions = {}): CutTreeResult {
     let s = (opts.seed ?? 12345) >>> 0;
     const rnd = () => ((s = (s * 1664525 + 1013904223) >>> 0) / 4294967296);
 
+    const saddles = saddleNodes(A, g);
+
     const score = (arcIdx: number, mode: number): number => {
         const arc = g.arcs[arcIdx];
         const d = Math.min(dist[arc.u], dist[arc.v]);
-        if (mode === 0) return d; // shortest route to the boundary
-        if (mode === 1) return d + rnd() * 1.5; // jittered
-        return rnd(); // free-for-all
+        // Saddle-incident arcs are wanted, so make them cheap: a saddle needs two
+        // cuts and picking these early is how it gets them.
+        const bonus =
+            (saddles.has(arc.u) ? 1 : 0) + (saddles.has(arc.v) ? 1 : 0);
+        if (mode === 0) return d - 2 * bonus;
+        if (mode === 1) return d - 2 * bonus + rnd() * 1.5;
+        return rnd() - 0.4 * bonus;
     };
 
     let best: {
@@ -535,7 +680,11 @@ export function cutTreeUnfold(opts: CutTreeOptions = {}): CutTreeResult {
     for (let attempt = 0; ; attempt++) {
         if (attempt > 0 && Date.now() - t0 > budget) break;
         const mode = attempt === 0 ? 0 : attempt < 8 ? 1 : 2;
-        const cuts = spanningCutSet(g, (i) => score(i, mode));
+        const cuts = enforceSaddles(
+            g,
+            spanningCutSet(g, (i) => score(i, mode)),
+            saddles,
+        );
         const dev = developFromCuts(A, cuts);
         const overlaps = countOverlaps(dev.placed);
         tried++;
@@ -551,22 +700,42 @@ export function cutTreeUnfold(opts: CutTreeOptions = {}): CutTreeResult {
     // Descend from the best candidate by swapping cuts that lie between overlapping
     // faces. Each accepted swap keeps one piece and lowers the overlap count.
     //
-    // The descent can strand itself in a basin it cannot swap out of — Pe3 gen 3
-    // reaches zero from some starting trees and sticks on one overlap from others.
-    // So when progress stops, abandon the basin and restart from a fresh random
-    // tree, keeping the best result across all restarts. That turned Pe3 gen 3 from
-    // luck-of-the-seed into reliable.
+    // The descent can strand itself in a basin it cannot swap out of. Restarting
+    // from a fresh random tree does escape, but it throws away a net that was one
+    // or two overlaps from done and makes it descend the whole way again — which is
+    // why Pe5 gen 3 was still failing half the time at the budget the page gives
+    // it. Iterated local search instead: on stagnation, go back to the best result
+    // so far and *kick* it with a few random swaps, then resume descending. The
+    // kick is large enough to leave the basin and small enough to keep the work.
     type Developed = ReturnType<typeof developFromCuts>;
     const arcByKey = new Map(g.arcs.map((a) => [a.key, a]));
     let swaps = 0;
     let accepted = 0;
     let cur = best!;
     let sinceGain = 0;
-    const STAGNANT = 250;
+    const STAGNANT = 120;
+
+    // One random spanning-tree swap, used to perturb a stuck solution.
+    const kick = (from: Set<string>): Set<string> => {
+        const next = new Set(from);
+        for (let guard = 0; guard < 40; guard++) {
+            const arc = g.arcs[Math.floor(rnd() * g.arcs.length)];
+            if (next.has(arc.key)) continue;
+            const cycle = cycleInCutTree(g, next, arc.u, arc.v);
+            if (!cycle.length) continue;
+            next.delete(cycle[Math.floor(rnd() * cycle.length)]);
+            next.add(arc.key);
+            return next;
+        }
+        return next;
+    };
 
     while (cur.overlaps > 0 && Date.now() - t0 < budget) {
         if (sinceGain > STAGNANT) {
-            const cuts2 = spanningCutSet(g, () => rnd());
+            let cuts2 = new Set(best!.cuts);
+            const n = 2 + Math.floor(rnd() * 5);
+            for (let k = 0; k < n; k++) cuts2 = kick(cuts2);
+            cuts2 = enforceSaddles(g, cuts2, saddles);
             const dev2 = developFromCuts(A, cuts2);
             cur = { cuts: cuts2, dev: dev2, overlaps: countOverlaps(dev2.placed) };
             tried++;
@@ -576,6 +745,44 @@ export function cutTreeUnfold(opts: CutTreeOptions = {}): CutTreeResult {
         const pairs = overlapPairs(cur.dev.placed);
         if (!pairs.length) break;
         const [x, y] = pairs[Math.floor(rnd() * pairs.length)];
+
+        // If the pair are tiling neighbours across a cut, try making that cut a
+        // hinge. It is the sharpest move available: it removes this overlap by
+        // construction rather than hoping a reroute happens to separate them.
+        const px = cur.dev.placed.get(x)!;
+        const py = cur.dev.placed.get(y)!;
+        const shared = px.verts.filter((v) => py.verts.includes(v));
+        if (shared.length === 2) {
+            const k = ekey(shared[0], shared[1]);
+            if (cur.cuts.has(k)) {
+                let bestRe: typeof cur | null = null;
+                const opts2 = reconnectOptions(g, cur.cuts, k);
+                for (let t = 0; t < Math.min(opts2.length, 8); t++) {
+                    const pick = opts2[Math.floor(rnd() * opts2.length)];
+                    const next = new Set(cur.cuts);
+                    next.delete(k);
+                    next.add(pick.key);
+                    const d2 = enforceSaddles(g, next, saddles);
+                    const dev2 = developFromCuts(A, d2);
+                    const ov2 = countOverlaps(dev2.placed);
+                    tried++;
+                    if (!bestRe || ov2 < bestRe.overlaps) {
+                        bestRe = { cuts: d2, dev: dev2, overlaps: ov2 };
+                    }
+                    if (ov2 === 0) break;
+                    if (Date.now() - t0 >= budget) break;
+                }
+                if (bestRe && bestRe.overlaps <= cur.overlaps) {
+                    if (bestRe.overlaps < cur.overlaps) sinceGain = 0;
+                    else sinceGain++;
+                    if (bestRe.overlaps < best!.overlaps) best = bestRe;
+                    cur = bestRe;
+                    swaps++;
+                    continue;
+                }
+            }
+        }
+
         const path = hingePathBetween(
             x,
             y,
