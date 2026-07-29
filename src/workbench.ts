@@ -2007,7 +2007,11 @@ function buildControls() {
     // Gen selector
     const genSelect = document.createElement("select");
     genSelect.style.cssText = "padding:4px;font-size:13px;";
-    for (let g = 0; g <= 3; g++) {
+    // Generation 0 produced nothing at all — expandPenta returns immediately — so
+    // it was a dead entry in the menu. Generation 1 stays: it is the smallest real
+    // patch for the Pe tiles, and the St tiles being empty there is expected, not
+    // an error, since star-type pieces emit no rhombs until a generation later.
+    for (let g = 1; g <= 4; g++) {
         const opt = document.createElement("option");
         opt.value = String(g);
         opt.textContent = `Gen ${g}`;
@@ -2215,6 +2219,13 @@ function regenerate() {
     generate();
     fitView();
     refreshNetView();
+    if (allRhombs.length === 0) {
+        const label = seedTypes[currentSeedIdx].label;
+        say(
+            `${label} produces no rhombs at generation ${gen} — star-type tiles ` +
+                `emit none until a generation later. Try ${gen + 1}.`,
+        );
+    }
     drawTiling();
     drawNet();
 }
