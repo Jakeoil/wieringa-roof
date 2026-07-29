@@ -77,6 +77,40 @@ differ (luminance 208.6→128.2 against 168.8→88.4).
 Color and shading are separate, as they should be: color is the constant tile
 property, shading the height layer over it.
 
+### Trap: corner order is not the same on both canvases
+
+Worth writing down because it cost three rounds. The gradient originally took its
+two stops from corners **0 and 2**. That is right for the generator, which emits
+`i, i+1, i+2, i+1` — scanned across every seed and generation with no exception,
+which is precisely what made it feel safe. But `placeAcross` re-orders every rhomb
+to begin at the edge it arrived across, so on the **net canvas** the order is
+frequently `2,1,2,3`: positions 0 and 2 both hold index 2, the two stops come out
+identical, and the tile renders flat. Roughly half of them — 13 of 25 on Pe5 gen 2,
+72 of 140 on gen 3.
+
+Take **argmin and argmax** of the four indices instead. Order-independent, and the
+extremes of a rhombus are always opposite so the gradient still runs along a
+diagonal. `isoglossSegments` had been doing this correctly all along — it searches
+for the lowest corner rather than assuming a position — which is why the contours
+looked right while the fills did not. The same idea written twice, once right.
+
+**Anything reading a rhomb's corners must not assume a position.** Positions carry
+meaning only within the canvas that produced them.
+
+### And the verification was aimed at the wrong thing
+
+The scan that found "no equal-stop tiles anywhere" only ever looked at
+`allRhombs`, the tiling view. The bug lived entirely in the unfolder's ordering, so
+the check kept certifying the canvas that was not broken and argued against the
+evidence. What broke it open was the page reporting `25/25 tiles get two different
+stops` while the tiles were visibly flat — a contradiction that can only mean the
+measurement and the symptom are looking at different things.
+
+Hence the diagnostics now in place: every build stamps `src/build-id.ts` and the
+workbench logs it, so a stale script is one glance to spot; and `generate()`
+reports colour mode, shade depth, index range and the equal-stop count **for both
+canvases**.
+
 **Done:** isogloss contours are on the workbench too, drawn on both canvases and
 switchable at any time — on a finished net as readily as an empty one. Same
 construction as 3D: seven per rhombus dividing the long diagonal into eight, which
@@ -200,3 +234,15 @@ hardcode), then retire `net.html`. Both wait on browser confirmation.
 Everything is verified numerically and by loading pages. Interaction is barely
 tested in a browser. The least-exercised parts, in order: the transport controls,
 the two canvas hit-tests, and printing.
+
+Two failures so far were browser-only and cost hours each — a stale cached script,
+and a rendering bug on the canvas the numerical checks did not cover. Both are now
+instrumented rather than argued about:
+
+- `npm run serve` (`tools/serve.py`) sends `no-store`, so a reload genuinely
+  reloads. Do not use `python3 -m http.server`, which sends `Last-Modified` and no
+  `Cache-Control` and lets the browser invent a freshness window.
+- Every build stamps itself; the console line `workbench build HH:MM:SS` settles
+  "am I even running this code" immediately.
+- `site.js` shows a red banner for any uncaught error, so a page that silently
+  fails to start says why.
