@@ -1318,7 +1318,7 @@ let traceEvents: TraceEvent[] = [];
 let traceIndex = 0; // number of events applied
 let tracePlaying = false;
 let traceSpeed = 15; // events per second, 0 = uncapped
-let traceMethod = "widened";
+let traceMethod = "cuttree";
 
 // roles for the tiling view at the current step
 const traceRoles = new Map<number, "placed" | "rejected" | "current">();
