@@ -698,9 +698,19 @@ export interface CutTreeResult extends UnfoldResult {
 }
 
 export function cutTreeUnfold(opts: CutTreeOptions = {}): CutTreeResult {
-    const budget = opts.budgetMs ?? 900;
     const t0 = Date.now();
     const A = analysePatch(opts.flip);
+
+    // The budget is a *cap*, not a cost: the search returns the moment it reaches
+    // zero overlaps, which almost every patch does in a fraction of it. So it has
+    // to scale with the patch, and the default has to be the scaled one — a flat
+    // 900 ms left an 835-rhomb patch with 813 overlaps and five layers, which makes
+    // the whole method look broken when it is only a search cut off early.
+    //
+    // This lived in the Net page and went with it. It belongs here: it is a
+    // property of the problem size, not of whoever is asking.
+    const budget =
+        opts.budgetMs ?? Math.min(12000, Math.max(1500, A.faces.length * 35));
     const g = buildCutGraph();
     const dist = boundaryDistance(g);
 

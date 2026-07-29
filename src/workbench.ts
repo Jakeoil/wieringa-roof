@@ -1430,7 +1430,29 @@ const traceRoles = new Map<number, "placed" | "rejected" | "current">();
 let traceGhost: { poly: [number, number][]; kind: TraceEvent["kind"] } | null =
     null;
 
-function runTrace(): void {
+// The branch-cut search blocks the thread while it runs, and on a generation-4
+// patch that is seconds rather than milliseconds. Announce it and yield once so the
+// message actually paints, then run. Callers pass their follow-up work as `after`,
+// because it has to happen once the trace exists rather than immediately.
+function runTrace(after?: () => void): void {
+    const n = allRhombs.length;
+    const heavy = traceMethod === "cuttree" && n > 300;
+    const go = () => {
+        runTraceBody();
+        after?.();
+    };
+    if (heavy) {
+        say(
+            `${n} rhombi — routing branch cuts. This takes a few seconds at this size; ` +
+                `the page is busy, not stuck.`,
+        );
+        setTimeout(go, 0);
+    } else {
+        go();
+    }
+}
+
+function runTraceBody(): void {
     traceEvents = [];
     const fn =
         traceMethod === "bfs"
@@ -1934,10 +1956,11 @@ function buildTransport(): void {
     methodSel.addEventListener("change", () => {
         traceMethod = methodSel.value;
         stopPlay();
-        runTrace();
-        syncTransport();
-        drawTiling();
-        drawNet();
+        runTrace(() => {
+            syncTransport();
+            drawTiling();
+            drawNet();
+        });
     });
     const methodLabel = mk("label");
     methodLabel.style.fontSize = "13px";
@@ -2039,9 +2062,10 @@ function setMode(next: Mode): void {
     }
     stopPlay();
     if (next === "watch") {
-        runTrace();
-        buildTransport();
-        say("Replaying — Play, or step with the arrow keys.");
+        runTrace(() => {
+            buildTransport();
+            say("Replaying — Play, or step with the arrow keys.");
+        });
     } else {
         netRhombs.length = 0;
         layersDirty = true;
@@ -2105,10 +2129,11 @@ function buildControls() {
         currentSeedIdx = parseInt(typeSelect.value);
         regenerate();
         if (mode === "watch") {
-            runTrace();
-            syncTransport();
-            drawTiling();
-            drawNet();
+            runTrace(() => {
+                syncTransport();
+                drawTiling();
+                drawNet();
+            });
         }
     });
 
@@ -2136,10 +2161,11 @@ function buildControls() {
         gen = parseInt(genSelect.value);
         regenerate();
         if (mode === "watch") {
-            runTrace();
-            syncTransport();
-            drawTiling();
-            drawNet();
+            runTrace(() => {
+                syncTransport();
+                drawTiling();
+                drawNet();
+            });
         }
     });
 

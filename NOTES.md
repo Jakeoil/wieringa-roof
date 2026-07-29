@@ -521,6 +521,31 @@ almost free and buys the tail. Page budget is now `35 ms × rhombi`, floor 5 s, 
 Result at the page's own settings: **0 failures in 210 runs** across all seven
 seeds at generations 2 and 3, worst case 1.9 s, most patches under 300 ms.
 
+### Regression: the budget went with the Net page
+
+Deleting `net.html` took the search-budget scaling with it, because I had put it in
+the page rather than the library. The Unfold page fell back to the flat 900 ms
+default, and generation 4 came out with **813 overlaps and five layers** instead of
+14 and two — the exact failure the scaling existed to prevent, reintroduced by
+removing the only thing that applied it.
+
+The budget now defaults inside `cutTreeUnfold`: `35 ms × faces`, floor 1.5 s, cap
+12 s. It belongs there — it is a property of the problem size, not of whoever is
+asking. Nothing outside needs to know.
+
+Same for the feedback. `runTrace` now announces the search and yields once so the
+message paints before the thread blocks, and takes the caller's follow-up as a
+callback, since that work has to happen after the trace exists rather than
+immediately. Four call sites, all updated.
+
+Costs at generation 4, measured: layer recompute on the workbench is 57 ms at 835
+faces and 84 ms at 1380, once, behind a dirty flag — `drawNet` runs on pointer
+moves and must not pay it. The search itself uses its full 12 s on the three hard
+seeds and returns early on the other four.
+
+Cross-checked: the workbench's own layer count, reconstructed from `netHinges` plus
+placement order, agrees with the algorithm's on every seed at generation 4.
+
 ### Layers: the z coordinate, taken literally
 
 Interim step before Stage B, and the visualization asked for. Where the net wraps
