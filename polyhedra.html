@@ -53,22 +53,12 @@
         </div>
         <h3>Rhombic triacontahedron</h3>
         <p>30 faces · 32 vertices · 60 edges</p>
-        <p class="hint" style="margin-bottom:6px">
-            <label>Equator contours:
-                <select id="equator" style="font:inherit;padding:2px 4px;">
-                    <option value="latitude">latitude slices</option>
-                    <option value="short">parallel to short diagonal</option>
-                    <option value="long">parallel to long diagonal</option>
-                    <option value="alternating">alternating</option>
-                </select>
-            </label>
-            <em>temporary, while we decide</em>
-        </p>
         <p class="hint">Drag to turn it. Stood on a five-fold axis: five blue at each
         pole, five yellow in each temperate band, ten orange round the equator. Each
         blue cap is a <span class="mono">Pe5</span> rosette in all but name. The
-        contours are level sets of height, sliced pole to pole, so they close into
-        rings of latitude the way the roof's run on from tile to tile.</p>
+        contours are level sets of height, sliced pole to pole, so they close into rings
+        of latitude — except round the equator, where the faces stand vertical and
+        take lines along their long diagonal instead.</p>
     </div>
 </div>
 
@@ -157,7 +147,10 @@
 {
     "imports": {
         "three": "./vendor/three.module.js",
-        "three/addons/controls/OrbitControls.js": "./vendor/OrbitControls.js"
+        "three/addons/controls/OrbitControls.js": "./vendor/OrbitControls.js",
+        "three/addons/lines/LineSegments2.js": "./vendor/LineSegments2.js",
+        "three/addons/lines/LineSegmentsGeometry.js": "./vendor/LineSegmentsGeometry.js",
+        "three/addons/lines/LineMaterial.js": "./vendor/LineMaterial.js"
     }
 }
 </script>
