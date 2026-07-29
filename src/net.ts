@@ -17,6 +17,7 @@ const marginInput = el<HTMLInputElement>("margin");
 const fillsSel = el<HTMLSelectElement>("fills");
 const anglesChk = el<HTMLInputElement>("angles");
 const flipChk = el<HTMLInputElement>("flip");
+const layerSel = el<HTMLSelectElement>("layer");
 const statusEl = el<HTMLElement>("status");
 const sheetsEl = el<HTMLElement>("sheets");
 
@@ -46,6 +47,121 @@ for (const g of [2, 3, 4]) {
 }
 genSel.value = "2";
 
+// The search is stochastic, so re-running it on a layer change would hand back a
+// different net and the layers would not correspond to what you were just looking
+// at. Compute once, keep it, and let the layer selector redraw only.
+type Built = {
+    res: ReturnType<typeof cutTreeUnfold> | ReturnType<typeof unfoldPatch>;
+    sideMm: number;
+    sideLabel: string;
+    pageW: number;
+    pageH: number;
+    margin: number;
+    ms: number;
+};
+let built: Built | null = null;
+
+function layerOf(b: Built): { layer?: Map<number, number>; count: number } {
+    const r = b.res as ReturnType<typeof cutTreeUnfold>;
+    return r.layer ? { layer: r.layer, count: r.layerCount } : { count: 1 };
+}
+
+function syncLayerSel(): void {
+    const wrap = layerSel.parentElement as HTMLElement;
+    if (!built) return;
+    const { count } = layerOf(built);
+    if (count <= 1) {
+        wrap.style.display = "none";
+        layerSel.innerHTML = "";
+        return;
+    }
+    wrap.style.display = "";
+    const keep = layerSel.value;
+    layerSel.innerHTML = "";
+    const add = (v: string, t: string) => {
+        const o = document.createElement("option");
+        o.value = v;
+        o.textContent = t;
+        layerSel.appendChild(o);
+    };
+    add("all", "All layers");
+    for (let L = 0; L < count; L++) add(String(L), `Layer ${L}`);
+    layerSel.value = Array.from(layerSel.options).some((o) => o.value === keep)
+        ? keep
+        : "all";
+}
+
+function draw(): void {
+    if (!built) return;
+    const b = built;
+    const { layer } = layerOf(b);
+    const active =
+        layerSel.value === "all" || layerSel.value === "" ? null : Number(layerSel.value);
+
+    const { sheets, oversize } = layoutSheets(
+        b.res.pieces,
+        b.sideMm,
+        b.pageW - 2 * b.margin,
+        b.pageH - 2 * b.margin,
+        6,
+    );
+
+    sheetsEl.innerHTML = sheets
+        .map((s) =>
+            renderSheet(s, b.res.placed, b.res.creases, b.res.hinges, {
+                sideMm: b.sideMm,
+                pageW: b.pageW,
+                pageH: b.pageH,
+                margin: b.margin,
+                fillMode: fillsSel.value as "none" | "type" | "cluster",
+                showAngles: anglesChk.checked,
+                showLegend: true,
+                layer,
+                activeLayer: active,
+            }),
+        )
+        .join("\n");
+
+    const folds = [...b.res.foldHistogram.entries()]
+        .sort((a, b2) => a[0] - b2[0])
+        .map(([k, v]) => `${k}°×${v}`)
+        .join("  ");
+    const sizes = b.res.pieces
+        .map(
+            (p) =>
+                `${p.faceIds.length} @ ${(p.w * b.sideMm).toFixed(0)}×${(p.h * b.sideMm).toFixed(0)} mm`,
+        )
+        .join(" · ");
+
+    const r = b.res as ReturnType<typeof cutTreeUnfold>;
+    let layerNote = "";
+    if (r.layer && r.layerCount > 1) {
+        const pop = new Map<number, number>();
+        for (const L of r.layer.values()) pop.set(L, (pop.get(L) ?? 0) + 1);
+        layerNote =
+            ` ${r.layerCount} layers (` +
+            [...pop.entries()]
+                .sort((x, y) => x[0] - y[0])
+                .map(([L, n]) => `L${L}: ${n}`)
+                .join(", ") +
+            `) — where the net wraps over itself it goes up a z coordinate` +
+            ` instead of being cut. The flat alternative is` +
+            ` ${r.flat.pieces.length} piece${r.flat.pieces.length === 1 ? "" : "s"}.`;
+    }
+
+    statusEl.className = "info" + (oversize.length ? " bad" : "");
+    statusEl.textContent =
+        `${b.res.faces.length} rhombi → ${b.res.pieces.length} ` +
+        `piece${b.res.pieces.length === 1 ? "" : "s"} ` +
+        `on ${sheets.length} sheet${sheets.length === 1 ? "" : "s"}, side ${b.sideLabel}. ` +
+        `Folds ${folds}. Pieces: ${sizes}.` +
+        layerNote +
+        (oversize.length
+            ? ` ${oversize.length} piece(s) too big for this page — reduce the side length.`
+            : "") +
+        ` (${b.ms} ms)`;
+}
+
 function rebuild(): void {
     const side = parseLength(sideInput.value);
     if (!side) {
@@ -74,54 +190,28 @@ function rebuild(): void {
             : modeSel.value === "widened"
               ? ribbonGrowPatch(opts)
               : unfoldPatch(opts);
-    const { sheets, oversize } = layoutSheets(
-        res.pieces,
-        side.mm,
-        pageW - 2 * margin,
-        pageH - 2 * margin,
-        6,
-    );
     const ms = Math.round(performance.now() - t0);
 
-    sheetsEl.innerHTML = sheets
-        .map((s) =>
-            renderSheet(s, res.placed, res.creases, res.hinges, {
-                sideMm: side.mm,
-                pageW,
-                pageH,
-                margin,
-                fillMode: fillsSel.value as "none" | "type" | "cluster",
-                showAngles: anglesChk.checked,
-                showLegend: true,
-            }),
-        )
-        .join("\n");
-
-    const folds = [...res.foldHistogram.entries()]
-        .sort((a, b) => a[0] - b[0])
-        .map(([k, v]) => `${k}°×${v}`)
-        .join("  ");
-    const sizes = res.pieces
-        .map(
-            (p) =>
-                `${p.faceIds.length} @ ${(p.w * side.mm).toFixed(0)}×${(p.h * side.mm).toFixed(0)} mm`,
-        )
-        .join(" · ");
-
-    statusEl.className = "info" + (oversize.length ? " bad" : "");
-    statusEl.textContent =
-        `${res.faces.length} rhombi → ${res.pieces.length} ` +
-        `piece${res.pieces.length === 1 ? "" : "s"} ` +
-        `on ${sheets.length} sheet${sheets.length === 1 ? "" : "s"}, side ${side.label}. ` +
-        `Folds ${folds}. Pieces: ${sizes}.` +
-        (oversize.length
-            ? ` ${oversize.length} piece(s) too big for this page — reduce the side length.`
-            : "") +
-        ` (${ms} ms)`;
+    built = {
+        res,
+        sideMm: side.mm,
+        sideLabel: side.label,
+        pageW,
+        pageH,
+        margin,
+        ms,
+    };
+    syncLayerSel();
+    draw();
 }
 
-for (const c of [patchSel, modeSel, genSel, pageSel, fillsSel, anglesChk, flipChk]) {
+// Only the first group changes the net; the rest are pure presentation and must
+// redraw rather than re-search, or toggling a fill would hand back a different net.
+for (const c of [patchSel, modeSel, genSel, pageSel, flipChk]) {
     c.addEventListener("change", rebuild);
+}
+for (const c of [fillsSel, anglesChk, layerSel]) {
+    c.addEventListener("change", draw);
 }
 for (const c of [sideInput, marginInput]) {
     c.addEventListener("change", rebuild);

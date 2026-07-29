@@ -137,6 +137,12 @@ export interface RenderOpts {
     showAngles: boolean;
     showLegend: boolean;
     standalone?: boolean; // emit xmlns (needed for a .svg file)
+    // Which z-level each face sits on, and which one to show. Faces off the active
+    // layer are ghosted rather than dropped: you need to see where the layer you
+    // are printing sits inside the whole net, or the sheet is unreadable on its
+    // own. Leave activeLayer null to draw everything solid, as before.
+    layer?: Map<number, number>;
+    activeLayer?: number | null;
 }
 
 export function renderSheet(
@@ -181,9 +187,24 @@ export function renderSheet(
         const labels: string[] = [];
         const drawn = new Set<string>();
 
+        const ghosts: string[] = [];
         for (const fid of piece.faceIds) {
             const p = placed.get(fid)!;
             const pts = p.poly.map(map);
+            const off =
+                o.activeLayer != null &&
+                o.layer != null &&
+                (o.layer.get(fid) ?? 0) !== o.activeLayer;
+
+            if (off) {
+                // context only: outline, no creases, nothing to cut along
+                ghosts.push(
+                    `<polygon points="${pts
+                        .map((q) => `${n3(q[0])},${n3(q[1])}`)
+                        .join(" ")}" fill="#fafafa" stroke="#e0e0e0" stroke-width="0.2"/>`,
+                );
+                continue;
+            }
 
             if (o.fillMode !== "none") {
                 const fill =
@@ -230,7 +251,7 @@ export function renderSheet(
             }
         }
 
-        out.push(...fills, ...creaseLines, ...cutLines, ...labels);
+        out.push(...ghosts, ...fills, ...creaseLines, ...cutLines, ...labels);
         const nRh = piece.faceIds.length;
         out.push(
             `<text x="${n3(margin + cx + pl.x)}" y="${n3(margin + cy + pl.y + pl.h + 4)}" ` +

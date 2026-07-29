@@ -1274,14 +1274,6 @@ function drawNet() {
             ctx.stroke();
         }
 
-        // Vertex index labels
-        for (let i = 0; i < 4; i++) {
-            const idx = displayIndex(vertexList[nr.verts[i]].index);
-            ctx.fillStyle = indexColor(idx);
-            ctx.font = "10px monospace";
-            ctx.textAlign = "center";
-            ctx.fillText(String(idx), sv[i].x, sv[i].y - 4);
-        }
     }
 
     if (mirror.onNet) {

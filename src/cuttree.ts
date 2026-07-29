@@ -368,6 +368,54 @@ function cycleInCutTree(
     return path;
 }
 
+// ── layers ────────────────────────────────────────────────────────
+//
+// The branch-cut picture taken literally. Where the development wants to wrap over
+// itself you do not have to cut — you can go up a z coordinate, which in complex
+// analysis is the next sheet of the Riemann surface and here is the next sheet of
+// paper. So: assign every face a layer such that no two overlapping faces share
+// one, and each layer is flat by construction.
+//
+// That is a colouring of the overlap graph. It is tiny — a handful of overlapping
+// pairs against hundreds of faces — so greedy colouring in descending degree
+// (Welsh–Powell) is both fast and, at these sizes, optimal in practice. Almost
+// everything stays on layer 0; only the branch points climb.
+
+export function assignLayers(
+    placed: Map<number, Placed>,
+    pairs?: Array<[number, number]>,
+): { layer: Map<number, number>; count: number } {
+    const ps = pairs ?? overlapPairs(placed);
+    const layer = new Map<number, number>();
+    for (const id of placed.keys()) layer.set(id, 0);
+    if (!ps.length) return { layer, count: 1 };
+
+    const adj = new Map<number, number[]>();
+    for (const [a, b] of ps) {
+        if (!adj.has(a)) adj.set(a, []);
+        if (!adj.has(b)) adj.set(b, []);
+        adj.get(a)!.push(b);
+        adj.get(b)!.push(a);
+    }
+    // Most-constrained first, so the awkward faces pick before the easy ones.
+    const order = [...adj.keys()].sort(
+        (x, y) => adj.get(y)!.length - adj.get(x)!.length,
+    );
+    for (const id of order) {
+        const taken = new Set<number>();
+        for (const nb of adj.get(id)!) {
+            if (adj.has(nb) && layer.has(nb)) taken.add(layer.get(nb)!);
+        }
+        let L = 0;
+        while (taken.has(L)) L++;
+        layer.set(id, L);
+    }
+    // A face not in the overlap graph never moves; recompute the count honestly.
+    let count = 0;
+    for (const L of layer.values()) count = Math.max(count, L + 1);
+    return { layer, count };
+}
+
 // ── the flat fallback ─────────────────────────────────────────────
 //
 // When one piece cannot be made overlap-free, the other answer is a net that lies
@@ -427,6 +475,10 @@ export interface FlatVariant {
 
 export interface CutTreeResult extends UnfoldResult {
     flat: FlatVariant;
+    // Which z-level each face sits on. Layer 0 holds almost everything; a face
+    // climbs only when it would otherwise overlap something already down.
+    layer: Map<number, number>;
+    layerCount: number;
     cuts: Set<string>;
     overlaps: number;
     interiorVertices: number;
@@ -549,6 +601,8 @@ export function cutTreeUnfold(opts: CutTreeOptions = {}): CutTreeResult {
         ? developFromCuts(A, cuts, opts.trace)
         : best!.dev;
 
+    const layers = assignLayers(dev.placed);
+
     // The other answer: flat at the cost of pieces. Free when the one-piece net is
     // already clean, which is the usual case up to generation 3.
     const flatRun =
@@ -588,6 +642,8 @@ export function cutTreeUnfold(opts: CutTreeOptions = {}): CutTreeResult {
         seedsTried: tried,
         cuts,
         overlaps,
+        layer: layers.layer,
+        layerCount: layers.count,
         flat: {
             placed: flatRun.dev.placed,
             pieces: boxes(flatRun.dev),

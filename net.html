@@ -77,6 +77,7 @@
         <option value="bfs">BFS unfolding</option>
     </select></label>
     <label>Generation <select id="gen"></select></label>
+    <label style="display:none">Layer <select id="layer"></select></label>
     <label>Rhombus side <input type="text" id="side" value="20mm"></label>
     <label>Page <select id="page">
         <option value="letter">Letter</option>
@@ -124,6 +125,25 @@
     overlap. Every patch here through generation 3 comes out as a single
     overlap-free sheet. The default.
 </p>
+<h2>Layers</h2>
+<p>
+    A branch cut is the decision point to <em>go up a z coordinate</em>. Where a
+    net wraps over itself you do not have to cut it apart — you can let the
+    offending faces climb to the next level, which in complex analysis is the next
+    sheet of the Riemann surface and here is the next sheet of paper. Faces are
+    assigned to layers so that no two overlapping ones share a level, which makes
+    <strong>every layer flat by construction</strong>. Almost everything stays on
+    layer 0; only the branch points climb, and two layers have always been enough.
+</p>
+<p>
+    The <strong>Layer</strong> selector appears whenever a net needs more than one.
+    Choosing a layer draws it solid and ghosts the rest, so you can see where the
+    part you are about to print sits inside the whole net — print each layer in
+    turn and join them at the hinges that cross between. Selecting a layer only
+    redraws; it never re-runs the search, so the net you are looking at stays the
+    net you were looking at.
+</p>
+
 <p>
     <strong>Widened ribbons</strong> takes the longest de Bruijn ribbon as a
     backbone and then accretes neighbouring rhombi onto it. It gathers the most

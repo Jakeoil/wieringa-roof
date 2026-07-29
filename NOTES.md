@@ -432,6 +432,34 @@ pieces — 41–46 at gen 3 where branch cuts need 1. It is still the reason a w
 ribbon makes a good backbone. `makeRunFinder` and the `Run`/`StripLink` machinery
 stay, because `ribbonGrowPatch` uses them.
 
+### Layers: the z coordinate, taken literally
+
+Interim step before Stage B, and the visualization asked for. Where the net wraps
+over itself it need not be cut — the offending faces can climb a level, which is
+the next sheet of the Riemann surface in complex analysis and the next sheet of
+paper here. `assignLayers` colours the overlap graph (greedy, most-constrained
+first), so **every layer is flat by construction**. Almost everything stays on
+layer 0; only the branch points climb.
+
+Two layers cover the converged gen-4 results (Pe5 835 rhombi → L0:824 L1:11). The
+count tracks how far the search got rather than anything intrinsic: St5 at a 6 s
+budget leaves 294 overlaps and wants 4 layers, at 20 s leaves 1 and wants 2.
+
+The Net page grows a **Layer** selector whenever a net needs more than one. It
+draws the chosen layer solid and ghosts the rest, so you can see where the part
+you are about to print sits inside the whole net. Selecting a layer only redraws —
+the search is stochastic, so re-running it would hand back a *different* net and
+the layers would stop corresponding to what you were just looking at. For the same
+reason the fill and angle controls now redraw rather than rebuild.
+
+The give-and-take between layers to balance net proportions is Stage B.
+
+### Presentation
+
+Vertex index labels are gone from the net canvas. They were redundant — the
+shading and the isoglosses already say height — and they put four numbers on every
+tile. The tiling canvas keeps them, where they are the point.
+
 ### Still open
 
 The gen-3 nets are one piece but far too big for one sheet — 336×391 mm at 20 mm
