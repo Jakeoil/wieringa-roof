@@ -215,6 +215,118 @@ hardcode), then retire `net.html`. Both wait on browser confirmation.
 
 ---
 
+## Plan: cut forests and branch cuts
+
+*Written down deliberately, so it survives a cleared session. This is the next
+substantial piece of work and it changes how sheets are handled.*
+
+### The reframing
+
+Watching a patch unfold, the overlaps are **branch points**, and the cuts that
+relieve them are **branch cuts** in exactly the sense of `log` and `√` in complex
+analysis. A multivalued function is made single-valued by cutting the plane; a
+surface with curvature is made flat by cutting the tiling. When the development
+wants to wrap over itself, you either cut, or you go up a level — and in complex
+analysis that level is another **sheet** of the Riemann surface, while here it is
+another **sheet of paper**. The pun is exact and worth keeping: a branch cut is the
+decision point to move up a z coordinate.
+
+### Separate the two constraints
+
+They are currently tangled together in the unfolding methods, which is why the
+results are hard to reason about. Split them:
+
+**Stage A — cutting (paper-agnostic).** Ignore paper size entirely. Ignore how big
+the result is.
+
+> A **net** is one connected unfolded piece.
+> The **cut tree** is the set of edges cut to produce it; over several nets, a
+> **cut forest**.
+> *Find a cut forest whose every component unfolds overlap-free, minimising the
+> number of connected components, and secondarily minimising orphans — the tiny
+> one- and two-rhomb pieces.*
+
+Hard constraint: each component overlap-free. Objective: fewest components. Tie
+break: avoid slivers. Nothing about paper enters here.
+
+**Stage B — packing (physical).** Take those nets and fit them to real sheets.
+Where a net is too big for the paper, introduce *further* branch cuts to divide it.
+That is a separate decision, made later, and it is allowed to be crude — a cut for
+paper is not a cut for geometry.
+
+Jeff's preference at Stage A is **large nets**. A second or third sheet to absorb
+an overlap is fine; many small pieces are not.
+
+### What exists to build on
+
+`src/unfold.ts` has three greedy methods — `unfoldPatch` (BFS), `ribbonGrowPatch`
+(widened ribbons, the default), `stripPatch` (pure de Bruijn ribbons). All three
+place faces through `placeSeed` / `placeAcross`, test with `convexOverlap` on
+polygons shrunk to 0.94, and emit a trace. The invariant `|hinges| = faces − pieces`
+holds for all of them: hinges are a spanning forest of the face dual graph, and
+**every other interior edge is a cut** — those are the branch cuts, and they are
+exactly the edges bounding the angular-defect wedges.
+
+Measured at generations 2–4: widened ribbons put 80–90% of a patch into one piece
+but leave many slivers; BFS gets fewer components overall but more of them big
+enough to be real work; strips are provably overlap-free at any length yet need
+5× the pieces. None of them optimises anything — they are all first-fit.
+
+`src/sheet.ts` already does Stage B mechanically: `layoutSheets` shelf-packs and
+`renderSheet` draws at true size. What it lacks is the ability to *split* a net
+that will not fit.
+
+### Notes toward Stage A
+
+- Minimising components subject to overlap-freeness is a global problem and the
+  current greedy is only a baseline. Worth trying, roughly in order of effort:
+  seed search (already there for BFS, capped at 150 faces); a merge pass that
+  attempts to join two components across a cut edge and keeps the join if it stays
+  overlap-free; local search that removes a cut and repairs elsewhere.
+- Overlap is not monotone in an obvious way — adding a face can only make a
+  component harder to place, but *which* face you added earlier changes what is
+  reachable. That is what makes greedy weak here.
+- The angular defect is the source of every forced cut: a saddle vertex has more
+  than 360° of paper meeting at a point, so the faces around it can never all stay
+  joined.
+
+**But saddles do not bound the number of components, and measuring that is the most
+useful thing found so far.** Counted:
+
+| patch | rhombi | interior vertices | saddles | widened pieces | BFS pieces |
+|---|---|---|---|---|---|
+| Pe3 gen 2 | 23 | 15 | 4 | 1 | 1 |
+| Deca gen 3 | 80 | 66 | 18 | 2 | 1 |
+| Pe1 gen 3 | 138 | 111 | 31 | 7 | 4 |
+| Pe5 gen 3 | 140 | 111 | 35 | 8 | 6 |
+| Pe3 gen 4 | 878 | 770 | 239 | 61 | 51 |
+
+Pe3 gen 2 has four saddles and still unfolds into **one** piece. So a saddle forces
+a **cut**, not a **component** — and that is the complex-analysis picture exactly. A
+branch cut runs from the branch point out to the boundary and the plane stays
+connected; here a cut runs from the saddle out to the patch edge and the net stays
+in one piece. Components only appear when a cut *cannot* reach the boundary without
+the piece overlapping itself, or when a greedy method simply gives up and starts
+again.
+
+That suggests Stage A is posed wrongly as "grow pieces and split when stuck". The
+better formulation is:
+
+> Route a branch cut from every saddle vertex out to the boundary, choosing routes
+> that leave the development overlap-free. Components are a failure mode, not the
+> unit of work.
+
+Which is a path-routing problem on the dual graph, not a region-growing one, and
+plausibly does far better than the greedy methods on exactly the patches where they
+do worst — note BFS needs 51 pieces at gen 4 against 239 saddles, so the two
+numbers are not even proportional.
+
+### Open
+
+- Is there a lower bound on component count from the defect structure alone?
+- Should Stage B's paper cuts be preferred along ribbon boundaries, where the
+  geometry is already straight and a join is easy to align?
+
 ## The rhombohedra are the real components
 
 Worth keeping in mind, because the site presents the roof as a surface and it is
