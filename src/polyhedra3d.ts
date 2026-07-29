@@ -138,6 +138,37 @@ function contourSegment(f: Face, z: number): [V3, V3] | null {
     return hits.length === 2 ? [hits[0], hits[1]] : null;
 }
 
+// Seven lines across one diagonal, i.e. running parallel to the other. Dividing
+// the LONG diagonal gives lines parallel to the short one, and vice versa — which
+// of the two reads better on the steep equatorial faces is a matter of taste, so
+// it is a switch rather than a decision.
+function perFaceContours(f: Face, divideLong: boolean): Array<[V3, V3]> {
+    const d02 = len(sub(f[0], f[2]));
+    const d13 = len(sub(f[1], f[3]));
+    const longStartsAt0 = d02 >= d13;
+    const k = divideLong === longStartsAt0 ? 0 : 1;
+    const lo = f[k];
+    const r1 = f[(k + 1) % 4];
+    const hi = f[(k + 2) % 4];
+    const r3 = f[(k + 3) % 4];
+    const mix = (a: V3, b: V3, t: number): V3 => add(a, mul(sub(b, a), t));
+
+    const out: Array<[V3, V3]> = [];
+    for (let i = 1; i <= 7; i++) {
+        const t = i / 8;
+        if (t <= 0.5) {
+            const u = t * 2;
+            out.push([mix(lo, r3, u), mix(lo, r1, u)]);
+        } else {
+            const u = (t - 0.5) * 2;
+            out.push([mix(r3, hi, u), mix(r1, hi, u)]);
+        }
+    }
+    return out;
+}
+
+export type EquatorMode = "latitude" | "short" | "long" | "alternating";
+
 function isoglosses(faces: Face[]): Array<[V3, V3]> {
     let zMin = Infinity;
     let zMax = -Infinity;
@@ -190,7 +221,7 @@ function makeViewer(
     host: HTMLElement,
     faces: Face[],
     colourOf: (f: Face) => THREE.Color,
-): void {
+): { setEquator: (m: EquatorMode) => void } {
     const scene = new THREE.Scene();
     scene.background = null;
 
@@ -244,6 +275,9 @@ function makeViewer(
                 roughness: 0.58,
                 metalness: 0.04,
                 flatShading: true,
+                transparent: true,
+                opacity: 0.86,
+                depthWrite: false,
                 polygonOffset: true,
                 polygonOffsetFactor: 1,
                 polygonOffsetUnits: 1,
@@ -261,33 +295,67 @@ function makeViewer(
     }
     const eg = new THREE.BufferGeometry();
     eg.setAttribute("position", new THREE.Float32BufferAttribute(edge, 3));
-    scene.add(
-        new THREE.LineSegments(
-            eg,
-            new THREE.LineBasicMaterial({ color: 0x23262c }),
-        ),
+    const edges = new THREE.LineSegments(
+        eg,
+        new THREE.LineBasicMaterial({
+            color: 0x23262c,
+            transparent: true,
+            opacity: 0.85,
+        }),
     );
+    edges.renderOrder = 1;
+    scene.add(edges);
 
-    const iso: number[] = [];
-    for (const [a, b] of isoglosses(faces)) {
-        iso.push(a[0], a[1], a[2], b[0], b[1], b[2]);
-    }
-    const ig = new THREE.BufferGeometry();
-    ig.setAttribute("position", new THREE.Float32BufferAttribute(iso, 3));
-    scene.add(
-        new THREE.LineSegments(
-            ig,
-            new THREE.LineBasicMaterial({
-                color: 0x2b2e35,
-                transparent: true,
-                opacity: 0.5,
-            }),
-        ),
-    );
+    const isoMat = new THREE.LineBasicMaterial({
+        color: 0x2b2e35,
+        transparent: true,
+        opacity: 0.5,
+    });
+    let isoLines: THREE.LineSegments | null = null;
 
+    const rebuildContours = (mode: EquatorMode) => {
+        if (isoLines) {
+            scene.remove(isoLines);
+            isoLines.geometry.dispose();
+        }
+        // the orange equatorial band is the part under discussion; everything else
+        // keeps the pole-to-pole latitude slices
+        const equator = faces.filter((f) => colourOf(f) === ORANGE);
+        const rest = faces.filter((f) => colourOf(f) !== ORANGE);
+        const segs: Array<[V3, V3]> =
+            mode === "latitude"
+                ? isoglosses(faces)
+                : isoglosses(rest).concat(
+                      equator.flatMap((f, i) =>
+                          perFaceContours(
+                              f,
+                              mode === "short"
+                                  ? true
+                                  : mode === "long"
+                                    ? false
+                                    : i % 2 === 0,
+                          ),
+                      ),
+                  );
+        const arr: number[] = [];
+        for (const [a, b] of segs) arr.push(a[0], a[1], a[2], b[0], b[1], b[2]);
+        const ig = new THREE.BufferGeometry();
+        ig.setAttribute("position", new THREE.Float32BufferAttribute(arr, 3));
+        isoLines = new THREE.LineSegments(ig, isoMat);
+        isoLines.renderOrder = 2;
+        scene.add(isoLines);
+    };
+    rebuildContours("latitude");
+
+    // r / sin(halfFov) is the distance at which the bounding sphere exactly fills
+    // the frame, so it wants a margin *above* it. The previous /1.35 pulled the
+    // camera closer than touching and cropped the solid against its border.
     geo.computeBoundingSphere();
     const r = geo.boundingSphere!.radius;
-    camera.position.setLength(r / Math.sin((camera.fov * Math.PI) / 360) / 1.35);
+    const fit = r / Math.sin((camera.fov * Math.PI) / 360);
+    camera.position.setLength(fit * 1.18);
+    controls.minDistance = fit * 0.6;
+    controls.maxDistance = fit * 3;
     controls.update();
 
     const resize = () => {
@@ -305,11 +373,22 @@ function makeViewer(
         controls.update();
         renderer.render(scene, camera);
     });
+
+    return { setEquator: rebuildContours };
 }
 
 const rt = document.getElementById("v-rt");
 const ac = document.getElementById("v-acute");
 const ob = document.getElementById("v-obtuse");
-if (rt) makeViewer(rt, triacontahedron(), bandColour);
+const rtView = rt ? makeViewer(rt, triacontahedron(), bandColour) : null;
 if (ac) makeViewer(ac, rhombohedron(true), apexColour(YELLOW));
 if (ob) makeViewer(ob, rhombohedron(false), apexColour(ORANGE));
+
+// Temporary: which way the contours should run on the steep equatorial faces is
+// undecided, so try them side by side rather than argue about it.
+const eqSel = document.getElementById("equator") as HTMLSelectElement | null;
+if (eqSel && rtView) {
+    eqSel.addEventListener("change", () => {
+        rtView.setEquator(eqSel.value as EquatorMode);
+    });
+}
