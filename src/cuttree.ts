@@ -487,49 +487,101 @@ function enforceSaddles(
     return cuts;
 }
 
-// ── layers ────────────────────────────────────────────────────────
+// ── layers: continuation, not colouring ───────────────────────────
 //
 // The branch-cut picture taken literally. Where the development wants to wrap over
 // itself you do not have to cut — you can go up a z coordinate, which in complex
 // analysis is the next sheet of the Riemann surface and here is the next sheet of
-// paper. So: assign every face a layer such that no two overlapping faces share
-// one, and each layer is flat by construction.
+// paper.
 //
-// That is a colouring of the overlap graph. It is tiny — a handful of overlapping
-// pairs against hundreds of faces — so greedy colouring in descending degree
-// (Welsh–Powell) is both fast and, at these sizes, optimal in practice. Almost
-// everything stays on layer 0; only the branch points climb.
+// The obvious way to assign layers is to colour the overlap graph, and that is what
+// this did first. It minimises the *number* of layers, which turns out to be the
+// wrong objective: the promoted faces are individually chosen, so the upper layers
+// come out as scattered single rhombi. A sheet of confetti, optimal in a statistic
+// nobody cares about.
+//
+// Continuation instead. Walk the hinge tree from the seed; when a face cannot be
+// placed without overlapping what is already on its layer, that face **and its
+// whole subtree** continue on the next layer up. Each layer is then a union of
+// connected subtrees — real pieces of surface you can fold — and the seam between
+// layers is where the net carries on rather than where it was severed.
+//
+// Three things make this the right construction:
+//
+//   * layers are connected regions, so every sheet is usable;
+//   * all layers stay in one coordinate frame, so the sheets can be registered and
+//     overlaid and the surface visibly continues across the seam — unlike the flat
+//     variant, which repacks each piece independently and destroys that;
+//   * it costs **no extra cuts**. A hinge crossing between layers is still a hinge,
+//     a real fold lifting off the page. The net remains one connected piece with
+//     exactly V_int cuts; it is only *drawn* across several sheets.
 
 export function assignLayers(
     placed: Map<number, Placed>,
-    pairs?: Array<[number, number]>,
+    parentFace?: Map<number, number>,
 ): { layer: Map<number, number>; count: number } {
-    const ps = pairs ?? overlapPairs(placed);
     const layer = new Map<number, number>();
     for (const id of placed.keys()) layer.set(id, 0);
-    if (!ps.length) return { layer, count: 1 };
+    if (!overlapPairs(placed).length) return { layer, count: 1 };
 
-    const adj = new Map<number, number[]>();
-    for (const [a, b] of ps) {
-        if (!adj.has(a)) adj.set(a, []);
-        if (!adj.has(b)) adj.set(b, []);
-        adj.get(a)!.push(b);
-        adj.get(b)!.push(a);
+    // Without the tree there is nothing to continue along, so fall back to placing
+    // each offending face on the lowest layer that will take it.
+    const order = [...placed.keys()];
+    if (parentFace) {
+        // Parents before children, so a subtree inherits a decision already made.
+        const depth = new Map<number, number>();
+        const depthOf = (id: number): number => {
+            if (depth.has(id)) return depth.get(id)!;
+            const p = parentFace.get(id);
+            const d = p == null ? 0 : depthOf(p) + 1;
+            depth.set(id, d);
+            return d;
+        };
+        for (const id of order) depthOf(id);
+        order.sort((a, b) => depth.get(a)! - depth.get(b)!);
     }
-    // Most-constrained first, so the awkward faces pick before the easy ones.
-    const order = [...adj.keys()].sort(
-        (x, y) => adj.get(y)!.length - adj.get(x)!.length,
-    );
-    for (const id of order) {
-        const taken = new Set<number>();
-        for (const nb of adj.get(id)!) {
-            if (adj.has(nb) && layer.has(nb)) taken.add(layer.get(nb)!);
+
+    // Faces already committed to each layer, for incremental collision testing.
+    const onLayer = new Map<number, number[]>();
+    const fits = (id: number, L: number): boolean => {
+        for (const other of onLayer.get(L) ?? []) {
+            if (
+                intersectionArea(
+                    placed.get(id)!.poly as P2[],
+                    placed.get(other)!.poly as P2[],
+                ) > AREA_EPS
+            ) {
+                return false;
+            }
         }
-        let L = 0;
-        while (taken.has(L)) L++;
+        return true;
+    };
+
+    let highest = 0;
+    for (const id of order) {
+        // Stay with the parent whenever possible — that is what keeps a layer
+        // connected, and it is the whole point of continuation rather than
+        // colouring.
+        const p = parentFace?.get(id);
+        const home = p == null ? 0 : layer.get(p)!;
+        let L: number;
+        if (fits(id, home)) {
+            L = home;
+        } else {
+            // Otherwise take the lowest layer that will have it, including layers
+            // *below* the parent. Only ever climbing made the promotion cascade:
+            // a subtree pushed off layer 0 would sit on layer 2 while layer 0 had
+            // room for it further along, which cost extra sheets and left layer 0
+            // holding a fifth of the net.
+            L = 0;
+            while (L <= highest && !fits(id, L)) L++;
+        }
+        if (L > highest) highest = L;
         layer.set(id, L);
+        if (!onLayer.has(L)) onLayer.set(L, []);
+        onLayer.get(L)!.push(id);
     }
-    // A face not in the overlap graph never moves; recompute the count honestly.
+
     let count = 0;
     for (const L of layer.values()) count = Math.max(count, L + 1);
     return { layer, count };
@@ -848,7 +900,7 @@ export function cutTreeUnfold(opts: CutTreeOptions = {}): CutTreeResult {
         ? developFromCuts(A, cuts, opts.trace)
         : best!.dev;
 
-    const layers = assignLayers(dev.placed);
+    const layers = assignLayers(dev.placed, dev.parentFace);
 
     // The other answer: flat at the cost of pieces. Free when the one-piece net is
     // already clean, which is the usual case up to generation 3.

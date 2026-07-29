@@ -23,7 +23,7 @@ import {
     unfoldPatch,
     ribbonGrowPatch,
 } from "./unfold.js";
-import { cutTreeUnfold } from "./cuttree.js";
+import { cutTreeUnfold, assignLayers } from "./cuttree.js";
 import type { Analysis, Placed, TraceEvent } from "./unfold.js";
 import { parseLength, layoutSheets, renderSheet, PAGES } from "./sheet.js";
 import { BUILD_ID } from "./build-id.js";
@@ -554,6 +554,96 @@ interface NetRhomb {
 const netRhombs: NetRhomb[] = [];
 const netHinges = new Set<string>();
 
+// ── layers ────────────────────────────────────────────────────────
+//
+// Where the net wraps over itself it need not be cut: it can continue on the next
+// sheet, which is the branch-cut picture taken literally. The layering lives in
+// cuttree.ts; all this has to do is feed it the net as it currently stands.
+//
+// NetRhomb carries no parent pointer, but it does not need one — the net is built
+// incrementally, so a rhomb's parent is the earliest already-placed neighbour it
+// shares a hinge with. That reconstructs the tree the layering needs without
+// changing the data model, and works the same whether the net was built by hand or
+// replayed from an algorithm.
+let netLayer = new Map<number, number>();
+let netLayerCount = 1;
+let activeLayer: number | null = null;
+let layersDirty = true;
+let layerSelect: HTMLSelectElement | null = null;
+let layerLabel: HTMLLabelElement | null = null;
+
+function syncLayerBar(): void {
+    if (!layerSelect || !layerLabel) return;
+    if (netLayerCount <= 1) {
+        layerLabel.style.display = "none";
+        activeLayer = null;
+        return;
+    }
+    layerLabel.style.display = "";
+    const keep = layerSelect.value;
+    layerSelect.innerHTML = "";
+    const add = (v: string, t: string) => {
+        const o = document.createElement("option");
+        o.value = v;
+        o.textContent = t;
+        layerSelect!.appendChild(o);
+    };
+    add("all", `All ${netLayerCount} layers`);
+    for (let L = 0; L < netLayerCount; L++) add(String(L), `Layer ${L}`);
+    layerSelect.value = Array.from(layerSelect.options).some(
+        (o) => o.value === keep,
+    )
+        ? keep
+        : "all";
+    activeLayer = layerSelect.value === "all" ? null : Number(layerSelect.value);
+}
+
+function netAsPlaced(): Map<number, Placed> {
+    const m = new Map<number, Placed>();
+    for (const nr of netRhombs) {
+        const src = allRhombs[nr.sourceId];
+        m.set(nr.sourceId, {
+            faceId: nr.sourceId,
+            thick: src.thick,
+            cluster: src.cluster,
+            poly: nr.poly,
+            verts: nr.verts,
+            piece: 0,
+        });
+    }
+    return m;
+}
+
+function netParents(): Map<number, number> {
+    const parent = new Map<number, number>();
+    for (let i = 1; i < netRhombs.length; i++) {
+        const nr = netRhombs[i];
+        for (let j = 0; j < i; j++) {
+            const prev = netRhombs[j];
+            const shared = nr.verts.filter((v) => prev.verts.includes(v));
+            if (shared.length < 2) continue;
+            if (!netHinges.has(ekey(shared[0], shared[1]))) continue;
+            parent.set(nr.sourceId, prev.sourceId);
+            break;
+        }
+    }
+    return parent;
+}
+
+function recomputeLayers(): void {
+    if (!netRhombs.length) {
+        netLayer = new Map();
+        netLayerCount = 1;
+        activeLayer = null;
+        return;
+    }
+    const r = assignLayers(netAsPlaced(), netParents());
+    netLayer = r.layer;
+    netLayerCount = r.count;
+    if (activeLayer != null && activeLayer >= netLayerCount) activeLayer = null;
+    syncLayerBar();
+}
+
 // Move preview. For every unplaced rhomb touching the net, try each hinge it
 // could arrive on: "clean" if at least one lands without overlapping, "overlap"
 // if every route collides. Showing this before the click is what turns the page
@@ -737,7 +827,9 @@ function pushHistory(): void {
 
 function restore(s: Snapshot): void {
     netRhombs.length = 0;
+    layersDirty = true;
     netRhombs.push(...s.rhombs);
+    layersDirty = true;
     netHinges.clear();
     for (const h of s.hinges) netHinges.add(h);
     placedRhombs.clear();
@@ -1068,6 +1160,7 @@ function placeRhomb(rid: number, viaEdge?: { a: number; b: number }): string {
 
     const overlapping = netOverlaps(poly, rid);
     netRhombs.push({ sourceId: rid, poly, verts, overlapping });
+    layersDirty = true;
     placedRhombs.add(rid);
     recheckOverlaps();
     recomputeMoveHints();
@@ -1099,6 +1192,7 @@ function removeRhomb(rid: number): string {
     if (i < 0) return "";
     pushHistory();
     netRhombs.splice(i, 1);
+    layersDirty = true;
     placedRhombs.delete(rid);
     // a hinge only survives while both its rhombs are placed
     for (const k of [...netHinges]) {
@@ -1126,6 +1220,13 @@ const FOLD_DASH: Record<number, number[]> = {
 function drawNet() {
     const ctx = netCtx;
     ctx.clearRect(0, 0, netCanvas.width, netCanvas.height);
+
+    // Layering is O(n²) in the net, so recompute only when the net has actually
+    // changed — not on every redraw, which happens on pointer moves.
+    if (layersDirty) {
+        layersDirty = false;
+        recomputeLayers();
+    }
 
     // Sheet and printable area, drawn axis-aligned in canvas space: the net is
     // rotated to meet the paper, not the other way round.
@@ -1193,6 +1294,18 @@ function drawNet() {
         ctx.moveTo(sv[0].x, sv[0].y);
         for (let i = 1; i < 4; i++) ctx.lineTo(sv[i].x, sv[i].y);
         ctx.closePath();
+
+        // Off the selected layer: outline only. Context, not something to cut
+        // along — you need to see where this sheet sits inside the whole net.
+        if (activeLayer != null && (netLayer.get(nr.sourceId) ?? 0) !== activeLayer) {
+            ctx.fillStyle = "#fafafa";
+            ctx.fill();
+            ctx.strokeStyle = "#dcdcdc";
+            ctx.lineWidth = 1;
+            ctx.setLineDash([]);
+            ctx.stroke();
+            continue;
+        }
 
         const src = allRhombs[nr.sourceId];
         const nvi = nr.verts.map((v) => displayIndex(vertexList[v].index));
@@ -1329,6 +1442,7 @@ function runTrace(): void {
 
     // fit to the finished net once, then hold it for the whole replay
     netRhombs.length = 0;
+    layersDirty = true;
     netHinges.clear();
     placedRhombs.clear();
     for (const pl of res.placed.values()) {
@@ -1351,6 +1465,7 @@ function runTrace(): void {
 function applyPrefix(k: number): void {
     traceIndex = Math.max(0, Math.min(k, traceEvents.length));
     netRhombs.length = 0;
+    layersDirty = true;
     netHinges.clear();
     placedRhombs.clear();
     traceRoles.clear();
@@ -1620,6 +1735,7 @@ netCanvas.addEventListener("click", (e) => {
 document.getElementById("btn-clear")!.addEventListener("click", () => {
     pushHistory();
     netRhombs.length = 0;
+    layersDirty = true;
     netHinges.clear();
     placedRhombs.clear();
     moveHints.clear();
@@ -1731,6 +1847,8 @@ function printNet(): void {
                 fillMode: "cluster",
                 showAngles: false,
                 showLegend: true,
+                layer: netLayerCount > 1 ? netLayer : undefined,
+                activeLayer,
             }),
         )
         .join("\n");
@@ -1738,6 +1856,9 @@ function printNet(): void {
     say(
         `Printing ${netRhombs.length} rhombi as ${pieces.length} piece${pieces.length === 1 ? "" : "s"} ` +
             `on ${sheets.length} sheet${sheets.length === 1 ? "" : "s"} at ${(sideIn * 25.4).toFixed(1)} mm side.` +
+            (netLayerCount > 1
+                ? `  Layer ${activeLayer == null ? "all" : activeLayer} of ${netLayerCount}.`
+                : "") +
             (oversize.length
                 ? `  ⚠ ${oversize.length} piece(s) too big — reduce the side.`
                 : ""),
@@ -1923,6 +2044,7 @@ function setMode(next: Mode): void {
         say("Replaying — Play, or step with the arrow keys.");
     } else {
         netRhombs.length = 0;
+        layersDirty = true;
         netHinges.clear();
         placedRhombs.clear();
         traceRoles.clear();
@@ -2139,6 +2261,26 @@ function buildControls() {
     sideLabel.appendChild(sideInput);
     controls.appendChild(sideLabel);
 
+    // Layer selector. Hidden unless the net actually needs more than one, so it
+    // stays out of the way on everything up to generation 3, which is one sheet.
+    layerLabel = document.createElement("label");
+    layerLabel.textContent = "Layer: ";
+    layerLabel.style.fontSize = "13px";
+    layerLabel.style.display = "none";
+    layerSelect = document.createElement("select");
+    layerSelect.addEventListener("change", () => {
+        activeLayer =
+            layerSelect!.value === "all" ? null : Number(layerSelect!.value);
+        drawNet();
+        say(
+            activeLayer == null
+                ? `Showing all ${netLayerCount} layers.`
+                : `Layer ${activeLayer} of ${netLayerCount}; the rest is ghosted for context.`,
+        );
+    });
+    layerLabel.appendChild(layerSelect);
+    controls.appendChild(layerLabel);
+
     const printBtn = document.createElement("button");
     printBtn.textContent = "Print / PDF";
     printBtn.title = "Print what you have built, at true size";
@@ -2204,6 +2346,7 @@ function buildControls() {
 
 function regenerate() {
     netRhombs.length = 0;
+    layersDirty = true;
     netHinges.clear();
     placedRhombs.clear();
     moveHints.clear();
