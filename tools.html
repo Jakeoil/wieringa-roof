@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tools — Wieringa Roof</title>
+<link rel="stylesheet" href="./site.css">
+<style>
+    /* Templates are drawn in real millimetres so the printout is 1:1. On screen a
+       CSS mm is nominal, which is fine — the screen copy is for reading, the
+       printed one is for cutting. */
+    .template {
+        background: #fff;
+        border: 1px solid var(--rule);
+        border-radius: 6px;
+        padding: 14px;
+        margin: 14px 0 6px;
+        overflow-x: auto;
+    }
+    .template svg { display: block; }
+    .caption { font-size: 13px; color: var(--ink-faint); margin: 0 0 22px; }
+
+    .kit { list-style: none; padding: 0; margin: 10px 0 0; }
+    .kit > li {
+        border-bottom: 1px solid var(--rule);
+        padding: 10px 0;
+        display: grid;
+        grid-template-columns: 190px 1fr;
+        gap: 14px;
+        align-items: baseline;
+    }
+    .kit > li:last-child { border-bottom: 0; }
+    .kit .what { font-weight: 600; font-size: 14px; }
+    .kit .why { font-size: 14px; color: var(--ink-soft); }
+    .kit .why em { color: var(--ink); font-style: normal; font-weight: 600; }
+    @media (max-width: 620px) {
+        .kit > li { grid-template-columns: 1fr; gap: 2px; }
+    }
+
+    .warn {
+        background: #fff8e6;
+        border: 1px solid #e8d8a8;
+        border-left: 3px solid #c9a227;
+        border-radius: 0 6px 6px 0;
+        padding: 12px 16px;
+        margin: 18px 0;
+        font-size: 14px;
+    }
+
+    @media print {
+        nav, .noprint { display: none !important; }
+        body { background: #fff; }
+        .template { border: 0; padding: 0; break-inside: avoid; }
+    }
+    @page { margin: 12mm; }
+</style>
+</head>
+<body>
+
+<nav>
+    <span class="brand">Wieringa Roof</span>
+    <a href="./index.html" draggable="false">Home</a>
+    <a href="./net.html" draggable="false">Net</a>
+    <a href="./roof3d.html" draggable="false">3D</a>
+    <a href="./info.html" draggable="false">Mathematics</a>
+    <a href="./polyhedra.html" draggable="false">Polyhedra</a>
+    <a href="./unfold.html" draggable="false">Unfold</a>
+    <a href="./tools.html" draggable="false" aria-current="page">Tools</a>
+</nav>
+
+<div class="wrap">
+
+<h1>Tools &amp; Templates</h1>
+<p class="lede">
+    What to cut with, what to fold against, and what to check the folds against —
+    plus true-size templates you can print, or send to a laser cutter in metal or
+    acrylic and keep forever.
+</p>
+
+<h2>One shape, ten orientations</h2>
+
+<p>
+    The whole model is a single cut shape. Every face of the Wieringa roof is the
+    same <strong>golden rhombus</strong> — thick and thin tiles differ only in
+    <em>which corner</em> meets the shared vertex, not in shape. So one template
+    cuts every piece, and one gauge checks every fold.
+</p>
+
+<div class="tbl-scroll">
+<table>
+<tr><th>quantity</th><th>exact</th><th>at 20 mm side</th></tr>
+<tr><td>side</td><td><span class="mono">s</span></td><td>20.000 mm</td></tr>
+<tr><td>acute angle</td><td><span class="mono">2·arctan(1/φ) = 63.43495°</span></td><td>63.435°</td></tr>
+<tr><td>obtuse angle</td><td><span class="mono">2·arctan(φ) = 116.56505°</span></td><td>116.565°</td></tr>
+<tr><td>short diagonal</td><td><span class="mono">2s/√(2+φ) = 1.05146 s</span></td><td>21.029 mm</td></tr>
+<tr><td>long diagonal</td><td><span class="mono">1.70130 s</span></td><td>34.026 mm</td></tr>
+<tr><td>diagonal ratio</td><td><span class="mono">φ = 1.61803…</span></td><td>—</td></tr>
+</table>
+</div>
+
+<p>
+    The angles are not round numbers and never will be — they are
+    <span class="mono">arctan</span>s of the golden ratio. Do not try to set them on
+    a protractor by eye. Cut one accurate template and trace it, or have one cut for
+    you; every error you build into the template gets repeated a few hundred times.
+</p>
+
+<div class="template">
+<svg width="150mm" height="72mm" viewBox="0 0 150 72" xmlns="http://www.w3.org/2000/svg">
+    <!-- Golden rhombus, 20 mm side, long diagonal horizontal.
+         half-long 17.013, half-short 10.5146 — checked: side 20.0000,
+         corners 63.43489 and 116.56511 -->
+    <g transform="translate(24,45)">
+        <polygon points="-17.013,0 0,-10.5146 17.013,0 0,10.5146"
+                 fill="#f4f4fb" stroke="#222" stroke-width="0.4"/>
+        <!-- diagonals, for registering the template while tracing -->
+        <line x1="-17.013" y1="0" x2="17.013" y2="0" stroke="#bbb" stroke-width="0.2" stroke-dasharray="2 2"/>
+        <line x1="0" y1="-10.5146" x2="0" y2="10.5146" stroke="#bbb" stroke-width="0.2" stroke-dasharray="2 2"/>
+        <text x="-15.4" y="1.1" font-size="2.4" font-family="sans-serif" fill="#6a5acd">63.43°</text>
+        <text x="-4.4" y="-6.6" font-size="2.4" font-family="sans-serif" fill="#6a5acd">116.57°</text>
+        <text x="-8" y="-12.4" font-size="2.6" font-family="sans-serif" fill="#888">side 20 mm</text>
+        <text x="-6" y="14.4" font-size="2.4" font-family="sans-serif" fill="#888">long 34.026</text>
+    </g>
+
+    <!-- The two corner angles as open tracing wedges. Arm length 26;
+         63.43495° -> (11.63, -23.26),  116.56505° -> (-11.63, -23.26) -->
+    <g transform="translate(62,34)">
+        <path d="M 0,0 L 26,0 L 11.6266,-23.2532 Z" fill="none" stroke="#222" stroke-width="0.35"/>
+        <text x="7.6" y="-3.4" font-size="2.6" font-family="sans-serif" fill="#6a5acd">63.43°</text>
+        <text x="0.4" y="3.2" font-size="2.2" font-family="sans-serif" fill="#888">acute</text>
+    </g>
+    <g transform="translate(120,34)">
+        <path d="M 0,0 L 26,0 L -11.6266,-23.2532 Z" fill="none" stroke="#222" stroke-width="0.35"/>
+        <text x="2.4" y="-4.2" font-size="2.6" font-family="sans-serif" fill="#6a5acd">116.57°</text>
+        <text x="0.6" y="3.2" font-size="2.2" font-family="sans-serif" fill="#888">obtuse</text>
+    </g>
+
+    <!-- Scale bar: a mis-scaled print shows up here before it wastes any card. -->
+    <g transform="translate(62,64)">
+        <line x1="0" y1="0" x2="50" y2="0" stroke="#222" stroke-width="0.4"/>
+        <g stroke="#222" stroke-width="0.4">
+            <line x1="0" y1="-2" x2="0" y2="2"/>
+            <line x1="10" y1="-1.4" x2="10" y2="1.4"/>
+            <line x1="20" y1="-1.4" x2="20" y2="1.4"/>
+            <line x1="30" y1="-1.4" x2="30" y2="1.4"/>
+            <line x1="40" y1="-1.4" x2="40" y2="1.4"/>
+            <line x1="50" y1="-2" x2="50" y2="2"/>
+        </g>
+        <text x="9" y="-3.6" font-size="3" font-family="sans-serif" fill="#222">50 mm — measure this first</text>
+    </g>
+</svg>
+</div>
+<p class="caption">
+    Golden rhombus at 20 mm side, with both corner angles repeated as open wedges
+    for setting a bevel or checking a cut. <strong>Print at 100%, no scaling</strong>,
+    then measure the 50 mm bar before trusting anything else on the page.
+</p>
+
+<h2>Fold angles are not the angles you measure</h2>
+
+<p>
+    This one is worth reading twice, because getting it wrong means a gauge cut to
+    the wrong shape. The nets label each crease <span class="mono">36</span>,
+    <span class="mono">72</span> or <span class="mono">108</span>. Those are
+    <strong>fold angles</strong> — how far the paper turns <em>away from flat</em>.
+    The angle you can actually put a gauge against, between the two panels, is the
+    <strong>dihedral</strong>, and it is the supplement:
+</p>
+
+<div class="tbl-scroll">
+<table>
+<tr><th>printed on the crease</th><th>turn from flat</th><th>dihedral between panels</th><th>feel</th></tr>
+<tr><td><span class="mono">36</span></td><td>36°</td><td><strong>144°</strong></td><td>gentle</td></tr>
+<tr><td><span class="mono">72</span></td><td>72°</td><td><strong>108°</strong></td><td>firm</td></tr>
+<tr><td><span class="mono">108</span></td><td>108°</td><td><strong>72°</strong></td><td>sharp — the fiddly one</td></tr>
+</table>
+</div>
+
+<p>
+    A useful check on all of this: <strong>144° is exactly the dihedral angle of the
+    rhombic triacontahedron</strong>, thirty golden rhombi closed into a solid. The
+    roof is locally the same surface, so its gentlest crease matching the RT is the
+    right answer falling out.
+</p>
+
+<div class="warn">
+    <strong>Cut the gauge to 144°, 108° and 72° — not 36, 72, 108.</strong>
+    The numbers <span class="mono">72</span> and <span class="mono">108</span> appear
+    in both columns with different meanings, which is exactly the sort of thing that
+    survives right up until the metal comes back wrong.
+</div>
+
+<div class="template">
+<svg width="160mm" height="72mm" viewBox="0 0 160 72" xmlns="http://www.w3.org/2000/svg">
+    <!-- Three dihedral gauges: a notch of the stated included angle. Stand the
+         folded pair of faces in until both sit flush against the arms.
+         144° arms (±38.04, 12.36) · 108° (±30.74, 22.34) · 72° (±21.75, 29.93) -->
+    <g transform="translate(44,8)">
+        <polygon points="0,0 -38.0423,12.3607 -38.04,20 38.04,20 38.0423,12.3607"
+                 fill="#f4f4fb" stroke="#222" stroke-width="0.4"/>
+        <text x="-5.4" y="17.2" font-size="4" font-family="sans-serif" fill="#6a5acd">144°</text>
+        <text x="-38" y="24.6" font-size="2.8" font-family="sans-serif" fill="#888">crease marked 36 — gentle</text>
+    </g>
+    <g transform="translate(44,38)">
+        <polygon points="0,0 -30.7427,22.3358 -30.74,28 30.74,28 30.7427,22.3358"
+                 fill="#f4f4fb" stroke="#222" stroke-width="0.4"/>
+        <text x="-5.4" y="25.4" font-size="4" font-family="sans-serif" fill="#6a5acd">108°</text>
+        <text x="-30.7" y="32.6" font-size="2.8" font-family="sans-serif" fill="#888">crease marked 72 — firm</text>
+    </g>
+    <g transform="translate(120,8)">
+        <polygon points="0,0 -21.7481,29.9336 -21.75,36 21.75,36 21.7481,29.9336"
+                 fill="#f4f4fb" stroke="#222" stroke-width="0.4"/>
+        <text x="-4.6" y="33.4" font-size="4" font-family="sans-serif" fill="#6a5acd">72°</text>
+        <text x="-21.75" y="40.6" font-size="2.8" font-family="sans-serif" fill="#888">crease marked 108 — sharp</text>
+    </g>
+</svg>
+</div>
+<p class="caption">
+    Three dihedral gauges. Set the folded pair of faces into the notch; when both
+    panels sit flush against the two arms, the crease is right. Cut these from
+    something rigid — card will splay and tell you what you want to hear.
+</p>
+
+<h2>A folding jig</h2>
+
+<p>
+    The gauges above <em>check</em> a fold after the fact. A jig <strong>forms</strong>
+    it, which is better — a crease set against a rigid edge comes out right the first
+    time instead of being coaxed towards right. And the two shapes are complements: a
+    gauge is the notch, a jig is the block that fits it.
+</p>
+
+<p>
+    Make three blocks whose apex angle <em>is</em> the target dihedral. Lay the scored
+    sheet over the apex with the score on the ridge, press both halves down onto the
+    two faces, and the paper leaves the block at exactly that angle. Cross-sections,
+    for a 40 mm-ish arm:
+</p>
+
+<div class="tbl-scroll">
+<table>
+<tr><th>crease marked</th><th>block apex angle</th><th>half-width</th><th>height</th></tr>
+<tr><td><span class="mono">36</span></td><td>144°</td><td>38.04 mm</td><td>12.36 mm</td></tr>
+<tr><td><span class="mono">72</span></td><td>108°</td><td>30.74 mm</td><td>22.34 mm</td></tr>
+<tr><td><span class="mono">108</span></td><td>72°</td><td>21.75 mm</td><td>29.93 mm</td></tr>
+</table>
+</div>
+
+<div class="template">
+<svg width="160mm" height="58mm" viewBox="0 0 160 58" xmlns="http://www.w3.org/2000/svg">
+    <!-- Forming blocks in cross-section, apex up. Apex angle = target dihedral. -->
+    <!-- 144 deg: half-width 38.04, height 12.36 -->
+    <g transform="translate(44,8)">
+        <polygon points="0,0 -38.0423,12.3607 38.0423,12.3607" fill="#eceaf7" stroke="#222" stroke-width="0.4"/>
+        <path d="M -41,13.34 L 0,-0.98 L 41,13.34" fill="none" stroke="#c0392b" stroke-width="0.7"/>
+        <text x="-5" y="9.4" font-size="3.4" font-family="sans-serif" fill="#6a5acd">144°</text>
+        <text x="-38" y="17.4" font-size="2.6" font-family="sans-serif" fill="#888">for creases marked 36 — a wide, shallow ridge</text>
+    </g>
+    <!-- 108 deg: half-width 30.74, height 22.34 -->
+    <g transform="translate(44,26)">
+        <polygon points="0,0 -30.7427,22.3358 30.7427,22.3358" fill="#eceaf7" stroke="#222" stroke-width="0.4"/>
+        <path d="M -33.2,24.13 L 0,-0.98 L 33.2,24.13" fill="none" stroke="#c0392b" stroke-width="0.7"/>
+        <text x="-5" y="16" font-size="3.4" font-family="sans-serif" fill="#6a5acd">108°</text>
+        <text x="-30" y="27.4" font-size="2.6" font-family="sans-serif" fill="#888">for creases marked 72</text>
+    </g>
+    <!-- 72 deg: half-width 21.75, height 29.93 -->
+    <g transform="translate(120,8)">
+        <polygon points="0,0 -21.7481,29.9336 21.7481,29.9336" fill="#eceaf7" stroke="#222" stroke-width="0.4"/>
+        <path d="M -23.5,31.6 L 0,-0.98 L 23.5,31.6" fill="none" stroke="#c0392b" stroke-width="0.7"/>
+        <text x="-5" y="20" font-size="3.4" font-family="sans-serif" fill="#6a5acd">72°</text>
+        <text x="-21" y="35" font-size="2.6" font-family="sans-serif" fill="#888">for creases marked 108</text>
+    </g>
+</svg>
+</div>
+<p class="caption">
+    Forming blocks, cross-section, drawn true size at these dimensions. The red line
+    is the paper draping over the apex. Extrude each to 100 mm or so along the crease
+    direction — a hardwood offcut planed to the angle, or three strips of acrylic
+    stacked and sanded, or 3D printed.
+</p>
+
+<div class="note">
+    <strong>The one jig that pays for itself: a scoring comb.</strong> Inside any de
+    Bruijn ribbon every crease is <em>parallel</em>, and the spacing is exactly
+    <span class="mono">2/√5 · s = 0.894427 s</span> — <strong>17.889 mm at a 20 mm
+    side</strong>, 22.361 mm at 25 mm. So a comb of parallel ridges at that single
+    pitch pre-scores a whole band in one pass, with no measuring and no cumulative
+    drift. This is the useful residue of the ribbon-strip idea: strips were retired as
+    a way to <em>build</em> nets, but the parallel-crease fact that made them work is
+    exactly what makes this jig possible.
+</div>
+
+<h2>Scoring and folding</h2>
+
+<p>
+    Do not fold paper freehand and do not cut the creases. <strong>Score</strong>
+    them: run a bone folder or a dead ballpoint along the line hard enough to crush
+    the fibres, not to cut through. The paper then folds exactly where you put the
+    score and nowhere else, which is the entire difference between a crisp model and
+    a soft one.
+</p>
+
+<p>
+    <strong>Score on the outside of the fold</strong> — the face that ends up convex.
+    A mountain crease is scored from the front, a valley from the back, so it helps
+    to sort the sheet into mountains and valleys before you start rather than
+    flipping back and forth. The nets colour them for you: <span style="color:#c0392b"><strong>red
+    for mountain</strong></span>, <span style="color:#2469b8"><strong>blue for
+    valley</strong></span>. Turning a whole piece over swaps them, so if a piece
+    folds more easily the other way up, that is fine and changes nothing.
+</p>
+
+<p>
+    Work the gentle <span class="mono">36</span> creases last. They are shallow
+    enough that a sharp neighbouring fold will pull them out of true if they are
+    already set.
+</p>
+
+<h2>Paper</h2>
+
+<p>
+    <strong>100–120 gsm</strong> is the sweet spot: heavy enough to hold a dihedral
+    without sagging, light enough that a 72° crease does not crack along the score.
+    Ordinary 80 gsm office paper will fold but will not hold its shape once the
+    model is large. Much above 160 gsm and you need to score both sides.
+</p>
+
+<p>
+    On size: <strong>below about 12 mm side the sharp creases get genuinely
+    fiddly</strong> — a 72° dihedral on a 12 mm panel leaves very little to grip. 20 mm
+    is the default on the net pages for that reason, and it also happens to put about
+    twenty rhombi on a Letter sheet.
+</p>
+
+<h2>Ordering a laser-cut template</h2>
+
+<p>
+    Worth doing if you are going to build more than one model. A cut template in
+    metal or acrylic lasts forever, cannot be trimmed away by your own knife, and
+    removes the compounding error of tracing a paper template with a paper template.
+</p>
+
+<ul class="kit">
+    <li><span class="what">What to have cut</span><span class="why">The rhombus as a <em>window</em> rather than a solid tile — you want to trace the inside of an opening, not around the outside of a shape, so the knife has something to run against. Plus the three gauge notches, 144° / 108° / 72°.</span></li>
+    <li><span class="what">Jigs, from sheet</span><span class="why">A laser cuts flat stock, so make each forming block as <em>several identical profiles</em> stacked and glued — cut six copies of the 144° triangle in 3 mm acrylic and you have an 18 mm block. Same for a scoring comb: one profile with teeth at 17.889 mm pitch, stacked.</span></li>
+    <li><span class="what">Material</span><span class="why">3 mm acrylic is cheap and accurate and enough for tracing. If you want to cut <em>against</em> it with a blade, use metal — 1.5 mm aluminium, brass or steel — because a blade will shave acrylic and your template will drift.</span></li>
+    <li><span class="what">Kerf</span><span class="why">The beam removes material as it goes, so the cut lands beside the line, not on it. Tell the shop the <em>finished</em> dimensions matter and let them compensate; do not assume a figure yourself, because it varies with machine, material and thickness.</span></li>
+    <li><span class="what">What to send</span><span class="why">Give them the numbers, not a screenshot: side 20 mm, angles 63.43495° and 116.56505°, or equivalently a rhombus with diagonals 34.026 mm × 21.029 mm. Diagonals are the safer specification — they are lengths, so nothing depends on the shop's angular precision.</span></li>
+</ul>
+
+<div class="warn">
+    Specify the rhombus <strong>by its diagonals</strong> if you can — 34.026 mm by
+    21.029 mm at 20 mm side. Two perpendicular lengths are unambiguous and easy to
+    inspect with callipers when it arrives. An angle spec has to be trusted.
+</div>
+
+<p>
+    A second option, if the shop will do it: have the <em>paper</em> laser-scored
+    directly. A low-power vector pass creases without cutting through, which is
+    faster and more accurate than scoring several hundred edges by hand. Send the
+    cut lines and the score lines as separate layers or colours and say clearly which
+    is which.
+</p>
+
+<h2>The kit</h2>
+
+<ul class="kit">
+    <li><span class="what">Bone folder</span><span class="why">The one tool that is not optional. Scores and then sets the crease. A cheap plastic one is fine; a Teflon one will not mark the paper.</span></li>
+    <li><span class="what">Craft knife</span><span class="why">X-Acto or similar with #11 blades. <em>Change the blade far more often than feels reasonable</em> — a dull blade tears rather than cuts, and on a 20 mm rhombus the tear is a visible fraction of the edge.</span></li>
+    <li><span class="what">Steel rule</span><span class="why">Not plastic, not aluminium. A blade will bite into soft edges and follow the notch it made. Cork-backed stops it sliding.</span></li>
+    <li><span class="what">Self-healing mat</span><span class="why">Keeps the blade sharp and stops the cut wandering into a groove left by the last one.</span></li>
+    <li><span class="what">Embossing stylus</span><span class="why">Optional alternative for scoring — a ball tip gets closer to a corner than a bone folder can. A ballpoint with no ink left does the same job.</span></li>
+    <li><span class="what">Tape, for joining</span><span class="why">Thin matte tape, 12 mm or narrower. Matte because gloss reflects and shows every join; narrow because the panels are small. <em>Tape on the inside</em> wherever you can.</span></li>
+    <li><span class="what">Tape, for holding</span><span class="why">Washi or artist's tape. Low tack and repositionable, so you can hold a dihedral while you check it against the gauge and then take it off without lifting the surface.</span></li>
+    <li><span class="what">Tweezers</span><span class="why">For the last few faces, where the model has closed up enough that fingers no longer reach inside.</span></li>
+    <li><span class="what">Small clips</span><span class="why">Binder clips or clothes pegs, to hold a seam while glue grabs. Pad the jaws or they will emboss the paper.</span></li>
+    <li><span class="what">Glue</span><span class="why">PVA, applied sparingly with a cocktail stick, if you would rather have tabs than tape. It is stronger and invisible but slow, and it will cockle thin paper.</span></li>
+    <li><span class="what">Cardstock</span><span class="why">100–120 gsm. Buy more than you think — the first sheet or two are always calibration.</span></li>
+</ul>
+
+<h2>Order of work</h2>
+
+<p>
+    Print, then <strong>score every crease before cutting anything out</strong>. The
+    sheet is far easier to hold flat and register against a rule while it is still a
+    sheet. Cut the outline last. Once a piece is free it will move under the blade,
+    and once it is folded you cannot score it at all.
+</p>
+
+<p class="noprint" style="margin-top:32px;color:var(--ink-faint);font-size:14px">
+    The angles and dihedrals on this page come from the same lift the rest of the
+    site uses — see <a href="./info.html">Mathematics</a> for where they come from,
+    and <a href="./unfold.html">Unfold</a> to build and print a net.
+</p>
+
+</div>
+
+<script src="./site.js"></script>
+</body>
+</html>
