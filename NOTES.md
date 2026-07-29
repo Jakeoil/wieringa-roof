@@ -432,6 +432,53 @@ pieces — 41–46 at gen 3 where branch cuts need 1. It is still the reason a w
 ribbon makes a good backbone. `makeRunFinder` and the `Run`/`StripLink` machinery
 stay, because `ribbonGrowPatch` uses them.
 
+### Corrected: the overlap test was blind, and every method was wrong
+
+Reported from the browser — a tiny overlap while the last boat went down on Pe3
+gen 2, and two of them on Pe3 gen 3. Both real. The measurement said zero.
+
+`convexOverlap(shrink(a, 0.94), shrink(b, 0.94))` was the culprit. The shrink was
+there for a good reason — faces that share an edge or a corner touch, and would
+otherwise register as overlapping — but a 6% margin also hides any genuine overlap
+thinner than that. The slivers measured 0.12–0.48% of a face, comfortably inside
+the blind spot. **The test was blind to exactly the defect it existed to find**,
+and it was not just the new method: `ribbonGrowPatch` and `unfoldPatch` use the
+same test to reject placements, and both were shipping nets with hidden overlaps
+at gen 3.
+
+Replaced by exact convex intersection (Sutherland–Hodgman) judged by area, in
+`unfold.ts` so all three methods share one honest test. Touching faces give zero
+area and need no fudge factor at all; only real double-covering registers.
+
+Consequences, all of them good:
+
+- The search can now *see* the slivers, so it fixes them. Every patch at gen 2 and
+  gen 3 is one piece with genuinely zero overlaps, confirmed by a second,
+  independent area implementation.
+- The flat fallback was counting overlaps **between different pieces**, which never
+  reach paper — `layoutSheets` repositions every piece by its own bounding box. It
+  now counts intra-piece only, and converges.
+- Pe3 gen 3 exposed a real weakness: the descent can strand itself in a basin, and
+  reached zero from some starting trees but stuck on one overlap from others. Added
+  restarts on stagnation (250 non-improving swaps → fresh random tree, keep the
+  global best). Pe3 gen 3 now reaches zero from every seed tried, in about a second.
+
+Two invariants I got wrong while checking this, worth recording because both are
+tempting and both are false:
+
+- *"Faces sharing a vertex cannot overlap."* False — a vertex whose developed
+  angles exceed 360° wraps its fan over itself, and the two extreme faces share
+  that vertex and genuinely overlap. Pe3 gen 2 has four such vertices, excess
+  63.4349°; gen 3 also shows 84.0446°.
+- *"Faces sharing an edge cannot overlap."* Also false, unless that edge is a
+  **hinge**. Across a cut edge the two faces arrived by different routes and are
+  under no constraint at all. Only hinged pairs are guaranteed disjoint, and that
+  is the invariant now asserted.
+
+The saddle vertices are resolved the way the theory says they must be: such a
+vertex receives **two or more cuts**, splitting the fan, which a spanning tree is
+perfectly free to do.
+
 ### Layers: the z coordinate, taken literally
 
 Interim step before Stage B, and the visualization asked for. Where the net wraps

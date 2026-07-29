@@ -21,11 +21,12 @@
 
 import { allRhombs, vertexList, edgeMap } from "./geometry.js";
 import {
+    intersectionArea,
+    FACE_AREA,
+    AREA_EPS,
     analysePatch,
     placeSeed,
     placeAcross,
-    convexOverlap,
-    shrink,
     ekey,
 } from "./unfold.js";
 import type {
@@ -48,16 +49,25 @@ type P2 = [number, number];
 
 const CELL = 1.1;
 
+// The overlap test itself lives in unfold.ts and is exact — see the note there on
+// why shrinking the polygons first was hiding real overlaps from every method.
+//
+// Overlaps between *different* pieces are not real: layoutSheets positions every
+// piece by its own bounding box, so two pieces that sit on top of each other in
+// development coordinates land far apart on paper. Only overlap within a single
+// piece survives to the printed sheet, so anything counting pieces must pass
+// samePieceOnly.
+
 export function countOverlaps(placed: Map<number, Placed>): number {
     return overlapPairs(placed).length;
 }
 
-export function overlapPairs(placed: Map<number, Placed>): Array<[number, number]> {
-    // Shrink once per face, not once per pair: a face in a crowded neighbourhood
-    // is tested many times and was re-allocating its polygon on every one.
+export function overlapPairs(
+    placed: Map<number, Placed>,
+    samePieceOnly = false,
+): Array<[number, number]> {
     const cells = new Map<number, number[]>();
     const boxes = new Map<number, [number, number, number, number]>();
-    const small = new Map<number, P2[]>();
 
     for (const p of placed.values()) {
         let x0 = Infinity;
@@ -71,7 +81,6 @@ export function overlapPairs(placed: Map<number, Placed>): Array<[number, number
             if (q[1] > y1) y1 = q[1];
         }
         boxes.set(p.faceId, [x0, y0, x1, y1]);
-        small.set(p.faceId, shrink(p.poly, 0.94) as P2[]);
         for (let i = Math.floor(x0 / CELL); i <= Math.floor(x1 / CELL); i++) {
             for (let j = Math.floor(y0 / CELL); j <= Math.floor(y1 / CELL); j++) {
                 const k = (i + 4096) * 8192 + (j + 4096);
@@ -98,7 +107,18 @@ export function overlapPairs(placed: Map<number, Placed>): Array<[number, number
                 if (bi[2] < bj[0] || bj[2] < bi[0] || bi[3] < bj[1] || bj[3] < bi[1]) {
                     continue;
                 }
-                if (convexOverlap(small.get(i)!, small.get(j)!)) {
+                if (
+                    samePieceOnly &&
+                    placed.get(i)!.piece !== placed.get(j)!.piece
+                ) {
+                    continue;
+                }
+                if (
+                    intersectionArea(
+                        placed.get(i)!.poly as P2[],
+                        placed.get(j)!.poly as P2[],
+                    ) > AREA_EPS
+                ) {
                     out.push([i, j]);
                 }
             }
@@ -433,7 +453,7 @@ function flattenByCutting(
 ): { cuts: Set<string>; dev: ReturnType<typeof developFromCuts>; overlaps: number } {
     let flat = new Set(cuts);
     let dev = developFromCuts(A, flat);
-    let pairs = overlapPairs(dev.placed);
+    let pairs = overlapPairs(dev.placed, true);
     let guard = 0;
     while (pairs.length && guard++ < 4000 && Date.now() - t0 < budget) {
         const [x, y] = pairs[0];
@@ -444,8 +464,9 @@ function flattenByCutting(
         const next = new Set(flat);
         next.add(path[Math.floor(rnd() * path.length)]);
         const dev2 = developFromCuts(A, next);
-        const p2 = overlapPairs(dev2.placed);
-        if (p2.length >= pairs.length && dev2.pieces.length > dev.pieces.length + 1) break;
+        const p2 = overlapPairs(dev2.placed, true);
+        // Every extra cut buys at most one extra piece, so insist it buys progress.
+        if (p2.length >= pairs.length) continue;
         flat = next;
         dev = dev2;
         pairs = p2;
@@ -529,12 +550,29 @@ export function cutTreeUnfold(opts: CutTreeOptions = {}): CutTreeResult {
 
     // Descend from the best candidate by swapping cuts that lie between overlapping
     // faces. Each accepted swap keeps one piece and lowers the overlap count.
-    let cur = best!;
+    //
+    // The descent can strand itself in a basin it cannot swap out of — Pe3 gen 3
+    // reaches zero from some starting trees and sticks on one overlap from others.
+    // So when progress stops, abandon the basin and restart from a fresh random
+    // tree, keeping the best result across all restarts. That turned Pe3 gen 3 from
+    // luck-of-the-seed into reliable.
     type Developed = ReturnType<typeof developFromCuts>;
     const arcByKey = new Map(g.arcs.map((a) => [a.key, a]));
     let swaps = 0;
     let accepted = 0;
+    let cur = best!;
+    let sinceGain = 0;
+    const STAGNANT = 250;
+
     while (cur.overlaps > 0 && Date.now() - t0 < budget) {
+        if (sinceGain > STAGNANT) {
+            const cuts2 = spanningCutSet(g, () => rnd());
+            const dev2 = developFromCuts(A, cuts2);
+            cur = { cuts: cuts2, dev: dev2, overlaps: countOverlaps(dev2.placed) };
+            tried++;
+            sinceGain = 0;
+            continue;
+        }
         const pairs = overlapPairs(cur.dev.placed);
         if (!pairs.length) break;
         const [x, y] = pairs[Math.floor(rnd() * pairs.length)];
@@ -579,6 +617,8 @@ export function cutTreeUnfold(opts: CutTreeOptions = {}): CutTreeResult {
 
         // Downhill always; sideways sometimes, which is what gets off a plateau
         // where every single swap is neutral.
+        if (bestSwap.overlaps < cur.overlaps) sinceGain = 0;
+        else sinceGain++;
         if (
             bestSwap.overlaps < cur.overlaps ||
             (bestSwap.overlaps === cur.overlaps && rnd() < 0.35)
@@ -656,5 +696,5 @@ export function cutTreeUnfold(opts: CutTreeOptions = {}): CutTreeResult {
     };
 }
 
-export { buildCutGraph, developFromCuts };
+export { buildCutGraph, developFromCuts, intersectionArea };
 export type { P2 };

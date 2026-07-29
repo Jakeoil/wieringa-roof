@@ -197,6 +197,66 @@ export function shrink(poly: P2[], f: number): P2[] {
     );
 }
 
+// Faces that merely share an edge or a corner touch without overlapping, which is
+// why these tests used to shrink both polygons to 0.94 before comparing. But a 6%
+// margin also hides any genuine overlap thinner than that, and those exist —
+// measured slivers of 0.1–0.5% of a face survived in nets all three methods
+// declared clean. Shrinking made every method blind to exactly the defect it was
+// checking for.
+//
+// So intersect exactly and judge by area: touching gives zero and needs no fudge
+// factor, and only a real double-covering registers.
+
+export const FACE_AREA = Math.sin((63.4349 * Math.PI) / 180);
+export const AREA_EPS = FACE_AREA * 1e-7;
+
+// Sutherland–Hodgman. Both polygons are convex, so the intersection is convex and
+// this is exact.
+export function intersectionArea(a: P2[], b: P2[]): number {
+    let s2 = 0;
+    for (let i = 0; i < b.length; i++) {
+        const p = b[i];
+        const q = b[(i + 1) % b.length];
+        s2 += p[0] * q[1] - q[0] * p[1];
+    }
+    const clip = s2 < 0 ? [...b].reverse() : b;
+
+    let out: P2[] = a;
+    for (let i = 0; i < clip.length && out.length; i++) {
+        const A = clip[i];
+        const B = clip[(i + 1) % clip.length];
+        const ex = B[0] - A[0];
+        const ey = B[1] - A[1];
+        const side = (p: P2) => ex * (p[1] - A[1]) - ey * (p[0] - A[0]);
+        const input = out;
+        out = [];
+        for (let j = 0; j < input.length; j++) {
+            const P = input[j];
+            const Q = input[(j + 1) % input.length];
+            const dp = side(P);
+            const dq = side(Q);
+            if (dp >= 0) out.push(P);
+            if (dp >= 0 !== dq >= 0) {
+                const t = dp / (dp - dq);
+                out.push([P[0] + t * (Q[0] - P[0]), P[1] + t * (Q[1] - P[1])]);
+            }
+        }
+    }
+    if (out.length < 3) return 0;
+    let a2 = 0;
+    for (let i = 0; i < out.length; i++) {
+        const p = out[i];
+        const q = out[(i + 1) % out.length];
+        a2 += p[0] * q[1] - q[0] * p[1];
+    }
+    return Math.abs(a2) / 2;
+}
+
+// Overlap of two placed faces, exact.
+export function facesOverlap(p1: P2[], p2: P2[]): boolean {
+    return intersectionArea(p1, p2) > AREA_EPS;
+}
+
 export function convexOverlap(p1: P2[], p2: P2[]): boolean {
     for (const poly of [p1, p2]) {
         for (let i = 0; i < poly.length; i++) {
@@ -348,11 +408,11 @@ function runBFS(
                     b: link.b,
                     poly: cand.poly,
                 });
-                const test = shrink(cand.poly, 0.94);
+                const test = cand.poly;
                 let clash = false;
                 for (const fid of mine) {
                     if (fid === cur) continue;
-                    if (convexOverlap(test, shrink(placed.get(fid)!.poly, 0.94))) {
+                    if (facesOverlap(test, placed.get(fid)!.poly)) {
                         clash = true;
                         break;
                     }
@@ -733,10 +793,10 @@ export function ribbonGrowPatch(opts: UnfoldOptions = {}): UnfoldResult {
     const pieceFaces: number[][] = [];
 
     const fits = (poly: P2[], mine: number[], skip: number): boolean => {
-        const test = shrink(poly, 0.94);
+        const test = poly;
         for (const fid of mine) {
             if (fid === skip) continue;
-            if (convexOverlap(test, shrink(placed.get(fid)!.poly, 0.94)))
+            if (facesOverlap(test, placed.get(fid)!.poly))
                 return false;
         }
         return true;
