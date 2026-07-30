@@ -579,6 +579,17 @@ function markNetChanged(): void {
     layersDirty = true;
     layersPinned = false;
 }
+// Facts about the last algorithm run, shown on the page. Diagnosing a layer
+// problem from a screenshot needs the method, the overlap count and the layer
+// count together — and nobody should have to open developer tools to get them.
+let lastRun: {
+    method: string;
+    faces: number;
+    overlaps: number | null;
+    layers: number;
+    cuts: number | null;
+} | null = null;
+
 let layerSelect: HTMLSelectElement | null = null;
 let layerLabel: HTMLLabelElement | null = null;
 
@@ -1499,7 +1510,12 @@ function runTraceBody(): void {
     // reconstructing it. cutTreeUnfold already layered this exact net from the real
     // hinge tree; recomputing from the net on screen can only agree at best, and
     // silently disagree at worst.
-    const withLayers = res as { layer?: Map<number, number>; layerCount?: number };
+    const withLayers = res as {
+        layer?: Map<number, number>;
+        layerCount?: number;
+        overlaps?: number;
+        cuts?: Set<string>;
+    };
     if (withLayers.layer && withLayers.layerCount) {
         netLayer = withLayers.layer;
         netLayerCount = withLayers.layerCount;
@@ -1510,12 +1526,28 @@ function runTraceBody(): void {
         layersDirty = true;
         recomputeLayers();
     }
+    // A net that overlaps cannot honestly be one layer. If the adopted numbers say
+    // otherwise, distrust them and layer the net on screen instead, so the control
+    // still works while the readout reports the contradiction.
+    if (
+        withLayers.overlaps != null &&
+        withLayers.overlaps > 0 &&
+        netLayerCount === 1
+    ) {
+        layersPinned = false;
+        layersDirty = true;
+        recomputeLayers();
+    }
+
     layersDirty = false;
     layersPinned = true;
-    console.log(
-        `runTrace: ${traceMethod}, ${netRhombs.length} rhombi, ` +
-            `${netLayerCount} layer(s), selector ${netLayerCount > 1 ? "shown" : "hidden"}`,
-    );
+    lastRun = {
+        method: traceMethod,
+        faces: netRhombs.length,
+        overlaps: withLayers.overlaps ?? null,
+        layers: netLayerCount,
+        cuts: withLayers.cuts ? withLayers.cuts.size : null,
+    };
 
     traceIndex = 0;
     applyPrefix(0);
@@ -1586,16 +1618,29 @@ function traceLabel(): string {
         const k = traceEvents[i].kind;
         if (k in counts) counts[k as keyof typeof counts]++;
     }
-    // Always report the layer count, including when it is 1. A hidden control and a
-    // silent "1" are indistinguishable on screen, which cost a round trip to work
-    // out; a number that is always present cannot fail quietly.
-    const layers =
-        netLayerCount > 1
-            ? ` · ${netLayerCount} layers — use the Layer control`
-            : ` · 1 layer (nothing overlaps, so nothing to select)`;
+    // Everything needed to diagnose a layer question, on the page. A hidden control
+    // and a silent "1" look identical on screen, and the method and overlap count
+    // are what distinguish "correctly one layer" from "something is wrong".
+    let diag = "";
+    if (lastRun) {
+        const bits = [`method ${lastRun.method}`];
+        if (lastRun.overlaps != null) bits.push(`overlaps ${lastRun.overlaps}`);
+        if (lastRun.cuts != null) bits.push(`cuts ${lastRun.cuts}`);
+        bits.push(
+            lastRun.layers > 1
+                ? `${lastRun.layers} layers — use the Layer control`
+                : `1 layer`,
+        );
+        diag = ` · ${bits.join(", ")}`;
+        // An overlapping net on a single layer is a contradiction; say so rather
+        // than quietly showing "1 layer".
+        if (lastRun.overlaps != null && lastRun.overlaps > 0 && lastRun.layers === 1) {
+            diag += ` ⚠ INCONSISTENT: ${lastRun.overlaps} overlaps but 1 layer`;
+        }
+    }
     return (
         `${at} · ${what} · placed ${counts.place + counts.seed}, ` +
-        `considered ${counts.consider}, rejected ${counts.reject}${layers}`
+        `considered ${counts.consider}, rejected ${counts.reject}${diag}`
     );
 }
 
