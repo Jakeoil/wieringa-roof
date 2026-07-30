@@ -13,7 +13,14 @@ import { seedTypes, generatePatch, allRhombs, vertexList } from "./geometry.js";
 import { analysePatch, ekey } from "./unfold.js";
 import type { Analysis, Placed } from "./unfold.js";
 import { developFromCuts } from "./cuttree.js";
-import { paginateBest, renderPage, fitTabHeights, TAB_MM } from "./paginate.js";
+import {
+    paginateBest,
+    renderPage,
+    renderMap,
+    fitTabHeights,
+    sheetPalette,
+    TAB_MM,
+} from "./paginate.js";
 import type { Pagination } from "./paginate.js";
 import { PAGES } from "./sheet.js";
 import { BUILD_ID } from "./build-id.js";
@@ -75,7 +82,17 @@ function load(): boolean {
     return true;
 }
 
-function pageOpts() {
+let colours: string[] = [];
+
+// The patch in its own plane, for the locator mini and the map. Rhomb.verts holds
+// exactly that — the tiling, which is the picture that can be recognised.
+function tilingPoly(faceId: number): [number, number][] | null {
+    const r = allRhombs[faceId];
+    if (!r) return null;
+    return r.verts.map((p) => [p.x, p.y] as [number, number]);
+}
+
+function pageOpts(sheet = 0) {
     const [pw, ph] = PAGES.letter;
     return {
         sideMm: handoff!.sideIn * 25.4,
@@ -91,6 +108,9 @@ function pageOpts() {
         dales: backside ? !handoff!.flip : handoff!.flip,
         indexOf: (v: number) => vertexList[v]?.index ?? 1,
         indexRange: [1, 4] as [number, number],
+        tilingPoly,
+        sheetColor: colours[sheet] ?? "#6a5acd",
+        sheetColors: colours,
     };
 }
 
@@ -101,15 +121,21 @@ function repaginate(): void {
     const netW = (pw / 25.4 - 2 * MARGIN_IN - 2 * tabIn) / handoff.sideIn;
     const netH = (ph / 25.4 - 2 * MARGIN_IN - 2 * tabIn) / handoff.sideIn;
     pagination = paginateBest(placed, hinges, netW, netH, ekey);
+    colours = sheetPalette(pagination.pages.length);
     pagination.tabH = fitTabHeights(pagination, placed, pageOpts());
     if (current >= pagination.pages.length) current = 0;
+    if (current < -1) current = -1;
 }
 
 function svgFor(i: number, standalone = false): string {
     return renderPage(pagination!, i, placed, analysis!.creases, hinges, ekey, {
-        ...pageOpts(),
+        ...pageOpts(i),
         standalone,
     });
+}
+
+function mapSvg(standalone = false): string {
+    return renderMap(pagination!, placed, { ...pageOpts(), standalone });
 }
 
 function printOne(i: number): void {
@@ -118,9 +144,15 @@ function printOne(i: number): void {
 }
 
 function printAll(): void {
-    el("printout").innerHTML = pagination!.pages
-        .map((_, i) => svgFor(i))
-        .join("\n");
+    // Map first: it is the assembly instructions for everything after it.
+    el("printout").innerHTML = [mapSvg(), ...pagination!.pages.map((_, i) => svgFor(i))].join(
+        "\n",
+    );
+    window.print();
+}
+
+function printMap(): void {
+    el("printout").innerHTML = mapSvg();
     window.print();
 }
 
@@ -128,6 +160,31 @@ function draw(): void {
     if (!pagination || !handoff) return;
     const list = el("list");
     list.innerHTML = "";
+
+    // The map is the first thing in the list, since it is the key to the rest.
+    {
+        const row = document.createElement("div");
+        row.className = "row" + (current === -1 ? " on" : "");
+        const pick = document.createElement("button");
+        pick.className = "pick";
+        pick.innerHTML =
+            `<strong>Map</strong> · the whole patch, colour-coded` +
+            `<br><span class="j">print this first</span>`;
+        pick.addEventListener("click", () => {
+            current = -1;
+            draw();
+        });
+        const pr = document.createElement("button");
+        pr.className = "one";
+        pr.textContent = "Print";
+        pr.addEventListener("click", (e) => {
+            e.stopPropagation();
+            printMap();
+        });
+        row.appendChild(pick);
+        row.appendChild(pr);
+        list.appendChild(row);
+    }
 
     pagination.pages.forEach((page, i) => {
         const row = document.createElement("div");
@@ -141,6 +198,7 @@ function draw(): void {
             .sort()
             .join(" ");
         pick.innerHTML =
+            `<span class="sw" style="background:${colours[i]}"></span>` +
             `<strong>Sheet ${i + 1}</strong> · ${page.faceIds.length} rhombi` +
             `<br><span class="j">${joins || "no joins"}</span>`;
         pick.addEventListener("click", () => {
@@ -162,7 +220,7 @@ function draw(): void {
         list.appendChild(row);
     });
 
-    el("view").innerHTML = svgFor(current, false);
+    el("view").innerHTML = current === -1 ? mapSvg(false) : svgFor(current, false);
 
     const nJoins = pagination.joins.length;
     el("status").textContent =

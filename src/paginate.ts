@@ -532,6 +532,49 @@ export interface PageRenderOpts {
     // tiling itself.
     indexOf?: (v: number) => number;
     indexRange?: [number, number];
+    // The tiling itself, for the locator mini: the planar position of a face in the
+    // Penrose patch, which is what you can actually recognise. The developed net is
+    // a shape nobody has seen before; the tiling is the picture on every other page.
+    tilingPoly?: (faceId: number) => P2[] | null;
+    // This sheet's colour, and everyone's, so a sheet can be identified at a glance
+    // and matched against the map.
+    sheetColor?: string;
+    sheetColors?: string[];
+}
+
+// Distinct, print-safe sheet colours. Spread around the hue circle at a modest
+// saturation: strong enough to tell apart, pale enough to draw cut lines over.
+export function sheetPalette(n: number): string[] {
+    const out: string[] = [];
+    for (let i = 0; i < n; i++) {
+        const hue = (i * 360) / Math.max(1, n) + 12;
+        out.push(hslHex(hue % 360, 0.55, 0.7));
+    }
+    return out;
+}
+
+function hslHex(h: number, s: number, l: number): string {
+    const c = (1 - Math.abs(2 * l - 1)) * s;
+    const x = c * (1 - Math.abs(((h / 60) % 2) - 1));
+    const m = l - c / 2;
+    const seg = Math.floor(h / 60) % 6;
+    const rgb: [number, number, number] =
+        seg === 0
+            ? [c, x, 0]
+            : seg === 1
+              ? [x, c, 0]
+              : seg === 2
+                ? [0, c, x]
+                : seg === 3
+                  ? [0, x, c]
+                  : seg === 4
+                    ? [x, 0, c]
+                    : [c, 0, x];
+    const hx = (v: number) =>
+        Math.round((v + m) * 255)
+            .toString(16)
+            .padStart(2, "0");
+    return `#${hx(rgb[0])}${hx(rgb[1])}${hx(rgb[2])}`;
 }
 
 // Light-to-dark along the height gradient. Kept at full strength for print: the
@@ -852,18 +895,19 @@ export function renderPage(
     return out.join("\n");
 }
 
-// ── the locator thumbnail ─────────────────────────────────────────
+// ── the locator mini ──────────────────────────────────────────────
 //
-// A sheet on its own tells you nothing about where it belongs. This is the whole net
-// at a glance with the current sheet picked out and every join marked — so before
-// cutting you can see which end you are holding, and after cutting you can find the
-// piece a tab points at.
+// A mini of the **Penrose tiling patch**, not of the unfolded net. The tiling is the
+// picture on every other page and the thing you can recognise; the development is a
+// shape nobody has seen before, so a mini of it locates nothing.
 //
-// It goes in whichever corner of the printable area is least covered by the net, so
-// it lands in real whitespace rather than on top of the work.
+// The sheet's own faces are filled in the sheet's colour and outlined with their
+// cuts, which is exactly the region you are about to hold. Folds are left out: at
+// this size they are noise, and the outline is the information.
+//
+// The same colour keys the sheet list and the printable map, so a sheet, its mini
+// and its patch on the map all read as one thing.
 
-// Sized by area, not by side: a long thin net scaled to fit a 40 mm box comes out
-// well under "a couple of square inches". Aim at the area and cap the long side.
 const THUMB_AREA_MM2 = 1500; // ≈ 2.3 square inches
 const THUMB_MAX_MM = 54;
 
@@ -877,16 +921,20 @@ function thumbnail(
     page: Page,
 ): string {
     const { pageW, pageH, margin, sideMm } = o;
+    const colour = o.sheetColor ?? "#6a5acd";
 
-    // whole net, in the shared orientation
+    // Tiling positions when we have them; fall back to the development otherwise.
+    const shape = new Map<number, P2[]>();
     let x0 = Infinity;
     let y0 = Infinity;
     let x1 = -Infinity;
     let y1 = -Infinity;
-    const rotated = new Map<number, P2[]>();
     for (const [id, p] of placed) {
-        const pts = p.poly.map((q) => rot(q as P2, pg.angle));
-        rotated.set(id, pts);
+        const pts = o.tilingPoly
+            ? o.tilingPoly(id)
+            : p.poly.map((q) => rot(q as P2, pg.angle));
+        if (!pts) continue;
+        shape.set(id, pts);
         for (const q of pts) {
             if (q[0] < x0) x0 = q[0];
             if (q[1] < y0) y0 = q[1];
@@ -894,19 +942,19 @@ function thumbnail(
             if (q[1] > y1) y1 = q[1];
         }
     }
-    const netW = x1 - x0;
-    const netH = y1 - y0;
-    let k = Math.sqrt(THUMB_AREA_MM2 / (netW * netH)); // mm per net unit
+    if (!shape.size) return "";
+    const netW = x1 - x0 || 1;
+    const netH = y1 - y0 || 1;
+    let k = Math.sqrt(THUMB_AREA_MM2 / (netW * netH));
     k = Math.min(k, THUMB_MAX_MM / Math.max(netW, netH));
     const tw = netW * k;
     const th = netH * k;
 
-    // Least-covered corner of the printable area, scored against the *faces* rather
-    // than their overall bounding box: these nets are snakey, so there is usually
-    // real whitespace inside the box and the box would hide it.
+    // Least-covered corner, scored against the faces rather than their overall box:
+    // these nets are snakey and the box hides the real whitespace inside it.
     const boxes: Array<[number, number, number, number]> = [];
     for (const fid of page.faceIds) {
-        const pts = rotated.get(fid)!;
+        const pts = placed.get(fid)!.poly.map((q) => rot(q as P2, pg.angle));
         let bx0 = Infinity;
         let by0 = Infinity;
         let bx1 = -Infinity;
@@ -950,55 +998,152 @@ function thumbnail(
         `<rect x="${n3(tx - 1.5)}" y="${n3(ty - 1.5)}" width="${n3(tw + 3)}" height="${n3(th + 3)}" ` +
             `fill="#fff" fill-opacity="0.92" stroke="#ddd" stroke-width="0.25"/>`,
     );
+    g.push(patchMini(pg, pageIndex, shape, T, colour, k));
+    g.push(
+        `<text x="${n3(tx)}" y="${n3(ty + th + 3.4)}" font-size="2.6" font-family="sans-serif" ` +
+            `fill="#666">patch · sheet ${pageIndex + 1}</text>`,
+    );
+    return g.join("\n");
+}
 
+/**
+ * The patch with one sheet picked out: everything faint, this sheet filled and
+ * outlined along its cuts. Shared by the mini and the printable map.
+ */
+function patchMini(
+    pg: Pagination,
+    pageIndex: number,
+    shape: Map<number, P2[]>,
+    T: (q: P2) => P2,
+    colour: string,
+    k: number,
+    withFaint = true,
+): string {
+    const page = pg.pages[pageIndex];
     const here = new Set(page.faceIds);
-    const others: string[] = [];
+    const faint: string[] = [];
     const mine: string[] = [];
-    for (const [id, pts] of rotated) {
-        const d = pts.map((q) => T(q));
+    for (const [id, pts] of shape) {
+        const d = pts.map(T);
         const poly = d.map((q) => `${n3(q[0])},${n3(q[1])}`).join(" ");
         if (here.has(id)) {
             mine.push(
-                `<polygon points="${poly}" fill="#6a5acd" fill-opacity="0.5" stroke="#6a5acd" stroke-width="0.12"/>`,
+                `<polygon points="${poly}" fill="${colour}" fill-opacity="0.85" ` +
+                    `stroke="${colour}" stroke-width="${n3(0.1 * k)}"/>`,
             );
-        } else {
-            others.push(
-                `<polygon points="${poly}" fill="none" stroke="#c8c8c8" stroke-width="0.12"/>`,
+        } else if (withFaint) {
+            faint.push(
+                `<polygon points="${poly}" fill="none" stroke="#d8d8d8" stroke-width="${n3(0.05 * k)}"/>`,
             );
         }
     }
-    g.push(...others, ...mine);
-
-    // Joins: every one marked, the ones on this sheet lettered.
-    for (const j of pg.joins) {
-        const pa = placed.get(j.faceA);
-        const pb = placed.get(j.faceB);
-        if (!pa || !pb) continue;
-        const ia = pa.verts.indexOf(j.va);
-        const ib = pa.verts.indexOf(j.vb);
-        if (ia < 0 || ib < 0) continue;
-        const ra = rotated.get(j.faceA)!;
-        const m: P2 = [
-            (ra[ia][0] + ra[ib][0]) / 2,
-            (ra[ia][1] + ra[ib][1]) / 2,
-        ];
-        const q = T(m);
-        const onThis = j.sheetA === pageIndex || j.sheetB === pageIndex;
-        g.push(
-            `<circle cx="${n3(q[0])}" cy="${n3(q[1])}" r="${onThis ? 1.1 : 0.6}" ` +
-                `fill="${onThis ? "#c0392b" : "#fff"}" stroke="#c0392b" stroke-width="0.25"/>`,
+    // The sheet's outline: every edge of the region with no neighbour inside it.
+    // That is precisely what you cut along, and at this size it is the information.
+    const seen = new Map<string, { pts: [P2, P2]; n: number }>();
+    for (const id of page.faceIds) {
+        const pts = shape.get(id);
+        if (!pts) continue;
+        for (let i = 0; i < 4; i++) {
+            const a = pts[i];
+            const b = pts[(i + 1) % 4];
+            const key = [a, b]
+                .map((q) => `${q[0].toFixed(4)},${q[1].toFixed(4)}`)
+                .sort()
+                .join("|");
+            const got = seen.get(key);
+            if (got) got.n++;
+            else seen.set(key, { pts: [a, b], n: 1 });
+        }
+    }
+    const edge: string[] = [];
+    for (const { pts, n } of seen.values()) {
+        if (n !== 1) continue; // interior to the sheet: a fold, left out on purpose
+        const a = T(pts[0]);
+        const b = T(pts[1]);
+        edge.push(
+            `<line x1="${n3(a[0])}" y1="${n3(a[1])}" x2="${n3(b[0])}" y2="${n3(b[1])}" ` +
+                `stroke="#222" stroke-width="${n3(0.13 * k)}" stroke-linecap="round"/>`,
         );
-        if (onThis) {
-            g.push(
-                `<text x="${n3(q[0] + 1.7)}" y="${n3(q[1] - 1.1)}" font-size="2.4" ` +
-                    `font-family="sans-serif" font-weight="bold" fill="#c0392b">${j.letter}</text>`,
-            );
+    }
+    return [...faint, ...mine, ...edge].join("\n");
+}
+
+/**
+ * The printable map: the whole patch with every sheet in its own colour. Before you
+ * cut it says how the patch will be divided; after, it says which piece is which.
+ */
+export function renderMap(
+    pg: Pagination,
+    placed: Map<number, Placed>,
+    o: PageRenderOpts,
+): string {
+    const { pageW, pageH, margin } = o;
+    const colours = o.sheetColors ?? sheetPalette(pg.pages.length);
+    const shape = new Map<number, P2[]>();
+    let x0 = Infinity;
+    let y0 = Infinity;
+    let x1 = -Infinity;
+    let y1 = -Infinity;
+    for (const [id, p] of placed) {
+        const pts = o.tilingPoly
+            ? o.tilingPoly(id)
+            : p.poly.map((q) => rot(q as P2, pg.angle));
+        if (!pts) continue;
+        shape.set(id, pts);
+        for (const q of pts) {
+            if (q[0] < x0) x0 = q[0];
+            if (q[1] < y0) y0 = q[1];
+            if (q[0] > x1) x1 = q[0];
+            if (q[1] > y1) y1 = q[1];
         }
     }
+    const availW = pageW - 2 * margin;
+    const availH = pageH - 2 * margin - 14;
+    const k = Math.min(availW / (x1 - x0 || 1), availH / (y1 - y0 || 1));
+    const ox = margin + (availW - (x1 - x0) * k) / 2;
+    const oy = margin + 8 + (availH - (y1 - y0) * k) / 2;
+    const T = (q: P2): P2 => [ox + (q[0] - x0) * k, oy + (q[1] - y0) * k];
 
-    g.push(
-        `<text x="${n3(tx)}" y="${n3(ty + th + 3.4)}" font-size="2.6" font-family="sans-serif" ` +
-            `fill="#666">whole net · sheet ${pageIndex + 1} shaded</text>`,
+    const out: string[] = [];
+    out.push(
+        `<svg class="sheet"${o.standalone === false ? "" : ' xmlns="http://www.w3.org/2000/svg"'} ` +
+            `width="${pageW}mm" height="${pageH}mm" viewBox="0 0 ${pageW} ${pageH}">`,
     );
-    return g.join("\n");
+    out.push(`<rect x="0" y="0" width="${pageW}" height="${pageH}" fill="#fff"/>`);
+    out.push(
+        `<text x="${n3(margin)}" y="${n3(margin + 2)}" font-size="5" font-family="sans-serif" ` +
+            `font-weight="bold" fill="#111">Map — ${pg.pages.length} sheets</text>`,
+    );
+
+    // every face faint, then each sheet in its colour, then each sheet's outline
+    for (const [, pts] of shape) {
+        const d = pts.map(T).map((q) => `${n3(q[0])},${n3(q[1])}`).join(" ");
+        out.push(`<polygon points="${d}" fill="none" stroke="#e2e2e2" stroke-width="0.15"/>`);
+    }
+    pg.pages.forEach((page, i) => {
+        out.push(patchMini(pg, i, shape, T, colours[i % colours.length], k, false));
+        // sheet number at the centroid of its region
+        let cx = 0;
+        let cy = 0;
+        let n = 0;
+        for (const fid of page.faceIds) {
+            const pts = shape.get(fid);
+            if (!pts) continue;
+            for (const q of pts.map(T)) {
+                cx += q[0];
+                cy += q[1];
+                n++;
+            }
+        }
+        if (n) {
+            out.push(
+                `<text x="${n3(cx / n)}" y="${n3(cy / n)}" font-size="7" font-family="sans-serif" ` +
+                    `font-weight="bold" fill="#111" text-anchor="middle" ` +
+                    `dominant-baseline="central" stroke="#fff" stroke-width="1.6" ` +
+                    `paint-order="stroke">${i + 1}</text>`,
+            );
+        }
+    });
+    out.push("</svg>");
+    return out.join("\n");
 }

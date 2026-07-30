@@ -158,6 +158,17 @@ stochastic and a re-run would quietly hand back a different net. Verified: rebui
 from hinges alone reproduces every placement with **0.0 deviation**. A hand-built net
 travels exactly as well as a replayed one.
 
+Every sheet carries a **locator mini of the patch** — the Penrose tiling, not the
+development. The tiling is the picture that can be recognised; the unfolded net is a
+shape nobody has seen before, so a mini of it locates nothing. The sheet's rhombi are
+filled in that sheet's colour and outlined along its cuts, with folds left out
+because at that size the outline is the information.
+
+The **Map** is the same drawing at full size with every sheet in its own colour and
+numbered: before cutting it says how the patch divides, after cutting it says which
+piece is which. It prints first in *Print all sheets*, and has its own row and print
+button. The same colour keys the list, the mini and the map.
+
 **Back side** swaps hills for dales for printing the underside. Reflection is not a
 concern: every patch here has a mirror axis.
 
