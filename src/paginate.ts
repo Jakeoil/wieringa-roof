@@ -21,7 +21,7 @@
 //     costs a little paper against rotating each sheet to fit, and buys the ability
 //     to lay the printed pages on a table and see them line up.
 
-import { edgeRole } from "./unfold.js";
+import { edgeRole, intersectionArea } from "./unfold.js";
 import type { Placed, Crease } from "./unfold.js";
 import { CLUSTER_TINTS, M_COLOR, V_COLOR } from "./sheet.js";
 
@@ -53,6 +53,9 @@ export interface Pagination {
     joins: Join[];
     angle: number; // the one orientation every page uses, radians
     fits: boolean; // false if some single rhombus cannot fit, which is hopeless
+    // Tab height per join edge key, in mm. Full height unless the tab would run
+    // over a rhombus that legitimately occupies that space; 0 means no room at all.
+    tabH?: Map<string, number>;
 }
 
 const rot = (q: P2, a: number): P2 => [
@@ -348,6 +351,97 @@ export function paginateNet(
     return { pages, joins, angle, fits: true };
 }
 
+// ── tab fitting ───────────────────────────────────────────────────
+//
+// A tab hangs into the space beyond its cut edge, and that space is often occupied:
+// the net folds back on itself, so the neighbour across the cut may be absent while
+// some *other* rhombus of the same sheet sits right there. A tab drawn over it
+// obscures real work and gets cut through.
+//
+// So each tab is shrunk until it clears every face on its own sheet, and then the
+// two halves of a join are given the smaller of their two heights — they are taped
+// to each other, so they have to stay congruent.
+
+const TAB_MIN_MM = 2.4; // below this there is no room for the letter; drop the tab
+
+function pageTransform(pg: Pagination, pageIndex: number, o: PageRenderOpts) {
+    const page = pg.pages[pageIndex];
+    const usableW = o.pageW - 2 * o.margin;
+    const usableH = o.pageH - 2 * o.margin;
+    const cx = o.margin + (usableW - page.w * o.sideMm) / 2;
+    const cy = o.margin + (usableH - page.h * o.sideMm) / 2;
+    const map = (q: P2): P2 => {
+        const r = rot(q, pg.angle);
+        return [
+            cx + (r[0] - page.minX) * o.sideMm,
+            cy + (r[1] - page.minY) * o.sideMm,
+        ];
+    };
+    return { page, cx, cy, map };
+}
+
+/** Largest tab height on one side of a join that touches nothing. */
+function safeHeight(
+    pg: Pagination,
+    pageIndex: number,
+    hostFace: number,
+    partnerFace: number,
+    va: number,
+    vb: number,
+    placed: Map<number, Placed>,
+    o: PageRenderOpts,
+): number {
+    const { page, map } = pageTransform(pg, pageIndex, o);
+    const host = placed.get(hostFace);
+    const partner = placed.get(partnerFace);
+    if (!host || !partner) return 0;
+
+    const i = host.verts.indexOf(va);
+    const j = host.verts.indexOf(vb);
+    if (i < 0 || j < 0) return 0;
+    const a = map(host.poly[i] as P2);
+    const b = map(host.poly[j] as P2);
+    let ccx = 0;
+    let ccy = 0;
+    for (const q of host.poly) {
+        const m = map(q as P2);
+        ccx += m[0] / 4;
+        ccy += m[1] / 4;
+    }
+
+    const neighbours = page.faceIds
+        .filter((f) => f !== hostFace)
+        .map((f) => placed.get(f)!.poly.map((q) => map(q as P2)));
+
+    for (let h = TAB_MM; h >= TAB_MIN_MM - 1e-9; h -= 0.4) {
+        const t = tabQuad(a, b, [ccx, ccy], partner, va, vb, map, h);
+        let clash = false;
+        for (const nb of neighbours) {
+            if (intersectionArea(t.quad, nb) > 0.02) {
+                clash = true;
+                break;
+            }
+        }
+        if (!clash) return h;
+    }
+    return 0;
+}
+
+/** Tab height for every join, shared between its two halves. */
+export function fitTabHeights(
+    pg: Pagination,
+    placed: Map<number, Placed>,
+    o: PageRenderOpts,
+): Map<string, number> {
+    const out = new Map<string, number>();
+    for (const j of pg.joins) {
+        const hA = safeHeight(pg, j.sheetA, j.faceA, j.faceB, j.va, j.vb, placed, o);
+        const hB = safeHeight(pg, j.sheetB, j.faceB, j.faceA, j.va, j.vb, placed, o);
+        out.set(j.key, Math.min(hA, hB));
+    }
+    return out;
+}
+
 // ── rendering one page ────────────────────────────────────────────
 //
 // Close to renderSheet, but a paginated page is a different thing: a subset of the
@@ -371,14 +465,20 @@ function tabQuad(
     map: (q: P2) => P2,
     h: number,
 ): { quad: P2[]; cx: number; cy: number; deg: number } {
-    // The partner's two corners away from the shared edge give its offset direction.
+    // Offset from the shared edge to the partner's opposite edge. This must be the
+    // partner's *edge* vector, not its diagonal: the diagonal shears the tab and
+    // makes it far too long, and — because the two diagonals differ — makes the
+    // shape depend on which end of the edge you start from, so the fitting pass and
+    // the renderer disagreed about where the tab was.
     const idxA = partner.verts.indexOf(va);
     const idxB = partner.verts.indexOf(vb);
     let d: P2 = [0, 0];
     if (idxA >= 0 && idxB >= 0) {
-        const oppA = map(partner.poly[(idxA + 2) % 4] as P2);
+        // the neighbour of idxA along the rhombus that is not the shared corner
+        const other = (idxA + 1) % 4 === idxB ? (idxA + 3) % 4 : (idxA + 1) % 4;
         const pa = map(partner.poly[idxA] as P2);
-        d = [oppA[0] - pa[0], oppA[1] - pa[1]];
+        const po = map(partner.poly[other] as P2);
+        d = [po[0] - pa[0], po[1] - pa[1]];
     }
     // Perpendicular to the edge, pointing away from the face this tab hangs off.
     let nx = -(b[1] - a[1]);
@@ -619,28 +719,42 @@ export function renderPage(
                 // supplementary, truncating the neighbour at a constant height gives a
                 // parallelogram rather than a general trapezoid — the tab really is a
                 // slice of the piece that belongs there.
-                const tab = tabQuad(
-                    a,
-                    b,
-                    [ccx, ccy],
-                    placed.get(join.partnerFace)!,
-                    p.verts[i],
-                    p.verts[(i + 1) % 4],
-                    map,
-                    TAB_MM,
-                );
-                labels.push(
-                    `<polygon points="${tab.quad.map((q) => `${n3(q[0])},${n3(q[1])}`).join(" ")}" ` +
-                        `fill="#fff" stroke="#111" stroke-width="0.3" stroke-dasharray="1.6 1.2"/>`,
-                );
-                // Text runs parallel to the cut, upright whichever way the edge lies.
-                labels.push(
-                    `<text x="${n3(tab.cx)}" y="${n3(tab.cy)}" ` +
-                        `transform="rotate(${n3(tab.deg)} ${n3(tab.cx)} ${n3(tab.cy)})" ` +
-                        `font-size="3" font-family="sans-serif" font-weight="bold" fill="#111" ` +
-                        `text-anchor="middle" dominant-baseline="central">` +
-                        `${join.letter}▸${join.partner + 1}</text>`,
-                );
+                const h = pg.tabH?.get(key) ?? TAB_MM;
+                if (h >= TAB_MIN_MM) {
+                    const tab = tabQuad(
+                        a,
+                        b,
+                        [ccx, ccy],
+                        placed.get(join.partnerFace)!,
+                        p.verts[i],
+                        p.verts[(i + 1) % 4],
+                        map,
+                        h,
+                    );
+                    labels.push(
+                        `<polygon points="${tab.quad.map((q) => `${n3(q[0])},${n3(q[1])}`).join(" ")}" ` +
+                            `fill="#fff" stroke="#111" stroke-width="0.3" stroke-dasharray="1.6 1.2"/>`,
+                    );
+                    // Text runs parallel to the cut, upright whichever way the edge lies.
+                    labels.push(
+                        `<text x="${n3(tab.cx)}" y="${n3(tab.cy)}" ` +
+                            `transform="rotate(${n3(tab.deg)} ${n3(tab.cx)} ${n3(tab.cy)})" ` +
+                            `font-size="${h < 4 ? 2.4 : 3}" font-family="sans-serif" font-weight="bold" fill="#111" ` +
+                            `text-anchor="middle" dominant-baseline="central">` +
+                            `${join.letter}▸${join.partner + 1}</text>`,
+                    );
+                } else {
+                    // No room outside: put the label inside the rhombus instead of
+                    // drawing over a neighbour.
+                    const mx = (a[0] + b[0]) / 2;
+                    const my = (a[1] + b[1]) / 2;
+                    labels.push(
+                        `<text x="${n3(mx + (ccx - mx) * 0.32)}" y="${n3(my + (ccy - my) * 0.32)}" ` +
+                            `font-size="2.8" font-family="sans-serif" font-weight="bold" fill="#111" ` +
+                            `text-anchor="middle" dominant-baseline="central">` +
+                            `${join.letter}▸${join.partner + 1}</text>`,
+                    );
+                }
                 continue;
             }
 

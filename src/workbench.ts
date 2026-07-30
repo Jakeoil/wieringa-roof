@@ -580,12 +580,6 @@ let layersPinned = false;
 function markNetChanged(): void {
     layersDirty = true;
     layersPinned = false;
-    // The sheets describe a net that no longer exists.
-    if (pagination) {
-        pagination = null;
-        const panel = document.getElementById("sheetpanel");
-        if (panel) panel.style.display = "none";
-    }
 }
 // Facts about the last algorithm run, shown on the page. Diagnosing a layer
 // problem from a screenshot needs the method, the overlap count and the layer
@@ -1444,13 +1438,14 @@ function drawNet() {
 // it re-fit each frame makes the whole picture lurch about and is unwatchable.
 
 type Mode = "build" | "watch";
-let mode: Mode = "build";
+let mode: Mode = "watch"; // Automatic: the algorithms are the point; hand-building is the sidebar
 
 // Buttons that only make sense while building by hand. Print is deliberately not
 // among them: in Watch mode the canvas holds a complete decomposition, and its
 // hinge components are exactly the pieces, so printing there gives what the sheet
 // page gives.
-const buildOnly: HTMLButtonElement[] = [];
+const buildOnly: HTMLElement[] = [];
+const watchOnly: HTMLElement[] = [];
 
 let traceEvents: TraceEvent[] = [];
 let traceIndex = 0; // number of events applied
@@ -1873,144 +1868,46 @@ document.getElementById("btn-clear")!.addEventListener("click", () => {
     drawNet();
 });
 
-// ── Sheets: split the finished net across pages ────────────────────
+// ── Handing the net to the Sheets page ─────────────────────────────
 //
-// The workbench is the master: you configure the patch and the method, get one net,
-// and when it looks right you split it. A generation-3 net is several times the size
-// of a sheet, so this is not optional at that scale — and the split is what makes a
-// big net buildable rather than merely correct.
+// The workbench is the master: it decides what the net *is*. Splitting that net
+// across paper, and printing it, is a separate job with its own controls, so it
+// lives on its own page.
 //
-// Every severed hinge becomes a taped join carrying a letter and the page number of
-// its other half, so the two can be found without hunting. All pages share one
-// orientation, so the printed sheets lie together the way they will assemble.
+// What crosses over is the hinge set. Hinges determine the development completely
+// given the patch, so the Sheets page can rebuild this exact net — which matters
+// because the branch-cut search is stochastic and re-running it would produce a
+// different net. It also means a hand-built net travels just as well as a
+// replayed one.
 
-let pagination: Pagination | null = null;
-let currentSheet = 0;
-
-// What reaches the paper. Deliberately separate from the height slider: the slider
-// says which way up the surface sits and how hard the screen shades it, these say
-// whether the rendering carries that information at all.
-let renderShading = true;
-let renderIsoglosses = false;
-
-// Which way up to render. A flat height setting carries no hills-or-dales
-// information, so the rendering falls back to hills.
-const renderDales = (): boolean => (shadeDepth === 0 ? false : flipHeight);
-
-function pageOpts() {
-    return {
-        sideMm: sideIn * 25.4,
-        pageW: PAPER[0] * 25.4,
-        pageH: PAPER[1] * 25.4,
-        margin: MARGIN_IN * 25.4,
-        fillMode: "cluster" as const,
-        shading: renderShading,
-        isoglosses: renderIsoglosses,
-        dales: renderDales(),
-        indexOf: (v: number) => vertexList[v]?.index ?? 1,
-        indexRange: [idxLo, idxHi] as [number, number],
-    };
+export interface NetHandoff {
+    seed: number;
+    gen: number;
+    flip: boolean;
+    sideIn: number;
+    hinges: string[];
+    label: string;
+    method: string;
 }
+
+const HANDOFF_KEY = "wr-net";
 
 function createSheets(): void {
     if (!netRhombs.length) {
         say("Nothing on the net to split yet.");
         return;
     }
-    if (!analysis) return;
-
-    // Printable area in net units — the pagination is unit-agnostic and the side
-    // length is what ties it to paper. Join tabs hang outside the page's bounding
-    // box, so reserve their height on every edge or a tab at the boundary would be
-    // printed off the paper.
-    const tabIn = TAB_MM / 25.4;
-    const pageW = (PRINTABLE[0] - 2 * tabIn) / sideIn;
-    const pageH = (PRINTABLE[1] - 2 * tabIn) / sideIn;
-
-    pagination = paginateBest(netAsPlaced(), netHinges, pageW, pageH, ekey);
-    if (!pagination.fits || !pagination.pages.length) {
-        say(
-            `A single rhombus does not fit the printable area at ${(sideIn * 25.4).toFixed(1)} mm side. ` +
-                `Reduce the side.`,
-        );
-        pagination = null;
-        return;
-    }
-    currentSheet = 0;
-    renderSheetList();
-    say(
-        `${netRhombs.length} rhombi split into ${pagination.pages.length} sheet` +
-            `${pagination.pages.length === 1 ? "" : "s"} with ` +
-            `${pagination.joins.length} taped join${pagination.joins.length === 1 ? "" : "s"}, ` +
-            `all at one orientation.`,
-    );
-}
-
-function sheetJoinSummary(idx: number): string {
-    if (!pagination) return "";
-    const here = pagination.joins
-        .filter((j) => j.sheetA === idx || j.sheetB === idx)
-        .map((j) => `${j.letter}\u25b8${(j.sheetA === idx ? j.sheetB : j.sheetA) + 1}`)
-        .sort();
-    return here.length ? here.join(" ") : "no joins";
-}
-
-function renderSheetList(): void {
-    const panel = document.getElementById("sheetpanel")!;
-    const list = document.getElementById("sheetlist")!;
-    const info = document.getElementById("sheetinfo")!;
-    if (!pagination) {
-        panel.style.display = "none";
-        return;
-    }
-    panel.style.display = "";
-    info.textContent =
-        `${pagination.pages.length} sheets, ${pagination.joins.length} taped joins, ` +
-        `shared orientation ${((pagination.angle * 180) / Math.PI).toFixed(1)}°. ` +
-        `Each join is a letter and the sheet its other half is on — tape like to like.`;
-
-    list.innerHTML = "";
-    pagination.pages.forEach((pageX, i) => {
-        const b = document.createElement("button");
-        b.innerHTML =
-            `Sheet ${i + 1} — ${pageX.faceIds.length} rhombi` +
-            `<br><span class="joins">${sheetJoinSummary(i)}</span>`;
-        b.setAttribute("aria-current", i === currentSheet ? "true" : "false");
-        b.addEventListener("click", () => {
-            currentSheet = i;
-            renderSheetList();
-        });
-        list.appendChild(b);
-    });
-
-    const view = document.getElementById("sheetview")!;
-    view.innerHTML = renderPage(
-        pagination,
-        currentSheet,
-        netAsPlaced(),
-        analysis!.creases,
-        netHinges,
-        ekey,
-        { ...pageOpts(), standalone: false },
-    );
-}
-
-function printSheets(): void {
-    if (!pagination) {
-        say("Press Create sheets first.");
-        return;
-    }
-    const host = document.getElementById("printout")!;
-    host.innerHTML = pagination.pages
-        .map((_, i) =>
-            renderPage(pagination!, i, netAsPlaced(), analysis!.creases, netHinges, ekey, pageOpts()),
-        )
-        .join("\n");
-    say(
-        `Printing ${pagination.pages.length} sheets at ${(sideIn * 25.4).toFixed(1)} mm side. ` +
-            `Save as PDF for a single file.`,
-    );
-    window.print();
+    const payload: NetHandoff = {
+        seed: currentSeedIdx,
+        gen,
+        flip: flipHeight,
+        sideIn,
+        hinges: [...netHinges],
+        label: seedTypes[currentSeedIdx]?.label ?? "?",
+        method: mode === "watch" ? traceMethod : "manual",
+    };
+    localStorage.setItem(HANDOFF_KEY, JSON.stringify(payload));
+    window.location.href = "./sheets.html";
 }
 
 // ── Print ─────────────────────────────────────────────────────────
@@ -2083,16 +1980,22 @@ function printNet(): void {
         for (const fid of pc.faceIds) placed.get(fid)!.piece = id;
     });
 
-    const sideMm = sideIn * 25.4;
+    // One page, whatever the net's size: shrink the rhombus until it fits. This is
+    // the overview print — the true-size version is the Sheets page, which splits
+    // rather than shrinks.
     const marginMm = MARGIN_IN * 25.4;
     const [pw, ph] = PAGES.letter;
-    const { sheets, oversize } = layoutSheets(
-        pieces,
-        sideMm,
-        pw - 2 * marginMm,
-        ph - 2 * marginMm,
-        6,
-    );
+    const availW = pw - 2 * marginMm;
+    const availH = ph - 2 * marginMm;
+    let widest = 0;
+    let tallest = 0;
+    for (const pc of pieces) {
+        widest = Math.max(widest, pc.w);
+        tallest = Math.max(tallest, pc.h);
+    }
+    const fitMm = Math.min(availW / (widest || 1), availH / (tallest || 1));
+    const sideMm = Math.min(sideIn * 25.4, fitMm);
+    const { sheets, oversize } = layoutSheets(pieces, sideMm, availW, availH, 6);
 
     // Every piece too big for the page means layoutSheets returns nothing, and
     // printing that would spool a blank sheet. Say so instead.
@@ -2123,7 +2026,8 @@ function printNet(): void {
 
     say(
         `Printing ${netRhombs.length} rhombi as ${pieces.length} piece${pieces.length === 1 ? "" : "s"} ` +
-            `on ${sheets.length} sheet${sheets.length === 1 ? "" : "s"} at ${(sideIn * 25.4).toFixed(1)} mm side.` +
+            `on ${sheets.length} sheet${sheets.length === 1 ? "" : "s"} at ${sideMm.toFixed(1)} mm side` +
+            `${sideMm < sideIn * 25.4 - 0.05 ? " (shrunk to fit one page)" : ""}.` +
             (netLayerCount > 1
                 ? `  Layer ${activeLayer == null ? "all" : activeLayer} of ${netLayerCount}.`
                 : "") +
@@ -2302,9 +2206,13 @@ function setMode(next: Mode): void {
     // Only Clear, Undo and Print are build-specific. Patch, generation, color,
     // height and side all still mean something while watching, so disabling the
     // whole bar — as this used to — took away controls for no reason.
+    // Hide rather than grey out: a control that does nothing in this mode is just
+    // noise, and there is a lot of bar to read already.
     for (const b of buildOnly) {
-        b.disabled = next === "watch";
-        b.style.opacity = next === "watch" ? "0.45" : "1";
+        b.style.display = next === "watch" ? "none" : "";
+    }
+    for (const b of watchOnly) {
+        b.style.display = next === "watch" ? "" : "none";
     }
     stopPlay();
     if (next === "watch") {
@@ -2334,8 +2242,8 @@ function setMode(next: Mode): void {
 function buildModeBar(): void {
     const bar = document.getElementById("modebar")!;
     for (const [v, t] of [
-        ["build", "Build by hand"],
-        ["watch", "Watch an algorithm"],
+        ["watch", "Automatic"],
+        ["build", "Manual"],
     ] as Array<[Mode, string]>) {
         const btn = document.createElement("button");
         btn.textContent = t;
@@ -2553,62 +2461,17 @@ function buildControls() {
     layerLabel.appendChild(layerSelect);
     controls.appendChild(layerLabel);
 
-    // Rendering settings — what the printed sheet carries, as against what the
-    // height slider does to the screen.
-    const renderBox = (
-        label: string,
-        get: () => boolean,
-        set: (v: boolean) => void,
-        title: string,
-    ) => {
-        const lab = document.createElement("label");
-        lab.style.fontSize = "13px";
-        lab.title = title;
-        const cb = document.createElement("input");
-        cb.type = "checkbox";
-        cb.checked = get();
-        cb.addEventListener("change", () => {
-            set(cb.checked);
-            if (pagination) renderSheetList();
-            say(
-                `Rendering: ${renderShading ? "shading" : "no shading"}, ` +
-                    `${renderIsoglosses ? "isoglosses" : "no isoglosses"}, ` +
-                    `${renderDales() ? "dales" : "hills"} up.`,
-            );
-        });
-        lab.appendChild(cb);
-        lab.appendChild(document.createTextNode(" " + label));
-        controls.appendChild(lab);
-    };
-    renderBox(
-        "shade",
-        () => renderShading,
-        (v) => (renderShading = v),
-        "Shade the printed sheets by height. Independent of the height slider, which only sets which way up and how strongly the screen shades.",
-    );
-    renderBox(
-        "isoglosses",
-        () => renderIsoglosses,
-        (v) => (renderIsoglosses = v),
-        "Draw the seven quarter-index contours on each rhombus of the printed sheets.",
-    );
-
     const sheetsBtn = document.createElement("button");
-    sheetsBtn.textContent = "Create sheets";
+    sheetsBtn.textContent = "Create sheets →";
     sheetsBtn.title =
-        "Split this net across pages, with lettered joins showing what tapes to what";
+        "Split this net across pages and open the Sheets page to print them";
     sheetsBtn.addEventListener("click", createSheets);
     controls.appendChild(sheetsBtn);
 
-    const printSheetsBtn = document.createElement("button");
-    printSheetsBtn.textContent = "Print sheets / PDF";
-    printSheetsBtn.title = "Print every sheet, at true size — Save as PDF for one file";
-    printSheetsBtn.addEventListener("click", printSheets);
-    controls.appendChild(printSheetsBtn);
-
     const printBtn = document.createElement("button");
-    printBtn.textContent = "Print net (1 page)";
-    printBtn.title = "Print the whole net on one page, whether or not it fits";
+    printBtn.textContent = "Print net";
+    printBtn.title =
+        "Print the whole net on one page, scaled down to fit however big it is";
     printBtn.addEventListener("click", printNet);
     controls.appendChild(printBtn);
 
@@ -2705,6 +2568,14 @@ if (help) {
 // is running a cached script — which has now cost us two debugging sessions.
 console.log(`workbench build ${BUILD_ID}`);
 
+// On the page too, not just the console. Working out whether the browser is running
+// a stale script has cost this project three debugging sessions, and asking someone
+// to open developer tools to find out is not an answer.
+{
+    const tag = document.getElementById("buildtag");
+    if (tag) tag.textContent = `· build ${BUILD_ID}`;
+}
+
 buildModeBar();
 buildControls();
 sizeTilingCanvas();
@@ -2714,6 +2585,10 @@ fitView();
 refreshNetView();
 drawTiling();
 drawNet();
+// Apply the starting mode rather than only reacting to clicks: Automatic is the
+// default, so the page should open already showing a replay with the manual-only
+// controls out of the way.
+setMode(mode);
 
 window.addEventListener("resize", () => {
     sizeTilingCanvas();

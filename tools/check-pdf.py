@@ -1,6 +1,9 @@
 """Verify a sheets PDF is Letter and at true size.
 
-    python3 tools/check-pdf.py sheets/wieringa-sheets.pdf
+    python3 tools/check-pdf.py <pdf> [side-in-inches ...]
+
+Defaults to checking for 1 in edges; pass other sides if the Sheets page was set to
+them.
 
 Scale is the only thing in this pipeline that can silently go wrong. Every angle and
 length is exact up to the point a print driver decides to be helpful, so the PDF gets
@@ -21,8 +24,6 @@ import sys
 import zlib
 
 MM_PER_IN = 25.4
-# Side lengths make-sheets.mjs emits, in inches.
-EXPECTED_SIDES_IN = [1, 0.7, 0.5]
 TOL_PT = 0.02
 
 TOK = re.compile(r"(-?(?:\d+\.?\d*|\.\d+))|([A-Za-z*'\"]+)")
@@ -85,7 +86,7 @@ def segments(text):
     return segs
 
 
-def main(path):
+def main(path, sides):
     raw = open(path, "rb").read()
     problems = []
 
@@ -105,7 +106,7 @@ def main(path):
     counts = collections.Counter(round(s, 2) for s in segs if s > 2)
 
     print("  rhombus edges found:")
-    for side_in in EXPECTED_SIDES_IN:
+    for side_in in sides:
         want = side_in * 72
         hits = sum(n for L, n in counts.items() if abs(L - want) <= TOL_PT)
         status = "ok" if hits else "MISSING"
@@ -126,4 +127,8 @@ def main(path):
 
 
 if __name__ == "__main__":
-    sys.exit(main(sys.argv[1] if len(sys.argv) > 1 else "sheets/wieringa-sheets.pdf"))
+    argv = sys.argv[1:]
+    if not argv:
+        print(__doc__)
+        sys.exit(2)
+    sys.exit(main(argv[0], [float(x) for x in argv[1:]] or [1.0]))

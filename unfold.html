@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Unfold — Wieringa Roof</title>
+<title>Workbench — Wieringa Roof</title>
 <link rel="stylesheet" href="./site.css">
 <style>
     .wrap-wide { max-width: 1440px; margin: 0 auto; padding: 20px 20px 48px; }
@@ -112,21 +112,21 @@
     <a href="./roof3d.html" draggable="false">3D</a>
     <a href="./info.html" draggable="false">Mathematics</a>
     <a href="./polyhedra.html" draggable="false">Polyhedra</a>
-    <a href="./unfold.html" draggable="false" aria-current="page">Unfold</a>
+    <a href="./unfold.html" draggable="false" aria-current="page">Workbench</a>
     <a href="./tools.html" draggable="false">Tools</a>
     <a href="./sheets.html" draggable="false">Sheets</a>
 </nav>
 
 <div class="wrap-wide">
 
-    <h1>Unfolding Workbench</h1>
+    <h1>Workbench</h1>
     <p class="lede">
         Build a net by hand, choosing the route yourself — or replay one of the
         automatic methods and watch the same choices being made for you.
     </p>
 
     <details id="help">
-        <summary>How it works</summary>
+        <summary>How it works <span class="mono" id="buildtag" style="font-weight:400;color:#888"></span></summary>
         <div class="helpbody">
 <strong>Green means a route lands clean; red means every route from there
         overlaps.</strong> The preview runs each hinge a rhomb could arrive on and
@@ -191,12 +191,15 @@
         file. Changing the net discards the sheets, since they described a net that no
         longer exists.
         <br><br>
-        <strong>shade</strong> and <strong>isoglosses</strong> control what the
-        <em>printed</em> sheets carry, and are deliberately separate from the height
-        slider. The slider says which way up the surface sits and how strongly the
-        screen shades it; these say whether that information reaches the paper. A flat
-        height setting carries no hills-or-dales information, so the rendering falls
-        back to hills.
+        <strong>Create sheets</strong> hands this net to the
+        <a href="./sheets.html">Sheets</a> page, which splits it across paper and prints
+        it — individually or all at once — and carries the rendering choices, since
+        those are print decisions. What crosses over is the hinge set, which pins the
+        development exactly, so a hand-built net travels as well as a replayed one and
+        the stochastic search is never re-run behind your back.
+        <br><br>
+        <strong>Print net</strong> is the overview instead: the whole net on one page,
+        shrunk however far it takes to fit.
         <br><br>
         <strong>Layer</strong> appears only when a net needs more than one sheet.
         Where the surface wraps over itself it need not be cut — the offending part
@@ -248,16 +251,6 @@
         <div class="panel">
             <h3>Net (true size on the sheet)</h3>
             <canvas id="net" width="620" height="802"></canvas>
-        </div>
-    </div>
-
-    <!-- Appears once "Create sheets" has split the net. -->
-    <div id="sheetpanel" style="display:none">
-        <h3 style="margin:24px 0 8px;font-size:15px;color:#333">Sheets</h3>
-        <p class="info" id="sheetinfo" style="margin:0 0 10px"></p>
-        <div class="sheetwrap">
-            <div id="sheetlist"></div>
-            <div id="sheetview"></div>
         </div>
     </div>
 

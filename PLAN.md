@@ -14,9 +14,9 @@ golden rhombi for physical models.
 | `roof3d.html` | three.js prototype of the surface | done |
 | `info.html` | "Mathematics" — golden rhombus, heights, fold angles, defects | done |
 | `polyhedra.html` | triacontahedron + the two rhombohedra, generated diagrams | done |
-| `unfold.html` | build or replay a net, layer selector, print at true size | done |
+| `unfold.html` | **Workbench** — build or replay a net; the master page | done |
 | `tools.html` | true-size templates, fold gauges, forming jigs, kit list | done |
-| `sheets.html` | nine finished nets at true size, 1 in to a rhombus, ready to cut | done |
+| `sheets.html` | split that net across pages, print one or all | done |
 
 `src/geometry.ts` holds the tiling and the lift; `src/unfold.ts` the two
 region-growing methods and `src/cuttree.ts` the branch-cut routing; `src/sheet.ts` layout and SVG;
@@ -147,105 +147,23 @@ gen 3 is 4–9 sheets (St5 9, Pe3 8, Pe1 8, Deca 4). Under 100 ms even at 1380 f
 
 ## Sheets
 
-`node tools/make-sheets.mjs` regenerates `sheets.html` plus one standalone SVG per
-model in `sheets/`. **One inch is the rhombus side**, and every generation-2 seed
-fits a single Letter sheet at exactly that — one inch, one model, one page, no
-arithmetic. Generation 3 exceeds a page at 1 in; only St1 (0.7 in) and Deca (0.5 in)
-fit reduced, and the rest need a net split across sheets, which is Stage B.
+`sheets.html` (`src/sheets.ts`) takes the net the Workbench made and turns it into
+paper. Per-sheet print buttons, print-all, a preview, and the rendering settings —
+because shading and isoglosses are print decisions, not modelling ones.
 
-`sh tools/make-pdf.sh` renders the page to `sheets/wieringa-sheets.pdf` through
-headless Chrome and then **measures it**: nine Letter pages, and rhombus edges at
-exactly 72.00 / 50.40 / 36.00 pt for the 1 / 0.7 / 0.5 in sides.
-`tools/check-pdf.py` does the measuring and can be run on any PDF. Scale is the one
-thing here that can silently go wrong — everything is exact until a print driver
-decides to fit-to-page — so it is checked rather than trusted.
+**The handoff is the hinge set**, passed through `localStorage`. Hinges pin the
+development completely given the patch, so this rebuilds the Workbench's exact net
+rather than re-running the search — which matters, since the branch-cut search is
+stochastic and a re-run would quietly hand back a different net. Verified: rebuilding
+from hinges alone reproduces every placement with **0.0 deviation**. A hand-built net
+travels exactly as well as a replayed one.
 
-The generator verifies before it writes: one piece, zero overlaps by exact area,
-inside the printable frame, and a side of at least 12 mm — below that the 72°
-dihedrals stop being foldable. Anything failing is reported and skipped, so the page
-never carries a net that cannot be built.
+**Back side** swaps hills for dales for printing the underside. Reflection is not a
+concern: every patch here has a mirror axis.
 
-`unfold.html` defaults to the same 1 in, so the two agree. The side is always the
-rhombus **edge**, never a diagonal. (An earlier default of `√5/2 ≈ 1.118 in` made
-each edge's rise `s/√5` exactly half an inch — elegant for heights, arbitrary for
-paper. `GOLDEN_SIDE` in `geometry.ts` is still √5/2, but that is the internal unit
-of the tiling, not a print size.)
+The previous static `sheets.html` — nine pre-baked models, plus `make-sheets.mjs`,
+`make-pdf.sh` and the committed SVG/PDF — is gone. It guessed at the wrong problem:
+you want *your* net split, not a fixed menu. `tools/check-pdf.py` survives, since
+measuring a PDF for true size is still worth doing.
 
 ## Print
-
-Side length, page and margin are all free parameters, in mm, cm or inches —
-nothing is pinned to any one size. Sheets render as SVG at exact physical units with a
-print stylesheet; the browser's Save as PDF gives reliable 1:1 with no PDF
-library. Each crease carries its fold angle (36/72/108, dash length) and
-mountain or valley (colour).
-
-**The side length is the free parameter** — the one real lever, since a net that
-will not fit a page fits at a smaller side. It is always the rhombus *edge*, never a
-diagonal, and it accepts mm, cm or in.
-
-**1 in is the default** and the size `sheets.html` uses: every generation-2 patch
-fits one Letter sheet at 1 in, and it folds crisply in 100–120 gsm. Below about
-12 mm (½ in) the 108° creases — 72° dihedrals — get fiddly, which is the practical
-floor.
-
-From the command line: `node tools/bfs-unfold.mjs [--gen=] [--side=] [--page=]
-[--margin=] [--mode=cuttree|widened|bfs] [--budget=ms] [--svg=DIR] [--angles]`.
-
-## Fixed: the pentagrid index formula is gone
-
-`assignIndicesFromPentagrid` was unsalvageable, not merely misconfigured. The
-pentagrid and the tiling are **dual spaces**, so `Σ floor(x·u_j/d)` over tiling
-coordinates telescopes to a bounded quantity that is not `Σ n_j` at all — in fact
-`Σ_k (x·u_k/d) = 0` identically, so the sum of floors can only land in `{−4…0}`.
-No choice of `gridSpacing` fixes that; it merely happened to agree at gen 2.
-The workbench defaulted to gen 3 at the time, so its index display was wrong as shipped.
-
-Replaced by `computeLift()`, which integrates `n ∈ Z⁵` along edges by BFS. Exact
-everywhere: all 21 seed/generation combinations give 0 bad edges, 0 conflicts,
-index ⊂ {1,2,3,4}, up to 1380 rhombi.
-
-Two traps when matching planar edges to generators, both of which bit once:
-as *undirected* lines the five directions sit 36° apart, not 72°; and
-representatives normalised to one half-plane make two of the five the negatives
-of the true `ζʲ`, silently negating two components of `n`. The fix is a directed
-72°-spaced fan with ± resolved per edge. Note the position-error check is
-self-consistent under both bugs and catches neither — what caught them was the
-index range `{1,2,3,4}` and the fold-angle set `{36,72,108}`.
-
-## Build
-
-`npm run build` runs `npm run vendor` (copies three.js out of `node_modules`
-into `vendor/`) then `tsc`. Both `dist/` and `vendor/` are gitignored, so a fresh
-clone needs `npm install && npm run build` before serving.
-
-## Deployment
-
-Live at https://jakeoil.github.io/wieringa-roof/, built from `main` by
-`.github/workflows/deploy.yml`. `deca-shape-expansion.png` is kept locally but is
-not in the repository; it was purged from history, taking `.git` from 11 MB to
-under 300 KB.
-
-## The workbench
-
-`unfold.html` (formerly `legacy.html`, entry point `src/workbench.ts`) does the
-hand-driven unfolding the original plan asked for, plus a replay player over the
-trace the algorithms emit. Placement goes through the same `placeSeed`/`placeAcross`
-primitives as the automatic methods, so its geometry is identical.
-
-The net is oriented and centred on the sheet by testing the net's own edge
-directions and their perpendiculars — a development only ever uses about nine, so
-this is an exhaustive check of a couple of dozen angles rather than a search,
-scored by the worst axis ratio `max(w/PW, h/PH)`.
-
-## Open
-
-- Nothing here has been exercised in a browser beyond loading and looking; the
-  transport controls and the two hit-tests are the least-tested parts.
-- Generation 5 is offered on the 3D page but not the net page: the unfolding
-  methods take 1.2–2.5 s at 5,719 rhombi, against 48–76 ms at gen 4.
-- Rotating pages independently would fill them better, at the cost of pieces
-  arriving turned differently. Deliberately not done: a shared orientation lets the
-  printed sheets be laid out and read together.
-- `Pe3` and `Pe1` patch outlines converge to a limit that is not their seed shape
-  (distance plateaus at 0.16 and 0.21). Only `Pe5` closes the loop exactly, its
-  hull being a regular pentagon at every generation. Worth understanding why.
