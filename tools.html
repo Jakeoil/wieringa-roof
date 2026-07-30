@@ -88,12 +88,12 @@
 
 <div class="tbl-scroll">
 <table>
-<tr><th>quantity</th><th>exact</th><th>at 20 mm side</th></tr>
-<tr><td>side</td><td><span class="mono">s</span></td><td>20.000 mm</td></tr>
+<tr><th>quantity</th><th>exact, for side <span class="mono">s</span></th><th>at <span class="mono">s</span> = 1 in</th></tr>
+<tr><td>side (the edge)</td><td><span class="mono">s</span></td><td>1 in = 25.400 mm</td></tr>
 <tr><td>acute angle</td><td><span class="mono">2·arctan(1/φ) = 63.43495°</span></td><td>63.435°</td></tr>
 <tr><td>obtuse angle</td><td><span class="mono">2·arctan(φ) = 116.56505°</span></td><td>116.565°</td></tr>
-<tr><td>short diagonal</td><td><span class="mono">2s/√(2+φ) = 1.05146 s</span></td><td>21.029 mm</td></tr>
-<tr><td>long diagonal</td><td><span class="mono">1.70130 s</span></td><td>34.026 mm</td></tr>
+<tr><td>short diagonal</td><td><span class="mono">1.05146 s</span></td><td>1.05146 in = 26.707 mm</td></tr>
+<tr><td>long diagonal</td><td><span class="mono">1.70130 s</span></td><td>1.70130 in = 43.213 mm</td></tr>
 <tr><td>diagonal ratio</td><td><span class="mono">φ = 1.61803…</span></td><td>—</td></tr>
 </table>
 </div>
@@ -106,25 +106,24 @@
 </p>
 
 <div class="template">
-<svg width="150mm" height="72mm" viewBox="0 0 150 72" xmlns="http://www.w3.org/2000/svg">
-    <!-- Golden rhombus, 20 mm side, long diagonal horizontal.
-         half-long 17.013, half-short 10.5146 — checked: side 20.0000,
-         corners 63.43489 and 116.56511 -->
-    <g transform="translate(24,45)">
-        <polygon points="-17.013,0 0,-10.5146 17.013,0 0,10.5146"
+<svg width="150mm" height="82mm" viewBox="0 0 150 82" xmlns="http://www.w3.org/2000/svg">
+    <!-- Golden rhombus at side 1 in = 25.4 mm, long diagonal horizontal.
+         half-long 21.6065, half-short 13.3536 — edge checks at 25.4000 mm,
+         corners 63.4349 and 116.5651. Same size as the printed sheets. -->
+    <g transform="translate(28,50)">
+        <polygon points="-21.6065,0 0,-13.3536 21.6065,0 0,13.3536"
                  fill="#f4f4fb" stroke="#222" stroke-width="0.4"/>
-        <!-- diagonals, for registering the template while tracing -->
-        <line x1="-17.013" y1="0" x2="17.013" y2="0" stroke="#bbb" stroke-width="0.2" stroke-dasharray="2 2"/>
-        <line x1="0" y1="-10.5146" x2="0" y2="10.5146" stroke="#bbb" stroke-width="0.2" stroke-dasharray="2 2"/>
-        <text x="-15.4" y="1.1" font-size="2.4" font-family="sans-serif" fill="#6a5acd">63.43°</text>
-        <text x="-4.4" y="-6.6" font-size="2.4" font-family="sans-serif" fill="#6a5acd">116.57°</text>
-        <text x="-8" y="-12.4" font-size="2.6" font-family="sans-serif" fill="#888">side 20 mm</text>
-        <text x="-6" y="14.4" font-size="2.4" font-family="sans-serif" fill="#888">long 34.026</text>
+        <line x1="-21.6065" y1="0" x2="21.6065" y2="0" stroke="#bbb" stroke-width="0.2" stroke-dasharray="2 2"/>
+        <line x1="0" y1="-13.3536" x2="0" y2="13.3536" stroke="#bbb" stroke-width="0.2" stroke-dasharray="2 2"/>
+        <text x="-19.6" y="1.2" font-size="2.6" font-family="sans-serif" fill="#6a5acd">63.43°</text>
+        <text x="-4.6" y="-8.6" font-size="2.6" font-family="sans-serif" fill="#6a5acd">116.57°</text>
+        <text x="-11" y="-15.6" font-size="2.8" font-family="sans-serif" fill="#888">side 1 in</text>
+        <text x="-9.4" y="17.6" font-size="2.4" font-family="sans-serif" fill="#888">long 1.7013 in</text>
     </g>
 
-    <!-- The two corner angles as open tracing wedges. Arm length 26;
-         63.43495° -> (11.63, -23.26),  116.56505° -> (-11.63, -23.26) -->
-    <g transform="translate(62,34)">
+    <!-- The two corner angles as open tracing wedges. Arm 26;
+         63.43495° -> (11.6266, -23.2532),  116.56505° -> (-11.6266, -23.2532) -->
+    <g transform="translate(66,34)">
         <path d="M 0,0 L 26,0 L 11.6266,-23.2532 Z" fill="none" stroke="#222" stroke-width="0.35"/>
         <text x="7.6" y="-3.4" font-size="2.6" font-family="sans-serif" fill="#6a5acd">63.43°</text>
         <text x="0.4" y="3.2" font-size="2.2" font-family="sans-serif" fill="#888">acute</text>
@@ -135,25 +134,26 @@
         <text x="0.6" y="3.2" font-size="2.2" font-family="sans-serif" fill="#888">obtuse</text>
     </g>
 
-    <!-- Scale bar: a mis-scaled print shows up here before it wastes any card. -->
-    <g transform="translate(62,64)">
-        <line x1="0" y1="0" x2="50" y2="0" stroke="#222" stroke-width="0.4"/>
+    <!-- Scale bar. A mis-scaled print shows up here before it wastes any card. -->
+    <g transform="translate(66,72)">
+        <line x1="0" y1="0" x2="50.8" y2="0" stroke="#222" stroke-width="0.4"/>
         <g stroke="#222" stroke-width="0.4">
             <line x1="0" y1="-2" x2="0" y2="2"/>
-            <line x1="10" y1="-1.4" x2="10" y2="1.4"/>
-            <line x1="20" y1="-1.4" x2="20" y2="1.4"/>
-            <line x1="30" y1="-1.4" x2="30" y2="1.4"/>
-            <line x1="40" y1="-1.4" x2="40" y2="1.4"/>
-            <line x1="50" y1="-2" x2="50" y2="2"/>
+            <line x1="12.7" y1="-1.4" x2="12.7" y2="1.4"/>
+            <line x1="25.4" y1="-2" x2="25.4" y2="2"/>
+            <line x1="38.1" y1="-1.4" x2="38.1" y2="1.4"/>
+            <line x1="50.8" y1="-2" x2="50.8" y2="2"/>
         </g>
-        <text x="9" y="-3.6" font-size="3" font-family="sans-serif" fill="#222">50 mm — measure this first</text>
+        <text x="4" y="-3.6" font-size="3" font-family="sans-serif" fill="#222">2 in — measure this first</text>
     </g>
 </svg>
 </div>
 <p class="caption">
-    Golden rhombus at 20 mm side, with both corner angles repeated as open wedges
+    Golden rhombus at <strong>1 in side</strong> — the same size as every
+    generation-2 net on the <a href="./sheets.html">Sheets</a> page, so a template cut
+    from this fits those nets directly. Both corner angles are repeated as open wedges
     for setting a bevel or checking a cut. <strong>Print at 100%, no scaling</strong>,
-    then measure the 50 mm bar before trusting anything else on the page.
+    then measure the 2 in bar before trusting anything else on the page.
 </p>
 
 <h2>Fold angles are not the angles you measure</h2>
@@ -282,8 +282,8 @@
 <div class="note">
     <strong>The one jig that pays for itself: a scoring comb.</strong> Inside any de
     Bruijn ribbon every crease is <em>parallel</em>, and the spacing is exactly
-    <span class="mono">2/√5 · s = 0.894427 s</span> — <strong>17.889 mm at a 20 mm
-    side</strong>, 22.361 mm at 25 mm. So a comb of parallel ridges at that single
+    <span class="mono">2/√5 · s = 0.894427 s</span> — <strong>0.894 in (22.72 mm) at a
+    1 in side</strong>. So a comb of parallel ridges at that single
     pitch pre-scores a whole band in one pass, with no measuring and no cumulative
     drift. This is the useful residue of the ribbon-strip idea: strips were retired as
     a way to <em>build</em> nets, but the parallel-crease fact that made them work is
@@ -327,9 +327,10 @@
 
 <p>
     On size: <strong>below about 12 mm side the sharp creases get genuinely
-    fiddly</strong> — a 72° dihedral on a 12 mm panel leaves very little to grip. 20 mm
-    is the default on the net pages for that reason, and it also happens to put about
-    twenty rhombi on a Letter sheet.
+    fiddly</strong> — a 72° dihedral on a 12 mm panel leaves very little to grip.
+    <strong>1 in is the standard side</strong> on the net pages, comfortably clear of
+    that, and it also puts about twenty rhombi on a Letter sheet. The side is a free
+    parameter everywhere; 1 in is only the default.
 </p>
 
 <h2>Ordering a laser-cut template</h2>
@@ -342,15 +343,15 @@
 
 <ul class="kit">
     <li><span class="what">What to have cut</span><span class="why">The rhombus as a <em>window</em> rather than a solid tile — you want to trace the inside of an opening, not around the outside of a shape, so the knife has something to run against. Plus the three gauge notches, 144° / 108° / 72°.</span></li>
-    <li><span class="what">Jigs, from sheet</span><span class="why">A laser cuts flat stock, so make each forming block as <em>several identical profiles</em> stacked and glued — cut six copies of the 144° triangle in 3 mm acrylic and you have an 18 mm block. Same for a scoring comb: one profile with teeth at 17.889 mm pitch, stacked.</span></li>
+    <li><span class="what">Jigs, from sheet</span><span class="why">A laser cuts flat stock, so make each forming block as <em>several identical profiles</em> stacked and glued — cut six copies of the 144° triangle in 3 mm acrylic and you have an 18 mm block. Same for a scoring comb: one profile with teeth at 22.72 mm pitch, stacked.</span></li>
     <li><span class="what">Material</span><span class="why">3 mm acrylic is cheap and accurate and enough for tracing. If you want to cut <em>against</em> it with a blade, use metal — 1.5 mm aluminium, brass or steel — because a blade will shave acrylic and your template will drift.</span></li>
     <li><span class="what">Kerf</span><span class="why">The beam removes material as it goes, so the cut lands beside the line, not on it. Tell the shop the <em>finished</em> dimensions matter and let them compensate; do not assume a figure yourself, because it varies with machine, material and thickness.</span></li>
-    <li><span class="what">What to send</span><span class="why">Give them the numbers, not a screenshot: side 20 mm, angles 63.43495° and 116.56505°, or equivalently a rhombus with diagonals 34.026 mm × 21.029 mm. Diagonals are the safer specification — they are lengths, so nothing depends on the shop's angular precision.</span></li>
+    <li><span class="what">What to send</span><span class="why">Give them the numbers, not a screenshot: side 1 in (25.400 mm), angles 63.43495° and 116.56505°, or equivalently a rhombus with diagonals 43.213 mm × 26.707 mm. Diagonals are the safer specification — they are lengths, so nothing depends on the shop's angular precision.</span></li>
 </ul>
 
 <div class="warn">
     Specify the rhombus <strong>by its diagonals</strong> if you can — 34.026 mm by
-    21.029 mm at 20 mm side. Two perpendicular lengths are unambiguous and easy to
+    43.213 mm by 26.707 mm at a 1 in side. Two perpendicular lengths are unambiguous and easy to
     inspect with callipers when it arrives. An angle spec has to be trusted.
 </div>
 
@@ -366,7 +367,7 @@
 
 <ul class="kit">
     <li><span class="what">Bone folder</span><span class="why">The one tool that is not optional. Scores and then sets the crease. A cheap plastic one is fine; a Teflon one will not mark the paper.</span></li>
-    <li><span class="what">Craft knife</span><span class="why">X-Acto or similar with #11 blades. <em>Change the blade far more often than feels reasonable</em> — a dull blade tears rather than cuts, and on a 20 mm rhombus the tear is a visible fraction of the edge.</span></li>
+    <li><span class="what">Craft knife</span><span class="why">X-Acto or similar with #11 blades. <em>Change the blade far more often than feels reasonable</em> — a dull blade tears rather than cuts, and on a 1 in rhombus the tear is a visible fraction of the edge.</span></li>
     <li><span class="what">Steel rule</span><span class="why">Not plastic, not aluminium. A blade will bite into soft edges and follow the notch it made. Cork-backed stops it sliding.</span></li>
     <li><span class="what">Self-healing mat</span><span class="why">Keeps the blade sharp and stops the cut wandering into a groove left by the last one.</span></li>
     <li><span class="what">Embossing stylus</span><span class="why">Optional alternative for scoring — a ball tip gets closer to a corner than a bone folder can. A ballpoint with no ink left does the same job.</span></li>

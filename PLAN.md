@@ -130,14 +130,19 @@ of the tiling, not a print size.)
 ## Print
 
 Side length, page and margin are all free parameters, in mm, cm or inches —
-nothing is pinned to 20 mm. Sheets render as SVG at exact physical units with a
+nothing is pinned to any one size. Sheets render as SVG at exact physical units with a
 print stylesheet; the browser's Save as PDF gives reliable 1:1 with no PDF
 library. Each crease carries its fold angle (36/72/108, dash length) and
 mountain or valley (colour).
 
-20 mm is a sensible default: strips advance 17.9 mm per face, ten faces to a
-Letter row, and it folds crisply in 100–120 gsm office paper. Below about 12 mm
-the 108° creases get fiddly.
+**The side length is the free parameter** — the one real lever, since a net that
+will not fit a page fits at a smaller side. It is always the rhombus *edge*, never a
+diagonal, and it accepts mm, cm or in.
+
+**1 in is the default** and the size `sheets.html` uses: every generation-2 patch
+fits one Letter sheet at 1 in, and it folds crisply in 100–120 gsm. Below about
+12 mm (½ in) the 108° creases — 72° dihedrals — get fiddly, which is the practical
+floor.
 
 From the command line: `node tools/bfs-unfold.mjs [--gen=] [--side=] [--page=]
 [--margin=] [--mode=cuttree|widened|bfs] [--budget=ms] [--svg=DIR] [--angles]`.
@@ -195,8 +200,9 @@ scored by the worst axis ratio `max(w/PW, h/PH)`.
 - Generation 5 is offered on the 3D page but not the net page: the unfolding
   methods take 1.2–2.5 s at 5,719 rhombi, against 48–76 ms at gen 4.
 - **Stage B — fitting paper.** Branch cuts give one piece, but a gen-3 net is
-  336×391 mm at 20 mm side against Letter's usable 191×254. Splitting a finished
-  net to fit, and packing the rectangles onto sheets, is the next work.
+  wider than a page at any foldable side: at 1 in only St1 and Deca fit, and the
+  other five need reducing below the 12 mm floor. Splitting a finished net to fit,
+  and packing the rectangles onto sheets, is the next work.
 - `Pe3` and `Pe1` patch outlines converge to a limit that is not their seed shape
   (distance plateaus at 0.16 and 0.21). Only `Pe5` closes the loop exactly, its
   hull being a regular pentagon at every generation. Worth understanding why.

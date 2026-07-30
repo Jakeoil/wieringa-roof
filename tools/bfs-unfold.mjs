@@ -9,7 +9,7 @@
 //   node tools/bfs-unfold.mjs --gen=3 --side=12mm --unit=mm
 //
 // Options
-//   --side=<len>   golden rhombus side, e.g. 20mm, 0.75in, 1in  (default 20mm)
+//   --side=<len>   golden rhombus side (the edge), e.g. 1in, 20mm, 0.75in  (default 1in)
 //   --gen=<n>      expansion generation                          (default 2)
 //   --page=<name>  letter | a4 | none                            (default letter)
 //   --margin=<len> page margin                                   (default 0.5in)
@@ -32,8 +32,8 @@ import {
 
 const MM_PER_IN = 25.4;
 
-function parseLen(str, fallbackMm) {
-    if (str == null) return { mm: fallbackMm, unit: "mm" };
+function parseLen(str, fallbackMm, fallbackUnit = "mm") {
+    if (str == null) return { mm: fallbackMm, unit: fallbackUnit };
     const m = String(str)
         .trim()
         .match(/^([0-9]*\.?[0-9]+)\s*(mm|cm|in|")?$/i);
@@ -58,7 +58,7 @@ const args = Object.fromEntries(
     }),
 );
 
-const side = parseLen(args.side, 20);
+const side = parseLen(args.side, MM_PER_IN, "in"); // default 1 in, the standard side
 const margin = parseLen(args.margin, 0.5 * MM_PER_IN);
 const GEN = Number(args.gen ?? 2);
 const MODE = String(args.mode ?? "cuttree");

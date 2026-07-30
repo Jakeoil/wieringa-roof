@@ -2367,7 +2367,7 @@ function buildControls() {
     const applySide = () => {
         const parsed = parseLength(sideInput.value);
         if (!parsed) {
-            say(`Cannot read "${sideInput.value}" as a length — try 20mm or 0.75in.`);
+            say(`Cannot read "${sideInput.value}" as a length — try 1in, 20mm or 0.75in.`);
             return;
         }
         sideIn = parsed.mm / 25.4;

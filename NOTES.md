@@ -629,8 +629,8 @@ tile. The tiling canvas keeps them, where they are the point.
 
 ### Still open
 
-The gen-3 nets are one piece but far too big for one sheet — 336×391 mm at 20 mm
-side against Letter's usable 191×254. That is precisely Stage B, untouched: cutting
+The gen-3 nets are one piece but too big for one sheet at any foldable side — at
+1 in only St1 and Deca fit, and the rest would need to go below the 12 mm floor. That is precisely Stage B, untouched: cutting
 a finished net down to paper, and packing the rectangles onto sheets.
 
 ## The rhombohedra are the real components
