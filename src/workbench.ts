@@ -1486,14 +1486,36 @@ function runTraceBody(): void {
         });
         placedRhombs.add(pl.faceId);
     }
+    // The finished net's hinges. These used to be left empty here and only filled
+    // in per step by applyPrefix, which meant the layering below ran with *no*
+    // parent tree at all — degrading continuation back to plain lowest-fit, the
+    // very confetti it exists to avoid.
+    for (const k of res.hinges) netHinges.add(k);
     refreshNetView();
 
-    // Layer the completed net, then pin it for the whole replay.
-    layersPinned = false;
-    layersDirty = true;
-    recomputeLayers();
+    // Layers for the completed net, pinned for the whole replay.
+    //
+    // Take the algorithm's own assignment when it has one rather than
+    // reconstructing it. cutTreeUnfold already layered this exact net from the real
+    // hinge tree; recomputing from the net on screen can only agree at best, and
+    // silently disagree at worst.
+    const withLayers = res as { layer?: Map<number, number>; layerCount?: number };
+    if (withLayers.layer && withLayers.layerCount) {
+        netLayer = withLayers.layer;
+        netLayerCount = withLayers.layerCount;
+        if (activeLayer != null && activeLayer >= netLayerCount) activeLayer = null;
+        syncLayerBar();
+    } else {
+        layersPinned = false;
+        layersDirty = true;
+        recomputeLayers();
+    }
     layersDirty = false;
     layersPinned = true;
+    console.log(
+        `runTrace: ${traceMethod}, ${netRhombs.length} rhombi, ` +
+            `${netLayerCount} layer(s), selector ${netLayerCount > 1 ? "shown" : "hidden"}`,
+    );
 
     traceIndex = 0;
     applyPrefix(0);
@@ -1564,7 +1586,17 @@ function traceLabel(): string {
         const k = traceEvents[i].kind;
         if (k in counts) counts[k as keyof typeof counts]++;
     }
-    return `${at} · ${what} · placed ${counts.place + counts.seed}, considered ${counts.consider}, rejected ${counts.reject}`;
+    // Always report the layer count, including when it is 1. A hidden control and a
+    // silent "1" are indistinguishable on screen, which cost a round trip to work
+    // out; a number that is always present cannot fail quietly.
+    const layers =
+        netLayerCount > 1
+            ? ` · ${netLayerCount} layers — use the Layer control`
+            : ` · 1 layer (nothing overlaps, so nothing to select)`;
+    return (
+        `${at} · ${what} · placed ${counts.place + counts.seed}, ` +
+        `considered ${counts.consider}, rejected ${counts.reject}${layers}`
+    );
 }
 
 // ── Events ────────────────────────────────────────────────────────
