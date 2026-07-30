@@ -151,6 +151,30 @@ of `St*` as well as of `Pe*` — the `Pe*` alone are not sufficient.
 
 ---
 
+## PDF: verified at true size, not assumed
+
+`sh tools/make-pdf.sh` → `sheets/wieringa-sheets.pdf`, nine Letter pages, then
+`tools/check-pdf.py` measures it: edges land at exactly **72.00 pt (1 in)**,
+50.40 pt (0.7 in) and 36.00 pt (0.5 in). The browser's own Save-as-PDF gives the
+same file; the script exists so it can be *checked*.
+
+Reading geometry back out of a PDF has two traps, both of which bit:
+
+- PDF numbers may be written with a **leading dot** — `.23999999`. A number regex of
+  `-?\d+\.?\d*` silently fails to match those, which shifts the whole operand
+  stream and makes every transform wrong. It first looked as though the mm units
+  were being read as CSS pixels and the output was a third of true size. It was the
+  measurement that was broken, not the PDF.
+- **Font and image streams** decompress into binary that parses as plausible path
+  data. Filter to streams that are ≥95% printable ASCII.
+
+The transform must be walked with the `q`/`Q` stack: Chrome nests a page-level
+`0.24` scale with a `3.125` factor for CSS pixels (0.24 × 3.125 = 0.75, so 96 px →
+72 pt) and an `11.811` factor inside an SVG sized in millimetres (0.24 × 11.811 =
+2.8346, so 25.4 mm → 72 pt). Both routes land on one inch, which is the check.
+
+---
+
 ## Settled: the rhombus side is 1 inch
 
 `GOLDEN_SIDE = √5/2 = 1.118034` **inches**, inherited from the first PLAN.md

@@ -116,6 +116,13 @@ fits a single Letter sheet at exactly that — one inch, one model, one page, no
 arithmetic. Generation 3 exceeds a page at 1 in; only St1 (0.7 in) and Deca (0.5 in)
 fit reduced, and the rest need a net split across sheets, which is Stage B.
 
+`sh tools/make-pdf.sh` renders the page to `sheets/wieringa-sheets.pdf` through
+headless Chrome and then **measures it**: nine Letter pages, and rhombus edges at
+exactly 72.00 / 50.40 / 36.00 pt for the 1 / 0.7 / 0.5 in sides.
+`tools/check-pdf.py` does the measuring and can be run on any PDF. Scale is the one
+thing here that can silently go wrong — everything is exact until a print driver
+decides to fit-to-page — so it is checked rather than trusted.
+
 The generator verifies before it writes: one piece, zero overlaps by exact area,
 inside the printable frame, and a side of at least 12 mm — below that the 72°
 dihedrals stop being foldable. Anything failing is reported and skipped, so the page
