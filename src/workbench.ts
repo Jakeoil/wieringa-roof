@@ -569,6 +569,16 @@ let netLayer = new Map<number, number>();
 let netLayerCount = 1;
 let activeLayer: number | null = null;
 let layersDirty = true;
+// During a replay the layering belongs to the *finished* net, not to whatever
+// prefix is on screen: a partial net has different overlaps, so recomputing per
+// step would make the layer count flicker as you scrub and would cost an O(n²)
+// pass every frame. So the trace pins it once and the steps leave it alone.
+let layersPinned = false;
+
+function markNetChanged(): void {
+    layersDirty = true;
+    layersPinned = false;
+}
 let layerSelect: HTMLSelectElement | null = null;
 let layerLabel: HTMLLabelElement | null = null;
 
@@ -827,9 +837,9 @@ function pushHistory(): void {
 
 function restore(s: Snapshot): void {
     netRhombs.length = 0;
-    layersDirty = true;
+    markNetChanged();
     netRhombs.push(...s.rhombs);
-    layersDirty = true;
+    markNetChanged();
     netHinges.clear();
     for (const h of s.hinges) netHinges.add(h);
     placedRhombs.clear();
@@ -1160,7 +1170,7 @@ function placeRhomb(rid: number, viaEdge?: { a: number; b: number }): string {
 
     const overlapping = netOverlaps(poly, rid);
     netRhombs.push({ sourceId: rid, poly, verts, overlapping });
-    layersDirty = true;
+    markNetChanged();
     placedRhombs.add(rid);
     recheckOverlaps();
     recomputeMoveHints();
@@ -1192,7 +1202,7 @@ function removeRhomb(rid: number): string {
     if (i < 0) return "";
     pushHistory();
     netRhombs.splice(i, 1);
-    layersDirty = true;
+    markNetChanged();
     placedRhombs.delete(rid);
     // a hinge only survives while both its rhombs are placed
     for (const k of [...netHinges]) {
@@ -1464,7 +1474,7 @@ function runTraceBody(): void {
 
     // fit to the finished net once, then hold it for the whole replay
     netRhombs.length = 0;
-    layersDirty = true;
+    markNetChanged();
     netHinges.clear();
     placedRhombs.clear();
     for (const pl of res.placed.values()) {
@@ -1478,6 +1488,13 @@ function runTraceBody(): void {
     }
     refreshNetView();
 
+    // Layer the completed net, then pin it for the whole replay.
+    layersPinned = false;
+    layersDirty = true;
+    recomputeLayers();
+    layersDirty = false;
+    layersPinned = true;
+
     traceIndex = 0;
     applyPrefix(0);
 }
@@ -1487,7 +1504,7 @@ function runTraceBody(): void {
 function applyPrefix(k: number): void {
     traceIndex = Math.max(0, Math.min(k, traceEvents.length));
     netRhombs.length = 0;
-    layersDirty = true;
+    if (!layersPinned) layersDirty = true;
     netHinges.clear();
     placedRhombs.clear();
     traceRoles.clear();
@@ -1757,7 +1774,7 @@ netCanvas.addEventListener("click", (e) => {
 document.getElementById("btn-clear")!.addEventListener("click", () => {
     pushHistory();
     netRhombs.length = 0;
-    layersDirty = true;
+    markNetChanged();
     netHinges.clear();
     placedRhombs.clear();
     moveHints.clear();
@@ -2068,7 +2085,7 @@ function setMode(next: Mode): void {
         });
     } else {
         netRhombs.length = 0;
-        layersDirty = true;
+        markNetChanged();
         netHinges.clear();
         placedRhombs.clear();
         traceRoles.clear();
@@ -2372,7 +2389,7 @@ function buildControls() {
 
 function regenerate() {
     netRhombs.length = 0;
-    layersDirty = true;
+    markNetChanged();
     netHinges.clear();
     placedRhombs.clear();
     moveHints.clear();
