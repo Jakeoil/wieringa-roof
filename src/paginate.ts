@@ -812,6 +812,41 @@ export function renderPage(
             `${page.faceIds.length} rhombi · side ${(sideMm / 25.4).toFixed(3)} in</text>`,
     );
 
+    // Legend. Went missing when pagination grew its own renderer, and a sheet of
+    // dashes means nothing without it: the dash pattern is the fold angle, and the
+    // colour is which way it folds.
+    if (o.showLegend !== false) {
+        const ly = pageH - margin + 9.5;
+        let lx = margin;
+        const txt = (t: string, col: string, size = 2.8) => {
+            out.push(
+                `<text x="${n3(lx)}" y="${n3(ly)}" font-size="${size}" ` +
+                    `font-family="sans-serif" fill="${col}">${t}</text>`,
+            );
+        };
+        const swatch = (col: string, dash: string | null, wid: number) => {
+            out.push(
+                `<line x1="${n3(lx)}" y1="${n3(ly - 1)}" x2="${n3(lx + 10)}" y2="${n3(ly - 1)}" ` +
+                    `stroke="${col}" stroke-width="${wid}"` +
+                    `${dash ? ` stroke-dasharray="${dash}"` : ""}/>`,
+            );
+            lx += 13;
+        };
+        txt("cut", "#666");
+        lx += 8;
+        swatch("#111", null, 0.5);
+        for (const f of [36, 72, 108]) {
+            txt(`${f}°`, "#666");
+            lx += f === 108 ? 8 : 6.5;
+            swatch("#666", DASH[f], 0.28);
+        }
+        txt("mountain", M_COLOR);
+        lx += 17;
+        txt("valley", V_COLOR);
+        lx += 13;
+        txt("tab = tape to like letter", "#666");
+    }
+
     out.push(thumbnail(pg, pageIndex, placed, o, cx, cy, page));
     out.push("</svg>");
     return out.join("\n");

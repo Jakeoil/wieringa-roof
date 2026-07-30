@@ -17,6 +17,11 @@ import { paginateBest, renderPage, fitTabHeights, TAB_MM } from "./paginate.js";
 import type { Pagination } from "./paginate.js";
 import { PAGES } from "./sheet.js";
 import { BUILD_ID } from "./build-id.js";
+import { loadPrefs, savePrefs, resetPrefs } from "./prefs.js";
+
+const PREFS_KEY = "wr-sheets";
+const PREF_DEFAULTS = { shading: true, isoglosses: false, backside: false, sheet: 0 };
+const prefs = loadPrefs(PREFS_KEY, PREF_DEFAULTS);
 
 interface NetHandoff {
     seed: number;
@@ -32,16 +37,16 @@ const MARGIN_IN = 0.5;
 const el = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 
 // ── rendering settings, which live here because they are print decisions ──
-let shading = true;
-let isoglosses = false;
-let backside = false;
+let shading = prefs.shading;
+let isoglosses = prefs.isoglosses;
+let backside = prefs.backside;
 
 let handoff: NetHandoff | null = null;
 let analysis: Analysis | null = null;
 let placed: Map<number, Placed> = new Map();
 let hinges = new Set<string>();
 let pagination: Pagination | null = null;
-let current = 0;
+let current = prefs.sheet;
 
 function load(): boolean {
     const raw = localStorage.getItem("wr-net");
@@ -190,6 +195,13 @@ if (!load()) {
     toggle("back", () => backside, (v) => (backside = v));
 
     el("printall").addEventListener("click", printAll);
+    el("reset").addEventListener("click", () => {
+        if (confirm("Reset the sheets page to default settings?")) {
+            window.removeEventListener("beforeunload", persist);
+            window.removeEventListener("pagehide", persist);
+            resetPrefs(PREFS_KEY);
+        }
+    });
     el("side").addEventListener("change", () => {
         const v = parseFloat(el<HTMLInputElement>("side").value);
         if (!isFinite(v) || v <= 0) return;
@@ -199,5 +211,11 @@ if (!load()) {
     });
     el<HTMLInputElement>("side").value = String(handoff!.sideIn);
 }
+
+function persist(): void {
+    savePrefs(PREFS_KEY, { shading, isoglosses, backside, sheet: current });
+}
+window.addEventListener("beforeunload", persist);
+window.addEventListener("pagehide", persist);
 
 console.log(`sheets build ${BUILD_ID}`);

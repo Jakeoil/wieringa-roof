@@ -29,12 +29,27 @@ import type { Pagination } from "./paginate.js";
 import type { Analysis, Placed, TraceEvent } from "./unfold.js";
 import { parseLength, layoutSheets, renderSheet, PAGES } from "./sheet.js";
 import { BUILD_ID } from "./build-id.js";
+import { loadPrefs, savePrefs, resetPrefs } from "./prefs.js";
+
+// Session settings, restored on load. See prefs.ts for why these are remembered.
+const PREFS_KEY = "wr-workbench";
+const PREF_DEFAULTS = {
+    seed: 1,
+    gen: 2,
+    mode: "watch",
+    method: "cuttree",
+    colour: "cluster",
+    sideIn: 1,
+    heightU: 1,
+    isogloss: false,
+};
+const prefs = loadPrefs(PREFS_KEY, PREF_DEFAULTS);
 
 // ── UI State ──────────────────────────────────────────────────────
 
-let currentSeedIdx = 1; // Pe3, the boat — 23 rhombi at gen 2, a sane place to land
+let currentSeedIdx = prefs.seed; // default Pe3, the boat — 23 rhombi at gen 2
 const currentIsHeads = true;
-let gen = 2;
+let gen = prefs.gen;
 
 // One control for height, matching the 3D page. Sign is the flip — real geometry,
 // the dual roof, every hill a dale. Magnitude is how strongly height is shaded,
@@ -44,7 +59,7 @@ let gen = 2;
 // This replaces two buttons that did one job badly: Hills up/Dales up flipped the
 // lift while Heads/Tails flipped only the gradient direction, and since shading
 // depicts height they cannot be independent.
-let heightU = 1; // slider position, −1 … +1
+let heightU = prefs.heightU; // slider position, −1 … +1
 let shadeDepth = 1; // |biased(heightU)|
 
 function biasedHeight(u: number): number {
@@ -54,7 +69,7 @@ function biasedHeight(u: number): number {
 // Face colouring in the tiling view. "Coloured by type or by vertex index" was in
 // the original spec and never got built.
 type TileColour = "cluster" | "type" | "index";
-let tileColour: TileColour = "cluster";
+let tileColour: TileColour = prefs.colour as TileColour;
 
 function faceIndexLow(r: Rhomb): number {
     return Math.min(...r.vertIndices);
@@ -447,7 +462,7 @@ function isoglossSegments(
     return out;
 }
 
-let showIsogloss = false;
+let showIsogloss = prefs.isogloss;
 
 // Ease a range input from one value to another, calling back each frame. Used to
 // snap the height sliders to their meaningful settings on release rather than
@@ -898,7 +913,7 @@ const DPI = 96;
 //
 // It was √5/2 ≈ 1.118" originally, which makes each edge's rise s/√5 exactly half
 // an inch — elegant for measuring heights, arbitrary for paper.
-let sideIn = 1; // inches
+let sideIn = prefs.sideIn; // inches
 
 const PAPER: [number, number] = [8.5, 11];
 const MARGIN_IN = 0.5;
@@ -1438,7 +1453,7 @@ function drawNet() {
 // it re-fit each frame makes the whole picture lurch about and is unwatchable.
 
 type Mode = "build" | "watch";
-let mode: Mode = "watch"; // Automatic: the algorithms are the point; hand-building is the sidebar
+let mode: Mode = prefs.mode === "build" ? "build" : "watch"; // Automatic by default
 
 // Buttons that only make sense while building by hand. Print is deliberately not
 // among them: in Watch mode the canvas holds a complete decomposition, and its
@@ -1451,7 +1466,7 @@ let traceEvents: TraceEvent[] = [];
 let traceIndex = 0; // number of events applied
 let tracePlaying = false;
 let traceSpeed = 15; // events per second, 0 = uncapped
-let traceMethod = "cuttree";
+let traceMethod = prefs.method;
 
 // roles for the tiling view at the current step
 const traceRoles = new Map<number, "placed" | "rejected" | "current">();
@@ -1907,6 +1922,7 @@ function createSheets(): void {
         method: mode === "watch" ? traceMethod : "manual",
     };
     localStorage.setItem(HANDOFF_KEY, JSON.stringify(payload));
+    persist();
     window.location.href = "./sheets.html";
 }
 
@@ -2279,6 +2295,7 @@ function buildControls() {
         if (i === currentSeedIdx) opt.selected = true;
         typeSelect.appendChild(opt);
     }
+    typeSelect.value = String(currentSeedIdx);
     typeSelect.addEventListener("change", () => {
         currentSeedIdx = parseInt(typeSelect.value);
         regenerate();
@@ -2311,6 +2328,7 @@ function buildControls() {
         if (g === gen) opt.selected = true;
         genSelect.appendChild(opt);
     }
+    genSelect.value = String(gen);
     genSelect.addEventListener("change", () => {
         gen = parseInt(genSelect.value);
         regenerate();
@@ -2340,7 +2358,7 @@ function buildControls() {
     heightSlider.min = "-1";
     heightSlider.max = "1";
     heightSlider.step = "0.02";
-    heightSlider.value = "1";
+    heightSlider.value = String(heightU);
     heightSlider.style.width = "130px";
     heightSlider.title =
         "Height: sign flips hills and dales, magnitude sets how strongly height is shaded";
@@ -2381,6 +2399,7 @@ function buildControls() {
     isoWrap.style.cssText = "font-size:13px;display:flex;align-items:center;gap:5px;";
     const isoChk = document.createElement("input");
     isoChk.type = "checkbox";
+    isoChk.checked = showIsogloss;
     isoChk.title =
         "Contour lines of constant height — seven per rhombus, on quarter-index steps";
     isoChk.addEventListener("change", () => {
@@ -2416,7 +2435,7 @@ function buildControls() {
 
     const sideInput = document.createElement("input");
     sideInput.type = "text";
-    sideInput.value = "1in";
+    sideInput.value = `${sideIn}in`;
     sideInput.size = 8;
     sideInput.style.cssText =
         "padding:4px;font-size:13px;border:1px solid #ccc;border-radius:4px;";
@@ -2467,6 +2486,18 @@ function buildControls() {
         "Split this net across pages and open the Sheets page to print them";
     sheetsBtn.addEventListener("click", createSheets);
     controls.appendChild(sheetsBtn);
+
+    const resetBtn = document.createElement("button");
+    resetBtn.textContent = "Reset";
+    resetBtn.title = "Forget saved settings and start again from the defaults";
+    resetBtn.addEventListener("click", () => {
+        if (confirm("Reset the workbench to default settings?")) {
+            window.removeEventListener("beforeunload", persist);
+            window.removeEventListener("pagehide", persist);
+            resetPrefs(PREFS_KEY);
+        }
+    });
+    controls.appendChild(resetBtn);
 
     const printBtn = document.createElement("button");
     printBtn.textContent = "Print net";
@@ -2566,6 +2597,21 @@ if (help) {
 
 // Stamped at build time. If this does not match what was just built, the browser
 // is running a cached script — which has now cost us two debugging sessions.
+function persist(): void {
+    savePrefs(PREFS_KEY, {
+        seed: currentSeedIdx,
+        gen,
+        mode,
+        method: traceMethod,
+        colour: tileColour,
+        sideIn,
+        heightU,
+        isogloss: showIsogloss,
+    });
+}
+window.addEventListener("beforeunload", persist);
+window.addEventListener("pagehide", persist);
+
 console.log(`workbench build ${BUILD_ID}`);
 
 // On the page too, not just the console. Working out whether the browser is running
