@@ -364,6 +364,18 @@ export function paginateNet(
 
 const TAB_MIN_MM = 2.4; // below this there is no room for the letter; drop the tab
 
+// The faint stroke: unoccupied rhombi on the mini, and the folds inside a sheet.
+// One constant for both, since they are meant to read as the same weight and drifted
+// apart when they were written out separately.
+//
+// Darker than it looks like it needs to be. These lines sit on white for the
+// unoccupied rhombi but on a coloured fill inside a sheet, and a grey that reads
+// perfectly well against white all but vanishes against the fill. Chosen by
+// measuring contrast rather than by eye: 5.1 against white, 2.45 against the worst
+// sheet colour. It has to stay clearly lighter than the cuts at #333 and the border
+// at #111 — a fold that competes with a cut is worse than a fold you cannot see.
+const PATCH_GREY = "#6e6e6e";
+
 function pageTransform(pg: Pagination, pageIndex: number, o: PageRenderOpts) {
     const page = pg.pages[pageIndex];
     const usableW = o.pageW - 2 * o.margin;
@@ -1039,7 +1051,7 @@ function patchMini(
     const wFaint = Math.max(0.08 * k, 0.1);
     const wCut = Math.max(0.16 * k, 0.22);
     const wEdge = Math.max(0.26 * k, 0.34);
-    const GREY = "#b4b4b4"; // unoccupied rhombi, and the folds inside a sheet
+    const GREY = PATCH_GREY;
 
     const faint: string[] = [];
     const mine: string[] = [];
@@ -1048,7 +1060,9 @@ function patchMini(
         const poly = d.map((q) => `${n3(q[0])},${n3(q[1])}`).join(" ");
         if (here.has(id)) {
             mine.push(
-                `<polygon points="${poly}" fill="${colour}" fill-opacity="0.85" ` +
+                // 0.70 rather than a solid fill: still unmistakably this sheet's
+                // colour, but light enough that the fold lines on top of it read.
+                `<polygon points="${poly}" fill="${colour}" fill-opacity="0.7" ` +
                     `stroke="none"/>`,
             );
         } else if (withFaint) {
@@ -1152,7 +1166,7 @@ export function renderMap(
     for (const [, pts] of shape) {
         const d = pts.map(T).map((q) => `${n3(q[0])},${n3(q[1])}`).join(" ");
         out.push(
-            `<polygon points="${d}" fill="none" stroke="#b4b4b4" ` +
+            `<polygon points="${d}" fill="none" stroke="${PATCH_GREY}" ` +
                 `stroke-width="${n3(Math.max(0.06 * k, 0.12))}"/>`,
         );
     }
