@@ -24,7 +24,7 @@ import {
     ribbonGrowPatch,
 } from "./unfold.js";
 import { cutTreeUnfold, assignLayers } from "./cuttree.js";
-import { paginateBest, renderPage } from "./paginate.js";
+import { paginateBest, renderPage, TAB_MM } from "./paginate.js";
 import type { Pagination } from "./paginate.js";
 import type { Analysis, Placed, TraceEvent } from "./unfold.js";
 import { parseLength, layoutSheets, renderSheet, PAGES } from "./sheet.js";
@@ -1887,6 +1887,31 @@ document.getElementById("btn-clear")!.addEventListener("click", () => {
 let pagination: Pagination | null = null;
 let currentSheet = 0;
 
+// What reaches the paper. Deliberately separate from the height slider: the slider
+// says which way up the surface sits and how hard the screen shades it, these say
+// whether the rendering carries that information at all.
+let renderShading = true;
+let renderIsoglosses = false;
+
+// Which way up to render. A flat height setting carries no hills-or-dales
+// information, so the rendering falls back to hills.
+const renderDales = (): boolean => (shadeDepth === 0 ? false : flipHeight);
+
+function pageOpts() {
+    return {
+        sideMm: sideIn * 25.4,
+        pageW: PAPER[0] * 25.4,
+        pageH: PAPER[1] * 25.4,
+        margin: MARGIN_IN * 25.4,
+        fillMode: "cluster" as const,
+        shading: renderShading,
+        isoglosses: renderIsoglosses,
+        dales: renderDales(),
+        indexOf: (v: number) => vertexList[v]?.index ?? 1,
+        indexRange: [idxLo, idxHi] as [number, number],
+    };
+}
+
 function createSheets(): void {
     if (!netRhombs.length) {
         say("Nothing on the net to split yet.");
@@ -1894,10 +1919,13 @@ function createSheets(): void {
     }
     if (!analysis) return;
 
-    // Printable area expressed in net units — the pagination is unit-agnostic and
-    // the side length is what ties it to paper.
-    const pageW = PRINTABLE[0] / sideIn;
-    const pageH = PRINTABLE[1] / sideIn;
+    // Printable area in net units — the pagination is unit-agnostic and the side
+    // length is what ties it to paper. Join tabs hang outside the page's bounding
+    // box, so reserve their height on every edge or a tab at the boundary would be
+    // printed off the paper.
+    const tabIn = TAB_MM / 25.4;
+    const pageW = (PRINTABLE[0] - 2 * tabIn) / sideIn;
+    const pageH = (PRINTABLE[1] - 2 * tabIn) / sideIn;
 
     pagination = paginateBest(netAsPlaced(), netHinges, pageW, pageH, ekey);
     if (!pagination.fits || !pagination.pages.length) {
@@ -1963,14 +1991,7 @@ function renderSheetList(): void {
         analysis!.creases,
         netHinges,
         ekey,
-        {
-            sideMm: sideIn * 25.4,
-            pageW: PAPER[0] * 25.4,
-            pageH: PAPER[1] * 25.4,
-            margin: MARGIN_IN * 25.4,
-            fillMode: "cluster",
-            standalone: false,
-        },
+        { ...pageOpts(), standalone: false },
     );
 }
 
@@ -1982,13 +2003,7 @@ function printSheets(): void {
     const host = document.getElementById("printout")!;
     host.innerHTML = pagination.pages
         .map((_, i) =>
-            renderPage(pagination!, i, netAsPlaced(), analysis!.creases, netHinges, ekey, {
-                sideMm: sideIn * 25.4,
-                pageW: PAPER[0] * 25.4,
-                pageH: PAPER[1] * 25.4,
-                margin: MARGIN_IN * 25.4,
-                fillMode: "cluster",
-            }),
+            renderPage(pagination!, i, netAsPlaced(), analysis!.creases, netHinges, ekey, pageOpts()),
         )
         .join("\n");
     say(
@@ -2537,6 +2552,46 @@ function buildControls() {
     });
     layerLabel.appendChild(layerSelect);
     controls.appendChild(layerLabel);
+
+    // Rendering settings — what the printed sheet carries, as against what the
+    // height slider does to the screen.
+    const renderBox = (
+        label: string,
+        get: () => boolean,
+        set: (v: boolean) => void,
+        title: string,
+    ) => {
+        const lab = document.createElement("label");
+        lab.style.fontSize = "13px";
+        lab.title = title;
+        const cb = document.createElement("input");
+        cb.type = "checkbox";
+        cb.checked = get();
+        cb.addEventListener("change", () => {
+            set(cb.checked);
+            if (pagination) renderSheetList();
+            say(
+                `Rendering: ${renderShading ? "shading" : "no shading"}, ` +
+                    `${renderIsoglosses ? "isoglosses" : "no isoglosses"}, ` +
+                    `${renderDales() ? "dales" : "hills"} up.`,
+            );
+        });
+        lab.appendChild(cb);
+        lab.appendChild(document.createTextNode(" " + label));
+        controls.appendChild(lab);
+    };
+    renderBox(
+        "shade",
+        () => renderShading,
+        (v) => (renderShading = v),
+        "Shade the printed sheets by height. Independent of the height slider, which only sets which way up and how strongly the screen shades.",
+    );
+    renderBox(
+        "isoglosses",
+        () => renderIsoglosses,
+        (v) => (renderIsoglosses = v),
+        "Draw the seven quarter-index contours on each rhombus of the printed sheets.",
+    );
 
     const sheetsBtn = document.createElement("button");
     sheetsBtn.textContent = "Create sheets";

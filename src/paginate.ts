@@ -356,6 +356,60 @@ export function paginateNet(
 // two halves can be found and taped without hunting.
 
 const DASH: Record<number, string> = { 36: "2 2", 72: "6 3", 108: "11 3" };
+export const TAB_MM = 5.0; // tab altitude: enough for 3 mm text with air around it
+
+// The tab on a cut edge, shaped as the adjoining rhombus truncated at height `h`.
+// Its slanted sides therefore carry that rhombus's own angles, so the tab reads as
+// the beginning of the piece that continues on the other sheet.
+function tabQuad(
+    a: P2,
+    b: P2,
+    inward: P2,
+    partner: Placed,
+    va: number,
+    vb: number,
+    map: (q: P2) => P2,
+    h: number,
+): { quad: P2[]; cx: number; cy: number; deg: number } {
+    // The partner's two corners away from the shared edge give its offset direction.
+    const idxA = partner.verts.indexOf(va);
+    const idxB = partner.verts.indexOf(vb);
+    let d: P2 = [0, 0];
+    if (idxA >= 0 && idxB >= 0) {
+        const oppA = map(partner.poly[(idxA + 2) % 4] as P2);
+        const pa = map(partner.poly[idxA] as P2);
+        d = [oppA[0] - pa[0], oppA[1] - pa[1]];
+    }
+    // Perpendicular to the edge, pointing away from the face this tab hangs off.
+    let nx = -(b[1] - a[1]);
+    let ny = b[0] - a[0];
+    const nlen = Math.hypot(nx, ny) || 1;
+    nx /= nlen;
+    ny /= nlen;
+    const mid: P2 = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
+    if ((mid[0] - inward[0]) * nx + (mid[1] - inward[1]) * ny < 0) {
+        nx = -nx;
+        ny = -ny;
+    }
+    // Scale the partner's offset so its perpendicular component is exactly h; fall
+    // back to a square tab if the partner geometry is unavailable.
+    const perp = d[0] * nx + d[1] * ny;
+    const off: P2 =
+        Math.abs(perp) > 1e-6
+            ? [(d[0] * h) / perp, (d[1] * h) / perp]
+            : [nx * h, ny * h];
+
+    const quad: P2[] = [a, b, [b[0] + off[0], b[1] + off[1]], [a[0] + off[0], a[1] + off[1]]];
+    let deg = (Math.atan2(b[1] - a[1], b[0] - a[0]) * 180) / Math.PI;
+    if (deg > 90) deg -= 180;
+    if (deg < -90) deg += 180;
+    return {
+        quad,
+        cx: mid[0] + off[0] / 2,
+        cy: mid[1] + off[1] / 2,
+        deg,
+    };
+}
 const n3 = (v: number) => (Math.abs(v) < 1e-9 ? "0" : v.toFixed(3));
 
 export interface PageRenderOpts {
@@ -366,6 +420,63 @@ export interface PageRenderOpts {
     fillMode: "none" | "type" | "cluster";
     showLegend?: boolean;
     standalone?: boolean;
+    // Height-derived decoration. Whether these appear is a *rendering* choice,
+    // independent of the height slider — the slider says which way up the surface
+    // sits and how strongly the screen shades it, these say what reaches the paper.
+    shading?: boolean;
+    isoglosses?: boolean;
+    // Which way up to render. The slider decides, except that a flat setting carries
+    // no hills-or-dales information, so rendering falls back to hills.
+    dales?: boolean;
+    // Height index per tiling vertex, and the range, so paginate need not import the
+    // tiling itself.
+    indexOf?: (v: number) => number;
+    indexRange?: [number, number];
+}
+
+// Light-to-dark along the height gradient. Kept at full strength for print: the
+// screen slider may be set shallow for looking at, but a printed sheet either shows
+// the relief legibly or should not bother.
+function shadeStops(fill: string): [string, string] {
+    return [mixHex(fill, "#ffffff", 0.5), mixHex(fill, "#000000", 0.4)];
+}
+
+function mixHex(a: string, b: string, t: number): string {
+    const p = (h: string) => [
+        parseInt(h.slice(1, 3), 16),
+        parseInt(h.slice(3, 5), 16),
+        parseInt(h.slice(5, 7), 16),
+    ];
+    const [r1, g1, b1] = p(a);
+    const [r2, g2, b2] = p(b);
+    const h = (v: number) => Math.round(v).toString(16).padStart(2, "0");
+    return `#${h(r1 + (r2 - r1) * t)}${h(g1 + (g2 - g1) * t)}${h(b1 + (b2 - b1) * t)}`;
+}
+
+// The seven quarter-index contours across a rhombus, from its lowest corner.
+function isoSegments(pts: P2[], idx: number[]): Array<[P2, P2]> {
+    let k = 0;
+    for (let i = 1; i < 4; i++) if (idx[i] < idx[k]) k = i;
+    const lo = pts[k];
+    const r1 = pts[(k + 1) % 4];
+    const hi = pts[(k + 2) % 4];
+    const r3 = pts[(k + 3) % 4];
+    const mix = (a: P2, b: P2, s: number): P2 => [
+        a[0] + (b[0] - a[0]) * s,
+        a[1] + (b[1] - a[1]) * s,
+    ];
+    const out: Array<[P2, P2]> = [];
+    for (let i = 1; i <= 7; i++) {
+        const t = i / 8;
+        if (t <= 0.5) {
+            const s = t * 2;
+            out.push([mix(lo, r3, s), mix(lo, r1, s)]);
+        } else {
+            const s = (t - 0.5) * 2;
+            out.push([mix(r3, hi, s), mix(r1, hi, s)]);
+        }
+    }
+    return out;
 }
 
 export function renderPage(
@@ -400,14 +511,33 @@ export function renderPage(
 
     const onThisPage = new Set(page.faceIds);
     // Severed hinges touching this page, by edge key, with the partner page.
-    const joinHere = new Map<string, { letter: string; partner: number }>();
+    const joinHere = new Map<
+        string,
+        { letter: string; partner: number; partnerFace: number }
+    >();
     for (const j of pg.joins) {
         if (j.sheetA === pageIndex) {
-            joinHere.set(j.key, { letter: j.letter, partner: j.sheetB });
+            joinHere.set(j.key, {
+                letter: j.letter,
+                partner: j.sheetB,
+                partnerFace: j.faceB,
+            });
         } else if (j.sheetB === pageIndex) {
-            joinHere.set(j.key, { letter: j.letter, partner: j.sheetA });
+            joinHere.set(j.key, {
+                letter: j.letter,
+                partner: j.sheetA,
+                partnerFace: j.faceA,
+            });
         }
     }
+
+    const defs: string[] = [];
+    const isoLines: string[] = [];
+    const [idxLo, idxHi] = o.indexRange ?? [1, 4];
+    const heightOf = (v: number): number => {
+        const raw = o.indexOf ? o.indexOf(v) : 1;
+        return o.dales ? idxLo + idxHi - raw : raw;
+    };
 
     const fills: string[] = [];
     const creaseLines: string[] = [];
@@ -421,15 +551,43 @@ export function renderPage(
         const pts = p.poly.map((q) => map(q as P2));
 
         if (o.fillMode !== "none") {
-            const fill =
+            const base =
                 o.fillMode === "cluster"
                     ? (CLUSTER_TINTS[p.cluster] ?? "#f4f4f4")
                     : p.thick
                       ? "#f2f2fa"
                       : "#fdf4ea";
-            fills.push(
-                `<polygon points="${pts.map((q) => `${n3(q[0])},${n3(q[1])}`).join(" ")}" fill="${fill}"/>`,
-            );
+            const shape = pts.map((q) => `${n3(q[0])},${n3(q[1])}`).join(" ");
+            const vidx = p.verts.map(heightOf);
+            if (o.shading) {
+                // Gradient along the tile's own fall line, low corner to high.
+                let cLo = 0;
+                let cHi = 0;
+                for (let t = 1; t < 4; t++) {
+                    if (vidx[t] < vidx[cLo]) cLo = t;
+                    if (vidx[t] > vidx[cHi]) cHi = t;
+                }
+                const [s0, s1] = shadeStops(base);
+                const gid = `g${pageIndex}_${fid}`;
+                defs.push(
+                    `<linearGradient id="${gid}" gradientUnits="userSpaceOnUse" ` +
+                        `x1="${n3(pts[cLo][0])}" y1="${n3(pts[cLo][1])}" ` +
+                        `x2="${n3(pts[cHi][0])}" y2="${n3(pts[cHi][1])}">` +
+                        `<stop offset="0" stop-color="${s0}"/>` +
+                        `<stop offset="1" stop-color="${s1}"/></linearGradient>`,
+                );
+                fills.push(`<polygon points="${shape}" fill="url(#${gid})"/>`);
+            } else {
+                fills.push(`<polygon points="${shape}" fill="${base}"/>`);
+            }
+            if (o.isoglosses) {
+                for (const [u1, u2] of isoSegments(pts, vidx)) {
+                    isoLines.push(
+                        `<line x1="${n3(u1[0])}" y1="${n3(u1[1])}" x2="${n3(u2[0])}" y2="${n3(u2[1])}" ` +
+                            `stroke="#7a7a7a" stroke-width="0.12" stroke-opacity="0.75"/>`,
+                    );
+                }
+            }
         }
 
         let ccx = 0;
@@ -456,14 +614,30 @@ export function renderPage(
                             `stroke="#111" stroke-width="0.6" stroke-linecap="round"/>`,
                     );
                 }
-                // Label just inside the face, pulled off the edge towards the centre
-                // so it cannot be confused with the neighbouring page's copy.
-                const mx = (a[0] + b[0]) / 2;
-                const my = (a[1] + b[1]) / 2;
-                const t = 0.3;
+                // The label goes *outside* the cut, on a tab shaped like the start of
+                // the rhombus it joins to. Because a rhombus's adjacent angles are
+                // supplementary, truncating the neighbour at a constant height gives a
+                // parallelogram rather than a general trapezoid — the tab really is a
+                // slice of the piece that belongs there.
+                const tab = tabQuad(
+                    a,
+                    b,
+                    [ccx, ccy],
+                    placed.get(join.partnerFace)!,
+                    p.verts[i],
+                    p.verts[(i + 1) % 4],
+                    map,
+                    TAB_MM,
+                );
                 labels.push(
-                    `<text x="${n3(mx + (ccx - mx) * t)}" y="${n3(my + (ccy - my) * t)}" ` +
-                        `font-size="3.4" font-family="sans-serif" font-weight="bold" fill="#111" ` +
+                    `<polygon points="${tab.quad.map((q) => `${n3(q[0])},${n3(q[1])}`).join(" ")}" ` +
+                        `fill="#fff" stroke="#111" stroke-width="0.3" stroke-dasharray="1.6 1.2"/>`,
+                );
+                // Text runs parallel to the cut, upright whichever way the edge lies.
+                labels.push(
+                    `<text x="${n3(tab.cx)}" y="${n3(tab.cy)}" ` +
+                        `transform="rotate(${n3(tab.deg)} ${n3(tab.cx)} ${n3(tab.cy)})" ` +
+                        `font-size="3" font-family="sans-serif" font-weight="bold" fill="#111" ` +
                         `text-anchor="middle" dominant-baseline="central">` +
                         `${join.letter}▸${join.partner + 1}</text>`,
                 );
@@ -499,7 +673,8 @@ export function renderPage(
     }
     void onThisPage;
 
-    out.push(...fills, ...creaseLines, ...cutLines, ...joinLines, ...labels);
+    if (defs.length) out.push(`<defs>${defs.join("")}</defs>`);
+    out.push(...fills, ...isoLines, ...creaseLines, ...cutLines, ...joinLines, ...labels);
 
     // Sheet number, and the joins on this page, so you know what to look for.
     const partners = [...joinHere.values()]
@@ -523,6 +698,158 @@ export function renderPage(
             `${page.faceIds.length} rhombi · side ${(sideMm / 25.4).toFixed(3)} in</text>`,
     );
 
+    out.push(thumbnail(pg, pageIndex, placed, o, cx, cy, page));
     out.push("</svg>");
     return out.join("\n");
+}
+
+// ── the locator thumbnail ─────────────────────────────────────────
+//
+// A sheet on its own tells you nothing about where it belongs. This is the whole net
+// at a glance with the current sheet picked out and every join marked — so before
+// cutting you can see which end you are holding, and after cutting you can find the
+// piece a tab points at.
+//
+// It goes in whichever corner of the printable area is least covered by the net, so
+// it lands in real whitespace rather than on top of the work.
+
+// Sized by area, not by side: a long thin net scaled to fit a 40 mm box comes out
+// well under "a couple of square inches". Aim at the area and cap the long side.
+const THUMB_AREA_MM2 = 1500; // ≈ 2.3 square inches
+const THUMB_MAX_MM = 54;
+
+function thumbnail(
+    pg: Pagination,
+    pageIndex: number,
+    placed: Map<number, Placed>,
+    o: PageRenderOpts,
+    contentX: number,
+    contentY: number,
+    page: Page,
+): string {
+    const { pageW, pageH, margin, sideMm } = o;
+
+    // whole net, in the shared orientation
+    let x0 = Infinity;
+    let y0 = Infinity;
+    let x1 = -Infinity;
+    let y1 = -Infinity;
+    const rotated = new Map<number, P2[]>();
+    for (const [id, p] of placed) {
+        const pts = p.poly.map((q) => rot(q as P2, pg.angle));
+        rotated.set(id, pts);
+        for (const q of pts) {
+            if (q[0] < x0) x0 = q[0];
+            if (q[1] < y0) y0 = q[1];
+            if (q[0] > x1) x1 = q[0];
+            if (q[1] > y1) y1 = q[1];
+        }
+    }
+    const netW = x1 - x0;
+    const netH = y1 - y0;
+    let k = Math.sqrt(THUMB_AREA_MM2 / (netW * netH)); // mm per net unit
+    k = Math.min(k, THUMB_MAX_MM / Math.max(netW, netH));
+    const tw = netW * k;
+    const th = netH * k;
+
+    // Least-covered corner of the printable area, scored against the *faces* rather
+    // than their overall bounding box: these nets are snakey, so there is usually
+    // real whitespace inside the box and the box would hide it.
+    const boxes: Array<[number, number, number, number]> = [];
+    for (const fid of page.faceIds) {
+        const pts = rotated.get(fid)!;
+        let bx0 = Infinity;
+        let by0 = Infinity;
+        let bx1 = -Infinity;
+        let by1 = -Infinity;
+        for (const q of pts) {
+            const X = contentX + (q[0] - page.minX) * sideMm;
+            const Y = contentY + (q[1] - page.minY) * sideMm;
+            if (X < bx0) bx0 = X;
+            if (Y < by0) by0 = Y;
+            if (X > bx1) bx1 = X;
+            if (Y > by1) by1 = Y;
+        }
+        boxes.push([bx0, by0, bx1, by1]);
+    }
+    const pad = 2;
+    const corners: Array<[number, number]> = [
+        [margin + pad, margin + pad],
+        [pageW - margin - tw - pad, margin + pad],
+        [margin + pad, pageH - margin - th - pad - 6],
+        [pageW - margin - tw - pad, pageH - margin - th - pad - 6],
+    ];
+    let best = corners[1];
+    let bestOverlap = Infinity;
+    for (const c of corners) {
+        let ov = 0;
+        for (const b of boxes) {
+            ov +=
+                Math.max(0, Math.min(c[0] + tw, b[2]) - Math.max(c[0], b[0])) *
+                Math.max(0, Math.min(c[1] + th, b[3]) - Math.max(c[1], b[1]));
+        }
+        if (ov < bestOverlap - 1e-9) {
+            bestOverlap = ov;
+            best = c;
+        }
+    }
+    const [tx, ty] = best;
+    const T = (q: P2): P2 => [tx + (q[0] - x0) * k, ty + (q[1] - y0) * k];
+
+    const g: string[] = [];
+    g.push(
+        `<rect x="${n3(tx - 1.5)}" y="${n3(ty - 1.5)}" width="${n3(tw + 3)}" height="${n3(th + 3)}" ` +
+            `fill="#fff" fill-opacity="0.92" stroke="#ddd" stroke-width="0.25"/>`,
+    );
+
+    const here = new Set(page.faceIds);
+    const others: string[] = [];
+    const mine: string[] = [];
+    for (const [id, pts] of rotated) {
+        const d = pts.map((q) => T(q));
+        const poly = d.map((q) => `${n3(q[0])},${n3(q[1])}`).join(" ");
+        if (here.has(id)) {
+            mine.push(
+                `<polygon points="${poly}" fill="#6a5acd" fill-opacity="0.5" stroke="#6a5acd" stroke-width="0.12"/>`,
+            );
+        } else {
+            others.push(
+                `<polygon points="${poly}" fill="none" stroke="#c8c8c8" stroke-width="0.12"/>`,
+            );
+        }
+    }
+    g.push(...others, ...mine);
+
+    // Joins: every one marked, the ones on this sheet lettered.
+    for (const j of pg.joins) {
+        const pa = placed.get(j.faceA);
+        const pb = placed.get(j.faceB);
+        if (!pa || !pb) continue;
+        const ia = pa.verts.indexOf(j.va);
+        const ib = pa.verts.indexOf(j.vb);
+        if (ia < 0 || ib < 0) continue;
+        const ra = rotated.get(j.faceA)!;
+        const m: P2 = [
+            (ra[ia][0] + ra[ib][0]) / 2,
+            (ra[ia][1] + ra[ib][1]) / 2,
+        ];
+        const q = T(m);
+        const onThis = j.sheetA === pageIndex || j.sheetB === pageIndex;
+        g.push(
+            `<circle cx="${n3(q[0])}" cy="${n3(q[1])}" r="${onThis ? 1.1 : 0.6}" ` +
+                `fill="${onThis ? "#c0392b" : "#fff"}" stroke="#c0392b" stroke-width="0.25"/>`,
+        );
+        if (onThis) {
+            g.push(
+                `<text x="${n3(q[0] + 1.7)}" y="${n3(q[1] - 1.1)}" font-size="2.4" ` +
+                    `font-family="sans-serif" font-weight="bold" fill="#c0392b">${j.letter}</text>`,
+            );
+        }
+    }
+
+    g.push(
+        `<text x="${n3(tx)}" y="${n3(ty + th + 3.4)}" font-size="2.6" font-family="sans-serif" ` +
+            `fill="#666">whole net · sheet ${pageIndex + 1} shaded</text>`,
+    );
+    return g.join("\n");
 }

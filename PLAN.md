@@ -127,8 +127,23 @@ edge directions to need the fewest sheets — worth 2–4 sheets on some patches
 (Pe1 gen 3: 11 → 7). That costs a little paper against rotating each page to fit, and
 buys being able to lay the sheets out and see them line up.
 
-Measured at 1 in on Letter: gen 2 is one sheet with no joins; gen 3 is 3–8 sheets
-(St5 8, Pe3 7, Pe1 7, St3 5, Deca 4, St1 3). Runs in under 100 ms even at 1380 faces.
+Each join is drawn as a **tab outside the cut**, shaped like the adjoining rhombus
+truncated at text height. Since a rhombus's adjacent angles are supplementary that
+comes out a parallelogram — a slice of the piece that continues elsewhere — and the
+letter runs parallel to the cut. Tabs hang outside the page's bounding box, so their
+height is reserved on every edge before paginating.
+
+Every sheet carries a **locator thumbnail**: the whole net with this sheet shaded and
+every join dotted, ≈2.7 square inches, placed in whichever corner the net's own faces
+leave clearest.
+
+**Shading and isoglosses on the printed sheet are separate from the height slider.**
+The slider sets which way up the surface sits and how strongly the *screen* shades it;
+the render checkboxes decide whether that reaches paper. A flat height setting carries
+no hills-or-dales information, so rendering falls back to hills.
+
+Measured at 1 in on Letter with tab allowance: gen 2 is one sheet with no joins;
+gen 3 is 4–9 sheets (St5 9, Pe3 8, Pe1 8, Deca 4). Under 100 ms even at 1380 faces.
 
 ## Sheets
 
