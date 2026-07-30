@@ -24,7 +24,14 @@ import {
     ribbonGrowPatch,
 } from "./unfold.js";
 import { cutTreeUnfold, assignLayers } from "./cuttree.js";
-import { paginateBest, renderPage, TAB_MM } from "./paginate.js";
+import {
+    paginateBest,
+    renderPage,
+    renderMap,
+    fitTabHeights,
+    sheetPalette,
+    TAB_MM,
+} from "./paginate.js";
 import type { Pagination } from "./paginate.js";
 import type { Analysis, Placed, TraceEvent } from "./unfold.js";
 import { parseLength, layoutSheets, renderSheet, PAGES } from "./sheet.js";
@@ -42,6 +49,8 @@ const PREF_DEFAULTS = {
     sideIn: 1,
     heightU: 1,
     isogloss: false,
+    shading: true,
+    renderIso: false,
 };
 const prefs = loadPrefs(PREFS_KEY, PREF_DEFAULTS);
 
@@ -286,6 +295,18 @@ function fromScreen(sx: number, sy: number): Pt {
     return p((sx - viewOffX) / viewScale, -(sy - viewOffY) / viewScale);
 }
 
+// Which sheet a rhomb landed on, once the net has been split. This is what turns
+// the tiling canvas into a before-and-after: the same picture you built the net on,
+// now divided and colour-keyed to the sheet list.
+let faceSheet = new Map<number, number>();
+function indexSheets(): void {
+    faceSheet = new Map();
+    if (!pagination) return;
+    pagination.pages.forEach((p, i) => {
+        for (const f of p.faceIds) faceSheet.set(f, i);
+    });
+}
+
 function drawTiling() {
     const ctx = tilingCtx;
     const W = tilingCanvas.width;
@@ -302,6 +323,10 @@ function drawTiling() {
         const vi = r.vertIndices.map(displayIndex);
         const [cLo, cHi] = extremeCorners(vi);
         const faceFill = (): string | CanvasGradient => {
+            // Once the net has been split, the tiling shows the partition: the same
+            // canvas you built the net on, now divided and keyed to the sheet list.
+            const sh = faceSheet.get(r.id);
+            if (sh != null) return sheetColours[sh] ?? "#ddd";
             if (tileColour === "type") return r.thick ? "#9292e3" : "#eec09b";
             if (tileColour === "index") return indexColor(vi[cLo]);
             return makeGradient(
@@ -595,6 +620,12 @@ let layersPinned = false;
 function markNetChanged(): void {
     layersDirty = true;
     layersPinned = false;
+    // The sheets described a net that no longer exists.
+    if (pagination) {
+        pagination = null;
+        faceSheet = new Map();
+        if (view === "sheets") showView("work");
+    }
 }
 // Facts about the last algorithm run, shown on the page. Diagnosing a layer
 // problem from a screenshot needs the method, the overlap count and the layer
@@ -1883,47 +1914,251 @@ document.getElementById("btn-clear")!.addEventListener("click", () => {
     drawNet();
 });
 
-// ── Handing the net to the Sheets page ─────────────────────────────
+// ── Sheets: the same net, split across paper ───────────────────────
 //
-// The workbench is the master: it decides what the net *is*. Splitting that net
-// across paper, and printing it, is a separate job with its own controls, so it
-// lives on its own page.
-//
-// What crosses over is the hinge set. Hinges determine the development completely
-// given the patch, so the Sheets page can rebuild this exact net — which matters
-// because the branch-cut search is stochastic and re-running it would produce a
-// different net. It also means a hand-built net travels just as well as a
-// replayed one.
+// One page, two views. Splitting and printing used to live on a page of its own,
+// which meant serialising the net through localStorage and rebuilding it there —
+// machinery whose only purpose was to survive a navigation nobody wanted. Sharing a
+// document, the net is simply already in memory: switching is instant, there is no
+// format to keep in sync, and the tiling canvas can show the partition on the very
+// canvas you built it on.
 
-export interface NetHandoff {
-    seed: number;
-    gen: number;
-    flip: boolean;
-    sideIn: number;
-    hinges: string[];
-    label: string;
-    method: string;
+let pagination: Pagination | null = null;
+let sheetColours: string[] = [];
+let currentSheet = 0; // −1 is the map
+
+// Rendering settings: print decisions, so they live with the sheets rather than
+// with the height slider, which only says which way up the surface sits.
+let renderShading = prefs.shading;
+let renderIsoglosses = prefs.renderIso;
+let renderBackside = false;
+
+// The patch in its own plane, for the locator mini and the map. Rhomb.verts is
+// exactly that — the tiling, which is the picture you can recognise.
+function tilingPoly(faceId: number): [number, number][] | null {
+    const r = allRhombs[faceId];
+    if (!r) return null;
+    return r.verts.map((q) => [q.x, q.y] as [number, number]);
 }
 
-const HANDOFF_KEY = "wr-net";
+function sheetOpts(sheet = 0) {
+    const [pw, ph] = PAGES.letter;
+    return {
+        sideMm: sideIn * 25.4,
+        pageW: pw,
+        pageH: ph,
+        margin: MARGIN_IN * 25.4,
+        fillMode: "cluster" as const,
+        shading: renderShading,
+        isoglosses: renderIsoglosses,
+        // A flat height setting carries no hills-or-dales information, so rendering
+        // falls back to hills; Back side swaps whatever that came to.
+        dales: renderBackside ? !(shadeDepth !== 0 && flipHeight) : shadeDepth !== 0 && flipHeight,
+        indexOf: (v: number) => vertexList[v]?.index ?? 1,
+        indexRange: [idxLo, idxHi] as [number, number],
+        tilingPoly,
+        sheetColor: sheetColours[sheet] ?? "#6a5acd",
+        sheetColors: sheetColours,
+    };
+}
 
 function createSheets(): void {
+    // Splitting means the whole net, not whatever prefix the replay is sitting on.
+    // A fresh Automatic load parks the scrubber at step 0, so the net on screen is
+    // empty until you play it — running the scrubber to the end here is both what
+    // "create sheets" has to mean and a sensible thing to see happen.
+    if (mode === "watch" && traceEvents.length) {
+        applyPrefix(traceEvents.length);
+        syncTransport();
+    }
     if (!netRhombs.length) {
         say("Nothing on the net to split yet.");
         return;
     }
-    const payload: NetHandoff = {
-        seed: currentSeedIdx,
-        gen,
-        flip: flipHeight,
-        sideIn,
-        hinges: [...netHinges],
-        label: seedTypes[currentSeedIdx]?.label ?? "?",
-        method: mode === "watch" ? traceMethod : "manual",
+    if (!analysis) return;
+
+    // Join tabs hang outside a page's bounding box, so reserve their height on every
+    // edge or a tab at the boundary prints off the paper.
+    const tabIn = TAB_MM / 25.4;
+    const pageW = (PRINTABLE[0] - 2 * tabIn) / sideIn;
+    const pageH = (PRINTABLE[1] - 2 * tabIn) / sideIn;
+
+    const placedNow = netAsPlaced();
+    pagination = paginateBest(placedNow, netHinges, pageW, pageH, ekey);
+    if (!pagination.fits || !pagination.pages.length) {
+        say(
+            `A single rhombus does not fit the printable area at ${(sideIn * 25.4).toFixed(1)} mm side. ` +
+                `Reduce the side.`,
+        );
+        pagination = null;
+        return;
+    }
+    sheetColours = sheetPalette(pagination.pages.length);
+    indexSheets();
+    pagination.tabH = fitTabHeights(pagination, placedNow, sheetOpts());
+    currentSheet = -1; // the map first: it is the key to everything else
+    drawSheets();
+    showView("sheets");
+    drawTiling(); // the partition, on the canvas the net was built on
+}
+
+function sheetSvg(i: number): string {
+    const placedNow = netAsPlaced();
+    return i === -1
+        ? renderMap(pagination!, placedNow, { ...sheetOpts(), standalone: false })
+        : renderPage(
+              pagination!,
+              i,
+              placedNow,
+              analysis!.creases,
+              netHinges,
+              ekey,
+              { ...sheetOpts(i), standalone: false },
+          );
+}
+
+function printSheets(which: number | "all"): void {
+    if (!pagination) return;
+    const host = document.getElementById("printout")!;
+    const list =
+        which === "all"
+            ? [-1, ...pagination.pages.map((_, i) => i)] // map first
+            : [which];
+    host.innerHTML = list.map((i) => sheetSvg(i)).join("\n");
+    window.print();
+}
+
+function drawSheets(): void {
+    if (!pagination) return;
+    const list = document.getElementById("sheet-list")!;
+    list.innerHTML = "";
+
+    const row = (
+        label: string,
+        sub: string,
+        idx: number,
+        swatch?: string,
+    ): void => {
+        const d = document.createElement("div");
+        d.className = "row" + (idx === currentSheet ? " on" : "");
+        const pick = document.createElement("button");
+        pick.className = "pick";
+        pick.innerHTML =
+            (swatch ? `<span class="sw" style="background:${swatch}"></span>` : "") +
+            `<strong>${label}</strong><br><span class="j">${sub}</span>`;
+        pick.addEventListener("click", () => {
+            currentSheet = idx;
+            drawSheets();
+        });
+        const pr = document.createElement("button");
+        pr.className = "one";
+        pr.textContent = "Print";
+        pr.title = `Print ${label} on its own`;
+        pr.addEventListener("click", (e) => {
+            e.stopPropagation();
+            printSheets(idx);
+        });
+        d.appendChild(pick);
+        d.appendChild(pr);
+        list.appendChild(d);
     };
-    localStorage.setItem(HANDOFF_KEY, JSON.stringify(payload));
-    persist();
-    window.location.href = "./sheets.html";
+
+    row("Map", "the whole patch, colour-coded — print this first", -1);
+    pagination.pages.forEach((page, i) => {
+        const joins = pagination!.joins
+            .filter((j) => j.sheetA === i || j.sheetB === i)
+            .map((j) => `${j.letter}\u25b8${(j.sheetA === i ? j.sheetB : j.sheetA) + 1}`)
+            .sort()
+            .join(" ");
+        row(
+            `Sheet ${i + 1}`,
+            `${page.faceIds.length} rhombi · ${joins || "no joins"}`,
+            i,
+            sheetColours[i],
+        );
+    });
+
+    document.getElementById("sheet-view")!.innerHTML = sheetSvg(currentSheet);
+    document.getElementById("sheet-status")!.textContent =
+        `${seedTypes[currentSeedIdx]?.label} gen ${gen}, ${netRhombs.length} rhombi, ` +
+        `${sideIn} in side — ${pagination.pages.length} sheets, ` +
+        `${pagination.joins.length} taped join${pagination.joins.length === 1 ? "" : "s"}, ` +
+        `one shared orientation. Build ${BUILD_ID}.`;
+}
+
+function buildViewTabs(): void {
+    document.getElementById("tab-work")!.addEventListener("click", () => {
+        showView("work");
+    });
+    document.getElementById("tab-sheets")!.addEventListener("click", () => {
+        if (!pagination) {
+            createSheets();
+            return;
+        }
+        showView("sheets");
+    });
+
+    const box = (id: string, get: () => boolean, set: (v: boolean) => void) => {
+        const cb = document.getElementById(id) as HTMLInputElement;
+        cb.checked = get();
+        cb.addEventListener("change", () => {
+            set(cb.checked);
+            drawSheets();
+        });
+    };
+    box("sheet-shade", () => renderShading, (v) => (renderShading = v));
+    box("sheet-iso", () => renderIsoglosses, (v) => (renderIsoglosses = v));
+    box("sheet-back", () => renderBackside, (v) => (renderBackside = v));
+
+    const sideBox = document.getElementById("sheet-side") as HTMLInputElement;
+    sideBox.value = String(sideIn);
+    sideBox.addEventListener("change", () => {
+        const v = parseFloat(sideBox.value);
+        if (!isFinite(v) || v <= 0) {
+            say(`Cannot read "${sideBox.value}" as a side length in inches.`);
+            return;
+        }
+        sideIn = v;
+        refreshNetView();
+        drawNet();
+        createSheets(); // the split depends on the side, so redo it
+    });
+
+    document
+        .getElementById("sheet-printall")!
+        .addEventListener("click", () => printSheets("all"));
+    document.getElementById("sheet-reset")!.addEventListener("click", () => {
+        if (confirm("Reset saved settings and start again from the defaults?")) {
+            window.removeEventListener("beforeunload", persist);
+            window.removeEventListener("pagehide", persist);
+            resetPrefs(PREFS_KEY);
+        }
+    });
+
+}
+
+// ── the two views ─────────────────────────────────────────────────
+
+type View = "work" | "sheets";
+let view: View = "work";
+
+function showView(v: View): void {
+    view = v;
+    document.getElementById("view-work")!.style.display = v === "work" ? "" : "none";
+    document.getElementById("view-sheets")!.style.display =
+        v === "sheets" ? "" : "none";
+    const tw = document.getElementById("tab-work")!;
+    const ts = document.getElementById("tab-sheets")!;
+    tw.setAttribute("aria-current", String(v === "work"));
+    ts.setAttribute("aria-current", String(v === "sheets"));
+    document.getElementById("tabnote")!.textContent =
+        v === "sheets"
+            ? ""
+            : pagination
+              ? `${pagination.pages.length} sheets ready — the tiling shows the partition`
+              : "";
+    // `history` is taken by the undo stack in this module, so be explicit.
+    window.history.replaceState(null, "", v === "sheets" ? "#sheets" : "#");
 }
 
 // ── Print ─────────────────────────────────────────────────────────
@@ -2607,6 +2842,8 @@ function persist(): void {
         sideIn,
         heightU,
         isogloss: showIsogloss,
+        shading: renderShading,
+        renderIso: renderIsoglosses,
     });
 }
 window.addEventListener("beforeunload", persist);
@@ -2624,6 +2861,7 @@ console.log(`workbench build ${BUILD_ID}`);
 
 buildModeBar();
 buildControls();
+buildViewTabs();
 sizeTilingCanvas();
 sizeNetCanvas();
 generate();
@@ -2635,6 +2873,15 @@ drawNet();
 // default, so the page should open already showing a replay with the manual-only
 // controls out of the way.
 setMode(mode);
+
+// Deep link from the nav. This has to wait for the net: setMode may defer a heavy
+// search to a timeout, so queue behind it rather than reading an empty net.
+if (location.hash === "#sheets") {
+    // createSheets runs the replay to the end itself, so no guard here — guarding on
+    // the current net would test the scrubber's position rather than whether a net
+    // exists at all.
+    setTimeout(createSheets, 0);
+}
 
 window.addEventListener("resize", () => {
     sizeTilingCanvas();

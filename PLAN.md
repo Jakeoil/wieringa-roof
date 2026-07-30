@@ -14,9 +14,9 @@ golden rhombi for physical models.
 | `roof3d.html` | three.js prototype of the surface | done |
 | `info.html` | "Mathematics" — golden rhombus, heights, fold angles, defects | done |
 | `polyhedra.html` | triacontahedron + the two rhombohedra, generated diagrams | done |
-| `unfold.html` | **Workbench** — build or replay a net; the master page | done |
+| `unfold.html` | **Workbench** and **Sheets**, two views of one page | done |
 | `tools.html` | true-size templates, fold gauges, forming jigs, kit list | done |
-| `sheets.html` | split that net across pages, print one or all | done |
+
 
 `src/geometry.ts` holds the tiling and the lift; `src/unfold.ts` the two
 region-growing methods and `src/cuttree.ts` the branch-cut routing; `src/sheet.ts` layout and SVG;
@@ -147,16 +147,24 @@ gen 3 is 4–9 sheets (St5 9, Pe3 8, Pe1 8, Deca 4). Under 100 ms even at 1380 f
 
 ## Sheets
 
-`sheets.html` (`src/sheets.ts`) takes the net the Workbench made and turns it into
-paper. Per-sheet print buttons, print-all, a preview, and the rendering settings —
-because shading and isoglosses are print decisions, not modelling ones.
+Sheets is a **second view of the Workbench page**, not a page of its own. Per-sheet
+print buttons, print-all, a preview, and the rendering settings — because shading and
+isoglosses are print decisions, not modelling ones.
 
-**The handoff is the hinge set**, passed through `localStorage`. Hinges pin the
-development completely given the patch, so this rebuilds the Workbench's exact net
-rather than re-running the search — which matters, since the branch-cut search is
-stochastic and a re-run would quietly hand back a different net. Verified: rebuilding
-from hinges alone reproduces every placement with **0.0 deviation**. A hand-built net
-travels exactly as well as a replayed one.
+Sharing a document is what makes it simple: the net is already in memory, so there is
+nothing to serialise, nothing to rebuild, no format to keep in sync, and switching is
+instant. A separate page needed the hinge set passed through `localStorage` and
+re-developed on arrival — machinery whose only purpose was surviving a navigation
+nobody wanted. The `#sheets` hash deep-links to the view and splits the current net on
+arrival.
+
+**The tiling canvas shows the partition.** Once a net is split, each region is drawn
+in its sheet's colour on the very canvas the net was built on — before and after in
+one picture, keyed to the sheet list, the minis and the Map.
+
+Splitting always uses the **finished** net: a fresh Automatic load parks the scrubber
+at step 0, so `createSheets` runs the replay to the end first rather than splitting
+whatever prefix happens to be on screen.
 
 Every sheet carries a **locator mini of the patch** — the Penrose tiling, not the
 development. The tiling is the picture that can be recognised; the unfolded net is a

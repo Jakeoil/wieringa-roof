@@ -77,6 +77,46 @@
         width: 420px;
     }
 
+    .viewtabs { display: flex; gap: 8px; align-items: center; margin: 0 0 14px; }
+    .viewtabs button {
+        font: inherit;
+        font-size: 14px;
+        padding: 6px 16px;
+        border: 1px solid var(--rule);
+        background: #fff;
+        border-radius: 6px;
+        cursor: pointer;
+    }
+    .viewtabs button[aria-current="true"] {
+        border-color: var(--accent);
+        background: #f2f0fb;
+        font-weight: 600;
+    }
+    .viewtabs button:hover { border-color: var(--accent); }
+
+    .sheetcols { display: flex; gap: 20px; align-items: flex-start; flex-wrap: wrap; }
+    #sheet-list { display: flex; flex-direction: column; gap: 4px; min-width: 250px; }
+    #sheet-list .row { display: flex; gap: 4px; }
+    #sheet-list .pick {
+        flex: 1; text-align: left; font: inherit; font-size: 13px; padding: 7px 10px;
+        border: 1px solid var(--rule); background: #fff; border-radius: 5px; cursor: pointer;
+    }
+    #sheet-list .row.on .pick { border-color: var(--accent); background: #f2f0fb; }
+    #sheet-list .pick:hover { border-color: var(--accent); }
+    #sheet-list .one {
+        font: inherit; font-size: 12px; padding: 0 10px; border: 1px solid var(--rule);
+        background: #fff; border-radius: 5px; cursor: pointer;
+    }
+    #sheet-list .one:hover { border-color: var(--accent); color: var(--accent); }
+    #sheet-list .j { color: var(--ink-faint); }
+    .sw {
+        display: inline-block; width: 11px; height: 11px; border-radius: 2px;
+        border: 1px solid rgba(0,0,0,0.25); margin-right: 6px; vertical-align: -1px;
+    }
+    #sheet-view svg {
+        border: 1px solid #ccc; background: #fff; width: 500px; max-width: 100%; height: auto;
+    }
+
     .bars { margin: 0 0 8px; }
     .bars .controls { margin: 0 0 6px; gap: 12px; }
     /* Fixed height: the readout changes length constantly and would otherwise
@@ -114,7 +154,7 @@
     <a href="./polyhedra.html" draggable="false">Polyhedra</a>
     <a href="./unfold.html" draggable="false" aria-current="page">Workbench</a>
     <a href="./tools.html" draggable="false">Tools</a>
-    <a href="./sheets.html" draggable="false">Sheets</a>
+    <a href="./unfold.html#sheets" draggable="false">Sheets</a>
 </nav>
 
 <div class="wrap-wide">
@@ -155,8 +195,7 @@
         snip along it. The <strong>Side</strong> box sets the rhombus edge, which is
         the real lever — at the default <strong>1 in</strong>, which is the rhombus
         <em>edge</em>, a sheet holds about twenty rhombi. Every generation-2 patch
-        fits one Letter sheet at that size; see <a href="./sheets.html">Sheets</a>
-        for those already laid out.
+        fits one Letter sheet at that size.
         <br><br>
         <strong>Watching a replay.</strong> Play, or step with ← and →, or drag the
         scrubber; space toggles play. The tiling shows the search's own state —
@@ -191,12 +230,12 @@
         file. Changing the net discards the sheets, since they described a net that no
         longer exists.
         <br><br>
-        <strong>Create sheets</strong> hands this net to the
-        <a href="./sheets.html">Sheets</a> page, which splits it across paper and prints
-        it — individually or all at once — and carries the rendering choices, since
-        those are print decisions. What crosses over is the hinge set, which pins the
-        development exactly, so a hand-built net travels as well as a replayed one and
-        the stochastic search is never re-run behind your back.
+        <strong>Create sheets</strong> splits this net across paper and switches to the
+        <strong>Sheets</strong> view — the same page, so nothing is re-computed and
+        switching back is instant. Sheets carries the rendering choices, since those are
+        print decisions rather than modelling ones, and prints individually or all at
+        once. Once a net is split, the tiling canvas here shows the partition, each
+        region in its sheet's colour: the same picture you built on, now divided.
         <br><br>
         <strong>Print net</strong> is the overview instead: the whole net on one page,
         shrunk however far it takes to fit.
@@ -234,6 +273,13 @@
         </div>
     </details>
 
+    <div class="viewtabs">
+        <button id="tab-work" aria-current="true">Workbench</button>
+        <button id="tab-sheets">Sheets</button>
+        <span class="info" id="tabnote"></span>
+    </div>
+
+    <div id="view-work">
     <div class="bars">
         <div class="controls" id="modebar"></div>
         <div class="controls" id="controls">
@@ -251,6 +297,44 @@
         <div class="panel">
             <h3>Net (true size on the sheet)</h3>
             <canvas id="net" width="620" height="802"></canvas>
+        </div>
+    </div>
+    </div><!-- /view-work -->
+
+    <div id="view-sheets" style="display:none">
+        <span class="info" id="sheet-status" style="display:block;margin:0 0 12px"></span>
+
+        <div class="controls" style="margin:0 0 14px">
+            <label>Side <input type="text" id="sheet-side" size="6"> in</label>
+            <label><input type="checkbox" id="sheet-shade"> shade</label>
+            <label><input type="checkbox" id="sheet-iso"> isoglosses</label>
+            <label><input type="checkbox" id="sheet-back"> back side</label>
+            <button id="sheet-printall">Print all</button>
+            <button id="sheet-reset">Reset</button>
+        </div>
+
+        <div class="sheetcols">
+            <div id="sheet-list"></div>
+            <div id="sheet-view"></div>
+        </div>
+
+        <div class="note" style="margin-top:22px;max-width:900px">
+            <strong>Joins.</strong> Each cut carries a tab shaped like the rhombus it
+            joins to — the adjoining rhombus truncated at text height, a parallelogram
+            because a rhombus's adjacent angles are supplementary. It is lettered with
+            the sheet its other half is on: <span class="mono">A▸3</span> tapes to
+            <span class="mono">A▸1</span> on sheet 3.
+            <br><br>
+            Every sheet carries a mini of the <strong>patch</strong> with its own rhombi
+            filled in the sheet's colour and outlined along its cuts. The same colour
+            keys this list, the mini, the <strong>Map</strong>, and the tiling canvas on
+            the Workbench — so a sheet and its region read as one thing.
+            <br><br>
+            All sheets share one orientation, so the printed pages lie together the way
+            they assemble. <strong>Print at 100%</strong> — no scaling, no fit-to-page —
+            and measure a rhombus edge against the side length before cutting.
+            <strong>Back side</strong> swaps hills for dales for the underside;
+            reflection does not matter, since every patch here has a mirror axis.
         </div>
     </div>
 
