@@ -16,6 +16,7 @@ golden rhombi for physical models.
 | `polyhedra.html` | triacontahedron + the two rhombohedra, generated diagrams | done |
 | `unfold.html` | build or replay a net, layer selector, print at true size | done |
 | `tools.html` | true-size templates, fold gauges, forming jigs, kit list | done |
+| `sheets.html` | nine finished nets at true size, 1 in to a rhombus, ready to cut | done |
 
 `src/geometry.ts` holds the tiling and the lift; `src/unfold.ts` the two
 region-growing methods and `src/cuttree.ts` the branch-cut routing; `src/sheet.ts` layout and SVG;
@@ -106,6 +107,22 @@ The P1 tiles map onto rhomb clusters (confirmed in `emitRhombs`):
 Each seed is expanded a generation or two and printed as an **independent
 one-sheet model** — no cross-sheet edge matching. `deca-shape-expansion.png` is
 the `penrose-mosaic` reference showing four generations.
+
+## Sheets
+
+`node tools/make-sheets.mjs` regenerates `sheets.html` plus one standalone SVG per
+model in `sheets/`. **One inch is the rhombus side**, and every generation-2 seed
+fits a single Letter sheet at exactly that — one inch, one model, one page, no
+arithmetic. Generation 3 exceeds a page at 1 in; only St1 (0.7 in) and Deca (0.5 in)
+fit reduced, and the rest need a net split across sheets, which is Stage B.
+
+The generator verifies before it writes: one piece, zero overlaps by exact area,
+inside the printable frame, and a side of at least 12 mm — below that the 72°
+dihedrals stop being foldable. Anything failing is reported and skipped, so the page
+never carries a net that cannot be built.
+
+Note `unfold.html` still defaults to 1.118 in, which is `√5/2` and makes each edge's
+rise `s/√5` exactly half an inch. Elegant for measuring heights, arbitrary for paper.
 
 ## Print
 

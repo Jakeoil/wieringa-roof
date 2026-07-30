@@ -546,6 +546,45 @@ seeds and returns early on the other four.
 Cross-checked: the workbench's own layer count, reconstructed from `netHinges` plus
 placement order, agrees with the algorithm's on every seed at generation 4.
 
+### Open: gen-4 layer count disagrees between browser and node
+
+**Unresolved, and parked deliberately — generation 4 is research, not a model we
+print.** Recorded so it is not rediscovered from scratch.
+
+On `unfold.html`, St5 and Pe5 at generation 4 report **1 layer** and hide the
+selector. Every measurement outside the browser says 2 and 3. Facts established:
+
+- The method really was branch cuts. `unfoldPatch` and `ribbonGrowPatch` both emit
+  consider/reject trace events, so the reported "considered 0, rejected 0" can only
+  come from `cutTreeUnfold`.
+- Zero overlaps is **not** reachable for St5 gen 4 — five seeds gave 5, 20, 36, 42,
+  68 at the full budget. So a 1-layer result is not the search quietly succeeding.
+- Simulating the page's exact sequence in node — same flip, same trace option, net
+  rebuilt from `res.placed`, hinges empty as the page had them — returns 2 and 3
+  correctly. The discrepancy does not reproduce outside the browser.
+- `layerCount === 1` happens only when `overlapPairs` finds nothing, so the page and
+  the library disagree about the same geometry, which should be impossible.
+
+Best remaining hypothesis: **partial script caching.** The build stamp only proves
+`workbench.js` is fresh; a stale `cuttree.js` would produce exactly this. That has
+cost this project two debugging sessions already.
+
+Two real bugs were found while looking, both fixed and both worth keeping fixed
+regardless of the above:
+
+- `runTraceBody` cleared `netHinges` and never refilled it, so the layering ran with
+  **no parent tree**, silently degrading continuation to plain lowest-fit — the
+  confetti it exists to avoid. The count often still came out right, so it was
+  invisible while being exactly wrong.
+- The page reconstructed layers from the net on screen when `cutTreeUnfold` had
+  already computed them from the real hinge tree. It now adopts `res.layer`
+  directly. Two paths that can only agree at best and disagree silently at worst
+  should have been one.
+
+The readout now always states method, overlaps, cuts and layers, and says
+`⚠ INCONSISTENT` when overlaps and layers contradict, falling back to layering the
+net on screen so the control still works. Whoever picks this up should start there.
+
 ### Layers: the z coordinate, taken literally
 
 Interim step before Stage B, and the visualization asked for. Where the net wraps

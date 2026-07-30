@@ -1,0 +1,51 @@
+<svg class="sheet" xmlns="http://www.w3.org/2000/svg" width="215.9mm" height="279.4mm" viewBox="0 0 215.9 279.4">
+<rect x="0" y="0" width="215.9" height="279.4" fill="#fff"/>
+<polygon points="88.230,127.142 113.630,127.142 124.989,149.860 99.589,149.860" fill="#f9e9dc"/>
+<polygon points="113.630,127.142 124.989,149.860 140.229,129.540 128.870,106.822" fill="#f9e9dc"/>
+<polygon points="124.989,149.860 99.589,149.860 88.230,172.578 113.630,172.578" fill="#f9e9dc"/>
+<polygon points="99.589,149.860 88.230,127.142 62.830,127.142 74.189,149.860" fill="#f9e9dc"/>
+<polygon points="113.630,127.142 128.870,106.822 117.510,84.103 102.270,104.423" fill="#f9e9dc"/>
+<polygon points="113.630,172.578 88.230,172.578 76.870,195.297 102.270,195.297" fill="#f9e9dc"/>
+<polygon points="88.230,127.142 62.830,127.142 74.189,104.423 99.589,104.423" fill="#f9e9dc"/>
+<polygon points="128.870,106.822 117.510,84.103 142.910,84.103 154.270,106.822" fill="#f9e9dc"/>
+<polygon points="88.230,172.578 76.870,195.297 61.630,174.977 72.990,152.258" fill="#f9e9dc"/>
+<line x1="113.630" y1="127.142" x2="124.989" y2="149.860" stroke="#2469b8" stroke-width="0.28" stroke-dasharray="1.4 1.4"/>
+<line x1="124.989" y1="149.860" x2="99.589" y2="149.860" stroke="#2469b8" stroke-width="0.28" stroke-dasharray="1.4 1.4"/>
+<line x1="99.589" y1="149.860" x2="88.230" y2="127.142" stroke="#c0392b" stroke-width="0.28" stroke-dasharray="3.2 1.6"/>
+<line x1="128.870" y1="106.822" x2="113.630" y2="127.142" stroke="#c0392b" stroke-width="0.28" stroke-dasharray="3.2 1.6"/>
+<line x1="88.230" y1="172.578" x2="113.630" y2="172.578" stroke="#c0392b" stroke-width="0.28" stroke-dasharray="3.2 1.6"/>
+<line x1="88.230" y1="127.142" x2="62.830" y2="127.142" stroke="#c0392b" stroke-width="0.28" stroke-dasharray="6 1.8"/>
+<line x1="128.870" y1="106.822" x2="117.510" y2="84.103" stroke="#c0392b" stroke-width="0.28" stroke-dasharray="6 1.8"/>
+<line x1="88.230" y1="172.578" x2="76.870" y2="195.297" stroke="#c0392b" stroke-width="0.28" stroke-dasharray="6 1.8"/>
+<line x1="88.230" y1="127.142" x2="113.630" y2="127.142" stroke="#111" stroke-width="0.5" stroke-linecap="round"/>
+<line x1="124.989" y1="149.860" x2="140.229" y2="129.540" stroke="#111" stroke-width="0.5" stroke-linecap="round"/>
+<line x1="140.229" y1="129.540" x2="128.870" y2="106.822" stroke="#111" stroke-width="0.5" stroke-linecap="round"/>
+<line x1="99.589" y1="149.860" x2="88.230" y2="172.578" stroke="#111" stroke-width="0.5" stroke-linecap="round"/>
+<line x1="113.630" y1="172.578" x2="124.989" y2="149.860" stroke="#111" stroke-width="0.5" stroke-linecap="round"/>
+<line x1="62.830" y1="127.142" x2="74.189" y2="149.860" stroke="#111" stroke-width="0.5" stroke-linecap="round"/>
+<line x1="74.189" y1="149.860" x2="99.589" y2="149.860" stroke="#111" stroke-width="0.5" stroke-linecap="round"/>
+<line x1="117.510" y1="84.103" x2="102.270" y2="104.423" stroke="#111" stroke-width="0.5" stroke-linecap="round"/>
+<line x1="102.270" y1="104.423" x2="113.630" y2="127.142" stroke="#111" stroke-width="0.5" stroke-linecap="round"/>
+<line x1="76.870" y1="195.297" x2="102.270" y2="195.297" stroke="#111" stroke-width="0.5" stroke-linecap="round"/>
+<line x1="102.270" y1="195.297" x2="113.630" y2="172.578" stroke="#111" stroke-width="0.5" stroke-linecap="round"/>
+<line x1="62.830" y1="127.142" x2="74.189" y2="104.423" stroke="#111" stroke-width="0.5" stroke-linecap="round"/>
+<line x1="74.189" y1="104.423" x2="99.589" y2="104.423" stroke="#111" stroke-width="0.5" stroke-linecap="round"/>
+<line x1="99.589" y1="104.423" x2="88.230" y2="127.142" stroke="#111" stroke-width="0.5" stroke-linecap="round"/>
+<line x1="117.510" y1="84.103" x2="142.910" y2="84.103" stroke="#111" stroke-width="0.5" stroke-linecap="round"/>
+<line x1="142.910" y1="84.103" x2="154.270" y2="106.822" stroke="#111" stroke-width="0.5" stroke-linecap="round"/>
+<line x1="154.270" y1="106.822" x2="128.870" y2="106.822" stroke="#111" stroke-width="0.5" stroke-linecap="round"/>
+<line x1="76.870" y1="195.297" x2="61.630" y2="174.977" stroke="#111" stroke-width="0.5" stroke-linecap="round"/>
+<line x1="61.630" y1="174.977" x2="72.990" y2="152.258" stroke="#111" stroke-width="0.5" stroke-linecap="round"/>
+<line x1="72.990" y1="152.258" x2="88.230" y2="172.578" stroke="#111" stroke-width="0.5" stroke-linecap="round"/>
+<text x="61.630" y="199.297" font-size="3.2" font-family="sans-serif" fill="#aaa">1 · 9 rhombi</text>
+<text x="12.700" y="271.200" font-size="3" font-family="sans-serif" fill="#666">cut</text>
+<line x1="21.700" y1="270.200" x2="33.700" y2="270.200" stroke="#111" stroke-width="0.5"/>
+<text x="36.700" y="271.200" font-size="3" font-family="sans-serif" fill="#666">36°</text>
+<line x1="43.700" y1="270.200" x2="55.700" y2="270.200" stroke="#666" stroke-width="0.28" stroke-dasharray="1.4 1.4"/>
+<text x="58.700" y="271.200" font-size="3" font-family="sans-serif" fill="#666">72°</text>
+<line x1="65.700" y1="270.200" x2="77.700" y2="270.200" stroke="#666" stroke-width="0.28" stroke-dasharray="3.2 1.6"/>
+<text x="80.700" y="271.200" font-size="3" font-family="sans-serif" fill="#666">108°</text>
+<line x1="89.700" y1="270.200" x2="101.700" y2="270.200" stroke="#666" stroke-width="0.28" stroke-dasharray="6 1.8"/>
+<text x="104.700" y="271.200" font-size="3" font-family="sans-serif" fill="#c0392b">mountain</text>
+<text x="124.700" y="271.200" font-size="3" font-family="sans-serif" fill="#2469b8">valley</text>
+</svg>
