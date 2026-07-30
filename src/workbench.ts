@@ -24,6 +24,8 @@ import {
     ribbonGrowPatch,
 } from "./unfold.js";
 import { cutTreeUnfold, assignLayers } from "./cuttree.js";
+import { paginateBest, renderPage } from "./paginate.js";
+import type { Pagination } from "./paginate.js";
 import type { Analysis, Placed, TraceEvent } from "./unfold.js";
 import { parseLength, layoutSheets, renderSheet, PAGES } from "./sheet.js";
 import { BUILD_ID } from "./build-id.js";
@@ -578,6 +580,12 @@ let layersPinned = false;
 function markNetChanged(): void {
     layersDirty = true;
     layersPinned = false;
+    // The sheets describe a net that no longer exists.
+    if (pagination) {
+        pagination = null;
+        const panel = document.getElementById("sheetpanel");
+        if (panel) panel.style.display = "none";
+    }
 }
 // Facts about the last algorithm run, shown on the page. Diagnosing a layer
 // problem from a screenshot needs the method, the overlap count and the layer
@@ -1865,6 +1873,131 @@ document.getElementById("btn-clear")!.addEventListener("click", () => {
     drawNet();
 });
 
+// ── Sheets: split the finished net across pages ────────────────────
+//
+// The workbench is the master: you configure the patch and the method, get one net,
+// and when it looks right you split it. A generation-3 net is several times the size
+// of a sheet, so this is not optional at that scale — and the split is what makes a
+// big net buildable rather than merely correct.
+//
+// Every severed hinge becomes a taped join carrying a letter and the page number of
+// its other half, so the two can be found without hunting. All pages share one
+// orientation, so the printed sheets lie together the way they will assemble.
+
+let pagination: Pagination | null = null;
+let currentSheet = 0;
+
+function createSheets(): void {
+    if (!netRhombs.length) {
+        say("Nothing on the net to split yet.");
+        return;
+    }
+    if (!analysis) return;
+
+    // Printable area expressed in net units — the pagination is unit-agnostic and
+    // the side length is what ties it to paper.
+    const pageW = PRINTABLE[0] / sideIn;
+    const pageH = PRINTABLE[1] / sideIn;
+
+    pagination = paginateBest(netAsPlaced(), netHinges, pageW, pageH, ekey);
+    if (!pagination.fits || !pagination.pages.length) {
+        say(
+            `A single rhombus does not fit the printable area at ${(sideIn * 25.4).toFixed(1)} mm side. ` +
+                `Reduce the side.`,
+        );
+        pagination = null;
+        return;
+    }
+    currentSheet = 0;
+    renderSheetList();
+    say(
+        `${netRhombs.length} rhombi split into ${pagination.pages.length} sheet` +
+            `${pagination.pages.length === 1 ? "" : "s"} with ` +
+            `${pagination.joins.length} taped join${pagination.joins.length === 1 ? "" : "s"}, ` +
+            `all at one orientation.`,
+    );
+}
+
+function sheetJoinSummary(idx: number): string {
+    if (!pagination) return "";
+    const here = pagination.joins
+        .filter((j) => j.sheetA === idx || j.sheetB === idx)
+        .map((j) => `${j.letter}\u25b8${(j.sheetA === idx ? j.sheetB : j.sheetA) + 1}`)
+        .sort();
+    return here.length ? here.join(" ") : "no joins";
+}
+
+function renderSheetList(): void {
+    const panel = document.getElementById("sheetpanel")!;
+    const list = document.getElementById("sheetlist")!;
+    const info = document.getElementById("sheetinfo")!;
+    if (!pagination) {
+        panel.style.display = "none";
+        return;
+    }
+    panel.style.display = "";
+    info.textContent =
+        `${pagination.pages.length} sheets, ${pagination.joins.length} taped joins, ` +
+        `shared orientation ${((pagination.angle * 180) / Math.PI).toFixed(1)}°. ` +
+        `Each join is a letter and the sheet its other half is on — tape like to like.`;
+
+    list.innerHTML = "";
+    pagination.pages.forEach((pageX, i) => {
+        const b = document.createElement("button");
+        b.innerHTML =
+            `Sheet ${i + 1} — ${pageX.faceIds.length} rhombi` +
+            `<br><span class="joins">${sheetJoinSummary(i)}</span>`;
+        b.setAttribute("aria-current", i === currentSheet ? "true" : "false");
+        b.addEventListener("click", () => {
+            currentSheet = i;
+            renderSheetList();
+        });
+        list.appendChild(b);
+    });
+
+    const view = document.getElementById("sheetview")!;
+    view.innerHTML = renderPage(
+        pagination,
+        currentSheet,
+        netAsPlaced(),
+        analysis!.creases,
+        netHinges,
+        ekey,
+        {
+            sideMm: sideIn * 25.4,
+            pageW: PAPER[0] * 25.4,
+            pageH: PAPER[1] * 25.4,
+            margin: MARGIN_IN * 25.4,
+            fillMode: "cluster",
+            standalone: false,
+        },
+    );
+}
+
+function printSheets(): void {
+    if (!pagination) {
+        say("Press Create sheets first.");
+        return;
+    }
+    const host = document.getElementById("printout")!;
+    host.innerHTML = pagination.pages
+        .map((_, i) =>
+            renderPage(pagination!, i, netAsPlaced(), analysis!.creases, netHinges, ekey, {
+                sideMm: sideIn * 25.4,
+                pageW: PAPER[0] * 25.4,
+                pageH: PAPER[1] * 25.4,
+                margin: MARGIN_IN * 25.4,
+                fillMode: "cluster",
+            }),
+        )
+        .join("\n");
+    say(
+        `Printing ${pagination.pages.length} sheets at ${(sideIn * 25.4).toFixed(1)} mm side. ` +
+            `Save as PDF for a single file.`,
+    );
+    window.print();
+}
+
 // ── Print ─────────────────────────────────────────────────────────
 //
 // Printing goes through sheet.ts, the shared sheet renderer, so a
@@ -2405,9 +2538,22 @@ function buildControls() {
     layerLabel.appendChild(layerSelect);
     controls.appendChild(layerLabel);
 
+    const sheetsBtn = document.createElement("button");
+    sheetsBtn.textContent = "Create sheets";
+    sheetsBtn.title =
+        "Split this net across pages, with lettered joins showing what tapes to what";
+    sheetsBtn.addEventListener("click", createSheets);
+    controls.appendChild(sheetsBtn);
+
+    const printSheetsBtn = document.createElement("button");
+    printSheetsBtn.textContent = "Print sheets / PDF";
+    printSheetsBtn.title = "Print every sheet, at true size — Save as PDF for one file";
+    printSheetsBtn.addEventListener("click", printSheets);
+    controls.appendChild(printSheetsBtn);
+
     const printBtn = document.createElement("button");
-    printBtn.textContent = "Print / PDF";
-    printBtn.title = "Print what you have built, at true size";
+    printBtn.textContent = "Print net (1 page)";
+    printBtn.title = "Print the whole net on one page, whether or not it fits";
     printBtn.addEventListener("click", printNet);
     controls.appendChild(printBtn);
 

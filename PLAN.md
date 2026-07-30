@@ -108,6 +108,28 @@ Each seed is expanded a generation or two and printed as an **independent
 one-sheet model** — no cross-sheet edge matching. `deca-shape-expansion.png` is
 the `penrose-mosaic` reference showing four generations.
 
+## Stage B: splitting a net across pages
+
+`src/paginate.ts`, driven from `unfold.html` by **Create sheets**. The workbench is
+the master: configure the patch and method, get one net, split it when it looks
+right.
+
+Splits run **along hinges**, never through a rhombus, so every face lands whole on
+one sheet. A severed hinge stops being a fold and becomes a taped join, labelled with
+a capital letter and the page number of its other half — `A▸3` tapes to `A▸1` on
+sheet 3. Verified: every letter appears on exactly two sheets and each points back at
+the other.
+
+Two facts shape it. The hinges form a **spanning tree**, so removing k edges gives
+exactly k+1 components: **pages = joins + 1**, and minimising taped joins *is*
+minimising sheets. And all pages share **one orientation**, chosen from the net's own
+edge directions to need the fewest sheets — worth 2–4 sheets on some patches
+(Pe1 gen 3: 11 → 7). That costs a little paper against rotating each page to fit, and
+buys being able to lay the sheets out and see them line up.
+
+Measured at 1 in on Letter: gen 2 is one sheet with no joins; gen 3 is 3–8 sheets
+(St5 8, Pe3 7, Pe1 7, St3 5, Deca 4, St1 3). Runs in under 100 ms even at 1380 faces.
+
 ## Sheets
 
 `node tools/make-sheets.mjs` regenerates `sheets.html` plus one standalone SVG per
@@ -206,10 +228,9 @@ scored by the worst axis ratio `max(w/PW, h/PH)`.
   transport controls and the two hit-tests are the least-tested parts.
 - Generation 5 is offered on the 3D page but not the net page: the unfolding
   methods take 1.2–2.5 s at 5,719 rhombi, against 48–76 ms at gen 4.
-- **Stage B — fitting paper.** Branch cuts give one piece, but a gen-3 net is
-  wider than a page at any foldable side: at 1 in only St1 and Deca fit, and the
-  other five need reducing below the 12 mm floor. Splitting a finished net to fit,
-  and packing the rectangles onto sheets, is the next work.
+- Rotating pages independently would fill them better, at the cost of pieces
+  arriving turned differently. Deliberately not done: a shared orientation lets the
+  printed sheets be laid out and read together.
 - `Pe3` and `Pe1` patch outlines converge to a limit that is not their seed shape
   (distance plateaus at 0.16 and 0.21). Only `Pe5` closes the loop exactly, its
   hull being a regular pentagon at every generation. Worth understanding why.

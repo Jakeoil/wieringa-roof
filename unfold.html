@@ -45,6 +45,38 @@
     details#help[open] > summary { border-bottom: 1px solid var(--rule); }
     .helpbody { padding: 12px 16px; }
 
+    .sheetwrap { display: flex; gap: 18px; align-items: flex-start; flex-wrap: wrap; }
+    #sheetlist {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        min-width: 260px;
+    }
+    #sheetlist button {
+        text-align: left;
+        font-size: 13px;
+        padding: 7px 10px;
+        border: 1px solid var(--rule);
+        background: #fff;
+        border-radius: 5px;
+        cursor: pointer;
+        font-family: inherit;
+    }
+    #sheetlist button:hover { border-color: var(--accent); }
+    #sheetlist button[aria-current="true"] {
+        border-color: var(--accent);
+        background: #f2f0fb;
+        font-weight: 600;
+    }
+    #sheetlist .joins { color: var(--ink-faint); font-weight: 400; }
+    #sheetview svg {
+        border: 1px solid #ccc;
+        background: #fff;
+        max-width: 100%;
+        height: auto;
+        width: 420px;
+    }
+
     .bars { margin: 0 0 8px; }
     .bars .controls { margin: 0 0 6px; gap: 12px; }
     /* Fixed height: the readout changes length constantly and would otherwise
@@ -135,6 +167,21 @@
         fitted once to the finished net and then held, since re-fitting each frame
         makes the picture lurch.
         <br><br>
+        <strong>Create sheets</strong> splits the finished net across pages. A
+        generation-3 net is several times the size of a sheet, so at that scale this
+        is what makes it buildable rather than merely correct. The split always runs
+        along a hinge, never through a rhombus, so every rhombus lands whole on one
+        sheet. Each severed hinge becomes a taped join carrying a <strong>capital
+        letter and the number of the sheet its other half is on</strong> — a rhomb
+        reading <span class="mono">A▸3</span> tapes to the rhomb reading
+        <span class="mono">A▸1</span> on sheet 3. Every page shares one orientation,
+        so you can lay the printed sheets on a table and see them line up. Because the
+        hinges form a spanning tree, pages are always joins + 1: there is no trade-off
+        between fewer sheets and fewer joins, and both are minimised together.
+        <strong>Print sheets / PDF</strong> outputs the lot; Save as PDF gives one
+        file. Changing the net discards the sheets, since they described a net that no
+        longer exists.
+        <br><br>
         <strong>Layer</strong> appears only when a net needs more than one sheet.
         Where the surface wraps over itself it need not be cut — the offending part
         continues on the next layer, which is the next sheet of paper, and every
@@ -185,6 +232,16 @@
         <div class="panel">
             <h3>Net (true size on the sheet)</h3>
             <canvas id="net" width="620" height="802"></canvas>
+        </div>
+    </div>
+
+    <!-- Appears once "Create sheets" has split the net. -->
+    <div id="sheetpanel" style="display:none">
+        <h3 style="margin:24px 0 8px;font-size:15px;color:#333">Sheets</h3>
+        <p class="info" id="sheetinfo" style="margin:0 0 10px"></p>
+        <div class="sheetwrap">
+            <div id="sheetlist"></div>
+            <div id="sheetview"></div>
         </div>
     </div>
 
