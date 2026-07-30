@@ -512,6 +512,12 @@ function tabQuad(
 }
 const n3 = (v: number) => (Math.abs(v) < 1e-9 ? "0" : v.toFixed(3));
 
+// Every render gets its own id namespace. The preview and the print copy of a sheet
+// live in the same document, so a fixed id appears twice and `url(#id)` resolves to
+// whichever came first — the hidden preview — leaving the printed shading blank while
+// the unshaded version looked fine.
+let renderSerial = 0;
+
 export interface PageRenderOpts {
     sideMm: number;
     pageW: number; // physical page, mm
@@ -631,6 +637,7 @@ export function renderPage(
     ekey: (a: number, b: number) => string,
     o: PageRenderOpts,
 ): string {
+    const scope = `${pageIndex}x${++renderSerial}`;
     const page = pg.pages[pageIndex];
     const { pageW, pageH, margin, sideMm } = o;
     const usableW = pageW - 2 * margin;
@@ -711,7 +718,7 @@ export function renderPage(
                     if (vidx[t] > vidx[cHi]) cHi = t;
                 }
                 const [s0, s1] = shadeStops(base);
-                const gid = `g${pageIndex}_${fid}`;
+                const gid = `g${scope}_${fid}`;
                 defs.push(
                     `<linearGradient id="${gid}" gradientUnits="userSpaceOnUse" ` +
                         `x1="${n3(pts[cLo][0])}" y1="${n3(pts[cLo][1])}" ` +
@@ -890,7 +897,7 @@ export function renderPage(
         txt("tab = tape to like letter", "#666");
     }
 
-    out.push(thumbnail(pg, pageIndex, placed, o, cx, cy, page));
+    out.push(thumbnail(pg, pageIndex, placed, hinges, ekey, o, cx, cy, page));
     out.push("</svg>");
     return out.join("\n");
 }
@@ -915,6 +922,8 @@ function thumbnail(
     pg: Pagination,
     pageIndex: number,
     placed: Map<number, Placed>,
+    hinges: Set<string>,
+    ekey: (a: number, b: number) => string,
     o: PageRenderOpts,
     contentX: number,
     contentY: number,
@@ -998,7 +1007,7 @@ function thumbnail(
         `<rect x="${n3(tx - 1.5)}" y="${n3(ty - 1.5)}" width="${n3(tw + 3)}" height="${n3(th + 3)}" ` +
             `fill="#fff" fill-opacity="0.92" stroke="#ddd" stroke-width="0.25"/>`,
     );
-    g.push(patchMini(pg, pageIndex, shape, T, colour, k));
+    g.push(patchMini(pg, pageIndex, shape, placed, hinges, ekey, T, colour, k));
     g.push(
         `<text x="${n3(tx)}" y="${n3(ty + th + 3.4)}" font-size="2.6" font-family="sans-serif" ` +
             `fill="#666">patch · sheet ${pageIndex + 1}</text>`,
@@ -1014,6 +1023,9 @@ function patchMini(
     pg: Pagination,
     pageIndex: number,
     shape: Map<number, P2[]>,
+    placed: Map<number, Placed>,
+    hinges: Set<string>,
+    ekey: (a: number, b: number) => string,
     T: (q: P2) => P2,
     colour: string,
     k: number,
@@ -1021,6 +1033,14 @@ function patchMini(
 ): string {
     const page = pg.pages[pageIndex];
     const here = new Set(page.faceIds);
+
+    // Weights scale with the mini but never vanish: at thumbnail size a width
+    // proportional to k alone rounds to nothing and the outline disappears.
+    const wFaint = Math.max(0.08 * k, 0.1);
+    const wCut = Math.max(0.16 * k, 0.22);
+    const wEdge = Math.max(0.26 * k, 0.34);
+    const GREY = "#b4b4b4"; // unoccupied rhombi, and the folds inside a sheet
+
     const faint: string[] = [];
     const mine: string[] = [];
     for (const [id, pts] of shape) {
@@ -1029,43 +1049,54 @@ function patchMini(
         if (here.has(id)) {
             mine.push(
                 `<polygon points="${poly}" fill="${colour}" fill-opacity="0.85" ` +
-                    `stroke="${colour}" stroke-width="${n3(0.1 * k)}"/>`,
+                    `stroke="none"/>`,
             );
         } else if (withFaint) {
             faint.push(
-                `<polygon points="${poly}" fill="none" stroke="#d8d8d8" stroke-width="${n3(0.05 * k)}"/>`,
+                `<polygon points="${poly}" fill="none" stroke="${GREY}" stroke-width="${n3(wFaint)}"/>`,
             );
         }
     }
-    // The sheet's outline: every edge of the region with no neighbour inside it.
-    // That is precisely what you cut along, and at this size it is the information.
-    const seen = new Map<string, { pts: [P2, P2]; n: number }>();
+
+    // Every edge of the sheet's faces, classified. Used once means it is on the
+    // region's boundary — that is what you cut round. Used twice means interior,
+    // and then a hinge is a fold and anything else is still a cut: the net is cut
+    // along those too, and a mini that hides them lies about the work.
+    interface E {
+        pts: [P2, P2];
+        n: number;
+        hinge: boolean;
+    }
+    const seen = new Map<string, E>();
     for (const id of page.faceIds) {
         const pts = shape.get(id);
-        if (!pts) continue;
+        const pl = placed.get(id);
+        if (!pts || !pl) continue;
         for (let i = 0; i < 4; i++) {
             const a = pts[i];
             const b = pts[(i + 1) % 4];
-            const key = [a, b]
-                .map((q) => `${q[0].toFixed(4)},${q[1].toFixed(4)}`)
-                .sort()
-                .join("|");
+            const key = ekey(pl.verts[i], pl.verts[(i + 1) % 4]);
             const got = seen.get(key);
             if (got) got.n++;
-            else seen.set(key, { pts: [a, b], n: 1 });
+            else seen.set(key, { pts: [a, b], n: 1, hinge: hinges.has(key) });
         }
     }
-    const edge: string[] = [];
-    for (const { pts, n } of seen.values()) {
-        if (n !== 1) continue; // interior to the sheet: a fold, left out on purpose
-        const a = T(pts[0]);
-        const b = T(pts[1]);
-        edge.push(
+
+    const folds: string[] = [];
+    const cuts: string[] = [];
+    const border: string[] = [];
+    for (const e of seen.values()) {
+        const a = T(e.pts[0]);
+        const b = T(e.pts[1]);
+        const line = (col: string, w: number) =>
             `<line x1="${n3(a[0])}" y1="${n3(a[1])}" x2="${n3(b[0])}" y2="${n3(b[1])}" ` +
-                `stroke="#222" stroke-width="${n3(0.13 * k)}" stroke-linecap="round"/>`,
-        );
+            `stroke="${col}" stroke-width="${n3(w)}" stroke-linecap="round"/>`;
+        if (e.n === 1) border.push(line("#111", wEdge));
+        else if (e.hinge) folds.push(line(GREY, wFaint));
+        else cuts.push(line("#333", wCut));
     }
-    return [...faint, ...mine, ...edge].join("\n");
+
+    return [...faint, ...mine, ...folds, ...cuts, ...border].join("\n");
 }
 
 /**
@@ -1075,6 +1106,8 @@ function patchMini(
 export function renderMap(
     pg: Pagination,
     placed: Map<number, Placed>,
+    hinges: Set<string>,
+    ekey: (a: number, b: number) => string,
     o: PageRenderOpts,
 ): string {
     const { pageW, pageH, margin } = o;
@@ -1118,10 +1151,15 @@ export function renderMap(
     // every face faint, then each sheet in its colour, then each sheet's outline
     for (const [, pts] of shape) {
         const d = pts.map(T).map((q) => `${n3(q[0])},${n3(q[1])}`).join(" ");
-        out.push(`<polygon points="${d}" fill="none" stroke="#e2e2e2" stroke-width="0.15"/>`);
+        out.push(
+            `<polygon points="${d}" fill="none" stroke="#b4b4b4" ` +
+                `stroke-width="${n3(Math.max(0.06 * k, 0.12))}"/>`,
+        );
     }
     pg.pages.forEach((page, i) => {
-        out.push(patchMini(pg, i, shape, T, colours[i % colours.length], k, false));
+        out.push(
+            patchMini(pg, i, shape, placed, hinges, ekey, T, colours[i % colours.length], k, false),
+        );
         // sheet number at the centroid of its region
         let cx = 0;
         let cy = 0;

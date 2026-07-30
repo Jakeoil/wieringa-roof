@@ -1639,8 +1639,12 @@ function applyPrefix(k: number): void {
         if (!placedRhombs.has(id)) traceRoles.set(id, "rejected");
     }
 
+    // "current" means the move being made right now. At the end of the replay no
+    // move is being made, so the marker was leaving the last tile highlighted for
+    // good — a single odd tile on a finished net, with nothing to explain it.
+    const atEnd = traceIndex >= traceEvents.length;
     const cur = traceEvents[traceIndex - 1];
-    if (cur && cur.kind !== "newPiece") {
+    if (cur && cur.kind !== "newPiece" && !atEnd) {
         traceRoles.set(cur.face, "current");
         if (cur.poly) {
             traceGhost = {
@@ -2005,7 +2009,10 @@ function createSheets(): void {
 function sheetSvg(i: number): string {
     const placedNow = netAsPlaced();
     return i === -1
-        ? renderMap(pagination!, placedNow, { ...sheetOpts(), standalone: false })
+        ? renderMap(pagination!, placedNow, netHinges, ekey, {
+              ...sheetOpts(),
+              standalone: false,
+          })
         : renderPage(
               pagination!,
               i,
