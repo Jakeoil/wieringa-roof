@@ -151,7 +151,7 @@ of `St*` as well as of `Pe*` — the `Pe*` alone are not sufficient.
 
 ---
 
-## Open: the rhombus side, and units
+## Settled: the rhombus side is 1 inch
 
 `GOLDEN_SIDE = √5/2 = 1.118034` **inches**, inherited from the first PLAN.md
 ("side = φ − ½ ≈ 1.118in", canvas "1:1 to inches for print fidelity"). It is not
@@ -167,8 +167,22 @@ Options:
 | **C** | Keep √5/2 in and just label it honestly. |
 | **D** | Presets (15 / 20 / 25 mm, ½ / ¾ / 1 in) plus free entry. |
 
-**Decided: 1 inch.** Round, and the workbench stays inch-native as it was designed
-to be. The box still accepts mm, cm or in, and is labelled so.
+**Decided: 1 inch**, and implemented — `sideIn = 1`, the box reads `1in`. Round, and
+the workbench stays inch-native as designed. The box still accepts mm, cm or in.
+
+The **side is always the rhombus edge**, never a diagonal. At 1 in the diagonals are
+1.7013 in and 1.0515 in.
+
+The help text on `unfold.html` went on advertising 1.118" long after the code
+changed, which is worse than a stale comment: it is a visible claim about behaviour,
+and it fooled me into repeating it in PLAN.md and telling Jeff the default still
+needed changing when it had been right all along. Prose that states a default has to
+be checked against the default.
+
+`GOLDEN_SIDE = √5/2` remains in `geometry.ts`, but that is the tiling's internal
+planar unit and has nothing to do with print size — the development normalises every
+edge to exactly 1 and `renderSheet` scales by the requested side. `sheets.html` uses
+1 in for every generation-2 model, so the two pages agree.
 
 ---
 

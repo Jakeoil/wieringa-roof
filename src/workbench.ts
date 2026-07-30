@@ -889,9 +889,13 @@ const DPI = 96;
 // the sheet edge is drawn too, and a net is allowed to spill past both — that is
 // the point, since a net a little too big is one you snip in two rather than one
 // you cannot have.
-// Rhombus side, in inches. Fixed at φ−½ ≈ 1.118" originally, which is a fine size
-// to fold but caps a sheet at roughly twenty rhombi — so the orientation search
-// alone cannot make a large net fit. Adjustable.
+// Rhombus side, in inches — the edge, not a diagonal. One inch: every
+// generation-2 patch fits a Letter sheet at that size, and it folds comfortably.
+// A sheet holds roughly twenty rhombi, so the orientation search alone cannot make
+// a large net fit; the side is the real lever, and it is adjustable.
+//
+// It was √5/2 ≈ 1.118" originally, which makes each edge's rise s/√5 exactly half
+// an inch — elegant for measuring heights, arbitrary for paper.
 let sideIn = 1; // inches
 
 const PAPER: [number, number] = [8.5, 11];

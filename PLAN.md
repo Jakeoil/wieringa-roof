@@ -121,8 +121,11 @@ inside the printable frame, and a side of at least 12 mm — below that the 72°
 dihedrals stop being foldable. Anything failing is reported and skipped, so the page
 never carries a net that cannot be built.
 
-Note `unfold.html` still defaults to 1.118 in, which is `√5/2` and makes each edge's
-rise `s/√5` exactly half an inch. Elegant for measuring heights, arbitrary for paper.
+`unfold.html` defaults to the same 1 in, so the two agree. The side is always the
+rhombus **edge**, never a diagonal. (An earlier default of `√5/2 ≈ 1.118 in` made
+each edge's rise `s/√5` exactly half an inch — elegant for heights, arbitrary for
+paper. `GOLDEN_SIDE` in `geometry.ts` is still √5/2, but that is the internal unit
+of the tiling, not a print size.)
 
 ## Print
 

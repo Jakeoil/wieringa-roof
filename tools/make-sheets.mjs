@@ -29,9 +29,9 @@ const MIN_SIDE = 12; // mm; below this the sharp creases stop being foldable
 // than a page at that size — only St1 and Deca fit at all, and they need reducing.
 // The rest of generation 3 needs a net split across sheets, which is Stage B.
 //
-// A note on 1 inch versus the 1.118 in the Unfold page defaults to: 1.118 is
-// sqrt(5)/2, which makes each edge's rise s/sqrt(5) exactly half an inch. Elegant
-// for measuring heights, arbitrary for paper. One inch prints better.
+// One inch is the rhombus EDGE, and unfold.html uses the same default, so the two
+// pages agree. (GOLDEN_SIDE in geometry.ts is sqrt(5)/2 -- that is the tiling's
+// internal unit, not a print size, and the two are unrelated.)
 const MODELS = [
     ["St1", 2, 1, "The diamond: three rhombi. Print this one first to check your scale."],
     ["St3", 2, 1, "The boat at one generation — nine rhombi, an afternoon's work."],
