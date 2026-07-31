@@ -11,7 +11,7 @@ golden rhombi for physical models.
 | page | content | state |
 |---|---|---|
 | `index.html` | splash — what the surface is, links to everything | done |
-| `roof3d.html` | three.js prototype of the surface | done |
+| `roof3d.html` | three.js prototype of the surface, generations 1–5 | done |
 | `info.html` | "Mathematics" — golden rhombus, heights, fold angles, defects | done |
 | `polyhedra.html` | triacontahedron + the two rhombohedra, generated diagrams | done |
 | `unfold.html` | **Workbench** and **Sheets**, two views of one page | done |

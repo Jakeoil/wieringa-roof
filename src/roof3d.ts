@@ -8,6 +8,7 @@
 
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+import { loadPrefs, savePrefs, resetPrefs } from "./prefs.js";
 import {
     seedTypes,
     generatePatch,
@@ -35,6 +36,23 @@ const genSel = el<HTMLSelectElement>("gen");
 const colorSel = el<HTMLSelectElement>("color");
 const vscaleInput = el<HTMLInputElement>("vscale");
 const vscaleOut = el<HTMLElement>("vscaleOut");
+const shadeChk = el<HTMLInputElement>("shade");
+
+// Session settings. Same treatment as the workbench: these are preferences, not a
+// document, and losing them on every reload turns a look at the model into a round
+// of re-setting dials.
+const PREFS_KEY = "wr-roof3d";
+const PREF_DEFAULTS = {
+    patch: "Pe3",
+    gen: 3,
+    color: "cluster",
+    vscale: 1,
+    edges: true,
+    isogloss: false,
+    transparent: false,
+    shade: false,
+};
+const prefs = loadPrefs(PREFS_KEY, PREF_DEFAULTS);
 const edgesChk = el<HTMLInputElement>("edges");
 const isoChk = el<HTMLInputElement>("isogloss");
 const transpChk = el<HTMLInputElement>("transparent");
@@ -146,6 +164,27 @@ function build(reframe: boolean): void {
         col.push(c.r, c.g, c.b);
     };
 
+    // Shading by height: high lighter, low darker. Its strength is |vscale|, the
+    // same number that flattens the surface — so at the middle of the slider, where
+    // the roof is flat, there is nothing to shade and the shading is gone. Every
+    // position in between gets its share, and no separate control can contradict the
+    // geometry by shading a flat sheet.
+    const shadeAmt = shadeChk.checked ? Math.abs(vscale) : 0;
+    const span = idxHi - idxLo || 1;
+    const WHITE = new THREE.Color(0xffffff);
+    const BLACK = new THREE.Color(0x000000);
+    const shaded = (c: THREE.Color, vid: number): THREE.Color => {
+        if (shadeAmt <= 0) return c;
+        const idx = flip
+            ? idxLo + idxHi - vertexList[vid].index
+            : vertexList[vid].index;
+        // −1 at the lowest vertex, +1 at the highest, 0 at mid-height, so the middle
+        // of the range keeps its own colour and only the extremes move.
+        const t = ((idx - idxLo) / span - 0.5) * 2;
+        const k = shadeAmt * Math.abs(t) * 0.55;
+        return c.clone().lerp(t >= 0 ? WHITE : BLACK, k);
+    };
+
     for (const f of faces) {
         const tri = [f.v[0], f.v[1], f.v[2], f.v[0], f.v[2], f.v[3]];
         for (const vid of tri) {
@@ -161,7 +200,7 @@ function build(reframe: boolean): void {
             } else {
                 c = new THREE.Color(0xc9cbd4);
             }
-            push(vid, c);
+            push(vid, shaded(c, vid));
         }
     }
 
@@ -175,8 +214,8 @@ function build(reframe: boolean): void {
     geo.translate(-c.x, -c.y, -c.z);
 
     const mat = new THREE.MeshStandardMaterial({
-        vertexColors: mode !== "plain",
-        color: mode === "plain" ? 0xc9cbd4 : 0xffffff,
+        vertexColors: mode !== "plain" || shadeAmt > 0,
+        color: mode === "plain" && shadeAmt <= 0 ? 0xc9cbd4 : 0xffffff,
         roughness: 0.62,
         metalness: 0.04,
         transparent: transpChk.checked,
@@ -318,15 +357,25 @@ for (const [code, nick] of [
     o.textContent = nick;
     patchSel.appendChild(o);
 }
-patchSel.value = "Pe3";
+patchSel.value = prefs.patch;
 
-for (const g of [2, 3, 4, 5]) {
+for (const g of [1, 2, 3, 4, 5]) {
     const o = document.createElement("option");
     o.value = String(g);
     o.textContent = `Generation ${g}`;
     genSel.appendChild(o);
 }
-genSel.value = "3";
+genSel.value = String(prefs.gen);
+// A saved patch or generation that no longer exists must not leave the menu blank.
+if (!patchSel.value) patchSel.value = PREF_DEFAULTS.patch;
+if (!genSel.value) genSel.value = String(PREF_DEFAULTS.gen);
+colorSel.value = prefs.color;
+if (!colorSel.value) colorSel.value = PREF_DEFAULTS.color;
+vscaleInput.value = String(prefs.vscale);
+edgesChk.checked = prefs.edges;
+isoChk.checked = prefs.isogloss;
+transpChk.checked = prefs.transparent;
+shadeChk.checked = prefs.shade;
 
 function rebuild(reframe: boolean): void {
     const uu = Number(vscaleInput.value);
@@ -339,7 +388,7 @@ function rebuild(reframe: boolean): void {
 for (const c of [patchSel, genSel]) {
     c.addEventListener("change", () => rebuild(true));
 }
-for (const c of [colorSel, edgesChk, isoChk, transpChk]) {
+for (const c of [colorSel, edgesChk, isoChk, transpChk, shadeChk]) {
     c.addEventListener("change", () => rebuild(false));
 }
 vscaleInput.addEventListener("input", () => rebuild(false));
@@ -375,6 +424,29 @@ function resize(): void {
     camera.aspect = w / Math.max(1, h);
     camera.updateProjectionMatrix();
 }
+function persist(): void {
+    savePrefs(PREFS_KEY, {
+        patch: patchSel.value,
+        gen: Number(genSel.value),
+        color: colorSel.value,
+        vscale: Number(vscaleInput.value),
+        edges: edgesChk.checked,
+        isogloss: isoChk.checked,
+        transparent: transpChk.checked,
+        shade: shadeChk.checked,
+    });
+}
+window.addEventListener("beforeunload", persist);
+window.addEventListener("pagehide", persist);
+
+el<HTMLButtonElement>("reset").addEventListener("click", () => {
+    if (confirm("Reset the 3D view to default settings?")) {
+        window.removeEventListener("beforeunload", persist);
+        window.removeEventListener("pagehide", persist);
+        resetPrefs(PREFS_KEY);
+    }
+});
+
 window.addEventListener("resize", resize);
 
 resize();

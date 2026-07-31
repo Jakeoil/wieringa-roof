@@ -125,6 +125,26 @@ snaps.
 
 ---
 
+## 3D shading follows the vertical scale
+
+The obvious way to add height shading is a strength control of its own. That is
+wrong here, and the reason is worth keeping: the vertical scale slider already runs
+from dales-up through **flat** to hills-up, and a flat roof has no height to shade.
+An independent strength would happily shade a flat sheet, which is a picture of
+something that does not exist.
+
+So the strength *is* `|vscale|` — the same number that flattens the surface. At the
+middle of the travel it is zero and the shading is simply gone; every position in
+between gets its share, and no control can contradict the geometry.
+
+Within a patch the ramp is signed about **mid-height**, not about the bottom:
+`t = ((idx − lo)/span − 0.5) × 2`, so the middle of the range keeps its own colour
+and only the extremes move — lighter above, darker below. Flip is applied to the
+index first, so inverting the roof inverts the shading with it rather than leaving
+the highlights on what are now the low points.
+
+---
+
 ## Settled: a composite seed does not spend a generation
 
 `Deca` is not a shape that substitutes — it is an *arrangement* of six shapes that
