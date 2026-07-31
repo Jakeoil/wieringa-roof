@@ -2561,8 +2561,9 @@ function buildControls() {
     genSelect.style.cssText = "padding:4px;font-size:13px;";
     // Generation 0 produced nothing at all — expandPenta returns immediately — so
     // it was a dead entry in the menu. Generation 1 stays: it is the smallest real
-    // patch for the Pe tiles, and the St tiles being empty there is expected, not
-    // an error, since star-type pieces emit no rhombs until a generation later.
+    // patch for the Pe tiles and for Deca, and the St tiles being empty there is
+    // expected, not an error, since star-type pieces emit no rhombs until a
+    // generation later.
     for (let g = 1; g <= 4; g++) {
         const opt = document.createElement("option");
         opt.value = String(g);

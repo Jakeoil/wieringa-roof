@@ -125,6 +125,40 @@ snaps.
 
 ---
 
+## Settled: a composite seed does not spend a generation
+
+`Deca` is not a shape that substitutes — it is an *arrangement* of six shapes that
+already exist: **1× Pe3 (yellow), 2× Pe1 (orange), 2× St1, 1× St3**. (Jeff cited it
+as 2 Pe3 and 1 Pe1; the counts settle it, since gen-1 emission is Pe3 = 4 rhombi and
+Pe1 = 3, so 1×4 + 2×3 = 10 is what Deca emits and 2×4 + 1×3 = 11 is not.)
+
+Because arranging is not substituting, **a composite must expand its parts at `gen`,
+not `gen − 1`**. `expandDeca` did the latter, which put Deca a whole generation behind
+every other seed — "Deca gen 2" carried the same amount of substitution as "Pe3
+gen 1" — and made generation 1 completely empty, since the parts were then asked for
+gen 0. One of the four menu entries did nothing.
+
+The fix has two halves, and the second is easy to miss:
+
+| | |
+|---|---|
+| parts | `gen − 1` → `gen` |
+| offsets | `wheels[gen]` → `wheels[gen + 1]` |
+
+**Wheel index `k` places children of generation `k − 1`** — that is the rule
+`expandPenta` and `expandStar` already follow. Moving the children without moving the
+offsets leaves the right shapes at the wrong spacing: 9 duplicate rhombi at gen 2 and,
+by gen 3, 116 duplicates, 276 lift conflicts and vertex indices running to 14 instead
+of staying in `{1,2,3,4}`. Counts alone looked fine throughout, which is why this
+needs a geometry check and not a headcount.
+
+Deca now reads 10 / 80 / 610 / 4430 at generations 1–4, no duplicates, no lift
+conflicts, indices in `{1,2,3,4}`, folds in `{36,72,108}`. No other seed moved.
+
+Any further composite follows the same rule.
+
+---
+
 ## Settled: `Pe*` are pentagons; use proper names
 
 `gen0-P1-tiles--rhomb-mappings.png` in this directory shows all five tile types

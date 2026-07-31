@@ -548,9 +548,23 @@ function expandDeca(
 ) {
     if (gen === 0) return;
 
-    const dWheel = wheels.d[gen].w;
-    const sWheel = wheels.s[gen].w;
-    const pWheel = wheels.p[gen].w;
+    // A composite seed is an *arrangement* of shapes that already exist, not a
+    // substitution step, so it must not spend a generation on itself: its parts are
+    // expanded at `gen`, not `gen - 1`.
+    //
+    // Getting this wrong put Deca a full generation behind every other seed —
+    // "Deca gen 2" held the same amount of substitution as "Pe3 gen 1" — and left
+    // generation 1 completely empty, since the parts were then asked for gen 0.
+    // Any further composite must follow the same rule or it will drift the same way.
+
+    // Wheel index k places children of generation k - 1 — that is the rule
+    // expandPenta and expandStar follow, using wheels[gen] for children at gen - 1.
+    // This composite puts its children at `gen`, so it needs wheels[gen + 1]. Moving
+    // the children without moving the offsets leaves them the right shapes at the
+    // wrong spacing, which shows up as rhombi sitting on top of one another.
+    const dWheel = wheels.d[gen + 1].w;
+    const sWheel = wheels.s[gen + 1].w;
+    const pWheel = wheels.p[gen + 1].w;
 
     // Two wheel-lookup patterns come over from penrose-mosaic and must not be
     // mixed up:
@@ -560,7 +574,7 @@ function expandDeca(
     const base = loc.tr(dWheel[angle.inv.tenths]);
 
     // central yellow pentagon — the boat, in rhomb terms
-    expandPenta(Pe3, angle, !isHeads, base, gen - 1, ci);
+    expandPenta(Pe3, angle, !isHeads, base, gen, ci);
 
     // two diamonds
     expandStar(
@@ -568,7 +582,7 @@ function expandDeca(
         angle.rot(3),
         isHeads,
         base.tr(sWheel[angle.rot(1).tenths]),
-        gen - 1,
+        gen,
         ci,
     );
     expandStar(
@@ -576,7 +590,7 @@ function expandDeca(
         angle.rot(2),
         isHeads,
         base.tr(sWheel[angle.rot(4).tenths]),
-        gen - 1,
+        gen,
         ci,
     );
 
@@ -586,7 +600,7 @@ function expandDeca(
         angle.rot(2).inv,
         !isHeads,
         base.tr(pWheel[angle.rot(3).inv.tenths]),
-        gen - 1,
+        gen,
         ci,
     );
     expandPenta(
@@ -594,7 +608,7 @@ function expandDeca(
         angle.rot(3).inv,
         !isHeads,
         base.tr(pWheel[angle.rot(2).inv.tenths]),
-        gen - 1,
+        gen,
         ci,
     );
 
@@ -606,7 +620,7 @@ function expandDeca(
         base
             .tr(pWheel[angle.rot(2).inv.tenths])
             .tr(sWheel[angle.rot(3).inv.tenths]),
-        gen - 1,
+        gen,
         ci,
     );
 }
