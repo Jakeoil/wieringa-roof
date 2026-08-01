@@ -17,6 +17,7 @@ const prefs = loadPrefs(PREFS_KEY, {
     colour: ICON_DEFAULTS.colour as string,
     background: "",
     stroke: ICON_DEFAULTS.stroke,
+    strokeColor: ICON_DEFAULTS.strokeColor,
     pad: ICON_DEFAULTS.pad,
     rotate: ICON_DEFAULTS.rotate,
 });
@@ -29,6 +30,7 @@ const bgSel = el<HTMLSelectElement>("bg");
 const strokeIn = el<HTMLInputElement>("stroke");
 const padIn = el<HTMLInputElement>("pad");
 const rotIn = el<HTMLInputElement>("rot");
+const strokeColSel = el<HTMLSelectElement>("strokeColor");
 
 // Queen reads better than "Deca" everywhere else on the site, so match that here.
 const nameOf = (label: string) => (label === "Deca" ? "Queen" : label);
@@ -52,6 +54,8 @@ subjectSel.value = prefs.subject;
 colourSel.value = prefs.colour;
 bgSel.value = prefs.background;
 strokeIn.value = String(prefs.stroke);
+strokeColSel.value = prefs.strokeColor;
+if (!strokeColSel.value) strokeColSel.value = ICON_DEFAULTS.strokeColor;
 padIn.value = String(prefs.pad);
 rotIn.value = String(prefs.rotate);
 
@@ -63,6 +67,7 @@ function current(size: number): Partial<IconOpts> {
         colour: colourSel.value as IconOpts["colour"],
         background: bgSel.value || null,
         stroke: Number(strokeIn.value),
+        strokeColor: strokeColSel.value,
         pad: Number(padIn.value),
         rotate: Number(rotIn.value),
         size,
@@ -70,7 +75,7 @@ function current(size: number): Partial<IconOpts> {
 }
 
 function draw(): void {
-    el<HTMLElement>("strokeOut").textContent = Number(strokeIn.value).toFixed(2);
+    el<HTMLElement>("strokeOut").textContent = Number(strokeIn.value).toFixed(3);
     el<HTMLElement>("padOut").textContent = Number(padIn.value).toFixed(2);
     el<HTMLElement>("rotOut").textContent = `${rotIn.value}°`;
 
@@ -93,7 +98,7 @@ function draw(): void {
         `Build ${BUILD_ID}.`;
 }
 
-for (const c of [seedSel, genSel, subjectSel, colourSel, bgSel]) {
+for (const c of [seedSel, genSel, subjectSel, colourSel, bgSel, strokeColSel]) {
     c.addEventListener("change", draw);
 }
 for (const c of [strokeIn, padIn, rotIn]) {
@@ -131,6 +136,7 @@ function persist(): void {
         colour: colourSel.value,
         background: bgSel.value,
         stroke: Number(strokeIn.value),
+        strokeColor: strokeColSel.value,
         pad: Number(padIn.value),
         rotate: Number(rotIn.value),
     });

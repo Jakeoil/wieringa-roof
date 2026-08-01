@@ -8,6 +8,7 @@ import {
     Pt,
     p,
     allRhombs,
+    MOSAIC_COLORS,
     allP1Tiles,
     p1Outline,
     vertexList,
@@ -79,7 +80,7 @@ function biasedHeight(u: number): number {
 
 // Face colouring in the tiling view. "Coloured by type or by vertex index" was in
 // the original spec and never got built.
-type TileColour = "cluster" | "type" | "index";
+type TileColour = "cluster" | "mosaic" | "type" | "index";
 let tileColour: TileColour = prefs.colour as TileColour;
 
 function faceIndexLow(r: Rhomb): number {
@@ -335,14 +336,14 @@ function drawTiling() {
             if (sh != null) return sheetColours[sh] ?? "#ddd";
             if (tileColour === "type") return r.thick ? "#9292e3" : "#eec09b";
             if (tileColour === "index") return indexColor(vi[cLo]);
-            return makeGradient(
-                ctx,
-                r.fill,
-                sv[cLo],
-                sv[cHi],
-                vi[cLo],
-                vi[cHi],
-            );
+            // The mosaic plate is the same drawing with a darker, more saturated
+            // palette — its character comes from the height ramp and the isoglosses
+            // over the top, not from the base colour alone.
+            const base =
+                tileColour === "mosaic"
+                    ? (MOSAIC_COLORS[r.cluster] ?? r.fill)
+                    : r.fill;
+            return makeGradient(ctx, base, sv[cLo], sv[cHi], vi[cLo], vi[cHi]);
         };
         const role = mode === "watch" ? traceRoles.get(r.id) : undefined;
         const hint = mode === "watch" ? undefined : moveHints.get(r.id);
@@ -391,6 +392,17 @@ function drawTiling() {
             ctx.fill();
             ctx.strokeStyle = hint === "clean" ? "#2ea043" : "#c0392b";
             ctx.lineWidth = r.id === hoveredRhomb ? 2.5 : 1.5;
+            ctx.stroke();
+        } else if (tileColour === "mosaic") {
+            // Heavy black outlines are half of what the plate looks like — the ramp
+            // and the isoglosses do nothing without them. Scale with the rhomb so a
+            // gen-4 patch does not turn solid black: the plate is gen 2, where a
+            // rhomb edge is wide, and the same fraction stays right as it shrinks.
+            const ex = sv[1].x - sv[0].x;
+            const ey = sv[1].y - sv[0].y;
+            const edgePx = Math.hypot(ex, ey);
+            ctx.strokeStyle = "#111";
+            ctx.lineWidth = Math.min(3, Math.max(0.5, edgePx * 0.045));
             ctx.stroke();
         } else {
             ctx.strokeStyle = "#555";
@@ -1391,7 +1403,9 @@ function drawNet() {
         const [nLo, nHi] = extremeCorners(nvi);
         ctx.fillStyle = makeGradient(
             ctx,
-            src.fill,
+            tileColour === "mosaic"
+                ? (MOSAIC_COLORS[src.cluster] ?? src.fill)
+                : src.fill,
             { x: sv[nLo].x, y: sv[nLo].y },
             { x: sv[nHi].x, y: sv[nHi].y },
             nvi[nLo],
@@ -2894,6 +2908,7 @@ function buildControls() {
     colourSel.style.cssText = "padding:4px;font-size:13px;";
     for (const [v, t] of [
         ["cluster", "Cluster"],
+        ["mosaic", "Mosaic plate"],
         ["type", "Thick / thin"],
         ["index", "Height index"],
     ] as Array<[TileColour, string]>) {
@@ -2905,6 +2920,14 @@ function buildControls() {
     colourSel.value = tileColour;
     colourSel.addEventListener("change", () => {
         tileColour = colourSel.value as TileColour;
+        if (tileColour === "mosaic" && !showIsogloss) {
+            showIsogloss = true;
+            isoChk.checked = true;
+            say(
+                "Mosaic plate: darker palette, height ramp and isoglosses — the " +
+                    "contour stripes are half of what makes the plate look like it does.",
+            );
+        }
         drawTiling();
     });
     const colourLabel = document.createElement("label");

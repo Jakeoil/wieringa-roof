@@ -467,6 +467,23 @@ interface Rhomb {
     cluster: string;
 }
 
+// The penrose-mosaic plate palette, sampled from deca-shape-expansion.png (the
+// median of each colour family in the generation-2 Queen). Darker and far more
+// saturated than the screen palette, and meant to be used *with* height shading and
+// isoglosses — the plate's character comes from a wide light-to-dark ramp inside
+// every tile, crossed by contour stripes, over heavy black edges. The colour alone
+// is only a third of it.
+// Sampled from the penrose-mosaic plate (deca-shape-expansion.png, Queen gen 2).
+// These are *mid-tone* values, not medians of the whole tile: each tile on the plate
+// is a wide light-to-dark ramp, so a median is dragged toward the dark stripes and
+// comes out duller than the colour the eye reads. Taking the median hue and
+// saturation at a mid lightness gives the colour the gradient should centre on.
+const MOSAIC_COLORS: Record<string, string> = {
+    Pe5: "#5b5b8a", // slate
+    Pe3: "#9f9f46", // olive
+    Pe1: "#ac6d38", // rust
+};
+
 // Cluster colors (matches penrose-mosaic custom palette)
 const CLUSTER_COLORS: Record<string, string> = {
     Pe5: "#9292e3", // [146,146,227]
@@ -1302,6 +1319,7 @@ function generatePatch(seedIdx: number, isHeads: boolean, gen: number): void {
 
 export {
     CLUSTER_COLORS,
+    MOSAIC_COLORS,
     SQRT5,
     PHI,
     GOLDEN_SIDE,

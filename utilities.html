@@ -74,6 +74,7 @@
             </select></label>
             <label>Colour <select id="colour">
                 <option value="cluster">cluster</option>
+                <option value="mosaic">mosaic plate</option>
                 <option value="type">thick / thin</option>
                 <option value="index">height</option>
                 <option value="mono">mono</option>
@@ -84,8 +85,13 @@
                 <option value="#1d1d22">dark</option>
                 <option value="#f4f4f7">page grey</option>
             </select></label>
-            <label>Outline <input type="range" id="stroke" min="0" max="0.14" step="0.01" value="0">
+            <label>Edge weight <input type="range" id="stroke" min="0" max="0.30" step="0.005" value="0">
                 <span class="mono" id="strokeOut">0</span></label>
+            <label>Edge colour <select id="strokeColor">
+                <option value="#111111">black</option>
+                <option value="#ffffff">white</option>
+                <option value="#5a4632">brown</option>
+            </select></label>
             <label>Padding <input type="range" id="pad" min="0" max="0.2" step="0.01" value="0.06">
                 <span class="mono" id="padOut">0.06</span></label>
             <label>Rotate <input type="range" id="rot" min="0" max="360" step="1" value="0">

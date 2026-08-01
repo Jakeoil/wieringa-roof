@@ -20,6 +20,7 @@ import {
     computeLift,
     pos3D,
     CLUSTER_COLORS,
+    MOSAIC_COLORS,
 } from "./geometry.js";
 
 // Naming the missing id turns a silent null-dereference three frames later into
@@ -112,7 +113,13 @@ const INDEX_COLORS = [
 const THICK_COLOR = new THREE.Color(0x8f8fdc);
 const THIN_COLOR = new THREE.Color(0xe2b184);
 
-// gen-1 P1 clusters, at the penrose-mosaic strengths: Pe5 blue star,
+// The penrose-mosaic plate palette, sampled from deca-shape-expansion.png. Darker
+// and more saturated than the screen colours, and meant to be seen with the height
+// shading on — the plate's depth comes from a wide ramp inside each tile.
+const MOSAIC_3D: Record<string, THREE.Color> = Object.fromEntries(
+    Object.entries(MOSAIC_COLORS).map(([k, v]) => [k, new THREE.Color(v)]),
+);
+// gen-1 P1 clusters, at the screen strengths: Pe5 blue star,
 // Pe3 yellow boat, Pe1 orange diamond
 const CLUSTER_3D: Record<string, THREE.Color> = Object.fromEntries(
     Object.entries(CLUSTER_COLORS).map(([k, v]) => [k, new THREE.Color(v)]),
@@ -203,7 +210,9 @@ function build(reframe: boolean): void {
         const tri = [f.v[0], f.v[1], f.v[2], f.v[0], f.v[2], f.v[3]];
         for (const vid of tri) {
             let c: THREE.Color;
-            if (mode === "cluster") {
+            if (mode === "mosaic") {
+                c = MOSAIC_3D[f.cluster] ?? CLUSTER_FALLBACK;
+            } else if (mode === "cluster") {
                 c = CLUSTER_3D[f.cluster] ?? CLUSTER_FALLBACK;
             } else if (mode === "type") {
                 c = f.thick ? THICK_COLOR : THIN_COLOR;
