@@ -250,6 +250,12 @@
         seam. Up to generation 3 every patch is a single layer and the control stays
         hidden.
         <br><br>
+        <strong>Type</strong> and <strong>Gen</strong> sit above the tabs rather than
+        inside a view: the patch is the subject of all of them, so it stays put when
+        you switch and you can step through seeds and generations while looking at
+        whichever view answers the question. Changing the patch on P1/P3 does not run
+        a branch-cut search, since there is no net on screen there to route.
+        <br><br>
         <strong>Colour</strong> switches the tiling between the gen-1 clusters,
         thick against thin, and height index. <strong>Heads / Tails</strong> flips
         which way the face shading runs and is display only — it no longer rebuilds
@@ -279,6 +285,10 @@
         <button id="tab-p1">P1 / P3</button>
         <span class="info" id="tabnote"></span>
     </div>
+
+    <!-- Which patch you are looking at is not a per-view setting: it is the subject
+         of every view, so it lives outside them and stays put when you switch. -->
+    <div class="controls" id="sharedbar" style="margin:0 0 12px"></div>
 
     <div id="view-work">
     <div class="bars">

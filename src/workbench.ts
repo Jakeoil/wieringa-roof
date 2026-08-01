@@ -2165,6 +2165,28 @@ function buildViewTabs(): void {
 
 }
 
+// What to do once the patch itself has changed. Replaying costs a branch-cut
+// search, which is worth it on the Workbench and pointless while browsing P1/P3 —
+// there is no net on screen there, only the tiling. So the search is skipped unless
+// a view that shows a net is actually in front of you.
+function afterPatchChange(): void {
+    if (view === "p1") {
+        drawTiling();
+        drawP1View();
+        return;
+    }
+    if (mode === "watch") {
+        runTrace(() => {
+            syncTransport();
+            drawTiling();
+            drawNet();
+        });
+        return;
+    }
+    drawTiling();
+    drawNet();
+}
+
 // ── P1 / P3: the two layers side by side ───────────────────────────
 //
 // The rhombs are P3. P1 is the layer they came from — pentagons, stars, boats and
@@ -2361,6 +2383,16 @@ function showView(v: View): void {
     ts.setAttribute("aria-current", String(v === "sheets"));
     tp.setAttribute("aria-current", String(v === "p1"));
     if (v === "p1") drawP1View();
+    // Coming back from P1/P3, the patch may have changed under a view that does not
+    // build nets, so the replay can be stale or absent. Catch it up on arrival
+    // rather than leaving an empty canvas.
+    if (v === "work" && mode === "watch" && !traceEvents.length) {
+        runTrace(() => {
+            syncTransport();
+            drawTiling();
+            drawNet();
+        });
+    }
     document.getElementById("tabnote")!.textContent =
         v === "sheets"
             ? ""
@@ -2753,20 +2785,19 @@ function buildControls() {
     typeSelect.addEventListener("change", () => {
         currentSeedIdx = parseInt(typeSelect.value);
         regenerate();
-        if (mode === "watch") {
-            runTrace(() => {
-                syncTransport();
-                drawTiling();
-                drawNet();
-            });
-        }
+        afterPatchChange();
     });
 
+    // Type and Gen sit in the shared bar above the tabs rather than in the
+    // Workbench's own controls: the patch is the subject of every view, so it should
+    // not disappear when you switch to P1/P3, and you should be able to step through
+    // seeds and generations while looking at whichever view answers your question.
+    const shared = document.getElementById("sharedbar")!;
     const typeLabel = document.createElement("label");
     typeLabel.textContent = "Type: ";
     typeLabel.style.fontSize = "13px";
     typeLabel.appendChild(typeSelect);
-    controls.insertBefore(typeLabel, controls.firstChild);
+    shared.appendChild(typeLabel);
 
     // Gen selector
     const genSelect = document.createElement("select");
@@ -2787,20 +2818,14 @@ function buildControls() {
     genSelect.addEventListener("change", () => {
         gen = parseInt(genSelect.value);
         regenerate();
-        if (mode === "watch") {
-            runTrace(() => {
-                syncTransport();
-                drawTiling();
-                drawNet();
-            });
-        }
+        afterPatchChange();
     });
 
     const genLabel = document.createElement("label");
     genLabel.textContent = "Gen: ";
     genLabel.style.fontSize = "13px";
     genLabel.appendChild(genSelect);
-    controls.insertBefore(genLabel, typeLabel.nextSibling);
+    shared.appendChild(genLabel);
 
     // one height control: sign flips the roof, magnitude sets shading depth
     const heightWrap = document.createElement("label");
