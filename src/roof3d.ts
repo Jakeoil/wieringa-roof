@@ -350,7 +350,9 @@ for (const [code, nick] of [
     ["St5", "St5 star"],
     ["St3", "St3 boat"],
     ["St1", "St1 diamond"],
-    ["Deca", "Deca"],
+    ["Deca", "Queen (composite)"],
+    ["Sun", "Sun (composite)"],
+    ["Star", "Star (composite)"],
 ] as Array<[string, string]>) {
     const o = document.createElement("option");
     o.value = code;

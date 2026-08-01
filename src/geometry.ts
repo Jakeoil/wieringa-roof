@@ -390,7 +390,7 @@ function p1Outline(type: TileType, tenth: number, gen: number): Pt[] {
 
 interface TileType {
     name: string;
-    kind: "penta" | "star" | "deca";
+    kind: "penta" | "star" | "deca" | "sun" | "starc";
     twist?: number[];
     diamond?: number[];
     color?: (string | null)[];
@@ -436,6 +436,8 @@ const Deca: TileType = {
     name: "Deca",
     kind: "deca",
 };
+const Sun: TileType = { name: "Sun", kind: "sun" };
+const StarC: TileType = { name: "Star", kind: "starc" };
 
 // ── Rhomb collection ──────────────────────────────────────────────
 
@@ -469,6 +471,7 @@ interface P1Tile {
     id: number;
     type: string;
     tenth: number;
+    isHeads: boolean;
     loc: Pt;
     gen: number;
     /** ids of the rhombs this tile emitted; empty for the star family */
@@ -573,6 +576,7 @@ function emitRhombs(
         id: p1Id++,
         type: type.name,
         tenth: angle.tenths,
+        isHeads,
         loc,
         gen,
         rhombIds: ids,
@@ -664,6 +668,7 @@ function expandStar(
             id: p1Id++,
             type: type.name,
             tenth: angle.tenths,
+            isHeads,
             loc,
             gen,
             rhombIds: [],
@@ -700,6 +705,112 @@ function expandStar(
             expandStar(St3, shift, !isHeads, locBoat, gen - 1, ci + boatDelta);
         }
     }
+}
+
+// ── Sun and Star: 5-fold composites ───────────────────────────────
+//
+// Both are described by what they *emit*, since the star family emits nothing:
+//
+//   Sun  = one Pe5 ringed by five Pe3   — a blue star inside five yellow boats
+//   Star = five Pe1 ringed by five Pe3  — five orange diamonds inside five boats,
+//                                          around a central star-shaped gap
+//
+// Read off a real tiling rather than derived: centred on a Pe5, the neighbours at
+// radius 14.414 are exactly five Pe3; centred on an St5, radius 14.414 holds five
+// Pe1 and radius 23.322 holds five Pe3 alongside five St3.
+//
+// The Sun's ring is precisely what Pe5's own substitution places, so the Sun is that
+// substitution taken one step. The Star's Pe1 ring likewise comes free from St5, but
+// its Pe3 ring does not — St5 puts boats there, which emit nothing — so those five
+// are the composite's own contribution, and the reason Star is a new shape while Sun
+// is Pe5 seen a generation later.
+//
+// Composite rule (NOTES): arranging is not substituting, so parts go at `gen` and
+// offsets come from wheels[gen + 1].
+
+/** Which tenth of the t-wheel carries the extra Pe3 ring, and the height-index step
+ *  to its centre. Both settled by test — see the tuning note below. */
+// Tile orientations for the two outer rings, settled by test rather than assumed.
+//
+// The arrangement was read off a real tiling, but the *orientations* there are
+// whatever that particular star inherited from its parent, and they turn out to be
+// chiral: 5-fold rotation and no mirror at all, confirmed against 720 candidate
+// axes. The Star tiling is not chiral, so those orientations are a local accident
+// rather than the figure. Searching the ten tenths for each ring finds the one that
+// restores all five mirror axes while keeping the patch valid.
+const PE3_TENTH = 5;
+const BOAT_TENTH = 9;
+
+function expandSun(
+    _type: TileType,
+    angle: Angle,
+    isHeads: boolean,
+    loc: Pt,
+    gen: number,
+    ci: number,
+) {
+    if (gen === 0) return;
+    // Pe5's substitution *is* a Pe5 ringed by five Pe3, so one step of it at gen + 1
+    // puts every part at gen — which is what a composite must do.
+    expandPenta(Pe5, angle, isHeads, loc, gen + 1, ci);
+}
+
+function expandStarComposite(
+    _type: TileType,
+    angle: Angle,
+    isHeads: boolean,
+    loc: Pt,
+    gen: number,
+    ci: number,
+) {
+    if (gen === 0) return;
+
+    // Placed at the offsets measured off a real tiling, not by borrowing
+    // expandStar's parameterisation. Those two are not the same thing: the tiles
+    // around a star in a finished tiling are put there by the wider recursion, and
+    // in expandStar's own indexing a boat at tenth 5 points at 90 degrees while the
+    // Pe3 that belongs at tenth 5 points at 270. Reading the arrangement off the
+    // tiling and placing it directly is the only way to get it right.
+    //
+    // Centred on the star gap, with the seed pointing "up":
+    //   five Pe1  at radius |s-wheel|, directions 18 + 72k, tenths (8 + 2k)
+    //   five Pe3  at radius |t-wheel|, directions 54 + 72k, tenths (9 + 2k)
+    const sW = wheels.s[gen + 1].w[0];
+    const tW = wheels.t[gen + 1].w[0];
+    const r1 = Math.hypot(sW.x, sW.y);
+    const r2 = Math.hypot(tW.x, tW.y);
+    const base = (angle.tenths * Math.PI) / 5;
+
+    const place = (
+        type: TileType,
+        r: number,
+        degOffset: number,
+        tenthBase: number,
+        heads: boolean,
+        ciDelta: number,
+    ) => {
+        for (let k = 0; k < 5; k++) {
+            const th = base + ((degOffset + 72 * k) * Math.PI) / 180;
+            const at = loc.tr(p(r * Math.cos(th), r * Math.sin(th)));
+            const t = mod10(tenthBase + 2 * k + angle.tenths);
+            expandPenta(
+                type,
+                ang(Math.floor(t / 2), t % 2 === 1),
+                heads,
+                at,
+                gen,
+                ci + ciDelta,
+            );
+        }
+    };
+
+    place(Pe1, r1, 18, 8, isHeads, isHeads ? -1 : +1);
+    place(Pe3, r2, 54, PE3_TENTH, !isHeads, isHeads ? -2 : +2);
+
+    // The five boats. They emit nothing at generation 1 — that is what a gap is —
+    // but they carry the reflection: without them the figure is 5-fold yet chiral,
+    // and the Star tiling is not. They also fill in from generation 2 onward.
+    place(St3, r2, 18, BOAT_TENTH, !isHeads, isHeads ? -2 : +2);
 }
 
 function expandDeca(
@@ -1078,8 +1189,10 @@ type SeedType = "Pe5" | "Pe3" | "Pe1" | "St5" | "St3" | "St1";
 const seedTypes: {
     label: string;
     type: TileType;
-    kind: "penta" | "star" | "deca";
+    kind: "penta" | "star" | "deca" | "sun" | "starc";
 }[] = [
+    // Order matters: the workbench and the 3D page persist a seed *index*, so new
+    // seeds go on the end. Menu grouping is a display question and belongs in the UI.
     { label: "Pe5", type: Pe5, kind: "penta" },
     { label: "Pe3", type: Pe3, kind: "penta" },
     { label: "Pe1", type: Pe1, kind: "penta" },
@@ -1087,6 +1200,8 @@ const seedTypes: {
     { label: "St3", type: St3, kind: "star" },
     { label: "St1", type: St1, kind: "star" },
     { label: "Deca", type: Deca, kind: "deca" },
+    { label: "Sun", type: Sun, kind: "sun" },
+    { label: "Star", type: StarC, kind: "starc" },
 ];
 
 // ── Generate a patch ──────────────────────────────────────────────
@@ -1109,6 +1224,10 @@ function generatePatch(seedIdx: number, isHeads: boolean, gen: number): void {
         expandPenta(seed.type, angle, isHeads, p(0, 0), gen, initialCI);
     } else if (seed.kind === "deca") {
         expandDeca(seed.type, angle, isHeads, p(0, 0), gen, initialCI);
+    } else if (seed.kind === "sun") {
+        expandSun(seed.type, angle, isHeads, p(0, 0), gen, initialCI);
+    } else if (seed.kind === "starc") {
+        expandStarComposite(seed.type, angle, isHeads, p(0, 0), gen, initialCI);
     } else {
         expandStar(seed.type, angle, isHeads, p(0, 0), gen, initialCI);
     }

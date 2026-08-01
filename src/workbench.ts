@@ -2737,7 +2737,15 @@ function buildControls() {
     for (let i = 0; i < seedTypes.length; i++) {
         const opt = document.createElement("option");
         opt.value = String(i);
-        opt.textContent = seedTypes[i].label;
+        // Deca is the Queen; the three composites are wholes rather than parts, so
+        // they read differently in the menu. The stored value is still the index.
+        const lab = seedTypes[i].label;
+        opt.textContent =
+            lab === "Deca"
+                ? "Queen"
+                : lab === "Sun" || lab === "Star"
+                  ? lab
+                  : lab;
         if (i === currentSeedIdx) opt.selected = true;
         typeSelect.appendChild(opt);
     }

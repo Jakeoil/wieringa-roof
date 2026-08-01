@@ -125,6 +125,50 @@ snaps.
 
 ---
 
+## Sun and Star: the three wholes
+
+`Deca` is now labelled **Queen**, and two 5-fold composites join it. Both are
+specified by what they *emit*, since the star family emits nothing:
+
+| | composition | gen 1 | 5-fold | mirrors | disc fill |
+|---|---|---|---|---|---|
+| Sun | 1 `Pe5` + 5 `Pe3` | 25 rhombs | yes | 5 | 66.7 / 67.6 / 64.3% |
+| Star | 5 `Pe1` + 5 `Pe3` | 35 rhombs | yes | 5 | **84.6** / 75.2 / 65.2% |
+| Queen | 1 `Pe3` + 2 `Pe1` | 10 rhombs | no | 1 | 91.9 / 93.3 / 82.6% |
+
+**Star gen 1 at 84.6% is the best 5-fold result** — against St5's 49%, which is what
+it is built on. That is the "fill a circular space" goal met.
+
+### The Sun is Pe5 seen a generation later
+
+`Pe5.twist = [0,0,0,0,0]` with no diamonds, so `expandPenta(Pe5)` *is* a Pe5 ringed
+by five Pe3. Sun is that substitution taken one step, so its numbers match Pe5's
+shifted by one. It earns its place as a named whole, not as new geometry.
+
+The Star is genuinely new: St5 gives the five `Pe1` free, but puts *boats* in the
+outer ring, and boats emit nothing. The five `Pe3` there are the composite's own
+contribution and the reason the figure fills where St5 does not.
+
+### Read the arrangement, do not derive it
+
+Both were read off a real tiling — centred on a `Pe5`, the neighbours at radius
+14.414 are exactly five `Pe3`; centred on an `St5`, radius 14.414 holds five `Pe1`
+and radius 23.322 holds five `Pe3` beside five `St3`.
+
+But **only the arrangement transfers, not the orientations.** The tiles around a
+star in a finished tiling were placed by the wider recursion, and in `expandStar`'s
+own indexing a boat at tenth 5 points at 90° while the `Pe3` belonging at tenth 5
+points at 270°. Copying the measured tenths gave a figure that was 5-fold and
+**chiral** — no mirror at all, confirmed against 720 candidate axes — because those
+orientations are a local accident. Searching the ten tenths per ring found the pair
+that restores all five mirror axes while keeping the patch valid.
+
+### Seed order is load-bearing
+
+The workbench and the 3D page persist a seed *index*, so new seeds go on the **end**
+of `seedTypes`. Prepending them silently turned a saved `seed: 1` from Pe3 into
+Star. Menu grouping is a display question and belongs in the UI.
+
 ## The P1 layer, and how its scale is pinned
 
 The rhombs are P3. P1 is the layer they came from — pentagons, stars, boats,
@@ -384,6 +428,7 @@ substantial piece of work and it changes how sheets are handled.*
 **Stage A is done — see "Done: branch-cut routing" below. Stage B (paper packing)
 is still open.**
 
+        
 ### The reframing
 
 Watching a patch unfold, the overlaps are **branch points**, and the cuts that
