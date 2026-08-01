@@ -163,6 +163,36 @@ points at 270°. Copying the measured tenths gave a figure that was 5-fold and
 orientations are a local accident. Searching the ten tenths per ring found the pair
 that restores all five mirror axes while keeping the patch valid.
 
+### The tenths reconstruction, and why the Star was subtly wrong
+
+`Angle.tenths = fifths * 2 + (isDown ? 5 : 0)` — the down half of the wheel is
+offset by **five**, not by one. Rebuilding an angle with `ang(t >> 1, t & 1)` maps
+tenth 5 to 9 and rotates the tile by two fifths.
+
+Every ring of the Star was placed at the right *position* with the wrong
+*orientation*. At generation 1 that was invisible: the boats emit no rhombs, so the
+only symptom was a P1 overlap nobody was looking at. From generation 2 the boats
+emit, and the figure came apart — 30 duplicate rhombs, and a growing hole where the
+centre should fill in.
+
+**The check that found it was P1 tile overlap**, not rhomb duplication. Rhombs can
+be perfectly disjoint while the tiles that produced them overlap, because a tile
+that emits nothing leaves no rhomb to collide. Any hand-placed arrangement should be
+checked at the P1 level first: `Star` gen 1 showed 5 overlapping `Pe1`/`St3` pairs at
+10.6% while its rhombs looked flawless.
+
+`angFromTenth` now does the reconstruction properly, and the Star is clean at every
+generation: 0 duplicates, 0 P1 overlaps, indices in range, 5-fold with five mirrors,
+disc fill 84.6 / 79.0 / 70.5%.
+
+### An empty patch used to poison the 3D camera
+
+St5 at generation 1 emits no rhombs, which is correct. But with no vertices the
+bounding sphere has radius 0, so the framing distance is 0 and
+`camera.position.normalize()` on a zero vector returns **NaN** — after which every
+frame is NaN and the view never recovers, whatever you select next. The 3D page now
+recognises an empty patch, says so, and leaves the camera alone.
+
 ### Seed order is load-bearing
 
 The workbench and the 3D page persist a seed *index*, so new seeds go on the **end**

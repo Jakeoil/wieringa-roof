@@ -137,6 +137,20 @@ function build(reframe: boolean): void {
     const u = Number(vscaleInput.value);
     const flip = u < 0;
     const vscale = Math.sign(u) * Math.pow(Math.abs(u), 1.6);
+    // An empty patch is a legitimate answer — the star family emits no rhombs until
+    // a generation later — but it used to wreck the view permanently. With no
+    // vertices the bounding sphere has radius 0, so the framing distance is 0 and
+    // `camera.position.normalize()` on a zero vector yields NaN, which poisons the
+    // camera for every frame afterwards. Say so and leave the camera alone.
+    if (allRhombs.length === 0) {
+        disposeOld();
+        statusEl.textContent =
+            `${patchSel.value} generation ${gen}: no rhombs at this generation. ` +
+            `Star-type seeds emit none until one generation later — try ${gen + 1}.`;
+        renderer.render(scene, camera);
+        return;
+    }
+
     const lift = computeLift();
     const P = lift.n.map((nv) => (nv ? pos3D(nv, flip) : null));
 

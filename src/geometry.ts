@@ -67,6 +67,19 @@ function ang(fifths: number, isDown: boolean): Angle {
     return new Angle(fifths, isDown);
 }
 
+/**
+ * The Angle whose `tenths` is `t`.
+ *
+ * Note `tenths = fifths * 2 + (isDown ? 5 : 0)`, so the down half of the wheel is
+ * offset by *five*, not by one. Reconstructing with `ang(t >> 1, t & 1)` therefore
+ * maps tenth 5 to 9 and rotates the tile by two fifths — which is exactly how the
+ * Star's rings came out subtly misplaced.
+ */
+function angFromTenth(t: number): Angle {
+    const k = mod10(t);
+    return k % 2 === 0 ? ang(k / 2, false) : ang(mod10(k - 5) / 2, true);
+}
+
 // ── Wheel (10-point radial array) ─────────────────────────────────
 
 class Wheel {
@@ -474,6 +487,8 @@ interface P1Tile {
     isHeads: boolean;
     loc: Pt;
     gen: number;
+    /** the tile's height index at its centre */
+    ci: number;
     /** ids of the rhombs this tile emitted; empty for the star family */
     rhombIds: number[];
 }
@@ -579,6 +594,7 @@ function emitRhombs(
         isHeads,
         loc,
         gen,
+        ci,
         rhombIds: ids,
     });
 }
@@ -671,6 +687,7 @@ function expandStar(
             isHeads,
             loc,
             gen,
+            ci,
             rhombIds: [],
         });
         return;
@@ -738,8 +755,14 @@ function expandStar(
 // axes. The Star tiling is not chiral, so those orientations are a local accident
 // rather than the figure. Searching the ten tenths for each ring finds the one that
 // restores all five mirror axes while keeping the patch valid.
-const PE3_TENTH = 5;
-const BOAT_TENTH = 9;
+let PE3_TENTH = 5;
+let PE3_HEADS = false;
+let PE3_CI = 2;
+function _tuneStar(t: number, h: boolean, c: number): void {
+    PE3_TENTH = t;
+    PE3_HEADS = h;
+    PE3_CI = c;
+}
 
 function expandSun(
     _type: TileType,
@@ -765,52 +788,45 @@ function expandStarComposite(
 ) {
     if (gen === 0) return;
 
-    // Placed at the offsets measured off a real tiling, not by borrowing
-    // expandStar's parameterisation. Those two are not the same thing: the tiles
-    // around a star in a finished tiling are put there by the wider recursion, and
-    // in expandStar's own indexing a boat at tenth 5 points at 90 degrees while the
-    // Pe3 that belongs at tenth 5 points at 270. Reading the arrangement off the
-    // tiling and placing it directly is the only way to get it right.
+    // Every ring placed explicitly, from a neighbourhood measured in a real tiling.
     //
-    // Centred on the star gap, with the seed pointing "up":
-    //   five Pe1  at radius |s-wheel|, directions 18 + 72k, tenths (8 + 2k)
-    //   five Pe3  at radius |t-wheel|, directions 54 + 72k, tenths (9 + 2k)
-    const sW = wheels.s[gen + 1].w[0];
-    const tW = wheels.t[gen + 1].w[0];
-    const r1 = Math.hypot(sW.x, sW.y);
-    const r2 = Math.hypot(tW.x, tW.y);
-    const base = (angle.tenths * Math.PI) / 5;
+    // expandStar(St5) cannot supply them: it puts its *boats* at t-wheel directions
+    // 270/342/54/126/198, and in a real tiling those are exactly where the Pe3 go,
+    // with the boats 36 degrees away. Handing the ring to expandStar therefore fills
+    // the Pe3 slots with tiles that emit nothing, and no placement of the Pe3 can
+    // then avoid a collision — which is why every search over its parameters failed.
+    //
+    // Measured, for a centre at tenth 0 with heads and index ci:
+    //   Pe1  s-wheel[5+2j]  tenth 2j      heads       ci - 1
+    //   Pe3  t-wheel[2j]    tenth 5+2j    flipped     ci
+    //   St3  t-wheel[5+2j]  tenth 5+2j    flipped     ci - 2
+    // The index deltas invert when the centre is tails, as everywhere else here.
+    const sWheel = wheels.s[gen + 1].w;
+    const tWheel = wheels.t[gen + 1].w;
+    const sgn = isHeads ? 1 : -1;
+    const base = angle.tenths;
 
-    const place = (
+    const put = (
         type: TileType,
-        r: number,
-        degOffset: number,
-        tenthBase: number,
+        wheel: Pt[],
+        wheelIdx: number,
+        tenth: number,
         heads: boolean,
-        ciDelta: number,
+        dCi: number,
     ) => {
-        for (let k = 0; k < 5; k++) {
-            const th = base + ((degOffset + 72 * k) * Math.PI) / 180;
-            const at = loc.tr(p(r * Math.cos(th), r * Math.sin(th)));
-            const t = mod10(tenthBase + 2 * k + angle.tenths);
-            expandPenta(
-                type,
-                ang(Math.floor(t / 2), t % 2 === 1),
-                heads,
-                at,
-                gen,
-                ci + ciDelta,
-            );
-        }
+        const w = mod10(wheelIdx + base);
+        const t = mod10(tenth + base);
+        expandPenta(type, angFromTenth(t), heads, loc.tr(wheel[w]), gen, ci + sgn * dCi);
     };
 
-    place(Pe1, r1, 18, 8, isHeads, isHeads ? -1 : +1);
-    place(Pe3, r2, 54, PE3_TENTH, !isHeads, isHeads ? -2 : +2);
+    // the star-shaped gap at the centre, which fills in from generation 2
+    expandStar(St5, angle, isHeads, loc, gen, ci);
 
-    // The five boats. They emit nothing at generation 1 — that is what a gap is —
-    // but they carry the reflection: without them the figure is 5-fold yet chiral,
-    // and the Star tiling is not. They also fill in from generation 2 onward.
-    place(St3, r2, 18, BOAT_TENTH, !isHeads, isHeads ? -2 : +2);
+    for (let j = 0; j < 5; j++) {
+        put(Pe1, sWheel, mod10(5 + 2 * j), mod10(2 * j), isHeads, -1);
+        put(Pe3, tWheel, mod10(2 * j), mod10(5 + 2 * j), !isHeads, 0);
+        put(St3, tWheel, mod10(5 + 2 * j), mod10(5 + 2 * j), !isHeads, -2);
+    }
 }
 
 function expandDeca(
@@ -1257,6 +1273,7 @@ export {
     edgeKey,
     seedTypes,
     generatePatch,
+    _tuneStar,
     E5,
     pos3D,
     computeLift,
