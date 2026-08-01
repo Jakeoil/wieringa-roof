@@ -491,6 +491,54 @@ const CLUSTER_COLORS: Record<string, string> = {
     Pe1: "#eec09b", // [238,192,155]
 };
 
+const TYPE_COLORS = { thick: "#9292e3", thin: "#eec09b" };
+
+const INDEX_PALETTE = [
+    "#888",
+    "#4a9eda",
+    "#2ecc71",
+    "#f39c12",
+    "#e74c3c",
+    "#9b59b6",
+    "#1abc9c",
+    "#e67e22",
+];
+
+function indexColor(idx: number): string {
+    if (idx < 0) return "#333";
+    return INDEX_PALETTE[idx % INDEX_PALETTE.length] || "#333";
+}
+
+type FillMode = "none" | "cluster" | "mosaic" | "type" | "index";
+
+/**
+ * The base colour of one rhomb under a given colour mode — the single answer the
+ * workbench, the sheets and the printable map all ask for.
+ *
+ * It lives here because the sheets used to keep their own washed-out copy of the
+ * cluster palette, so the same net came out one colour on screen and another on
+ * paper. One function, one answer: what you build is what prints.
+ */
+function tileFill(
+    mode: FillMode,
+    cluster: string,
+    thick: boolean,
+    lowIndex: number,
+): string | null {
+    switch (mode) {
+        case "none":
+            return null;
+        case "mosaic":
+            return MOSAIC_COLORS[cluster] ?? "#888888";
+        case "type":
+            return thick ? TYPE_COLORS.thick : TYPE_COLORS.thin;
+        case "index":
+            return indexColor(lowIndex);
+        default:
+            return CLUSTER_COLORS[cluster] ?? "#f4f4f4";
+    }
+}
+
 let allRhombs: Rhomb[] = [];
 
 // The P1 tiles the expansion laid down, kept rather than discarded. Recorded at the
@@ -1317,9 +1365,14 @@ function generatePatch(seedIdx: number, isHeads: boolean, gen: number): void {
 
 // ── Exports ───────────────────────────────────────────────────────
 
+export type { FillMode };
 export {
     CLUSTER_COLORS,
     MOSAIC_COLORS,
+    TYPE_COLORS,
+    INDEX_PALETTE,
+    indexColor,
+    tileFill,
     SQRT5,
     PHI,
     GOLDEN_SIDE,

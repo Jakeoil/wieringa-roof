@@ -14,6 +14,7 @@ import {
     vertexList,
     seedTypes,
     generatePatch,
+    indexColor,
 } from "./geometry.js";
 import type { Rhomb, Vertex } from "./geometry.js";
 import {
@@ -150,20 +151,6 @@ function generate() {
 // ── Rendering ─────────────────────────────────────────────────────
 
 // Index colors: cycle through palette for indices outside 0-4
-const INDEX_PALETTE = [
-    "#888",
-    "#4a9eda",
-    "#2ecc71",
-    "#f39c12",
-    "#e74c3c",
-    "#9b59b6",
-    "#1abc9c",
-    "#e67e22",
-];
-function indexColor(idx: number): string {
-    if (idx < 0) return "#333";
-    return INDEX_PALETTE[idx % INDEX_PALETTE.length] || "#333";
-}
 
 function hexToRGB(h: string): [number, number, number] {
     const n = parseInt(h.slice(1), 16);
@@ -231,7 +218,11 @@ function makeGradient(
     pHigh: { x: number; y: number },
     iLow: number,
     iHigh: number,
-): CanvasGradient {
+): CanvasGradient | string {
+    // Shading is one shared field across the views, so "off" has to mean off here
+    // as well — the workbench used to gradient unconditionally while the sheets
+    // had a checkbox, which is half of why the two never looked alike.
+    if (!renderShading) return fill;
     const grad = ctx.createLinearGradient(pLow.x, pLow.y, pHigh.x, pHigh.y);
     grad.addColorStop(0, shadeOf(fill, iLow));
     grad.addColorStop(1, shadeOf(fill, iHigh));
@@ -1954,7 +1945,12 @@ let currentSheet = 0; // −1 is the map
 // Rendering settings: print decisions, so they live with the sheets rather than
 // with the height slider, which only says which way up the surface sits.
 let renderShading = prefs.shading;
-let renderIsoglosses = prefs.renderIso;
+// Set once the workbench controls exist; mirrors the shared appearance fields into
+// every control that shows them.
+let appearanceControls: (() => void) | null = null;
+function syncAppearance(): void {
+    appearanceControls?.();
+}
 let renderBackside = false;
 
 // The patch in its own plane, for the locator mini and the map. Rhomb.verts is
@@ -1972,9 +1968,9 @@ function sheetOpts(sheet = 0) {
         pageW: pw,
         pageH: ph,
         margin: MARGIN_IN * 25.4,
-        fillMode: "cluster" as const,
+        fillMode: tileColour,
         shading: renderShading,
-        isoglosses: renderIsoglosses,
+        isoglosses: showIsogloss,
         // A flat height setting carries no hills-or-dales information, so rendering
         // falls back to hills; Back side swaps whatever that came to.
         dales: renderBackside ? !(shadeDepth !== 0 && flipHeight) : shadeDepth !== 0 && flipHeight,
@@ -2145,11 +2141,12 @@ function buildViewTabs(): void {
         cb.checked = get();
         cb.addEventListener("change", () => {
             set(cb.checked);
+            syncAppearance();
             drawSheets();
         });
     };
     box("sheet-shade", () => renderShading, (v) => (renderShading = v));
-    box("sheet-iso", () => renderIsoglosses, (v) => (renderIsoglosses = v));
+    box("sheet-iso", () => showIsogloss, (v) => (showIsogloss = v));
     box("sheet-back", () => renderBackside, (v) => (renderBackside = v));
 
     const sideBox = document.getElementById("sheet-side") as HTMLInputElement;
@@ -2523,7 +2520,8 @@ function printNet(): void {
                 pageW: pw,
                 pageH: ph,
                 margin: marginMm,
-                fillMode: "cluster",
+                fillMode: tileColour,
+                indexOf: (v: number) => vertexList[v]?.index ?? 1,
                 showAngles: false,
                 showLegend: true,
                 layer: netLayerCount > 1 ? netLayer : undefined,
@@ -2889,6 +2887,18 @@ function buildControls() {
     controls.insertBefore(heightWrap, genLabel.nextSibling);
     syncHeight(false);
 
+    // Colour, shading and isoglosses are one field each, shown on more than one
+    // overlay. Whichever copy of a control you touch, every copy has to agree —
+    // otherwise the checkbox you are looking at lies about what will print.
+    appearanceControls = () => {
+        isoChk.checked = showIsogloss;
+        colourSel.value = tileColour;
+        const shadeBox = document.getElementById("sheet-shade") as HTMLInputElement | null;
+        const isoBox = document.getElementById("sheet-iso") as HTMLInputElement | null;
+        if (shadeBox) shadeBox.checked = renderShading;
+        if (isoBox) isoBox.checked = showIsogloss;
+    };
+
     const isoWrap = document.createElement("label");
     isoWrap.style.cssText = "font-size:13px;display:flex;align-items:center;gap:5px;";
     const isoChk = document.createElement("input");
@@ -2898,8 +2908,10 @@ function buildControls() {
         "Contour lines of constant height — seven per rhombus, on quarter-index steps";
     isoChk.addEventListener("change", () => {
         showIsogloss = isoChk.checked;
+        syncAppearance();
         drawTiling();
         drawNet();
+        if (pagination) drawSheets();
     });
     isoWrap.append(isoChk, document.createTextNode("isoglosses"));
     controls.insertBefore(isoWrap, heightWrap.nextSibling);
@@ -2922,13 +2934,15 @@ function buildControls() {
         tileColour = colourSel.value as TileColour;
         if (tileColour === "mosaic" && !showIsogloss) {
             showIsogloss = true;
-            isoChk.checked = true;
             say(
                 "Mosaic plate: darker palette, height ramp and isoglosses — the " +
                     "contour stripes are half of what makes the plate look like it does.",
             );
         }
+        syncAppearance();
         drawTiling();
+        drawNet();
+        if (pagination) drawSheets();
     });
     const colourLabel = document.createElement("label");
     colourLabel.textContent = "Color: ";
@@ -3111,7 +3125,7 @@ function persist(): void {
         heightU,
         isogloss: showIsogloss,
         shading: renderShading,
-        renderIso: renderIsoglosses,
+        renderIso: showIsogloss,
     });
 }
 window.addEventListener("beforeunload", persist);

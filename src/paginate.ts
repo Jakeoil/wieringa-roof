@@ -23,7 +23,9 @@
 
 import { edgeRole, intersectionArea } from "./unfold.js";
 import type { Placed, Crease } from "./unfold.js";
-import { CLUSTER_TINTS, M_COLOR, V_COLOR } from "./sheet.js";
+import { M_COLOR, V_COLOR } from "./sheet.js";
+import { tileFill } from "./geometry.js";
+import type { FillMode } from "./geometry.js";
 
 type P2 = [number, number];
 
@@ -535,7 +537,7 @@ export interface PageRenderOpts {
     pageW: number; // physical page, mm
     pageH: number;
     margin: number; // mm
-    fillMode: "none" | "type" | "cluster";
+    fillMode: FillMode;
     showLegend?: boolean;
     standalone?: boolean;
     // Height-derived decoration. Whether these appear is a *rendering* choice,
@@ -712,15 +714,16 @@ export function renderPage(
         const p = placed.get(fid)!;
         const pts = p.poly.map((q) => map(q as P2));
 
-        if (o.fillMode !== "none") {
-            const base =
-                o.fillMode === "cluster"
-                    ? (CLUSTER_TINTS[p.cluster] ?? "#f4f4f4")
-                    : p.thick
-                      ? "#f2f2fa"
-                      : "#fdf4ea";
+        const vidx0 = p.verts.map(heightOf);
+        const base = tileFill(
+            o.fillMode,
+            p.cluster,
+            p.thick,
+            Math.min(...vidx0),
+        );
+        if (base) {
             const shape = pts.map((q) => `${n3(q[0])},${n3(q[1])}`).join(" ");
-            const vidx = p.verts.map(heightOf);
+            const vidx = vidx0;
             if (o.shading) {
                 // Gradient along the tile's own fall line, low corner to high.
                 let cLo = 0;

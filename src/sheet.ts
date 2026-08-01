@@ -4,7 +4,8 @@
 // tools/bfs-unfold.mjs (writes .svg files).
 
 import { edgeRole } from "./unfold.js";
-import { CLUSTER_COLORS } from "./geometry.js";
+import { tileFill } from "./geometry.js";
+import type { FillMode } from "./geometry.js";
 import type { Placed, Piece, Crease } from "./unfold.js";
 
 type P2 = [number, number];
@@ -41,22 +42,6 @@ export const DASH: Record<number, string> = {
 };
 export const M_COLOR = "#c0392b";
 
-// Cluster tints for print: the penrose-mosaic cluster colours mixed toward white
-// so a sheet does not soak ink and stays easy to draw on. Same hues as the 3D
-// page, which uses them at full strength.
-function lighten(hex: string, t: number): string {
-    const n = parseInt(hex.slice(1), 16);
-    const mix = (c: number) => Math.round(c + (255 - c) * t);
-    return (
-        "#" +
-        [(n >> 16) & 255, (n >> 8) & 255, n & 255]
-            .map((c) => mix(c).toString(16).padStart(2, "0"))
-            .join("")
-    );
-}
-export const CLUSTER_TINTS: Record<string, string> = Object.fromEntries(
-    Object.entries(CLUSTER_COLORS).map(([k, v]) => [k, lighten(v, 0.65)]),
-);
 export const V_COLOR = "#2469b8";
 
 // ── layout ────────────────────────────────────────────────────────
@@ -133,7 +118,9 @@ export interface RenderOpts {
     pageW: number;
     pageH: number;
     margin: number;
-    fillMode: "none" | "type" | "cluster";
+    fillMode: FillMode;
+    /** Height index per vertex; only "index" fill needs it. */
+    indexOf?: (v: number) => number;
     showAngles: boolean;
     showLegend: boolean;
     standalone?: boolean; // emit xmlns (needed for a .svg file)
@@ -206,13 +193,14 @@ export function renderSheet(
                 continue;
             }
 
-            if (o.fillMode !== "none") {
-                const fill =
-                    o.fillMode === "cluster"
-                        ? (CLUSTER_TINTS[p.cluster] ?? "#f4f4f4")
-                        : p.thick
-                          ? "#f2f2fa"
-                          : "#fdf4ea";
+            const idxOf = o.indexOf;
+            const fill = tileFill(
+                o.fillMode,
+                p.cluster,
+                p.thick,
+                idxOf ? Math.min(...p.verts.map(idxOf)) : 1,
+            );
+            if (fill) {
                 fills.push(
                     `<polygon points="${pts
                         .map((q) => `${n3(q[0])},${n3(q[1])}`)
