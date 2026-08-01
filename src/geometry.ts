@@ -773,9 +773,55 @@ function expandSun(
     ci: number,
 ) {
     if (gen === 0) return;
-    // Pe5's substitution *is* a Pe5 ringed by five Pe3, so one step of it at gen + 1
-    // puts every part at gen — which is what a composite must do.
-    expandPenta(Pe5, angle, isHeads, loc, gen + 1, ci);
+
+    // A blue star with five Queens around it. Measured from a real tiling, centred
+    // on a Pe5 at tenth 0 with heads:
+    //
+    //   Pe3  r = |s-wheel|            dirs 18 + 72k   tenth 3 + 2k   heads   ci - 1
+    //   St1  r = |t-wheel|            dirs 54 + 72k   tenth 9 + 2k   flip    ci
+    //   Pe1  r = |s-wheel|·2cos18°    dirs 0 + 72k    tenth 4 + 2k   heads   ci
+    //   Pe1  r = |s-wheel|·2cos18°    dirs 36 + 72k   tenth 2 + 2k   heads   ci
+    //
+    // The five Pe3 with the ten Pe1 are the five Queens — a Queen being one Pe3 with
+    // two Pe1 — and the five St1 are the diamond gaps between them. The Pe1 ring
+    // radius is not a wheel magnitude but a fixed multiple of one, so it still
+    // scales correctly with generation.
+    const sW = wheels.s[gen + 1].w[0];
+    const tW = wheels.t[gen + 1].w[0];
+    const r1 = Math.hypot(sW.x, sW.y);
+    const r2 = Math.hypot(tW.x, tW.y);
+    const r3 = r1 * 2 * Math.cos(Math.PI / 10);
+    const base = (angle.tenths * Math.PI) / 5;
+    const sgn = isHeads ? 1 : -1;
+
+    const put = (
+        type: TileType,
+        r: number,
+        deg: number,
+        tenth: number,
+        heads: boolean,
+        dCi: number,
+    ) => {
+        const th = base + (deg * Math.PI) / 180;
+        expandPenta(
+            type,
+            angFromTenth(tenth + angle.tenths),
+            heads,
+            loc.tr(p(r * Math.cos(th), r * Math.sin(th))),
+            gen,
+            ci + sgn * dCi,
+        );
+    };
+
+    // the star at the centre
+    expandPenta(Pe5, angle, isHeads, loc, gen, ci);
+
+    for (let k = 0; k < 5; k++) {
+        put(Pe3, r1, 18 + 72 * k, 3 + 2 * k, isHeads, -1);
+        put(St1, r2, 54 + 72 * k, 9 + 2 * k, !isHeads, 0);
+        put(Pe1, r3, 0 + 72 * k, 4 + 2 * k, isHeads, 0);
+        put(Pe1, r3, 36 + 72 * k, 2 + 2 * k, isHeads, 0);
+    }
 }
 
 function expandStarComposite(

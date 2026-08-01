@@ -130,20 +130,23 @@ snaps.
 `Deca` is now labelled **Queen**, and two 5-fold composites join it. Both are
 specified by what they *emit*, since the star family emits nothing:
 
-| | composition | gen 1 | 5-fold | mirrors | disc fill |
+| | composition | gen 1 | 5-fold | mirrors | disc fill (gen 1/2/3) |
 |---|---|---|---|---|---|
-| Sun | 1 `Pe5` + 5 `Pe3` | 25 rhombs | yes | 5 | 66.7 / 67.6 / 64.3% |
-| Star | 5 `Pe1` + 5 `Pe3` | 35 rhombs | yes | 5 | **84.6** / 75.2 / 65.2% |
+| Sun | a star + **five Queens** | 55 rhombs | yes | 5 | 76.7 / **84.3** / 82.8% |
+| Star | 5 `Pe1` + 5 `Pe3` | 35 rhombs | yes | 5 | **84.6** / 79.0 / 70.5% |
 | Queen | 1 `Pe3` + 2 `Pe1` | 10 rhombs | no | 1 | 91.9 / 93.3 / 82.6% |
 
-**Star gen 1 at 84.6% is the best 5-fold result** — against St5's 49%, which is what
-it is built on. That is the "fill a circular space" goal met.
+Both 5-fold composites now fill 77–85%, against 49% for the `St5` the Star is built
+on and 67% for the `Pe5` the Sun grew out of. That is the "fill a circular space"
+goal met without giving up the symmetry.
 
-### The Sun is Pe5 seen a generation later
+### The Sun is a star with five Queens round it
 
-`Pe5.twist = [0,0,0,0,0]` with no diamonds, so `expandPenta(Pe5)` *is* a Pe5 ringed
-by five Pe3. Sun is that substitution taken one step, so its numbers match Pe5's
-shifted by one. It earns its place as a named whole, not as new geometry.
+Not "a Pe5 ringed by five Pe3" — that reading is just `Pe5` one generation later,
+since `Pe5.twist` is all zeros with no diamonds and its substitution already *is*
+that. The Sun is the bigger figure: the blue star, five `Pe3`, **ten** `Pe1` making
+five Queens with them, and five `St1` diamond gaps between. It went from 66.7% fill
+to 76.7 / 84.3 / 82.8%.
 
 The Star is genuinely new: St5 gives the five `Pe1` free, but puts *boats* in the
 outer ring, and boats emit nothing. The five `Pe3` there are the composite's own
