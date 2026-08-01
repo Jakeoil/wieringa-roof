@@ -8,7 +8,7 @@ import {
     Pt,
     p,
     allRhombs,
-    MOSAIC_COLORS,
+    tileFill,
     allP1Tiles,
     p1Outline,
     vertexList,
@@ -81,7 +81,7 @@ function biasedHeight(u: number): number {
 
 // Face colouring in the tiling view. "Coloured by type or by vertex index" was in
 // the original spec and never got built.
-type TileColour = "cluster" | "mosaic" | "type" | "index";
+type TileColour = "cluster" | "mosaic" | "classic" | "type" | "index";
 let tileColour: TileColour = prefs.colour as TileColour;
 
 function faceIndexLow(r: Rhomb): number {
@@ -325,15 +325,11 @@ function drawTiling() {
             // canvas you built the net on, now divided and keyed to the sheet list.
             const sh = faceSheet.get(r.id);
             if (sh != null) return sheetColours[sh] ?? "#ddd";
-            if (tileColour === "type") return r.thick ? "#9292e3" : "#eec09b";
-            if (tileColour === "index") return indexColor(vi[cLo]);
-            // The mosaic plate is the same drawing with a darker, more saturated
-            // palette — its character comes from the height ramp and the isoglosses
-            // over the top, not from the base colour alone.
-            const base =
-                tileColour === "mosaic"
-                    ? (MOSAIC_COLORS[r.cluster] ?? r.fill)
-                    : r.fill;
+            // Same tileFill the sheets ask, so a mode added in one place cannot
+            // quietly go missing in the other. Flat modes stay flat: thick/thin and
+            // height already *are* the information, and ramping them muddles it.
+            const base = tileFill(tileColour, r.cluster, r.thick, vi[cLo]) ?? r.fill;
+            if (tileColour === "type" || tileColour === "index") return base;
             return makeGradient(ctx, base, sv[cLo], sv[cHi], vi[cLo], vi[cHi]);
         };
         const role = mode === "watch" ? traceRoles.get(r.id) : undefined;
@@ -384,7 +380,7 @@ function drawTiling() {
             ctx.strokeStyle = hint === "clean" ? "#2ea043" : "#c0392b";
             ctx.lineWidth = r.id === hoveredRhomb ? 2.5 : 1.5;
             ctx.stroke();
-        } else if (tileColour === "mosaic") {
+        } else if (tileColour === "mosaic" || tileColour === "classic") {
             // Heavy black outlines are half of what the plate looks like — the ramp
             // and the isoglosses do nothing without them. Scale with the rhomb so a
             // gen-4 patch does not turn solid black: the plate is gen 2, where a
@@ -1394,9 +1390,7 @@ function drawNet() {
         const [nLo, nHi] = extremeCorners(nvi);
         ctx.fillStyle = makeGradient(
             ctx,
-            tileColour === "mosaic"
-                ? (MOSAIC_COLORS[src.cluster] ?? src.fill)
-                : src.fill,
+            tileFill(tileColour, src.cluster, src.thick, nvi[nLo]) ?? src.fill,
             { x: sv[nLo].x, y: sv[nLo].y },
             { x: sv[nHi].x, y: sv[nHi].y },
             nvi[nLo],
@@ -2921,6 +2915,7 @@ function buildControls() {
     for (const [v, t] of [
         ["cluster", "Cluster"],
         ["mosaic", "Mosaic plate"],
+        ["classic", "Mosaic classic"],
         ["type", "Thick / thin"],
         ["index", "Height index"],
     ] as Array<[TileColour, string]>) {

@@ -484,6 +484,17 @@ const MOSAIC_COLORS: Record<string, string> = {
     Pe1: "#ac6d38", // rust
 };
 
+// penrose-mosaic's own defaults, verbatim from penrose.js:11-13 — the strong blue,
+// orange and yellow it starts up with. The cluster names there say the mapping
+// outright: Pe5 is BLUE_PENTA, Pe3 YELLOW_PENTA, Pe1 ORANGE_PENTA. Pure #0000ff and
+// #ffff00 are far more saturated than anything else on this site, which is the point:
+// this is the classic look, not a toned-down version of it.
+const MOSAIC_CLASSIC: Record<string, string> = {
+    Pe5: "#0000ff", // BLUE
+    Pe3: "#ffff00", // YELLOW
+    Pe1: "#e46c0a", // ORANGE
+};
+
 // Cluster colors (matches penrose-mosaic custom palette)
 const CLUSTER_COLORS: Record<string, string> = {
     Pe5: "#9292e3", // [146,146,227]
@@ -509,7 +520,7 @@ function indexColor(idx: number): string {
     return INDEX_PALETTE[idx % INDEX_PALETTE.length] || "#333";
 }
 
-type FillMode = "none" | "cluster" | "mosaic" | "type" | "index";
+type FillMode = "none" | "cluster" | "mosaic" | "classic" | "type" | "index";
 
 /**
  * The base colour of one rhomb under a given colour mode — the single answer the
@@ -530,6 +541,8 @@ function tileFill(
             return null;
         case "mosaic":
             return MOSAIC_COLORS[cluster] ?? "#888888";
+        case "classic":
+            return MOSAIC_CLASSIC[cluster] ?? "#888888";
         case "type":
             return thick ? TYPE_COLORS.thick : TYPE_COLORS.thin;
         case "index":
@@ -1369,6 +1382,7 @@ export type { FillMode };
 export {
     CLUSTER_COLORS,
     MOSAIC_COLORS,
+    MOSAIC_CLASSIC,
     TYPE_COLORS,
     INDEX_PALETTE,
     indexColor,

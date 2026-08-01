@@ -21,6 +21,7 @@ import {
     pos3D,
     CLUSTER_COLORS,
     MOSAIC_COLORS,
+    MOSAIC_CLASSIC,
 } from "./geometry.js";
 
 // Naming the missing id turns a silent null-dereference three frames later into
@@ -119,6 +120,11 @@ const THIN_COLOR = new THREE.Color(0xe2b184);
 const MOSAIC_3D: Record<string, THREE.Color> = Object.fromEntries(
     Object.entries(MOSAIC_COLORS).map(([k, v]) => [k, new THREE.Color(v)]),
 );
+// penrose-mosaic's start-up colours. Very saturated next to everything else here,
+// which is what makes them the classic look rather than a variant of it.
+const CLASSIC_3D: Record<string, THREE.Color> = Object.fromEntries(
+    Object.entries(MOSAIC_CLASSIC).map(([k, v]) => [k, new THREE.Color(v)]),
+);
 // gen-1 P1 clusters, at the screen strengths: Pe5 blue star,
 // Pe3 yellow boat, Pe1 orange diamond
 const CLUSTER_3D: Record<string, THREE.Color> = Object.fromEntries(
@@ -212,6 +218,8 @@ function build(reframe: boolean): void {
             let c: THREE.Color;
             if (mode === "mosaic") {
                 c = MOSAIC_3D[f.cluster] ?? CLUSTER_FALLBACK;
+            } else if (mode === "classic") {
+                c = CLASSIC_3D[f.cluster] ?? CLUSTER_FALLBACK;
             } else if (mode === "cluster") {
                 c = CLUSTER_3D[f.cluster] ?? CLUSTER_FALLBACK;
             } else if (mode === "type") {

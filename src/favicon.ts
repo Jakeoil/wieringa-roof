@@ -16,6 +16,7 @@ import {
     seedTypes,
     vertexList,
     MOSAIC_COLORS,
+    MOSAIC_CLASSIC,
 } from "./geometry.js";
 import { cutTreeUnfold } from "./cuttree.js";
 
@@ -24,7 +25,7 @@ export interface IconOpts {
     gen: number;
     /** "net" unfolds the patch; "tiling" uses the flat Penrose patch */
     subject: "net" | "tiling";
-    colour: "cluster" | "mosaic" | "type" | "index" | "mono";
+    colour: "cluster" | "mosaic" | "classic" | "type" | "index" | "mono";
     /** stroke width as a fraction of a rhomb edge; 0 for none */
     stroke: number;
     strokeColor: string;
@@ -70,6 +71,7 @@ function subjectPolys(o: IconOpts): Array<{ poly: P2[]; fill: string }> {
     const fillFor = (cluster: string, thick: boolean, lowIndex: number): string => {
         if (o.colour === "mono") return "#333333";
         if (o.colour === "mosaic") return MOSAIC_COLORS[cluster] ?? "#888888";
+        if (o.colour === "classic") return MOSAIC_CLASSIC[cluster] ?? "#888888";
         if (o.colour === "type") return thick ? "#6f6fd0" : "#e39a5c";
         if (o.colour === "index") {
             return INDEX_COLOURS[Math.min(3, Math.max(0, lowIndex - 1))];
