@@ -2184,55 +2184,82 @@ const P1_FILL: Record<string, string> = {
     Pe1: "#eec09b",
 };
 
-function drawP1(): void {
-    const canvas = document.getElementById("p1canvas") as HTMLCanvasElement;
-    const ctx = canvas.getContext("2d")!;
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+// The P1 view needs its own transform. The main one is fitted to the tiling canvas,
+// whose pixel size is its CSS width times devicePixelRatio — so reusing it here drew
+// everything about twice too large and mostly off the edge. Both panels then share
+// this one transform, which is the only way the two layers can be compared: same
+// scale, same position, same patch.
+let p1Scale = 1;
+let p1OffX = 0;
+let p1OffY = 0;
 
-    // Overlaid, the rhombs go down first so the P1 outlines read on top of them.
-    if (p1Overlay) drawRhombsInto(ctx, 0.35);
+function p1Canvases(): HTMLCanvasElement[] {
+    return [
+        document.getElementById("p1canvas") as HTMLCanvasElement,
+        document.getElementById("p3canvas") as HTMLCanvasElement,
+    ];
+}
 
-    for (const t of allP1Tiles) {
-        const gap = t.rhombIds.length === 0;
-        if (gap && !p1ShowGaps) continue;
-        const out = p1Outline({ name: t.type } as never, t.tenth, t.gen);
-        if (!out.length) continue;
-        const pts = out.map((q) => toScreen(t.loc.tr(q)));
-        ctx.beginPath();
-        ctx.moveTo(pts[0].x, pts[0].y);
-        for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
-        ctx.closePath();
-
-        if (gap) {
-            // A gap has no rhombs to colour it, so it is drawn as an opening.
-            ctx.fillStyle = "rgba(0,0,0,0.045)";
-            ctx.fill();
-            ctx.strokeStyle = "#9a9a9a";
-            ctx.lineWidth = 1;
-            ctx.setLineDash([4, 3]);
-        } else {
-            ctx.fillStyle = (P1_FILL[t.type] ?? "#dcdcdc") + (p1Overlay ? "55" : "cc");
-            ctx.fill();
-            ctx.strokeStyle = "#555";
-            ctx.lineWidth = 1;
-            ctx.setLineDash([]);
-        }
-        ctx.stroke();
-        ctx.setLineDash([]);
-
-        if (p1Labels) {
-            const c = toScreen(t.loc);
-            ctx.fillStyle = "#333";
-            ctx.font = "10px sans-serif";
-            ctx.textAlign = "center";
-            ctx.fillText(t.type, c.x, c.y + 3);
-        }
+function sizeP1Canvases(): void {
+    const wrap = document.getElementById("p1-panels");
+    const total = wrap?.clientWidth ?? 1120;
+    // Side by side, each takes half; overlaid, one takes the room of both.
+    const cssW = p1Overlay
+        ? Math.max(320, Math.min(total - 20, 720))
+        : Math.max(280, Math.min(Math.round(total / 2) - 20, 520));
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    for (const c of p1Canvases()) {
+        c.style.width = `${cssW}px`;
+        c.style.height = `${cssW}px`;
+        c.width = Math.round(cssW * dpr);
+        c.height = Math.round(cssW * dpr);
     }
 }
 
-function drawRhombsInto(ctx: CanvasRenderingContext2D, alpha = 1): void {
+/** Fit both layers, so neither is clipped and the two panels line up. */
+function fitP1(): void {
+    const canvas = p1Canvases()[0];
+    let minX = Infinity;
+    let minY = Infinity;
+    let maxX = -Infinity;
+    let maxY = -Infinity;
+    const see = (x: number, y: number) => {
+        if (x < minX) minX = x;
+        if (y < minY) minY = y;
+        if (x > maxX) maxX = x;
+        if (y > maxY) maxY = y;
+    };
+    for (const r of allRhombs) for (const v of r.verts) see(v.x, v.y);
+    // P1 tiles can reach past the rhombs — a star's points do — so include them.
+    for (const t of allP1Tiles) {
+        for (const q of p1Outline({ name: t.type } as never, t.tenth, t.gen)) {
+            see(t.loc.x + q.x, t.loc.y + q.y);
+        }
+    }
+    if (!isFinite(minX)) return;
+    const w = maxX - minX || 1;
+    const h = maxY - minY || 1;
+    const pad = 12;
+    p1Scale = Math.min(
+        (canvas.width - pad * 2) / w,
+        (canvas.height - pad * 2) / h,
+    );
+    p1OffX = canvas.width / 2 - ((minX + maxX) / 2) * p1Scale;
+    p1OffY = canvas.height / 2 + ((minY + maxY) / 2) * p1Scale;
+}
+
+const p1Screen = (pt: Pt): { x: number; y: number } => ({
+    x: pt.x * p1Scale + p1OffX,
+    y: -pt.y * p1Scale + p1OffY,
+});
+
+function drawRhombsInto(
+    ctx: CanvasRenderingContext2D,
+    alpha: number,
+    lw: number,
+): void {
     for (const r of allRhombs) {
-        const sv = r.verts.map((v) => toScreen(v));
+        const sv = r.verts.map((v) => p1Screen(v));
         ctx.beginPath();
         ctx.moveTo(sv[0].x, sv[0].y);
         for (let i = 1; i < 4; i++) ctx.lineTo(sv[i].x, sv[i].y);
@@ -2241,31 +2268,79 @@ function drawRhombsInto(ctx: CanvasRenderingContext2D, alpha = 1): void {
         ctx.fillStyle = r.fill;
         ctx.fill();
         ctx.globalAlpha = 1;
-        ctx.strokeStyle = "#666";
-        ctx.lineWidth = 0.7;
+        ctx.strokeStyle = "#777";
+        ctx.lineWidth = lw;
         ctx.stroke();
     }
 }
 
-function drawP3(): void {
-    const canvas = document.getElementById("p3canvas") as HTMLCanvasElement;
-    const ctx = canvas.getContext("2d")!;
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    drawRhombsInto(ctx, 1);
+function drawP1Tiles(ctx: CanvasRenderingContext2D, lw: number): void {
+    for (const t of allP1Tiles) {
+        const gap = t.rhombIds.length === 0;
+        if (gap && !p1ShowGaps) continue;
+        const out = p1Outline({ name: t.type } as never, t.tenth, t.gen);
+        if (!out.length) continue;
+        const pts = out.map((q) => p1Screen(t.loc.tr(q)));
+        ctx.beginPath();
+        ctx.moveTo(pts[0].x, pts[0].y);
+        for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
+        ctx.closePath();
+
+        if (gap) {
+            // A gap has no rhombs to colour it. That is the point of it.
+            ctx.fillStyle = "rgba(192,57,43,0.10)";
+            ctx.fill();
+            ctx.strokeStyle = "#c0392b";
+            ctx.lineWidth = lw;
+            ctx.setLineDash([5, 3]);
+        } else {
+            ctx.fillStyle = (P1_FILL[t.type] ?? "#dcdcdc") + (p1Overlay ? "44" : "cc");
+            ctx.fill();
+            ctx.strokeStyle = "#444";
+            ctx.lineWidth = lw;
+            ctx.setLineDash([]);
+        }
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        if (p1Labels) {
+            const c = p1Screen(t.loc);
+            ctx.fillStyle = gap ? "#c0392b" : "#333";
+            ctx.font = `${Math.round(9 * (lw / 1.2))}px sans-serif`;
+            ctx.textAlign = "center";
+            ctx.fillText(t.type, c.x, c.y + 3);
+        }
+    }
 }
 
 function drawP1View(): void {
     const panel = document.getElementById("p3-panel")!;
     panel.style.display = p1Overlay ? "none" : "";
-    drawP1();
-    if (!p1Overlay) drawP3();
+    sizeP1Canvases();
+    fitP1();
+
+    const [c1, c2] = p1Canvases();
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const lw = 1.2 * dpr;
+
+    const a = c1.getContext("2d")!;
+    a.clearRect(0, 0, c1.width, c1.height);
+    if (p1Overlay) drawRhombsInto(a, 0.5, lw * 0.6);
+    drawP1Tiles(a, lw);
+
+    if (!p1Overlay) {
+        const b = c2.getContext("2d")!;
+        b.clearRect(0, 0, c2.width, c2.height);
+        drawRhombsInto(b, 1, lw * 0.6);
+    }
 
     const gaps = allP1Tiles.filter((t) => t.rhombIds.length === 0).length;
     const solid = allP1Tiles.length - gaps;
     document.getElementById("p1-status")!.textContent =
-        `${seedTypes[currentSeedIdx]?.label} gen ${gen}: ${allRhombs.length} rhombs from ` +
-        `${solid} rhomb-emitting tile${solid === 1 ? "" : "s"}, plus ${gaps} gap ` +
-        `tile${gaps === 1 ? "" : "s"} that emit none. Build ${BUILD_ID}.`;
+        `${seedTypes[currentSeedIdx]?.label} gen ${gen} — ${allRhombs.length} rhombs from ` +
+        `${solid} rhomb-emitting tile${solid === 1 ? "" : "s"}, and ${gaps} gap ` +
+        `tile${gaps === 1 ? "" : "s"} (red, dashed) that emit none. ` +
+        `Both panels share one scale. Build ${BUILD_ID}.`;
 }
 
 // ── the two views ─────────────────────────────────────────────────
@@ -2293,7 +2368,8 @@ function showView(v: View): void {
               ? `${pagination.pages.length} sheets ready — the tiling shows the partition`
               : "";
     // `history` is taken by the undo stack in this module, so be explicit.
-    window.history.replaceState(null, "", v === "sheets" ? "#sheets" : "#");
+    const hash = v === "sheets" ? "#sheets" : v === "p1" ? "#p1" : "#";
+    window.history.replaceState(null, "", hash);
 }
 
 // ── Print ─────────────────────────────────────────────────────────
@@ -3012,7 +3088,9 @@ setMode(mode);
 
 // Deep link from the nav. This has to wait for the net: setMode may defer a heavy
 // search to a timeout, so queue behind it rather than reading an empty net.
-if (location.hash === "#sheets") {
+if (location.hash === "#p1") {
+    setTimeout(() => showView("p1"), 0);
+} else if (location.hash === "#sheets") {
     // createSheets runs the replay to the end itself, so no guard here — guarding on
     // the current net would test the scrubber's position rather than whether a net
     // exists at all.
@@ -3020,6 +3098,7 @@ if (location.hash === "#sheets") {
 }
 
 window.addEventListener("resize", () => {
+    if (view === "p1") drawP1View();
     sizeTilingCanvas();
     sizeNetCanvas();
     fitView();

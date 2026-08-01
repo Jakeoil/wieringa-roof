@@ -137,6 +137,17 @@ definite tile on the P1 side. Those are the places a composite can be extended, 
 they cannot be picked if they cannot be seen. `unfold.html` gains a P1/P3 view,
 side by side or overlaid.
 
+### The view needs its own transform
+
+The main transform is fitted to the tiling canvas, whose pixel size is its CSS width
+times `devicePixelRatio`. Reusing it for a fixed 500×500 canvas drew everything about
+twice too large and mostly off the edge — "the tiles are huge, nothing to compare".
+The P1 view sizes its own canvases and fits both layers together, and **both panels
+share that one transform**, which is the only way the layers can be compared.
+
+The fit has to include the P1 outlines, not just the rhombs: a star's points reach
+well past any rhomb, so fitting to the rhombs alone clips them.
+
 ### Scale is derived, not asserted
 
 Two wrong turns worth recording, since both looked plausible:
@@ -160,6 +171,16 @@ requires. Measured: circumradius 8.9081 against rhomb edge 8.9081, centre-to-cen
 
 **Verified: no P1 tile overlaps another**, on every seed at generations 2 and 3 —
 6 to 256 tiles per patch. That is the check that validates the whole layer.
+
+### What it shows
+
+`St5` gen 2 makes the case on its own: five orange `Pe1` pentagons around a
+**central star gap**, plus five more star gaps outside — six gap tiles, against 15
+rhombs from the five pentagons. The right-hand panel shows none of it. That is the
+"Star contains St5, with bigger cracks" claim, visible.
+
+It also settles what sits at the centre of a Star: **a star-shaped gap**, not five
+diamonds meeting at a point.
 
 A useful thing fell out: `Pe5` gen 2 is six pentagons and *zero* gap tiles, so its
 ten cracks are space no P1 tile covers at all. `Pe3` places one diamond
