@@ -125,6 +125,49 @@ snaps.
 
 ---
 
+## The P1 layer, and how its scale is pinned
+
+The rhombs are P3. P1 is the layer they came from — pentagons, stars, boats,
+diamonds — and every rhomb belongs to exactly one P1 tile. `allP1Tiles` now records
+the tiles the expansion laid down, which it used to discard after emitting rhombs.
+
+**The point is the tiles that emit nothing.** The star family produces no rhombs at
+all, so a gap in the rhomb picture is invisible there while being a perfectly
+definite tile on the P1 side. Those are the places a composite can be extended, and
+they cannot be picked if they cannot be seen. `unfold.html` gains a P1/P3 view,
+side by side or overlaid.
+
+### Scale is derived, not asserted
+
+Two wrong turns worth recording, since both looked plausible:
+
+- **A pentagon does not contain its own rhombs.** A `Pe5` tile's rhombs form a
+  *star*, which is the whole "gen-1 Pe5 looks like St5" observation. Testing
+  containment as a validation fails for correct geometry.
+- **`wheels.d[k]` is not the apothem at generation k.** It grows by *three* per
+  index, not φ² — the wheel entries are not uniform — so picking an index and
+  hoping is exactly how this goes wrong.
+
+What pins it is that P1 and P3 must share one scale, so derive one from the other:
+
+```
+pentagon circumradius == rhomb edge length
+```
+
+which puts adjacent pentagons exactly two apothems apart, edge to edge, as P1
+requires. Measured: circumradius 8.9081 against rhomb edge 8.9081, centre-to-centre
+14.4137 against 2 × apothem 14.4137.
+
+**Verified: no P1 tile overlaps another**, on every seed at generations 2 and 3 —
+6 to 256 tiles per patch. That is the check that validates the whole layer.
+
+A useful thing fell out: `Pe5` gen 2 is six pentagons and *zero* gap tiles, so its
+ten cracks are space no P1 tile covers at all. `Pe3` places one diamond
+(`diamond: [0]`), `Pe1` places two. That difference is what a Sun or Star composite
+would be choosing about.
+
+---
+
 ## 3D shading follows the vertical scale
 
 The obvious way to add height shading is a strength control of its own. That is

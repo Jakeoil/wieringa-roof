@@ -266,6 +266,126 @@ function makeRhombShapes(
     return { thick: thickAll, thin: thinAll };
 }
 
+// ── P1 outline shapes ─────────────────────────────────────────────
+//
+// The rhombs are P3. P1 is the layer above them: pentagons, stars, boats and
+// diamonds. Every rhomb belongs to exactly one P1 tile — `Rhomb.cluster` already
+// says which type — but the P1 tiles that emit *no* rhombs are invisible in the
+// rhomb view, and those are precisely the gaps in a figure. To reason about filling
+// a patch you have to be able to see them, so the outlines are built here.
+//
+// The proportions are the same ones the wheels are already derived from (see
+// makeSeeds): a pentagon of side 4 has circumradius `pgon_R * 4`, and the pentagram
+// that defines the star, boat and diamond has its lengths scaled by `4 / pgram_a`.
+// Nothing new is introduced — this is the geometry the tiling was built on, kept
+// rather than discarded.
+
+interface P1Shapes {
+    penta: Pt[][];
+    star: Pt[][];
+    boat: Pt[][];
+    diamond: Pt[][];
+}
+
+const p1Shapes = new Map<number, P1Shapes>();
+
+function makeP1Shapes(wheels: WheelSet, gen: number): P1Shapes {
+    // Scale is taken from the rhombs rather than from a wheel index. The wheels do
+    // not scale uniformly per index — d grows by three per step, not by phi squared —
+    // so picking an index and hoping is how this goes wrong. The rhomb geometry is
+    // already correct and already generation-indexed, and the two layers must share a
+    // scale in any case, so derive one from the other:
+    //
+    //   pentagon circumradius == rhomb edge length
+    //
+    // which also makes adjacent pentagons land exactly two apothems apart, i.e.
+    // edge to edge, as P1 requires.
+    const rs = makeRhombShapes(wheels, gen).thick[0];
+    const circum = Math.hypot(rs[1].x - rs[0].x, rs[1].y - rs[0].y);
+    const pgon_r = Math.sqrt(25 + 10 * SQRT5) / 10;
+    const pgon_R = Math.sqrt(50 + 10 * SQRT5) / 10;
+    const apothem = (circum * pgon_r) / pgon_R;
+    const pgram_a = (3 - SQRT5) / 2;
+    const pgram_R = Math.sqrt((25 - 11 * SQRT5) / 10);
+    const pgram_rho = Math.sqrt((5 - SQRT5) / 10);
+
+    const k = circum / pgon_R; // side length at this generation
+    void apothem;
+    const c_0 = 1;
+    const c_1 = (SQRT5 - 1) / 4;
+    const c_2 = (SQRT5 + 1) / 4;
+    const s_0 = 0;
+    const s_1 = Math.sqrt(10 + 2 * SQRT5) / 4;
+    const s_2 = Math.sqrt(10 - 2 * SQRT5) / 4;
+    const unitUp: Pt[] = [
+        p(s_0, -c_0),
+        p(s_1, -c_1),
+        p(s_2, c_2),
+        p(-s_2, c_2),
+        p(-s_1, -c_1),
+    ];
+    const unitDown = unitUp.map((q) => q.neg);
+
+    const tips = unitUp.map((q) => q.mult((pgram_rho * k) / pgram_a));
+    const dimples = unitDown.map((q) => q.mult((pgram_R * k) / pgram_a));
+    const pentaUp = unitUp.map((q) => q.mult(pgon_R * k));
+
+    // A star is the ten-gon alternating tips and dimples; a boat is a star with
+    // three points removed; a diamond is a star with four.
+    const starUp = [
+        tips[0], dimples[3], tips[1], dimples[4],
+        tips[2], dimples[0], tips[3], dimples[1],
+        tips[4], dimples[2],
+    ];
+    const boatUp = [
+        tips[0], dimples[3], tips[1], dimples[4],
+        dimples[1], tips[4], dimples[2],
+    ];
+    const diamondUp = [tips[0], dimples[3], dimples[0], dimples[2]];
+
+    // Ten orientations: rotate by a tenth of a turn each time. The even tenths are
+    // the "up" family and the odd ones the reflected "down" family, which is what
+    // the wheel indexing everywhere else assumes.
+    const spin = (shape: Pt[], tenth: number): Pt[] => {
+        const a = (Math.PI * tenth) / 5;
+        const c = Math.cos(a);
+        const sn = Math.sin(a);
+        return shape.map((q) => p(q.x * c - q.y * sn, q.x * sn + q.y * c));
+    };
+    const wheelOf = (shape: Pt[]): Pt[][] => {
+        const out: Pt[][] = [];
+        for (let t = 0; t < 10; t++) out.push(spin(shape, t));
+        return out;
+    };
+
+    return {
+        penta: wheelOf(pentaUp),
+        star: wheelOf(starUp),
+        boat: wheelOf(boatUp),
+        diamond: wheelOf(diamondUp),
+    };
+}
+
+/** Outline of a P1 tile, in tiling coordinates. */
+function p1Outline(type: TileType, tenth: number, gen: number): Pt[] {
+    if (!p1Shapes.has(gen)) p1Shapes.set(gen, makeP1Shapes(wheels, gen));
+    const sh = p1Shapes.get(gen)!;
+    switch (type.name) {
+        case "Pe5":
+        case "Pe3":
+        case "Pe1":
+            return sh.penta[tenth];
+        case "St5":
+            return sh.star[tenth];
+        case "St3":
+            return sh.boat[tenth];
+        case "St1":
+            return sh.diamond[tenth];
+        default:
+            return [];
+    }
+}
+
 // ── Tile type definitions ─────────────────────────────────────────
 
 interface TileType {
@@ -340,6 +460,22 @@ const CLUSTER_COLORS: Record<string, string> = {
 };
 
 let allRhombs: Rhomb[] = [];
+
+// The P1 tiles the expansion laid down, kept rather than discarded. Recorded at the
+// point each one bottoms out — a pentagon at gen 1, or a star-family tile that stops
+// because it has no rhombs to emit — so the list is the P1 picture of exactly this
+// patch, at the resolution the rhombs were drawn.
+interface P1Tile {
+    id: number;
+    type: string;
+    tenth: number;
+    loc: Pt;
+    gen: number;
+    /** ids of the rhombs this tile emitted; empty for the star family */
+    rhombIds: number[];
+}
+let allP1Tiles: P1Tile[] = [];
+let p1Id = 0;
 let rhombId = 0;
 
 function emitRhomb(
@@ -396,6 +532,7 @@ function emitRhombs(
     const thins = shapes.thin;
 
     const fill = CLUSTER_COLORS[type.name];
+    const firstRhomb = rhombId;
 
     for (let i = 0; i < 5; i++) {
         const shift = angle.rot(i);
@@ -429,6 +566,17 @@ function emitRhombs(
                 break;
         }
     }
+
+    const ids: number[] = [];
+    for (let r = firstRhomb; r < rhombId; r++) ids.push(r);
+    allP1Tiles.push({
+        id: p1Id++,
+        type: type.name,
+        tenth: angle.tenths,
+        loc,
+        gen,
+        rhombIds: ids,
+    });
 }
 
 function expandPenta(
@@ -504,6 +652,22 @@ function expandStar(
     ci: number,
 ) {
     if (gen === 0) {
+        return;
+    }
+
+    // A star-family tile bottoms out here: at gen 1 its children are all asked for
+    // gen 0 and do nothing, so it emits no rhombs at all. That is not a failure —
+    // it is what a gap *is*, and recording it is the only way the gaps can be seen
+    // or reasoned about, since they leave no trace in the rhombs.
+    if (gen === 1) {
+        allP1Tiles.push({
+            id: p1Id++,
+            type: type.name,
+            tenth: angle.tenths,
+            loc,
+            gen,
+            rhombIds: [],
+        });
         return;
     }
 
@@ -934,6 +1098,8 @@ function generatePatch(seedIdx: number, isHeads: boolean, gen: number): void {
 
     allRhombs = [];
     rhombId = 0;
+    allP1Tiles = [];
+    p1Id = 0;
 
     const seed = seedTypes[seedIdx];
     const angle = ang(0, false);
@@ -963,6 +1129,8 @@ export {
     Angle,
     ang,
     allRhombs,
+    allP1Tiles,
+    p1Outline,
     vertexList,
     vertexMap,
     edgeMap,
@@ -975,4 +1143,4 @@ export {
     computeLift,
     getLift,
 };
-export type { Rhomb, Vertex, Edge, TileType, SeedType, Lift, V3 };
+export type { Rhomb, P1Tile, Vertex, Edge, TileType, SeedType, Lift, V3 };

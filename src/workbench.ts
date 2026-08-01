@@ -8,6 +8,8 @@ import {
     Pt,
     p,
     allRhombs,
+    allP1Tiles,
+    p1Outline,
     vertexList,
     seedTypes,
     generatePatch,
@@ -308,6 +310,10 @@ function indexSheets(): void {
 }
 
 function drawTiling() {
+    // The P1 view is another picture of this same patch, so it follows the same
+    // redraws rather than needing its own hook at every seed and generation change.
+    if (view === "p1") drawP1View();
+
     const ctx = tilingCtx;
     const W = tilingCanvas.width;
     const H = tilingCanvas.height;
@@ -2097,6 +2103,21 @@ function buildViewTabs(): void {
     document.getElementById("tab-work")!.addEventListener("click", () => {
         showView("work");
     });
+    document.getElementById("tab-p1")!.addEventListener("click", () => {
+        showView("p1");
+    });
+    for (const [id, set] of [
+        ["p1-overlay", (v: boolean) => (p1Overlay = v)],
+        ["p1-gaps", (v: boolean) => (p1ShowGaps = v)],
+        ["p1-labels", (v: boolean) => (p1Labels = v)],
+    ] as Array<[string, (v: boolean) => void]>) {
+        const cb = document.getElementById(id) as HTMLInputElement;
+        cb.addEventListener("change", () => {
+            set(cb.checked);
+            drawP1View();
+        });
+    }
+
     document.getElementById("tab-sheets")!.addEventListener("click", () => {
         if (!pagination) {
             createSheets();
@@ -2144,9 +2165,112 @@ function buildViewTabs(): void {
 
 }
 
+// ── P1 / P3: the two layers side by side ───────────────────────────
+//
+// The rhombs are P3. P1 is the layer they came from — pentagons, stars, boats and
+// diamonds — and every rhomb belongs to exactly one P1 tile. The point of showing
+// both is the tiles that emit *nothing*: the star family leaves no rhombs, so a gap
+// in the rhomb picture is invisible there while being a perfectly definite tile on
+// the P1 side. Those are the places a composite can be extended, and you cannot pick
+// what you cannot see.
+
+let p1Overlay = false;
+let p1ShowGaps = true;
+let p1Labels = false;
+
+const P1_FILL: Record<string, string> = {
+    Pe5: "#9292e3",
+    Pe3: "#e6e68e",
+    Pe1: "#eec09b",
+};
+
+function drawP1(): void {
+    const canvas = document.getElementById("p1canvas") as HTMLCanvasElement;
+    const ctx = canvas.getContext("2d")!;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // Overlaid, the rhombs go down first so the P1 outlines read on top of them.
+    if (p1Overlay) drawRhombsInto(ctx, 0.35);
+
+    for (const t of allP1Tiles) {
+        const gap = t.rhombIds.length === 0;
+        if (gap && !p1ShowGaps) continue;
+        const out = p1Outline({ name: t.type } as never, t.tenth, t.gen);
+        if (!out.length) continue;
+        const pts = out.map((q) => toScreen(t.loc.tr(q)));
+        ctx.beginPath();
+        ctx.moveTo(pts[0].x, pts[0].y);
+        for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
+        ctx.closePath();
+
+        if (gap) {
+            // A gap has no rhombs to colour it, so it is drawn as an opening.
+            ctx.fillStyle = "rgba(0,0,0,0.045)";
+            ctx.fill();
+            ctx.strokeStyle = "#9a9a9a";
+            ctx.lineWidth = 1;
+            ctx.setLineDash([4, 3]);
+        } else {
+            ctx.fillStyle = (P1_FILL[t.type] ?? "#dcdcdc") + (p1Overlay ? "55" : "cc");
+            ctx.fill();
+            ctx.strokeStyle = "#555";
+            ctx.lineWidth = 1;
+            ctx.setLineDash([]);
+        }
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        if (p1Labels) {
+            const c = toScreen(t.loc);
+            ctx.fillStyle = "#333";
+            ctx.font = "10px sans-serif";
+            ctx.textAlign = "center";
+            ctx.fillText(t.type, c.x, c.y + 3);
+        }
+    }
+}
+
+function drawRhombsInto(ctx: CanvasRenderingContext2D, alpha = 1): void {
+    for (const r of allRhombs) {
+        const sv = r.verts.map((v) => toScreen(v));
+        ctx.beginPath();
+        ctx.moveTo(sv[0].x, sv[0].y);
+        for (let i = 1; i < 4; i++) ctx.lineTo(sv[i].x, sv[i].y);
+        ctx.closePath();
+        ctx.globalAlpha = alpha;
+        ctx.fillStyle = r.fill;
+        ctx.fill();
+        ctx.globalAlpha = 1;
+        ctx.strokeStyle = "#666";
+        ctx.lineWidth = 0.7;
+        ctx.stroke();
+    }
+}
+
+function drawP3(): void {
+    const canvas = document.getElementById("p3canvas") as HTMLCanvasElement;
+    const ctx = canvas.getContext("2d")!;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    drawRhombsInto(ctx, 1);
+}
+
+function drawP1View(): void {
+    const panel = document.getElementById("p3-panel")!;
+    panel.style.display = p1Overlay ? "none" : "";
+    drawP1();
+    if (!p1Overlay) drawP3();
+
+    const gaps = allP1Tiles.filter((t) => t.rhombIds.length === 0).length;
+    const solid = allP1Tiles.length - gaps;
+    document.getElementById("p1-status")!.textContent =
+        `${seedTypes[currentSeedIdx]?.label} gen ${gen}: ${allRhombs.length} rhombs from ` +
+        `${solid} rhomb-emitting tile${solid === 1 ? "" : "s"}, plus ${gaps} gap ` +
+        `tile${gaps === 1 ? "" : "s"} that emit none. Build ${BUILD_ID}.`;
+}
+
 // ── the two views ─────────────────────────────────────────────────
 
-type View = "work" | "sheets";
+type View = "work" | "sheets" | "p1";
 let view: View = "work";
 
 function showView(v: View): void {
@@ -2154,10 +2278,14 @@ function showView(v: View): void {
     document.getElementById("view-work")!.style.display = v === "work" ? "" : "none";
     document.getElementById("view-sheets")!.style.display =
         v === "sheets" ? "" : "none";
+    document.getElementById("view-p1")!.style.display = v === "p1" ? "" : "none";
     const tw = document.getElementById("tab-work")!;
     const ts = document.getElementById("tab-sheets")!;
+    const tp = document.getElementById("tab-p1")!;
     tw.setAttribute("aria-current", String(v === "work"));
     ts.setAttribute("aria-current", String(v === "sheets"));
+    tp.setAttribute("aria-current", String(v === "p1"));
+    if (v === "p1") drawP1View();
     document.getElementById("tabnote")!.textContent =
         v === "sheets"
             ? ""

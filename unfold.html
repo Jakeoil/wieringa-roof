@@ -276,6 +276,7 @@
     <div class="viewtabs">
         <button id="tab-work" aria-current="true">Workbench</button>
         <button id="tab-sheets">Sheets</button>
+        <button id="tab-p1">P1 / P3</button>
         <span class="info" id="tabnote"></span>
     </div>
 
@@ -300,6 +301,36 @@
         </div>
     </div>
     </div><!-- /view-work -->
+
+    <div id="view-p1" style="display:none">
+        <span class="info" id="p1-status" style="display:block;margin:0 0 12px"></span>
+        <div class="controls" style="margin:0 0 12px">
+            <label><input type="checkbox" id="p1-overlay"> overlay instead of side by side</label>
+            <label><input type="checkbox" id="p1-gaps" checked> show gap tiles</label>
+            <label><input type="checkbox" id="p1-labels"> label tiles</label>
+        </div>
+        <div class="workspace" id="p1-panels">
+            <div class="panel">
+                <h3>P1 — pentagons, stars, boats, diamonds</h3>
+                <canvas id="p1canvas" width="500" height="500"></canvas>
+            </div>
+            <div class="panel" id="p3-panel">
+                <h3>P3 — the rhombs they produce</h3>
+                <canvas id="p3canvas" width="500" height="500"></canvas>
+            </div>
+        </div>
+        <div class="note" style="margin-top:18px;max-width:900px">
+            Every rhomb belongs to exactly one P1 tile. The tiles that emit <em>no</em>
+            rhombs — stars, boats and diamonds — are the <strong>gaps</strong>, and they
+            are invisible on the right precisely because they produce nothing. They are
+            drawn on the left dashed, because those are the places a composite can be
+            extended.
+            <br><br>
+            Scale is not asserted, it is derived: a pentagon's circumradius equals the
+            rhomb edge exactly, which puts adjacent pentagons two apothems apart, edge
+            to edge. Checked across every seed — no P1 tile overlaps another.
+        </div>
+    </div>
 
     <div id="view-sheets" style="display:none">
         <span class="info" id="sheet-status" style="display:block;margin:0 0 12px"></span>
