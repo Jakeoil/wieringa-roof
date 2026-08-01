@@ -125,6 +125,26 @@ snaps.
 
 ---
 
+## The favicon, and the Utilities page
+
+`utilities.html` is where odds and ends built from the geometry can accumulate. The
+first is an icon designer, and `src/favicon.ts` is shared with
+`tools/make-favicon.mjs` so the icon in the tab is produced by exactly the code that
+previews it — an icon disagreeing with its preview is worse than no preview.
+
+**An unfolding makes a good favicon because it is sparse.** At sixteen pixels only
+silhouette and colour survive. Queen generation 1 unfolds to ten rhombi filling 47%
+of their own bounding box, and that spidery outline still reads when the individual
+rhombi do not. Two colours only, since gen-1 Queen is `Pe1` and `Pe3` with no `Pe5`.
+
+The page swaps its **own** `<link rel="icon">` on demand, which is the only honest
+preview: a browser rendering an icon at 16 px does not look like a 16 px image sitting
+on a page.
+
+Measured, for what it is worth: rotation changes how much of the square the ink
+covers, from 30.9% at 36° to **36.4% at 60°**. Shipped at 0°, since orientation is a
+look rather than a correctness question.
+
 ## Sun and Star: the three wholes
 
 `Deca` is now labelled **Queen**, and two 5-fold composites join it. Both are

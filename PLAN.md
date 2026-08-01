@@ -16,6 +16,7 @@ golden rhombi for physical models.
 | `polyhedra.html` | triacontahedron + the two rhombohedra, generated diagrams | done |
 | `unfold.html` | **Workbench** and **Sheets**, two views of one page | done |
 | `tools.html` | true-size templates, fold gauges, forming jigs, kit list | done |
+| `utilities.html` | odds and ends; currently the favicon designer | done |
 
 
 `src/geometry.ts` holds the tiling and the lift; `src/unfold.ts` the two
