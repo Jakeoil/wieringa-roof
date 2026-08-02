@@ -1531,7 +1531,6 @@ function replayFinished(): boolean {
 // a signal everyone can read, and these buttons change meaning as well as colour.
 const LIGHTS: Record<string, [string, string]> = {
     white: ["#ffffff", "#c8c8d0"],
-    red: ["#f8d7da", "#c0392b"],
     yellow: ["#fdf3c8", "#c9a227"],
     green: ["#d7f0dd", "#2ea043"],
 };
@@ -1549,6 +1548,13 @@ let syncButtons: () => void = () => {};
 let sheetsBusy = false;
 // The Side box in the shared bar; the Sheets view mirrors it.
 let sharedSideInput: HTMLInputElement | null = null;
+/** Report the side on the Sheets view, which reads it but does not set it. */
+function showSide(): void {
+    const out = document.getElementById("sheet-side");
+    // Round-tripping "0.75in" through millimetres lands on 0.7499999999999999,
+    // which is true and useless on screen.
+    if (out) out.textContent = String(Number(sideIn.toFixed(4)));
+}
 
 let traceEvents: TraceEvent[] = [];
 let traceIndex = 0; // number of events applied
@@ -2207,20 +2213,10 @@ function buildViewTabs(): void {
     box("sheet-iso", () => showIsogloss, (v) => (showIsogloss = v));
     box("sheet-back", () => renderBackside, (v) => (renderBackside = v));
 
-    const sideBox = document.getElementById("sheet-side") as HTMLInputElement;
-    sideBox.value = String(sideIn);
-    sideBox.addEventListener("change", () => {
-        const v = parseFloat(sideBox.value);
-        if (!isFinite(v) || v <= 0) {
-            say(`Cannot read "${sideBox.value}" as a side length in inches.`);
-            return;
-        }
-        sideIn = v;
-        if (sharedSideInput) sharedSideInput.value = `${sideIn}in`;
-        refreshNetView();
-        drawNet();
-        createSheets(); // the split depends on the side, so redo it
-    });
+    // Side is set on the Workbench and only reported here. It was editable in both
+    // places, which meant two boxes for one number and a split silently redone from
+    // under you; the Workbench owns it, and this shows what it currently is.
+    showSide();
 
     document
         .getElementById("sheet-printall")!
@@ -3041,8 +3037,7 @@ function buildControls() {
         drawNet();
         // Round-tripping "0.75in" through millimetres lands on 0.7499999999999999,
         // which is true and useless in a text box.
-        const box = document.getElementById("sheet-side") as HTMLInputElement | null;
-        if (box) box.value = String(Number(sideIn.toFixed(4)));
+        showSide();
         say(`Rhombus side ${parsed.label}. ${fitReport()}`);
     };
     sideInput.addEventListener("change", applySide);
@@ -3079,18 +3074,20 @@ function buildControls() {
     layerLabel.appendChild(layerSelect);
     edit.appendChild(layerLabel);
 
-    // Red nothing to split, yellow splitting, green ready — and once it is green or
-    // yellow it stops being a verb and becomes the way through to the sheets.
+    // Yellow standing by, green ready — and once it is green it stops being a verb
+    // and becomes the way through to the sheets. No red: there is nothing wrong with
+    // a net that has not been split yet, and a button that looks like a warning
+    // reads as one.
     const sheetsBtn = document.createElement("button");
     sheetsBtn.addEventListener("click", () => {
         if (pagination || sheetsBusy) {
             showView("sheets");
             return;
         }
-        if (!netRhombs.length) {
-            say("Nothing to split yet — run the search, or place some rhombi.");
-            return;
-        }
+        // No emptiness check here: createSheets runs the replay to its end first, so
+        // the net is empty only when there genuinely is nothing, and it says so
+        // itself. Testing netRhombs at this point meant pressing the button before
+        // playing did nothing at all.
         createSheets();
     });
     actions.appendChild(sheetsBtn);
@@ -3105,14 +3102,10 @@ function buildControls() {
             sheetsBtn.textContent = `Sheets ready (${n}) →`;
             sheetsBtn.title = "Open the Sheets view";
             paintLight(sheetsBtn, "green");
-        } else if (!netRhombs.length) {
-            sheetsBtn.textContent = "Create sheets";
-            sheetsBtn.title = "Nothing to split yet — run the search first";
-            paintLight(sheetsBtn, "red");
         } else {
             sheetsBtn.textContent = "Create sheets";
             sheetsBtn.title = "Split this net across pages";
-            paintLight(sheetsBtn, "red");
+            paintLight(sheetsBtn, "yellow");
         }
     };
 
