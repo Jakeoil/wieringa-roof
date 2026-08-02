@@ -78,7 +78,7 @@ function biasedHeight(u: number): number {
     return Math.sign(u) * Math.pow(Math.abs(u), 1.6);
 }
 
-// Face colouring in the tiling view. "Coloured by type or by vertex index" was in
+// Face colouring in the tiling view. "Colored by type or by vertex index" was in
 // the original spec and never got built.
 type TileColour = "cluster" | "mosaic" | "classic" | "type" | "index";
 let tileColour: TileColour = prefs.colour as TileColour;
@@ -2150,7 +2150,7 @@ function drawSheets(): void {
         list.appendChild(d);
     };
 
-    row("Map", "the whole patch, colour-coded — print this first", -1);
+    row("Map", "the whole patch, color-coded — print this first", -1);
     pagination.pages.forEach((page, i) => {
         const joins = pagination!.joins
             .filter((j) => j.sheetA === i || j.sheetB === i)

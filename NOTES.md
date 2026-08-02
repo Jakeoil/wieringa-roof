@@ -5,6 +5,19 @@ the project *is*; this is what we have argued about and what is still unsettled.
 
 ---
 
+## House style
+
+**American spellings, everywhere.** `color` not colour, `center` not centre, `gray`
+not grey, `neighbor` not neighbour, `labeled` not labelled, `minimize` /
+`normalize` not `-ise`. This is not only about what the reader sees: it applies to
+**code identifiers and comments** as well, so the vocabulary stays consistent
+whether you are reading the page or the source. `colour` is the one that keeps
+creeping back in, because it turns up naturally when writing about palettes.
+
+Also: **"Mathematics"**, never "The Maths".
+
+---
+
 ## Naming and vocabulary
 
 **Penrose vertex figures.** Conway named the seven vertex figures of the P2
@@ -24,9 +37,9 @@ earlier claim of mine that there were two:
 is bilateral. Measured and agrees: the deca has one mirror axis at generations 2, 3
 and 4 and no 72° rotation, where Pe5 and St5 have both.
 
-**Spelling.** Use **color**, not colour, in UI labels and prose. (US English.)
-
-**"Mode"** on the Unfold page means *Build by hand* vs *Watch an algorithm*.
+**"Mode"** on the Workbench is gone. There were two — *Build by hand* and *Watch an
+algorithm* — and they were never really two things: the canvas holds a net either
+way. One workbench now, with the replay running and the canvas always live.
 
 ---
 
