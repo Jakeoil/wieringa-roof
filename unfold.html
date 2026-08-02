@@ -132,7 +132,7 @@
     .workspace { align-items: flex-start; }
 
     @media print {
-        nav, .wrap-wide, .note, #modebar, #controls, #transport { display: none !important; }
+        nav, .wrap-wide, .note, #controls, #transportline, #actionbar { display: none !important; }
         body { background: #fff; }
         #printout { display: block; }
         #printout svg {
@@ -163,8 +163,8 @@
 
     <h1>Workbench</h1>
     <p class="lede">
-        Build a net by hand, choosing the route yourself — or replay one of the
-        automatic methods and watch the same choices being made for you.
+        Watch branch-cut routing lay a net out step by step — or take over at any
+        point and choose the route yourself.
     </p>
 
     <details id="help">
@@ -200,13 +200,27 @@
         fits one Letter sheet at that size.
         <br><br>
         <strong>Watching a replay.</strong> Play, or step with ← and →, or drag the
-        scrubber; space toggles play. The tiling shows the search's own state —
-        yellow placed, red tried and rejected for overlap, violet the move being
-        made right now, with its candidate ghosted on the sheet. The replay is not a
-        re-enactment: the algorithms emit a step log as they run, and this reads it
-        back, so what you see is the very run that produced the net. The view is
-        fitted once to the finished net and then held, since re-fitting each frame
-        makes the picture lurch.
+        scrubber; space toggles play. While it runs, the tiling shows the search's own
+        state — yellow placed, red tried and rejected for overlap, violet the move
+        being made right now, with its candidate ghosted on the sheet. Those are
+        colours <em>about the run</em>, so when it finishes they go and the tiling
+        returns to whichever colour you chose. The replay is not a re-enactment: the
+        search emits a step log as it runs and this reads it back, so what you see is
+        the very run that produced the net. The view is fitted once to the finished
+        net and then held, since re-fitting each frame makes the picture lurch.
+        <br><br>
+        <strong>Play is a traffic light.</strong> White waiting, yellow running, green
+        finished. Pressing it while it is yellow queues the split, so a long replay can
+        be left to run and will arrive at sheets on its own; pressing again cancels
+        that. Pause has its own button, because at generation 3 a replay is some nine
+        hundred steps and stopping to look at one is the whole reason to watch.
+        <br><br>
+        <strong>You can take over at any point.</strong> The canvas is always live —
+        click to place, alt-click to remove — and there is no mode to switch first. The
+        one consequence is that the scrubber describes the log, not the canvas, so the
+        first edit of your own detaches it: the transport goes away and Play changes to
+        offer running the search again, which would replace what you built and
+        therefore asks first.
         <br><br>
         <strong>Create sheets</strong> splits the finished net across pages. A
         generation-3 net is several times the size of a sheet, so at that scale this
@@ -232,12 +246,14 @@
         file. Changing the net discards the sheets, since they described a net that no
         longer exists.
         <br><br>
-        <strong>Create sheets</strong> splits this net across paper and switches to the
-        <strong>Sheets</strong> view — the same page, so nothing is re-computed and
-        switching back is instant. Sheets carries the rendering choices, since those are
-        print decisions rather than modelling ones, and prints individually or all at
-        once. Once a net is split, the tiling canvas here shows the partition, each
-        region in its sheet's colour: the same picture you built on, now divided.
+        <strong>Create sheets is the second traffic light.</strong> Red nothing to
+        split yet, yellow splitting, green done — and once it is green it stops being a
+        verb and becomes the way through to the <strong>Sheets</strong> view. It does
+        not throw you there by itself: going green is the answer, and whether you want
+        to look yet is your business. Sheets is the same page, so nothing is
+        re-computed and switching back is instant. Once a net is split, the tiling
+        canvas here shows the partition, each region in its sheet's colour: the same
+        picture you built on, now divided.
         <br><br>
         <strong>Print net</strong> is the overview instead: the whole net on one page,
         shrunk however far it takes to fit.
@@ -252,16 +268,19 @@
         seam. Up to generation 3 every patch is a single layer and the control stays
         hidden.
         <br><br>
-        <strong>Type</strong> and <strong>Gen</strong> sit above the tabs rather than
-        inside a view: the patch is the subject of all of them, so it stays put when
-        you switch and you can step through seeds and generations while looking at
-        whichever view answers the question. Changing the patch on P1/P3 does not run
-        a branch-cut search, since there is no net on screen there to route.
+        <strong>Type</strong>, <strong>Gen</strong> and <strong>Side</strong> sit above
+        the tabs rather than inside a view: the patch is the subject of all of them, so
+        it stays put when you switch, and you can step through seeds and generations
+        while looking at whichever view answers the question. Side belongs there too —
+        it decides how many sheets the net needs, so the Sheets view shows the same
+        field rather than a second one that could disagree. Changing the patch on P1/P3
+        does not run a search, since there is no net on screen there to route.
         <br><br>
-        <strong>Colour</strong> switches the tiling between the gen-1 clusters,
-        thick against thin, and height index. <strong>Heads / Tails</strong> flips
-        which way the face shading runs and is display only — it no longer rebuilds
-        the patch, so it will not throw away the net you are working on.
+        <strong>Colour</strong> switches the tiling between the gen-1 clusters, the two
+        mosaic palettes, thick against thin, and height index. <strong>Height</strong> is
+        one control doing one job: its sign flips the lift, hills for dales, and its
+        magnitude is how hard height is shaded, with the middle leaving the tiles flat.
+        Both are display only and will not throw away the net you are working on.
         <strong>Print / PDF</strong> outputs what you have built, as vector at true
         size, through the sheet renderer in <span class="mono">sheet.ts</span>.
         <br><br>
@@ -273,11 +292,13 @@
         show what it would take. Plain clicking the work canvas removes too, and
         <strong>Undo</strong> or ⌘Z steps back. Since hinges are what hold the net
         together, taking out an interior rhomb can leave two islands that only look
-        like one net — you will be told when that happens. All seven seeds are here — the three
-        <span class="mono">Pe</span> pentagons, the <span class="mono">St</span>
-        star, boat and diamond, and <span class="mono">Deca</span> — and the patch
-        controls stay live while watching, so you can switch seed or generation
-        mid-replay.
+        like one net — you will be told when that happens. All nine seeds are here — the
+        three <span class="mono">Pe</span> pentagons, the <span class="mono">St</span>
+        star, boat and diamond, and the three composites <strong>Queen</strong>,
+        <strong>Sun</strong> and <strong>Star</strong> — and the patch controls stay
+        live while watching, so you can switch seed or generation mid-replay. Doing so
+        starts the search again and discards any sheets, since they described a net
+        that no longer exists.
         </div>
     </details>
 
@@ -294,11 +315,14 @@
 
     <div id="view-work">
     <div class="bars">
-        <div class="controls" id="modebar"></div>
-        <div class="controls" id="controls">
-            <button id="btn-clear">Clear Net</button>
+        <!-- Four lines, in the order you use them: what the patch looks like, how it
+             is drawn, running the search, and getting it onto paper. -->
+        <div class="controls" id="controls"></div>
+        <div class="controls" id="transportline">
+            <span id="transport" style="display:contents"></span>
+            <span id="editbar" style="display:contents"><button id="btn-clear">Clear net</button></span>
         </div>
-        <div class="controls" id="transport" style="display:none"></div>
+        <div class="controls" id="actionbar"></div>
         <span class="info" id="info">Click a rhomb to place it; click an edge to choose the hinge</span>
     </div>
 
@@ -308,7 +332,7 @@
             <canvas id="tiling" width="500" height="500"></canvas>
         </div>
         <div class="panel">
-            <h3>Net (true size on the sheet)</h3>
+            <h3>Net — not to scale. Relative sheet size indicated</h3>
             <canvas id="net" width="620" height="802"></canvas>
         </div>
     </div>

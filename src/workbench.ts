@@ -47,7 +47,6 @@ const PREFS_KEY = "wr-workbench";
 const PREF_DEFAULTS = {
     seed: 1,
     gen: 2,
-    mode: "watch",
     method: "cuttree",
     colour: "cluster",
     sideIn: 1,
@@ -332,8 +331,11 @@ function drawTiling() {
             if (tileColour === "type" || tileColour === "index") return base;
             return makeGradient(ctx, base, sv[cLo], sv[cHi], vi[cLo], vi[cHi]);
         };
-        const role = mode === "watch" ? traceRoles.get(r.id) : undefined;
-        const hint = mode === "watch" ? undefined : moveHints.get(r.id);
+        // The search's own colours — yellow placed, red rejected, violet current —
+        // are about the run, not about the net. Once the run is over they are just a
+        // wash sitting on top of whichever theme you picked, so they stop here.
+        const role = replayRunning() ? traceRoles.get(r.id) : undefined;
+        const hint = moveHints.get(r.id);
         if (role) {
             ctx.fillStyle = faceFill();
             ctx.fill();
@@ -362,7 +364,12 @@ function drawTiling() {
         if (r.id === hoveredRhomb) ctx.globalAlpha = 0.9;
         ctx.fill();
         ctx.globalAlpha = 1;
-        if (placedRhombs.has(r.id)) {
+        // The yellow "placed" wash says which rhombi are on the net, which is worth
+        // seeing while one is being built and worth nothing once the answer is all
+        // of them: a finished replay came out uniformly yellow, hiding whichever
+        // colour theme was chosen. Alt still reddens, since that is the affordance
+        // for removing and has to show through regardless.
+        if (placedRhombs.has(r.id) && (altDown || !replayFinished())) {
             ctx.fillStyle = altDown
                 ? "rgba(192, 57, 43, 0.45)"
                 : "rgba(255, 200, 0, 0.45)";
@@ -895,6 +902,10 @@ function snapshot(): Snapshot {
 }
 
 function pushHistory(): void {
+    // The one choke point for "you changed this yourself" — placing, removing and
+    // clearing all pass through here, and the replay does not: applyPrefix rebuilds
+    // netRhombs directly.
+    detachTrace();
     history.push(snapshot());
     if (history.length > HISTORY_LIMIT) history.shift();
 }
@@ -1488,21 +1499,64 @@ function drawNet() {
 // The view is deliberately fitted once, to the *final* net, and then held. Letting
 // it re-fit each frame makes the whole picture lurch about and is unwatchable.
 
-type Mode = "build" | "watch";
-let mode: Mode = prefs.mode === "build" ? "build" : "watch"; // Automatic by default
+// There used to be two modes, Automatic and Manual, and a button to choose between
+// them. They were never really two things: the canvas holds a net either way, and
+// every control except Undo meant the same in both. Now there is one workbench —
+// the replay runs, and the canvas stays live so you can take over whenever.
+//
+// Taking over has one consequence worth naming. The scrubber describes the *log*
+// the algorithm emitted, so the moment you place or remove a rhomb yourself the log
+// no longer describes what is on screen. Rather than let the scrubber lie, the
+// first hand edit detaches: the transport disappears and Play offers to run the
+// search again from scratch, which would discard your work and therefore asks.
+let traceDetached = false;
+// Set by pressing Play while it is already running: split into sheets the moment
+// the replay finishes, so a long run can be left alone.
+let queueSheets = false;
 
-// Buttons that only make sense while building by hand. Print is deliberately not
-// among them: in Watch mode the canvas holds a complete decomposition, and its
-// hinge components are exactly the pieces, so printing there gives what the sheet
-// page gives.
-const buildOnly: HTMLElement[] = [];
-const watchOnly: HTMLElement[] = [];
+/** A replay exists and has not reached its end. */
+function replayRunning(): boolean {
+    return (
+        !traceDetached && traceEvents.length > 0 && traceIndex < traceEvents.length
+    );
+}
+/** A replay exists and has reached its end. */
+function replayFinished(): boolean {
+    return (
+        !traceDetached && traceEvents.length > 0 && traceIndex >= traceEvents.length
+    );
+}
+
+// Red / yellow / green, with the label saying the same thing. Colour alone is not
+// a signal everyone can read, and these buttons change meaning as well as colour.
+const LIGHTS: Record<string, [string, string]> = {
+    white: ["#ffffff", "#c8c8d0"],
+    red: ["#f8d7da", "#c0392b"],
+    yellow: ["#fdf3c8", "#c9a227"],
+    green: ["#d7f0dd", "#2ea043"],
+};
+function paintLight(btn: HTMLButtonElement, light: keyof typeof LIGHTS): void {
+    const [bg, border] = LIGHTS[light];
+    btn.style.background = bg;
+    btn.style.borderColor = border;
+    btn.style.fontWeight = light === "white" ? "400" : "600";
+}
+
+// Both traffic lights, kept honest from one place.
+let syncButtons: () => void = () => {};
+// True only while paginateBest is running, which is the yellow light on the sheets
+// button. Pagination is synchronous, so the paint has to happen before it starts.
+let sheetsBusy = false;
+// The Side box in the shared bar; the Sheets view mirrors it.
+let sharedSideInput: HTMLInputElement | null = null;
 
 let traceEvents: TraceEvent[] = [];
 let traceIndex = 0; // number of events applied
 let tracePlaying = false;
 let traceSpeed = 15; // events per second, 0 = uncapped
-let traceMethod = prefs.method;
+// Branch cuts, always. The other two decompositions still live in unfold.ts and
+// still pass their tests; they are simply not choices the page asks you to make.
+const traceMethod = "cuttree";
 
 // roles for the tiling view at the current step
 const traceRoles = new Map<number, "placed" | "rejected" | "current">();
@@ -1533,13 +1587,7 @@ function runTrace(after?: () => void): void {
 
 function runTraceBody(): void {
     traceEvents = [];
-    const fn =
-        traceMethod === "bfs"
-            ? unfoldPatch
-            : traceMethod === "cuttree"
-              ? cutTreeUnfold
-              : ribbonGrowPatch;
-    const res = fn({ flip: flipHeight, trace: traceEvents });
+    const res = cutTreeUnfold({ flip: flipHeight, trace: traceEvents });
 
     // fit to the finished net once, then hold it for the whole replay
     netRhombs.length = 0;
@@ -1819,10 +1867,6 @@ tilingCanvas.addEventListener("mousemove", (e) => {
 });
 
 tilingCanvas.addEventListener("click", (e) => {
-    if (mode === "watch") {
-        say("Watching a replay — switch to Build to place rhombi yourself.");
-        return;
-    }
     const [sx, sy] = tilingPointFromEvent(e);
     if (e.altKey) {
         const rid = findRhombAt(sx, sy);
@@ -1900,7 +1944,6 @@ tilingCanvas.addEventListener("mouseleave", () => {
 
 // Click a placed rhomb on the work canvas to take it off again.
 netCanvas.addEventListener("click", (e) => {
-    if (mode === "watch") return;
     const [mx, my] = netPointFromEvent(e);
     const nr = netRhombAt(mx, my);
     if (!nr) return;
@@ -1978,10 +2021,10 @@ function sheetOpts(sheet = 0) {
 
 function createSheets(): void {
     // Splitting means the whole net, not whatever prefix the replay is sitting on.
-    // A fresh Automatic load parks the scrubber at step 0, so the net on screen is
-    // empty until you play it — running the scrubber to the end here is both what
-    // "create sheets" has to mean and a sensible thing to see happen.
-    if (mode === "watch" && traceEvents.length) {
+    // A fresh load parks the scrubber at step 0, so the net on screen is empty until
+    // you play it — running the scrubber to the end here is both what "create
+    // sheets" has to mean and a sensible thing to see happen.
+    if (traceEvents.length && !traceDetached) {
         applyPrefix(traceEvents.length);
         syncTransport();
     }
@@ -1990,6 +2033,17 @@ function createSheets(): void {
         return;
     }
     if (!analysis) return;
+
+    // Pagination is synchronous and can take a moment on a big net, so the yellow
+    // has to be painted and given a frame before the work starts, or it is never
+    // seen at all.
+    sheetsBusy = true;
+    syncButtons();
+    say("Splitting the net across pages…");
+    setTimeout(paginateNow, 0);
+}
+
+function paginateNow(): void {
 
     // Join tabs hang outside a page's bounding box, so reserve their height on every
     // edge or a tab at the boundary prints off the paper.
@@ -2005,6 +2059,8 @@ function createSheets(): void {
                 `Reduce the side.`,
         );
         pagination = null;
+        sheetsBusy = false;
+        syncButtons();
         return;
     }
     sheetColours = sheetPalette(pagination.pages.length);
@@ -2012,7 +2068,15 @@ function createSheets(): void {
     pagination.tabH = fitTabHeights(pagination, placedNow, sheetOpts());
     currentSheet = -1; // the map first: it is the key to everything else
     drawSheets();
-    showView("sheets");
+    sheetsBusy = false;
+    syncButtons();
+    // Deliberately *not* jumping to the Sheets view. The button going green is the
+    // answer; whether you want to look at them yet is your business, and being
+    // thrown off the canvas you are working on is the thing that made this annoying.
+    say(
+        `Split into ${pagination.pages.length} sheet${pagination.pages.length === 1 ? "" : "s"} — ` +
+            `press the green button to see them.`,
+    );
     drawTiling(); // the partition, on the canvas the net was built on
 }
 
@@ -2152,6 +2216,7 @@ function buildViewTabs(): void {
             return;
         }
         sideIn = v;
+        if (sharedSideInput) sharedSideInput.value = `${sideIn}in`;
         refreshNetView();
         drawNet();
         createSheets(); // the split depends on the side, so redo it
@@ -2180,16 +2245,11 @@ function afterPatchChange(): void {
         drawP1View();
         return;
     }
-    if (mode === "watch") {
-        runTrace(() => {
-            syncTransport();
-            drawTiling();
-            drawNet();
-        });
-        return;
-    }
-    drawTiling();
-    drawNet();
+    runTrace(() => {
+        syncTransport();
+        drawTiling();
+        drawNet();
+    });
 }
 
 // ── P1 / P3: the two layers side by side ───────────────────────────
@@ -2391,7 +2451,7 @@ function showView(v: View): void {
     // Coming back from P1/P3, the patch may have changed under a view that does not
     // build nets, so the replay can be stale or absent. Catch it up on arrival
     // rather than leaving an empty canvas.
-    if (v === "work" && mode === "watch" && !traceEvents.length) {
+    if (v === "work" && !traceEvents.length && !traceDetached) {
         runTrace(() => {
             syncTransport();
             drawTiling();
@@ -2560,6 +2620,16 @@ function tick(now: number): void {
     if (traceIndex >= traceEvents.length) {
         tracePlaying = false;
         syncTransport();
+        drawTiling();
+        drawNet();
+        // Armed while it was running: go straight on to the split. The roles have
+        // already been cleared by the finish, so the tiling is back to its theme
+        // before the partition colours land on top.
+        if (queueSheets) {
+            queueSheets = false;
+            createSheets();
+        }
+        return;
     }
     drawTiling();
     drawNet();
@@ -2567,7 +2637,7 @@ function tick(now: number): void {
 }
 
 function startPlay(): void {
-    if (traceEvents.length === 0) return;
+    if (traceEvents.length === 0 || traceDetached) return;
     if (traceIndex >= traceEvents.length) applyPrefix(0);
     tracePlaying = true;
     lastFrame = 0;
@@ -2591,33 +2661,6 @@ function buildTransport(): void {
         tag: K,
     ): HTMLElementTagNameMap[K] => document.createElement(tag);
 
-    const methodSel = mk("select");
-    for (const [v, t] of [
-        ["cuttree", "Branch cuts"],
-        ["widened", "Widened ribbons"],
-        ["bfs", "BFS"],
-    ]) {
-        const o = mk("option");
-        o.value = v;
-        o.textContent = t;
-        methodSel.appendChild(o);
-    }
-    methodSel.value = traceMethod;
-    methodSel.addEventListener("change", () => {
-        traceMethod = methodSel.value;
-        stopPlay();
-        runTrace(() => {
-            syncTransport();
-            drawTiling();
-            drawNet();
-        });
-    });
-    const methodLabel = mk("label");
-    methodLabel.style.fontSize = "13px";
-    methodLabel.textContent = "Method: ";
-    methodLabel.appendChild(methodSel);
-    bar.appendChild(methodLabel);
-
     const back = mk("button");
     back.textContent = "◀";
     back.title = "Step back (←)";
@@ -2630,12 +2673,52 @@ function buildTransport(): void {
     });
     bar.appendChild(back);
 
+    // White idle, yellow running, green done — and pressing it while it is yellow
+    // queues the split, so a long replay can be left to finish into sheets.
     const playBtn = mk("button");
     playBtn.addEventListener("click", () => {
-        if (tracePlaying) stopPlay();
-        else startPlay();
+        if (traceDetached) {
+            if (
+                netRhombs.length &&
+                !confirm(
+                    "Running the search again will replace the net you built by hand. Continue?",
+                )
+            ) {
+                return;
+            }
+            startReplay();
+            return;
+        }
+        if (tracePlaying) {
+            queueSheets = !queueSheets;
+            say(
+                queueSheets
+                    ? "Sheets will be created as soon as the replay finishes."
+                    : "Sheets will not be created automatically.",
+            );
+            syncTransport();
+            return;
+        }
+        if (replayFinished()) {
+            applyPrefix(0);
+            drawTiling();
+            drawNet();
+        }
+        startPlay();
     });
     bar.appendChild(playBtn);
+
+    // Pressing Play while it is running now arms the split rather than pausing, so
+    // pause needs its own button: a generation-3 replay is nine hundred steps and
+    // stopping to look at one is the reason to watch at all.
+    const pauseBtn = mk("button");
+    pauseBtn.textContent = "❚❚";
+    pauseBtn.title = "Pause (space)";
+    pauseBtn.addEventListener("click", () => {
+        stopPlay();
+        syncTransport();
+    });
+    bar.appendChild(pauseBtn);
 
     const fwd = mk("button");
     fwd.textContent = "▶|";
@@ -2655,8 +2738,12 @@ function buildTransport(): void {
     scrub.step = "1";
     scrub.style.width = "260px";
     scrub.addEventListener("input", () => {
+        // Read the position *before* stopping: stopPlay syncs the transport, which
+        // writes traceIndex back into this very input, so reading it afterwards
+        // always gave back the step we were already on and the scrubber did nothing.
+        const want = Number(scrub.value);
         stopPlay();
-        applyPrefix(Number(scrub.value));
+        applyPrefix(want);
         syncTransport();
         drawTiling();
         drawNet();
@@ -2691,83 +2778,75 @@ function buildTransport(): void {
     bar.appendChild(readout);
 
     syncTransport = () => {
-        playBtn.textContent = tracePlaying ? "❚❚ Pause" : "▶ Play";
+        const detached = traceDetached || !traceEvents.length;
+        for (const el of [back, pauseBtn, fwd, scrub, speedLabel, readout]) {
+            (el as HTMLElement).style.display = detached ? "none" : "";
+        }
+        pauseBtn.disabled = !tracePlaying;
+        if (detached) {
+            playBtn.textContent = "▶ Run the search";
+            playBtn.title =
+                "Run branch-cut routing on this patch. Replaces the net on screen.";
+            paintLight(playBtn, "white");
+        } else if (tracePlaying) {
+            playBtn.textContent = queueSheets ? "▶ Playing → sheets" : "▶ Playing";
+            playBtn.title = queueSheets
+                ? "Sheets will be created when this finishes — press again to cancel that"
+                : "Press again to create sheets as soon as this finishes";
+            paintLight(playBtn, "yellow");
+        } else if (replayFinished()) {
+            playBtn.textContent = "▶ Replay";
+            playBtn.title = "Net complete — press to watch it again from the start";
+            paintLight(playBtn, "green");
+        } else {
+            playBtn.textContent = "▶ Play";
+            playBtn.title = "Play the replay (space)";
+            paintLight(playBtn, "white");
+        }
         scrub.max = String(traceEvents.length);
         scrub.value = String(traceIndex);
         readout.textContent = traceLabel();
+        syncButtons();
     };
     syncTransport();
 }
 
-function setMode(next: Mode): void {
-    mode = next;
-    const transport = document.getElementById("transport")!;
-    transport.style.display = next === "watch" ? "flex" : "none";
-    // Only Clear, Undo and Print are build-specific. Patch, generation, color,
-    // height and side all still mean something while watching, so disabling the
-    // whole bar — as this used to — took away controls for no reason.
-    // Hide rather than grey out: a control that does nothing in this mode is just
-    // noise, and there is a lot of bar to read already.
-    for (const b of buildOnly) {
-        b.style.display = next === "watch" ? "none" : "";
-    }
-    for (const b of watchOnly) {
-        b.style.display = next === "watch" ? "" : "none";
-    }
+/** Run the search for the current patch and show it from the start. */
+function startReplay(): void {
     stopPlay();
-    if (next === "watch") {
-        runTrace(() => {
-            buildTransport();
-            say("Replaying — Play, or step with the arrow keys.");
-        });
-    } else {
-        netRhombs.length = 0;
-        markNetChanged();
-        netHinges.clear();
-        placedRhombs.clear();
-        traceRoles.clear();
-        traceGhost = null;
-        traceEvents = [];
-        moveHints.clear();
-        history.length = 0;
-        refreshNetView();
-        say("Build mode. Click a rhomb to seed a net.");
-    }
-    drawTiling();
-    drawNet();
+    traceDetached = false;
+    runTrace(() => {
+        buildTransport();
+        syncButtons();
+        drawTiling();
+        drawNet();
+        say("Press Play, or step with the arrow keys.");
+    });
+}
+
+/**
+ * Hand editing takes the net away from the log that produced it. Say so once, drop
+ * the transport, and leave what you built alone.
+ */
+function detachTrace(): void {
+    if (traceDetached) return;
+    traceDetached = true;
+    stopPlay();
+    traceEvents = [];
+    traceIndex = 0;
+    traceRoles.clear();
+    traceGhost = null;
+    syncTransport();
+    syncButtons();
 }
 
 // ── Control panel ─────────────────────────────────────────────────
 
-function buildModeBar(): void {
-    const bar = document.getElementById("modebar")!;
-    for (const [v, t] of [
-        ["watch", "Automatic"],
-        ["build", "Manual"],
-    ] as Array<[Mode, string]>) {
-        const btn = document.createElement("button");
-        btn.textContent = t;
-        btn.addEventListener("click", () => {
-            for (const b of Array.from(bar.querySelectorAll("button"))) {
-                b.style.fontWeight = "400";
-                b.style.borderColor = "#ccc";
-            }
-            btn.style.fontWeight = "600";
-            btn.style.borderColor = "#6a5acd";
-            setMode(v);
-        });
-        if (v === mode) {
-            btn.style.fontWeight = "600";
-            btn.style.borderColor = "#6a5acd";
-        }
-        bar.appendChild(btn);
-    }
-}
-
 function buildControls() {
     const controls = document.getElementById("controls")!;
+    const edit = document.getElementById("editbar")!;
+    const actions = document.getElementById("actionbar")!;
     const clearBtn = document.getElementById("btn-clear") as HTMLButtonElement;
-    if (clearBtn) buildOnly.push(clearBtn);
 
     // Type selector
     const typeSelect = document.createElement("select");
@@ -2960,17 +3039,25 @@ function buildControls() {
         sideIn = parsed.mm / 25.4;
         refreshNetView();
         drawNet();
+        // Round-tripping "0.75in" through millimetres lands on 0.7499999999999999,
+        // which is true and useless in a text box.
+        const box = document.getElementById("sheet-side") as HTMLInputElement | null;
+        if (box) box.value = String(Number(sideIn.toFixed(4)));
         say(`Rhombus side ${parsed.label}. ${fitReport()}`);
     };
     sideInput.addEventListener("change", applySide);
     sideInput.addEventListener("keydown", (ev) => {
         if ((ev as KeyboardEvent).key === "Enter") applySide();
     });
+    // Side sits with Type and Gen, above the tabs. It is not a workbench setting:
+    // it decides how many sheets the net needs, so the Sheets view has always had a
+    // box of its own for it. One field now, mirrored into that box.
     const sideLabel = document.createElement("label");
-    sideLabel.textContent = "Side (mm/cm/in): ";
+    sideLabel.textContent = "Side: ";
     sideLabel.style.fontSize = "13px";
     sideLabel.appendChild(sideInput);
-    controls.appendChild(sideLabel);
+    shared.appendChild(sideLabel);
+    sharedSideInput = sideInput;
 
     // Layer selector. Hidden unless the net actually needs more than one, so it
     // stays out of the way on everything up to generation 3, which is one sheet.
@@ -2990,14 +3077,44 @@ function buildControls() {
         );
     });
     layerLabel.appendChild(layerSelect);
-    controls.appendChild(layerLabel);
+    edit.appendChild(layerLabel);
 
+    // Red nothing to split, yellow splitting, green ready — and once it is green or
+    // yellow it stops being a verb and becomes the way through to the sheets.
     const sheetsBtn = document.createElement("button");
-    sheetsBtn.textContent = "Create sheets →";
-    sheetsBtn.title =
-        "Split this net across pages and open the Sheets page to print them";
-    sheetsBtn.addEventListener("click", createSheets);
-    controls.appendChild(sheetsBtn);
+    sheetsBtn.addEventListener("click", () => {
+        if (pagination || sheetsBusy) {
+            showView("sheets");
+            return;
+        }
+        if (!netRhombs.length) {
+            say("Nothing to split yet — run the search, or place some rhombi.");
+            return;
+        }
+        createSheets();
+    });
+    actions.appendChild(sheetsBtn);
+
+    syncButtons = () => {
+        if (sheetsBusy) {
+            sheetsBtn.textContent = "Splitting…";
+            sheetsBtn.title = "Working — press to watch it arrive on the Sheets view";
+            paintLight(sheetsBtn, "yellow");
+        } else if (pagination) {
+            const n = pagination.pages.length;
+            sheetsBtn.textContent = `Sheets ready (${n}) →`;
+            sheetsBtn.title = "Open the Sheets view";
+            paintLight(sheetsBtn, "green");
+        } else if (!netRhombs.length) {
+            sheetsBtn.textContent = "Create sheets";
+            sheetsBtn.title = "Nothing to split yet — run the search first";
+            paintLight(sheetsBtn, "red");
+        } else {
+            sheetsBtn.textContent = "Create sheets";
+            sheetsBtn.title = "Split this net across pages";
+            paintLight(sheetsBtn, "red");
+        }
+    };
 
     const resetBtn = document.createElement("button");
     resetBtn.textContent = "Reset";
@@ -3009,14 +3126,14 @@ function buildControls() {
             resetPrefs(PREFS_KEY);
         }
     });
-    controls.appendChild(resetBtn);
+    actions.appendChild(resetBtn);
 
     const printBtn = document.createElement("button");
     printBtn.textContent = "Print net";
     printBtn.title =
         "Print the whole net on one page, scaled down to fit however big it is";
     printBtn.addEventListener("click", printNet);
-    controls.appendChild(printBtn);
+    actions.insertBefore(printBtn, resetBtn); // Reset stays last, out of the way
 
     const undoBtn = document.createElement("button");
     undoBtn.textContent = "Undo";
@@ -3026,8 +3143,8 @@ function buildControls() {
         drawTiling();
         drawNet();
     });
-    controls.insertBefore(undoBtn, controls.firstChild?.nextSibling ?? null);
-    buildOnly.push(undoBtn);
+    edit.appendChild(undoBtn);
+    edit.appendChild(clearBtn); // re-appended so it lands after Undo
 
     window.addEventListener("keydown", (e) => {
         if (e.altKey && !altDown) {
@@ -3044,7 +3161,7 @@ function buildControls() {
     });
 
     window.addEventListener("keydown", (e) => {
-        if (mode !== "watch") return;
+        if (!traceEvents.length || traceDetached) return;
         if (e.key === " ") {
             e.preventDefault();
             if (tracePlaying) stopPlay();
@@ -3113,7 +3230,6 @@ function persist(): void {
     savePrefs(PREFS_KEY, {
         seed: currentSeedIdx,
         gen,
-        mode,
         method: traceMethod,
         colour: tileColour,
         sideIn,
@@ -3136,7 +3252,6 @@ console.log(`workbench build ${BUILD_ID}`);
     if (tag) tag.textContent = `· build ${BUILD_ID}`;
 }
 
-buildModeBar();
 buildControls();
 buildViewTabs();
 sizeTilingCanvas();
@@ -3146,13 +3261,11 @@ fitView();
 refreshNetView();
 drawTiling();
 drawNet();
-// Apply the starting mode rather than only reacting to clicks: Automatic is the
-// default, so the page should open already showing a replay with the manual-only
-// controls out of the way.
-setMode(mode);
+// Open on a replay of the current patch, ready to play.
+startReplay();
 
-// Deep link from the nav. This has to wait for the net: setMode may defer a heavy
-// search to a timeout, so queue behind it rather than reading an empty net.
+// Deep link from the nav. This has to wait for the net: startReplay may defer a
+// heavy search to a timeout, so queue behind it rather than reading an empty net.
 if (location.hash === "#p1") {
     setTimeout(() => showView("p1"), 0);
 } else if (location.hash === "#sheets") {
