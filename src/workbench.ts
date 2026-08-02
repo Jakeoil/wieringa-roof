@@ -2439,6 +2439,29 @@ function showView(v: View): void {
     tw.setAttribute("aria-current", String(v === "work"));
     ts.setAttribute("aria-current", String(v === "sheets"));
     tp.setAttribute("aria-current", String(v === "p1"));
+    // The heading names the overlay, not the page — the tab you pressed and the
+    // title you are under should agree.
+    const titles: Record<View, [string, string]> = {
+        work: [
+            "Workbench",
+            "Watch branch-cut routing lay a net out step by step — or take over at " +
+                "any point and choose the route yourself.",
+        ],
+        sheets: [
+            "Sheets",
+            "The finished net divided across pages, each join lettered and numbered " +
+                "for the sheet its other half is on.",
+        ],
+        p1: [
+            "Penta vs Rhombs",
+            "The pentagon tiling the rhombi come from, beside the rhombi it " +
+                "produces — the tiles that emit nothing are the gaps.",
+        ],
+    };
+    const [title, lede] = titles[v];
+    document.getElementById("viewtitle")!.textContent = title;
+    document.getElementById("viewlede")!.textContent = lede;
+
     if (v === "p1") drawP1View();
     // Coming back from P1/P3, the patch may have changed under a view that does not
     // build nets, so the replay can be stale or absent. Catch it up on arrival
