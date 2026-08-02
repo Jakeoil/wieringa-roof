@@ -1,7 +1,7 @@
 // The three solids, live: rhombic triacontahedron and the two golden rhombohedra.
 //
 // Every face of all three is the same golden rhombus, so they get the same
-// treatment as the roof — cluster colours, isogloss contours, dark edges — and the
+// treatment as the roof — cluster colors, isogloss contours, dark edges — and the
 // family resemblance does the explaining.
 //
 // The triacontahedron is built as a zonohedron on the six icosahedral five-fold
@@ -13,7 +13,7 @@ import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 // LineBasicMaterial's linewidth is ignored by WebGL — every edge comes out one
 // device pixel, which at devicePixelRatio 2 is half a CSS pixel and reads as thin
-// and grey. LineSegments2 draws lines as camera-facing quads, so a width in pixels
+// and gray. LineSegments2 draws lines as camera-facing quads, so a width in pixels
 // actually means something.
 import { LineSegments2 } from "three/addons/lines/LineSegments2.js";
 import { LineSegmentsGeometry } from "three/addons/lines/LineSegmentsGeometry.js";
@@ -105,7 +105,7 @@ function rhombohedron(acute: boolean): Face[] {
     return faces.map((f) => f.map((q) => sub(q, mid)));
 }
 
-// All three solids are convex and centred on the origin, so a face is wound
+// All three solids are convex and centered on the origin, so a face is wound
 // outward exactly when its normal agrees with its own centroid. The zonohedron
 // construction flips the normal for each ± pair, leaving half the triacontahedron
 // wound inward: those faces were being culled outright by a FrontSide material,
@@ -141,7 +141,7 @@ function contourSegment(f: Face, z: number): [V3, V3] | null {
         }
     }
     // a plane through a vertex can give one or three; skip those rather than
-    // guess, the neighbouring slices cover the same ground
+    // guess, the neighboring slices cover the same ground
     return hits.length === 2 ? [hits[0], hits[1]] : null;
 }
 
@@ -203,7 +203,7 @@ const ORANGE = new THREE.Color("#eec09b");
 // Standing on a five-fold axis the thirty faces band 5 · 5 · 10 · 5 · 5. The caps
 // of five are Pe5 rosettes, so they take the blue; the rings take yellow and the
 // equator orange, mirrored top and bottom.
-function bandColour(f: Face): THREE.Color {
+function bandColor(f: Face): THREE.Color {
     const z = f.reduce((s, p) => s + p[2], 0) / 4;
     const a = Math.abs(z);
     if (a > 0.95) return BLUE;
@@ -214,7 +214,7 @@ function bandColour(f: Face): THREE.Color {
 // Three faces meet at each apex of a rhombohedron. Blue at the apexes, the accent
 // round the waist — yellow for the acute solid, orange for the obtuse, so the two
 // stay tellable apart at a glance.
-function apexColour(accent: THREE.Color) {
+function apexColor(accent: THREE.Color) {
     return (f: Face): THREE.Color => {
         const z = f.reduce((s, p) => s + p[2], 0) / 4;
         return z > 0 ? BLUE : accent;
@@ -226,7 +226,7 @@ function apexColour(accent: THREE.Color) {
 function makeViewer(
     host: HTMLElement,
     faces: Face[],
-    colourOf: (f: Face) => THREE.Color,
+    colorOf: (f: Face) => THREE.Color,
 ): void {
     const scene = new THREE.Scene();
     scene.background = null;
@@ -263,7 +263,7 @@ function makeViewer(
     const pos: number[] = [];
     const col: number[] = [];
     for (const f of faces) {
-        const c = colourOf(f);
+        const c = colorOf(f);
         for (const q of [f[0], f[1], f[2], f[0], f[2], f[3]]) {
             pos.push(q[0], q[1], q[2]);
             col.push(c.r, c.g, c.b);
@@ -310,7 +310,7 @@ function makeViewer(
     eg.setPositions(edge);
     const edgeMat = new LineMaterial({
         color: 0x23262c,
-        linewidth: 2.6, // pixels, and here it is honoured
+        linewidth: 2.6, // pixels, and here it is honored
         worldUnits: false,
         alphaToCoverage: true,
     });
@@ -320,8 +320,8 @@ function makeViewer(
 
     // Pole-to-pole latitude slices everywhere except the vertical equatorial band,
     // which takes lines along its long diagonal instead.
-    const equator = faces.filter((f) => colourOf(f) === ORANGE);
-    const rest = faces.filter((f) => colourOf(f) !== ORANGE);
+    const equator = faces.filter((f) => colorOf(f) === ORANGE);
+    const rest = faces.filter((f) => colorOf(f) !== ORANGE);
     const segs = isoglosses(rest).concat(equator.flatMap(perFaceContours));
     const arr: number[] = [];
     for (const [a, b] of segs) arr.push(a[0], a[1], a[2], b[0], b[1], b[2]);
@@ -370,6 +370,6 @@ function makeViewer(
 const rt = document.getElementById("v-rt");
 const ac = document.getElementById("v-acute");
 const ob = document.getElementById("v-obtuse");
-if (rt) makeViewer(rt, triacontahedron(), bandColour);
-if (ac) makeViewer(ac, rhombohedron(true), apexColour(YELLOW));
-if (ob) makeViewer(ob, rhombohedron(false), apexColour(ORANGE));
+if (rt) makeViewer(rt, triacontahedron(), bandColor);
+if (ac) makeViewer(ac, rhombohedron(true), apexColor(YELLOW));
+if (ob) makeViewer(ob, rhombohedron(false), apexColor(ORANGE));

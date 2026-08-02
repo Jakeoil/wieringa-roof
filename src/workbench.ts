@@ -18,7 +18,7 @@ import {
 } from "./geometry.js";
 import type { Rhomb, Vertex } from "./geometry.js";
 import {
-    analysePatch,
+    analyzePatch,
     placeSeed,
     placeAcross,
     convexOverlap,
@@ -48,7 +48,7 @@ const PREF_DEFAULTS = {
     seed: 1,
     gen: 2,
     method: "cuttree",
-    colour: "cluster",
+    color: "cluster",
     sideIn: 1,
     heightU: 1,
     isogloss: false,
@@ -65,7 +65,7 @@ let gen = prefs.gen;
 
 // One control for height, matching the 3D page. Sign is the flip — real geometry,
 // the dual roof, every hill a dale. Magnitude is how strongly height is shaded,
-// 0 leaving the tiles flat colour. Biased so the middle of the travel is spread
+// 0 leaving the tiles flat color. Biased so the middle of the travel is spread
 // out, which is where small differences are worth seeing.
 //
 // This replaces two buttons that did one job badly: Hills up/Dales up flipped the
@@ -78,10 +78,10 @@ function biasedHeight(u: number): number {
     return Math.sign(u) * Math.pow(Math.abs(u), 1.6);
 }
 
-// Face colouring in the tiling view. "Colored by type or by vertex index" was in
+// Face coloring in the tiling view. "Colored by type or by vertex index" was in
 // the original spec and never got built.
-type TileColour = "cluster" | "mosaic" | "classic" | "type" | "index";
-let tileColour: TileColour = prefs.colour as TileColour;
+type TileColor = "cluster" | "mosaic" | "classic" | "type" | "index";
+let tileColor: TileColor = prefs.color as TileColor;
 
 function faceIndexLow(r: Rhomb): number {
     return Math.min(...r.vertIndices);
@@ -90,7 +90,7 @@ function faceIndexLow(r: Rhomb): number {
 // Height flip — the dual roof, hills for dales. The tiling fixes the surface only
 // up to a reflection in the horizontal plane, so every vertex height can be read
 // either way round. Mirroring the index about the patch's observed range is the
-// same thing as negating z and renormalising the lowest level back to 1, which is
+// same thing as negating z and renormalizing the lowest level back to 1, which is
 // why it is a mirror rather than a negation.
 let flipHeight = false;
 let idxLo = 1;
@@ -114,7 +114,7 @@ function generate() {
         idxLo = 1;
         idxHi = 4;
     }
-    analysis = allRhombs.length ? analysePatch(flipHeight) : null;
+    analysis = allRhombs.length ? analyzePatch(flipHeight) : null;
 
     // Reports what the shading path actually computes, so a flat-looking tile can
     // be traced without guessing. Two wrong diagnoses have already been paid for.
@@ -128,7 +128,7 @@ function generate() {
             if (shadeOf(r.fill, a) !== shadeOf(r.fill, c)) distinct++;
         }
         console.log(
-            `shading: color=${tileColour} depth=${shadeDepth.toFixed(2)} ` +
+            `shading: color=${tileColor} depth=${shadeDepth.toFixed(2)} ` +
                 `range ${idxLo}..${idxHi} · ${distinct}/${allRhombs.length} tiles ` +
                 `get two different stops · spans ${JSON.stringify(Object.fromEntries(pairs))}`,
         );
@@ -157,7 +157,7 @@ function hexToRGB(h: string): [number, number, number] {
 }
 
 // Emit integer hex rather than rgb() with fractional components. Canvas parses
-// colour strings through CSS, and a value like rgb(205.95,205.95,242.39999999999998)
+// color strings through CSS, and a value like rgb(205.95,205.95,242.39999999999998)
 // is at the mercy of that parser; a stop it rejects throws out of addColorStop and
 // takes the whole draw with it. Hex has no such ambiguity, and the values were
 // never meaningfully fractional anyway.
@@ -178,12 +178,12 @@ function lerpColor(start: string, end: string, alpha: number): string {
 // 2→4: the shading carried no height information at all, only which way the face
 // tilted.
 //
-// Now the ramp is absolute. shadeOf maps a level to a colour once, for the whole
+// Now the ramp is absolute. shadeOf maps a level to a color once, for the whole
 // patch, and a face simply draws the segment of that ramp between its own two
 // extreme corners. Height varies affinely along the v0→v2 diagonal, so two stops
 // are exact — the old third stop at 2/3 was what encoded the wrong thing.
 //
-// Colour and shading stay separate: colour is the constant tile property, shading
+// Color and shading stay separate: color is the constant tile property, shading
 // is the height layer over it.
 // Which corners are the height extremes. NOT positions 0 and 2 in general: the
 // generator emits them that way, but placeAcross re-orders each rhomb to start at
@@ -290,7 +290,7 @@ function fromScreen(sx: number, sy: number): Pt {
 
 // Which sheet a rhomb landed on, once the net has been split. This is what turns
 // the tiling canvas into a before-and-after: the same picture you built the net on,
-// now divided and colour-keyed to the sheet list.
+// now divided and color-keyed to the sheet list.
 let faceSheet = new Map<number, number>();
 function indexSheets(): void {
     faceSheet = new Map();
@@ -323,15 +323,15 @@ function drawTiling() {
             // Once the net has been split, the tiling shows the partition: the same
             // canvas you built the net on, now divided and keyed to the sheet list.
             const sh = faceSheet.get(r.id);
-            if (sh != null) return sheetColours[sh] ?? "#ddd";
+            if (sh != null) return sheetColors[sh] ?? "#ddd";
             // Same tileFill the sheets ask, so a mode added in one place cannot
             // quietly go missing in the other. Flat modes stay flat: thick/thin and
             // height already *are* the information, and ramping them muddles it.
-            const base = tileFill(tileColour, r.cluster, r.thick, vi[cLo]) ?? r.fill;
-            if (tileColour === "type" || tileColour === "index") return base;
+            const base = tileFill(tileColor, r.cluster, r.thick, vi[cLo]) ?? r.fill;
+            if (tileColor === "type" || tileColor === "index") return base;
             return makeGradient(ctx, base, sv[cLo], sv[cHi], vi[cLo], vi[cHi]);
         };
-        // The search's own colours — yellow placed, red rejected, violet current —
+        // The search's own colors — yellow placed, red rejected, violet current —
         // are about the run, not about the net. Once the run is over they are just a
         // wash sitting on top of whichever theme you picked, so they stop here.
         const role = replayRunning() ? traceRoles.get(r.id) : undefined;
@@ -367,7 +367,7 @@ function drawTiling() {
         // The yellow "placed" wash says which rhombi are on the net, which is worth
         // seeing while one is being built and worth nothing once the answer is all
         // of them: a finished replay came out uniformly yellow, hiding whichever
-        // colour theme was chosen. Alt still reddens, since that is the affordance
+        // color theme was chosen. Alt still reddens, since that is the affordance
         // for removing and has to show through regardless.
         if (placedRhombs.has(r.id) && (altDown || !replayFinished())) {
             ctx.fillStyle = altDown
@@ -387,7 +387,7 @@ function drawTiling() {
             ctx.strokeStyle = hint === "clean" ? "#2ea043" : "#c0392b";
             ctx.lineWidth = r.id === hoveredRhomb ? 2.5 : 1.5;
             ctx.stroke();
-        } else if (tileColour === "mosaic" || tileColour === "classic") {
+        } else if (tileColor === "mosaic" || tileColor === "classic") {
             // Heavy black outlines are half of what the plate looks like — the ramp
             // and the isoglosses do nothing without them. Scale with the rhomb so a
             // gen-4 patch does not turn solid black: the plate is gen 2, where a
@@ -615,7 +615,7 @@ const netHinges = new Set<string>();
 // cuttree.ts; all this has to do is feed it the net as it currently stands.
 //
 // NetRhomb carries no parent pointer, but it does not need one — the net is built
-// incrementally, so a rhomb's parent is the earliest already-placed neighbour it
+// incrementally, so a rhomb's parent is the earliest already-placed neighbor it
 // shares a hinge with. That reconstructs the tree the layering needs without
 // changing the data model, and works the same whether the net was built by hand or
 // replayed from an algorithm.
@@ -949,7 +949,7 @@ function recomputeMoveHints(): void {
 let analysis: Analysis | null = null;
 const DPI = 96;
 
-// Paper, in inches. The net is oriented and centred against the printable area;
+// Paper, in inches. The net is oriented and centered against the printable area;
 // the sheet edge is drawn too, and a net is allowed to spill past both — that is
 // the point, since a net a little too big is one you snip in two rather than one
 // you cannot have.
@@ -1121,7 +1121,7 @@ function refreshNetView(): void {
         }
     }
 
-    // centre the oriented net on the sheet
+    // center the oriented net on the sheet
     let x0 = Infinity;
     let y0 = Infinity;
     let x1 = -Infinity;
@@ -1202,7 +1202,7 @@ function placeRhomb(rid: number, viaEdge?: { a: number; b: number }): string {
     if (netRhombs.length === 0) {
         poly = placeSeed(face, P) as [number, number][];
         verts = face.v.slice();
-        // no need to position it: refreshNetView centres whatever is there
+        // no need to position it: refreshNetView centers whatever is there
         note = `Seeded with rhomb ${rid}.`;
     } else {
         // candidate hinges: edges to rhombs already placed
@@ -1223,7 +1223,7 @@ function placeRhomb(rid: number, viaEdge?: { a: number; b: number }): string {
             }
             chosen = match;
         } else {
-            // default to the most recently placed neighbour
+            // default to the most recently placed neighbor
             for (let i = netRhombs.length - 1; i >= 0; i--) {
                 const m = cands.find((l) => l.other === netRhombs[i].sourceId);
                 if (m) {
@@ -1401,7 +1401,7 @@ function drawNet() {
         const [nLo, nHi] = extremeCorners(nvi);
         ctx.fillStyle = makeGradient(
             ctx,
-            tileFill(tileColour, src.cluster, src.thick, nvi[nLo]) ?? src.fill,
+            tileFill(tileColor, src.cluster, src.thick, nvi[nLo]) ?? src.fill,
             { x: sv[nLo].x, y: sv[nLo].y },
             { x: sv[nHi].x, y: sv[nHi].y },
             nvi[nLo],
@@ -1527,8 +1527,8 @@ function replayFinished(): boolean {
     );
 }
 
-// Red / yellow / green, with the label saying the same thing. Colour alone is not
-// a signal everyone can read, and these buttons change meaning as well as colour.
+// Red / yellow / green, with the label saying the same thing. Color alone is not
+// a signal everyone can read, and these buttons change meaning as well as color.
 const LIGHTS: Record<string, [string, string]> = {
     white: ["#ffffff", "#c8c8d0"],
     yellow: ["#fdf3c8", "#c9a227"],
@@ -1982,7 +1982,7 @@ document.getElementById("btn-clear")!.addEventListener("click", () => {
 // canvas you built it on.
 
 let pagination: Pagination | null = null;
-let sheetColours: string[] = [];
+let sheetColors: string[] = [];
 let currentSheet = 0; // −1 is the map
 
 // Rendering settings: print decisions, so they live with the sheets rather than
@@ -1997,7 +1997,7 @@ function syncAppearance(): void {
 let renderBackside = false;
 
 // The patch in its own plane, for the locator mini and the map. Rhomb.verts is
-// exactly that — the tiling, which is the picture you can recognise.
+// exactly that — the tiling, which is the picture you can recognize.
 function tilingPoly(faceId: number): [number, number][] | null {
     const r = allRhombs[faceId];
     if (!r) return null;
@@ -2011,7 +2011,7 @@ function sheetOpts(sheet = 0) {
         pageW: pw,
         pageH: ph,
         margin: MARGIN_IN * 25.4,
-        fillMode: tileColour,
+        fillMode: tileColor,
         shading: renderShading,
         isoglosses: showIsogloss,
         // A flat height setting carries no hills-or-dales information, so rendering
@@ -2020,8 +2020,8 @@ function sheetOpts(sheet = 0) {
         indexOf: (v: number) => vertexList[v]?.index ?? 1,
         indexRange: [idxLo, idxHi] as [number, number],
         tilingPoly,
-        sheetColor: sheetColours[sheet] ?? "#6a5acd",
-        sheetColors: sheetColours,
+        sheetColor: sheetColors[sheet] ?? "#6a5acd",
+        sheetColors: sheetColors,
     };
 }
 
@@ -2069,7 +2069,7 @@ function paginateNow(): void {
         syncButtons();
         return;
     }
-    sheetColours = sheetPalette(pagination.pages.length);
+    sheetColors = sheetPalette(pagination.pages.length);
     indexSheets();
     pagination.tabH = fitTabHeights(pagination, placedNow, sheetOpts());
     currentSheet = -1; // the map first: it is the key to everything else
@@ -2161,7 +2161,7 @@ function drawSheets(): void {
             `Sheet ${i + 1}`,
             `${page.faceIds.length} rhombi · ${joins || "no joins"}`,
             i,
-            sheetColours[i],
+            sheetColors[i],
         );
     });
 
@@ -2370,7 +2370,7 @@ function drawP1Tiles(ctx: CanvasRenderingContext2D, lw: number): void {
         ctx.closePath();
 
         if (gap) {
-            // A gap has no rhombs to colour it. That is the point of it.
+            // A gap has no rhombs to color it. That is the point of it.
             ctx.fillStyle = "rgba(192,57,43,0.10)";
             ctx.fill();
             ctx.strokeStyle = "#c0392b";
@@ -2570,7 +2570,7 @@ function printNet(): void {
                 pageW: pw,
                 pageH: ph,
                 margin: marginMm,
-                fillMode: tileColour,
+                fillMode: tileColor,
                 indexOf: (v: number) => vertexList[v]?.index ?? 1,
                 showAngles: false,
                 showLegend: true,
@@ -2620,7 +2620,7 @@ function tick(now: number): void {
         drawNet();
         // Armed while it was running: go straight on to the split. The roles have
         // already been cleared by the finish, so the tiling is back to its theme
-        // before the partition colours land on top.
+        // before the partition colors land on top.
         if (queueSheets) {
             queueSheets = false;
             createSheets();
@@ -2935,7 +2935,7 @@ function buildControls() {
                 : `${v < 0 ? "dales" : "hills"} ${shadeDepth.toFixed(2)}`;
         // creases follow the lift, so a change of sign needs the analysis rebuilt
         if (regen && flipHeight !== wasFlipped && allRhombs.length) {
-            analysis = analysePatch(flipHeight);
+            analysis = analyzePatch(flipHeight);
         }
         drawTiling();
         drawNet();
@@ -2956,12 +2956,12 @@ function buildControls() {
     controls.insertBefore(heightWrap, genLabel.nextSibling);
     syncHeight(false);
 
-    // Colour, shading and isoglosses are one field each, shown on more than one
+    // Color, shading and isoglosses are one field each, shown on more than one
     // overlay. Whichever copy of a control you touch, every copy has to agree —
     // otherwise the checkbox you are looking at lies about what will print.
     appearanceControls = () => {
         isoChk.checked = showIsogloss;
-        colourSel.value = tileColour;
+        colorSel.value = tileColor;
         const shadeBox = document.getElementById("sheet-shade") as HTMLInputElement | null;
         const isoBox = document.getElementById("sheet-iso") as HTMLInputElement | null;
         if (shadeBox) shadeBox.checked = renderShading;
@@ -2985,24 +2985,24 @@ function buildControls() {
     isoWrap.append(isoChk, document.createTextNode("isoglosses"));
     controls.insertBefore(isoWrap, heightWrap.nextSibling);
 
-    const colourSel = document.createElement("select");
-    colourSel.style.cssText = "padding:4px;font-size:13px;";
+    const colorSel = document.createElement("select");
+    colorSel.style.cssText = "padding:4px;font-size:13px;";
     for (const [v, t] of [
         ["cluster", "Cluster"],
         ["mosaic", "Mosaic plate"],
         ["classic", "Mosaic classic"],
         ["type", "Thick / thin"],
         ["index", "Height index"],
-    ] as Array<[TileColour, string]>) {
+    ] as Array<[TileColor, string]>) {
         const opt = document.createElement("option");
         opt.value = v;
         opt.textContent = t;
-        colourSel.appendChild(opt);
+        colorSel.appendChild(opt);
     }
-    colourSel.value = tileColour;
-    colourSel.addEventListener("change", () => {
-        tileColour = colourSel.value as TileColour;
-        if (tileColour === "mosaic" && !showIsogloss) {
+    colorSel.value = tileColor;
+    colorSel.addEventListener("change", () => {
+        tileColor = colorSel.value as TileColor;
+        if (tileColor === "mosaic" && !showIsogloss) {
             showIsogloss = true;
             say(
                 "Mosaic plate: darker palette, height ramp and isoglosses — the " +
@@ -3014,11 +3014,11 @@ function buildControls() {
         drawNet();
         if (pagination) drawSheets();
     });
-    const colourLabel = document.createElement("label");
-    colourLabel.textContent = "Color: ";
-    colourLabel.style.fontSize = "13px";
-    colourLabel.appendChild(colourSel);
-    controls.insertBefore(colourLabel, heightWrap.nextSibling);
+    const colorLabel = document.createElement("label");
+    colorLabel.textContent = "Color: ";
+    colorLabel.style.fontSize = "13px";
+    colorLabel.appendChild(colorSel);
+    controls.insertBefore(colorLabel, heightWrap.nextSibling);
 
     const sideInput = document.createElement("input");
     sideInput.type = "text";
@@ -3224,7 +3224,7 @@ function persist(): void {
         seed: currentSeedIdx,
         gen,
         method: traceMethod,
-        colour: tileColour,
+        color: tileColor,
         sideIn,
         heightU,
         isogloss: showIsogloss,

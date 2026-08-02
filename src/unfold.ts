@@ -613,7 +613,7 @@ export interface Analysis {
     creases: Map<string, Crease>;
 }
 
-export function analysePatch(flip = false): Analysis {
+export function analyzePatch(flip = false): Analysis {
     const faces = buildFaces();
     const lift = computeLift();
     const P: (V3 | null)[] = lift.n.map((nv) => (nv ? pos3D(nv, flip) : null));
@@ -765,7 +765,7 @@ function pieceBox(faceIds: number[], placed: Map<number, Placed>) {
 // A pure ribbon is one rhomb wide, and family j only reaches the 2/5 of rhombi
 // that have direction j at all, so the plain strip decomposition leaves a lot of
 // orphans between bands. This takes the longest available ribbon as a *backbone*
-// and then accretes neighbouring rhombi onto it across any edge — not just the
+// and then accretes neighboring rhombi onto it across any edge — not just the
 // j-parallel ones — largest backbone first, so the longest strip gets first claim
 // on the rhombi it could share.
 //

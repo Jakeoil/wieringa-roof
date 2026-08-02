@@ -122,8 +122,8 @@ sheet 3. Verified: every letter appears on exactly two sheets and each points ba
 the other.
 
 Two facts shape it. The hinges form a **spanning tree**, so removing k edges gives
-exactly k+1 components: **pages = joins + 1**, and minimising taped joins *is*
-minimising sheets. And all pages share **one orientation**, chosen from the net's own
+exactly k+1 components: **pages = joins + 1**, and minimizing taped joins *is*
+minimizing sheets. And all pages share **one orientation**, chosen from the net's own
 edge directions to need the fewest sheets — worth 2–4 sheets on some patches
 (Pe1 gen 3: 11 → 7). That costs a little paper against rotating each page to fit, and
 buys being able to lay the sheets out and see them line up.
@@ -150,7 +150,7 @@ gen 3 is 4–9 sheets (St5 9, Pe3 8, Pe1 8, Deca 4). Under 100 ms even at 1380 f
 
 Sheets is a **second view of the Workbench page**, not a page of its own. Per-sheet
 print buttons, print-all, a preview, and the rendering settings — because shading and
-isoglosses are print decisions, not modelling ones.
+isoglosses are print decisions, not modeling ones.
 
 Sharing a document is what makes it simple: the net is already in memory, so there is
 nothing to serialise, nothing to rebuild, no format to keep in sync, and switching is
@@ -168,7 +168,7 @@ at step 0, so `createSheets` runs the replay to the end first rather than splitt
 whatever prefix happens to be on screen.
 
 Every sheet carries a **locator mini of the patch** — the Penrose tiling, not the
-development. The tiling is the picture that can be recognised; the unfolded net is a
+development. The tiling is the picture that can be recognized; the unfolded net is a
 shape nobody has seen before, so a mini of it locates nothing. The sheet's rhombi are
 filled in that sheet's colour and outlined along its cuts, with folds left out
 because at that size the outline is the information.

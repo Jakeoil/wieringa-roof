@@ -468,16 +468,16 @@ interface Rhomb {
 }
 
 // The penrose-mosaic plate palette, sampled from deca-shape-expansion.png (the
-// median of each colour family in the generation-2 Queen). Darker and far more
+// median of each color family in the generation-2 Queen). Darker and far more
 // saturated than the screen palette, and meant to be used *with* height shading and
 // isoglosses — the plate's character comes from a wide light-to-dark ramp inside
-// every tile, crossed by contour stripes, over heavy black edges. The colour alone
+// every tile, crossed by contour stripes, over heavy black edges. The color alone
 // is only a third of it.
 // Sampled from the penrose-mosaic plate (deca-shape-expansion.png, Queen gen 2).
 // These are *mid-tone* values, not medians of the whole tile: each tile on the plate
 // is a wide light-to-dark ramp, so a median is dragged toward the dark stripes and
-// comes out duller than the colour the eye reads. Taking the median hue and
-// saturation at a mid lightness gives the colour the gradient should centre on.
+// comes out duller than the color the eye reads. Taking the median hue and
+// saturation at a mid lightness gives the color the gradient should center on.
 const MOSAIC_COLORS: Record<string, string> = {
     Pe5: "#5b5b8a", // slate
     Pe3: "#9f9f46", // olive
@@ -523,11 +523,11 @@ function indexColor(idx: number): string {
 type FillMode = "none" | "cluster" | "mosaic" | "classic" | "type" | "index";
 
 /**
- * The base colour of one rhomb under a given colour mode — the single answer the
+ * The base color of one rhomb under a given color mode — the single answer the
  * workbench, the sheets and the printable map all ask for.
  *
  * It lives here because the sheets used to keep their own washed-out copy of the
- * cluster palette, so the same net came out one colour on screen and another on
+ * cluster palette, so the same net came out one color on screen and another on
  * paper. One function, one answer: what you build is what prints.
  */
 function tileFill(
@@ -565,7 +565,7 @@ interface P1Tile {
     isHeads: boolean;
     loc: Pt;
     gen: number;
-    /** the tile's height index at its centre */
+    /** the tile's height index at its center */
     ci: number;
     /** ids of the rhombs this tile emitted; empty for the star family */
     rhombIds: number[];
@@ -810,8 +810,8 @@ function expandStar(
 //   Star = five Pe1 ringed by five Pe3  — five orange diamonds inside five boats,
 //                                          around a central star-shaped gap
 //
-// Read off a real tiling rather than derived: centred on a Pe5, the neighbours at
-// radius 14.414 are exactly five Pe3; centred on an St5, radius 14.414 holds five
+// Read off a real tiling rather than derived: centered on a Pe5, the neighbors at
+// radius 14.414 are exactly five Pe3; centered on an St5, radius 14.414 holds five
 // Pe1 and radius 23.322 holds five Pe3 alongside five St3.
 //
 // The Sun's ring is precisely what Pe5's own substitution places, so the Sun is that
@@ -824,7 +824,7 @@ function expandStar(
 // offsets come from wheels[gen + 1].
 
 /** Which tenth of the t-wheel carries the extra Pe3 ring, and the height-index step
- *  to its centre. Both settled by test — see the tuning note below. */
+ *  to its center. Both settled by test — see the tuning note below. */
 // Tile orientations for the two outer rings, settled by test rather than assumed.
 //
 // The arrangement was read off a real tiling, but the *orientations* there are
@@ -852,7 +852,7 @@ function expandSun(
 ) {
     if (gen === 0) return;
 
-    // A blue star with five Queens around it. Measured from a real tiling, centred
+    // A blue star with five Queens around it. Measured from a real tiling, centered
     // on a Pe5 at tenth 0 with heads:
     //
     //   Pe3  r = |s-wheel|            dirs 18 + 72k   tenth 3 + 2k   heads   ci - 1
@@ -891,7 +891,7 @@ function expandSun(
         );
     };
 
-    // the star at the centre
+    // the star at the center
     expandPenta(Pe5, angle, isHeads, loc, gen, ci);
 
     for (let k = 0; k < 5; k++) {
@@ -912,7 +912,7 @@ function expandStarComposite(
 ) {
     if (gen === 0) return;
 
-    // Every ring placed explicitly, from a neighbourhood measured in a real tiling.
+    // Every ring placed explicitly, from a neighborhood measured in a real tiling.
     //
     // expandStar(St5) cannot supply them: it puts its *boats* at t-wheel directions
     // 270/342/54/126/198, and in a real tiling those are exactly where the Pe3 go,
@@ -920,11 +920,11 @@ function expandStarComposite(
     // the Pe3 slots with tiles that emit nothing, and no placement of the Pe3 can
     // then avoid a collision — which is why every search over its parameters failed.
     //
-    // Measured, for a centre at tenth 0 with heads and index ci:
+    // Measured, for a center at tenth 0 with heads and index ci:
     //   Pe1  s-wheel[5+2j]  tenth 2j      heads       ci - 1
     //   Pe3  t-wheel[2j]    tenth 5+2j    flipped     ci
     //   St3  t-wheel[5+2j]  tenth 5+2j    flipped     ci - 2
-    // The index deltas invert when the centre is tails, as everywhere else here.
+    // The index deltas invert when the center is tails, as everywhere else here.
     const sWheel = wheels.s[gen + 1].w;
     const tWheel = wheels.t[gen + 1].w;
     const sgn = isHeads ? 1 : -1;
@@ -943,7 +943,7 @@ function expandStarComposite(
         expandPenta(type, angFromTenth(t), heads, loc.tr(wheel[w]), gen, ci + sgn * dCi);
     };
 
-    // the star-shaped gap at the centre, which fills in from generation 2
+    // the star-shaped gap at the center, which fills in from generation 2
     expandStar(St5, angle, isHeads, loc, gen, ci);
 
     for (let j = 0; j < 5; j++) {
@@ -1044,7 +1044,7 @@ function expandDeca(
 
 // Every E_j shares z = 1/√5, so a vertex's height is (Σ n_j) · s/√5 and the
 // de Bruijn index is simply Σ n_j. Because the z components are all equal,
-// heights and dihedral angles are invariant under relabelling of j.
+// heights and dihedral angles are invariant under relabeling of j.
 type V3 = [number, number, number];
 
 const E5: V3[] = [];
@@ -1139,7 +1139,7 @@ function buildRegistries() {
 // Match every planar edge to one of five DIRECTED generator directions.
 //
 // Two traps here. As *undirected* lines the five edge directions sit 36° apart,
-// not 72°. And normalising representatives to one half-plane makes two of the
+// not 72°. And normalizing representatives to one half-plane makes two of the
 // five the negatives of the true ζ^j, which silently negates two components of
 // n. Both are avoided by building the generators as a 72°-spaced directed fan
 // from a single representative and resolving ± per edge. Which representative

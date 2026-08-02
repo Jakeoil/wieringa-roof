@@ -96,7 +96,7 @@ function buildFaces() {
     }));
 }
 
-function faceNeighbours(faces) {
+function faceNeighbors(faces) {
     const nb = new Map(faces.map((f) => [f.id, []]));
     for (const e of edgeMap.values()) {
         if (e.rhombIds.length !== 2) continue;
@@ -226,7 +226,7 @@ function placeAcross(face, P, ea, eb, hostPoly, hostVerts) {
 
 function unfold(faces, P, firstSeed = null) {
     const byId = new Map(faces.map((f) => [f.id, f]));
-    const nb = faceNeighbours(faces);
+    const nb = faceNeighbors(faces);
     const placed = new Map();
     const nets = [];
     const remaining = new Set(faces.map((f) => f.id));

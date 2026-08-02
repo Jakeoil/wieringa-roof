@@ -15,7 +15,7 @@ const svg = iconSvg({
     seed,
     gen,
     subject: "net",
-    colour: "cluster",
+    color: "cluster",
     stroke: 0,
     background: null,
     pad: 0.06,
@@ -33,5 +33,5 @@ const polys = (svg.match(/<polygon/g) ?? []).length;
 const cols = [...new Set([...svg.matchAll(/fill="(#[0-9a-f]{6})"/g)].map((m) => m[1]))];
 console.log(
     `favicon.svg: ${seed === "Deca" ? "Queen" : seed} gen ${gen} unfolded — ` +
-        `${polys} rhombs, ${cols.length} colours (${cols.join(" ")}), ${svg.length} bytes`,
+        `${polys} rhombs, ${cols.length} colors (${cols.join(" ")}), ${svg.length} bytes`,
 );

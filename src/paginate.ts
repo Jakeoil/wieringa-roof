@@ -1,4 +1,4 @@
-// Stage B: split one finished net across pages, with labelled joins.
+// Stage B: split one finished net across pages, with labeled joins.
 //
 // The net that comes out of branch-cut routing is a single connected piece, and at
 // generation 3 it is much bigger than a sheet of paper. Splitting it is not the same
@@ -13,8 +13,8 @@
 // Two facts make this tractable:
 //
 //   * The hinges form a spanning tree of the faces. Removing k tree edges gives
-//     exactly k+1 components, so **parts = cuts + 1**: minimising the number of
-//     taped joins and minimising the number of sheets are the same objective. There
+//     exactly k+1 components, so **parts = cuts + 1**: minimizing the number of
+//     taped joins and minimizing the number of sheets are the same objective. There
 //     is nothing to trade off.
 //   * All sheets share one orientation. Each page is then an axis-aligned rectangle
 //     in a fixed frame, so "does this set of faces fit" is a bounding-box test. It
@@ -356,7 +356,7 @@ export function paginateNet(
 // ── tab fitting ───────────────────────────────────────────────────
 //
 // A tab hangs into the space beyond its cut edge, and that space is often occupied:
-// the net folds back on itself, so the neighbour across the cut may be absent while
+// the net folds back on itself, so the neighbor across the cut may be absent while
 // some *other* rhombus of the same sheet sits right there. A tab drawn over it
 // obscures real work and gets cut through.
 //
@@ -371,12 +371,12 @@ const TAB_MIN_MM = 2.4; // below this there is no room for the letter; drop the 
 // apart when they were written out separately.
 //
 // Darker than it looks like it needs to be. These lines sit on white for the
-// unoccupied rhombi but on a coloured fill inside a sheet, and a grey that reads
+// unoccupied rhombi but on a colored fill inside a sheet, and a gray that reads
 // perfectly well against white all but vanishes against the fill. Chosen by
 // measuring contrast rather than by eye: 5.1 against white, 2.45 against the worst
-// sheet colour. It has to stay clearly lighter than the cuts at #333 and the border
+// sheet color. It has to stay clearly lighter than the cuts at #333 and the border
 // at #111 — a fold that competes with a cut is worse than a fold you cannot see.
-const PATCH_GREY = "#6e6e6e";
+const PATCH_GRAY = "#6e6e6e";
 
 function pageTransform(pg: Pagination, pageIndex: number, o: PageRenderOpts) {
     const page = pg.pages[pageIndex];
@@ -423,14 +423,14 @@ function safeHeight(
         ccy += m[1] / 4;
     }
 
-    const neighbours = page.faceIds
+    const neighbors = page.faceIds
         .filter((f) => f !== hostFace)
         .map((f) => placed.get(f)!.poly.map((q) => map(q as P2)));
 
     for (let h = TAB_MM; h >= TAB_MIN_MM - 1e-9; h -= 0.4) {
         const t = tabQuad(a, b, [ccx, ccy], partner, va, vb, map, h);
         let clash = false;
-        for (const nb of neighbours) {
+        for (const nb of neighbors) {
             if (intersectionArea(t.quad, nb) > 0.02) {
                 clash = true;
                 break;
@@ -488,7 +488,7 @@ function tabQuad(
     const idxB = partner.verts.indexOf(vb);
     let d: P2 = [0, 0];
     if (idxA >= 0 && idxB >= 0) {
-        // the neighbour of idxA along the rhombus that is not the shared corner
+        // the neighbor of idxA along the rhombus that is not the shared corner
         const other = (idxA + 1) % 4 === idxB ? (idxA + 3) % 4 : (idxA + 1) % 4;
         const pa = map(partner.poly[idxA] as P2);
         const po = map(partner.poly[other] as P2);
@@ -553,16 +553,16 @@ export interface PageRenderOpts {
     indexOf?: (v: number) => number;
     indexRange?: [number, number];
     // The tiling itself, for the locator mini: the planar position of a face in the
-    // Penrose patch, which is what you can actually recognise. The developed net is
+    // Penrose patch, which is what you can actually recognize. The developed net is
     // a shape nobody has seen before; the tiling is the picture on every other page.
     tilingPoly?: (faceId: number) => P2[] | null;
-    // This sheet's colour, and everyone's, so a sheet can be identified at a glance
+    // This sheet's color, and everyone's, so a sheet can be identified at a glance
     // and matched against the map.
     sheetColor?: string;
     sheetColors?: string[];
 }
 
-// Distinct, print-safe sheet colours. Spread around the hue circle at a modest
+// Distinct, print-safe sheet colors. Spread around the hue circle at a modest
 // saturation: strong enough to tell apart, pale enough to draw cut lines over.
 export function sheetPalette(n: number): string[] {
     const out: string[] = [];
@@ -657,7 +657,7 @@ export function renderPage(
     const usableW = pageW - 2 * margin;
     const usableH = pageH - 2 * margin;
 
-    // Centre this page's own bounding box inside the printable area. The rotation is
+    // Center this page's own bounding box inside the printable area. The rotation is
     // shared, so pages still relate to one another; only the offset differs.
     const cx = margin + (usableW - page.w * sideMm) / 2;
     const cy = margin + (usableH - page.h * sideMm) / 2;
@@ -781,7 +781,7 @@ export function renderPage(
                 }
                 // The label goes *outside* the cut, on a tab shaped like the start of
                 // the rhombus it joins to. Because a rhombus's adjacent angles are
-                // supplementary, truncating the neighbour at a constant height gives a
+                // supplementary, truncating the neighbor at a constant height gives a
                 // parallelogram rather than a general trapezoid — the tab really is a
                 // slice of the piece that belongs there.
                 const h = pg.tabH?.get(key) ?? TAB_MM;
@@ -810,7 +810,7 @@ export function renderPage(
                     );
                 } else {
                     // No room outside: put the label inside the rhombus instead of
-                    // drawing over a neighbour.
+                    // drawing over a neighbor.
                     const mx = (a[0] + b[0]) / 2;
                     const my = (a[1] + b[1]) / 2;
                     labels.push(
@@ -823,10 +823,10 @@ export function renderPage(
                 continue;
             }
 
-            // A hinge whose neighbour is on this page is a crease; anything else,
+            // A hinge whose neighbor is on this page is a crease; anything else,
             // including a hinge to a face that is simply absent, is a cut.
             const cr = edgeRole(va, vb, hinges, creases);
-            const neighbourHere =
+            const neighborHere =
                 cr &&
                 page.faceIds.some(
                     (g) =>
@@ -834,7 +834,7 @@ export function renderPage(
                         placed.get(g)!.verts.includes(va) &&
                         placed.get(g)!.verts.includes(vb),
                 );
-            if (cr && neighbourHere) {
+            if (cr && neighborHere) {
                 if (drawn.has(key)) continue;
                 drawn.add(key);
                 creaseLines.push(
@@ -879,7 +879,7 @@ export function renderPage(
 
     // Legend. Went missing when pagination grew its own renderer, and a sheet of
     // dashes means nothing without it: the dash pattern is the fold angle, and the
-    // colour is which way it folds.
+    // color is which way it folds.
     if (o.showLegend !== false) {
         const ly = pageH - margin + 9.5;
         let lx = margin;
@@ -920,14 +920,14 @@ export function renderPage(
 // ── the locator mini ──────────────────────────────────────────────
 //
 // A mini of the **Penrose tiling patch**, not of the unfolded net. The tiling is the
-// picture on every other page and the thing you can recognise; the development is a
+// picture on every other page and the thing you can recognize; the development is a
 // shape nobody has seen before, so a mini of it locates nothing.
 //
-// The sheet's own faces are filled in the sheet's colour and outlined with their
+// The sheet's own faces are filled in the sheet's color and outlined with their
 // cuts, which is exactly the region you are about to hold. Folds are left out: at
 // this size they are noise, and the outline is the information.
 //
-// The same colour keys the sheet list and the printable map, so a sheet, its mini
+// The same color keys the sheet list and the printable map, so a sheet, its mini
 // and its patch on the map all read as one thing.
 
 const THUMB_AREA_MM2 = 1500; // ≈ 2.3 square inches
@@ -945,7 +945,7 @@ function thumbnail(
     page: Page,
 ): string {
     const { pageW, pageH, margin, sideMm } = o;
-    const colour = o.sheetColor ?? "#6a5acd";
+    const color = o.sheetColor ?? "#6a5acd";
 
     // Tiling positions when we have them; fall back to the development otherwise.
     const shape = new Map<number, P2[]>();
@@ -1022,7 +1022,7 @@ function thumbnail(
         `<rect x="${n3(tx - 1.5)}" y="${n3(ty - 1.5)}" width="${n3(tw + 3)}" height="${n3(th + 3)}" ` +
             `fill="#fff" fill-opacity="0.92" stroke="#ddd" stroke-width="0.25"/>`,
     );
-    g.push(patchMini(pg, pageIndex, shape, placed, hinges, ekey, T, colour, k));
+    g.push(patchMini(pg, pageIndex, shape, placed, hinges, ekey, T, color, k));
     g.push(
         `<text x="${n3(tx)}" y="${n3(ty + th + 3.4)}" font-size="2.6" font-family="sans-serif" ` +
             `fill="#666">patch · sheet ${pageIndex + 1}</text>`,
@@ -1042,7 +1042,7 @@ function patchMini(
     hinges: Set<string>,
     ekey: (a: number, b: number) => string,
     T: (q: P2) => P2,
-    colour: string,
+    color: string,
     k: number,
     withFaint = true,
 ): string {
@@ -1054,7 +1054,7 @@ function patchMini(
     const wFaint = Math.max(0.08 * k, 0.1);
     const wCut = Math.max(0.16 * k, 0.22);
     const wEdge = Math.max(0.26 * k, 0.34);
-    const GREY = PATCH_GREY;
+    const GRAY = PATCH_GRAY;
 
     const faint: string[] = [];
     const mine: string[] = [];
@@ -1064,13 +1064,13 @@ function patchMini(
         if (here.has(id)) {
             mine.push(
                 // 0.70 rather than a solid fill: still unmistakably this sheet's
-                // colour, but light enough that the fold lines on top of it read.
-                `<polygon points="${poly}" fill="${colour}" fill-opacity="0.7" ` +
+                // color, but light enough that the fold lines on top of it read.
+                `<polygon points="${poly}" fill="${color}" fill-opacity="0.7" ` +
                     `stroke="none"/>`,
             );
         } else if (withFaint) {
             faint.push(
-                `<polygon points="${poly}" fill="none" stroke="${GREY}" stroke-width="${n3(wFaint)}"/>`,
+                `<polygon points="${poly}" fill="none" stroke="${GRAY}" stroke-width="${n3(wFaint)}"/>`,
             );
         }
     }
@@ -1109,7 +1109,7 @@ function patchMini(
             `<line x1="${n3(a[0])}" y1="${n3(a[1])}" x2="${n3(b[0])}" y2="${n3(b[1])}" ` +
             `stroke="${col}" stroke-width="${n3(w)}" stroke-linecap="round"/>`;
         if (e.n === 1) border.push(line("#111", wEdge));
-        else if (e.hinge) folds.push(line(GREY, wFaint));
+        else if (e.hinge) folds.push(line(GRAY, wFaint));
         else cuts.push(line("#333", wCut));
     }
 
@@ -1117,7 +1117,7 @@ function patchMini(
 }
 
 /**
- * The printable map: the whole patch with every sheet in its own colour. Before you
+ * The printable map: the whole patch with every sheet in its own color. Before you
  * cut it says how the patch will be divided; after, it says which piece is which.
  */
 export function renderMap(
@@ -1128,7 +1128,7 @@ export function renderMap(
     o: PageRenderOpts,
 ): string {
     const { pageW, pageH, margin } = o;
-    const colours = o.sheetColors ?? sheetPalette(pg.pages.length);
+    const colors = o.sheetColors ?? sheetPalette(pg.pages.length);
     const shape = new Map<number, P2[]>();
     let x0 = Infinity;
     let y0 = Infinity;
@@ -1165,17 +1165,17 @@ export function renderMap(
             `font-weight="bold" fill="#111">Map — ${pg.pages.length} sheets</text>`,
     );
 
-    // every face faint, then each sheet in its colour, then each sheet's outline
+    // every face faint, then each sheet in its color, then each sheet's outline
     for (const [, pts] of shape) {
         const d = pts.map(T).map((q) => `${n3(q[0])},${n3(q[1])}`).join(" ");
         out.push(
-            `<polygon points="${d}" fill="none" stroke="${PATCH_GREY}" ` +
+            `<polygon points="${d}" fill="none" stroke="${PATCH_GRAY}" ` +
                 `stroke-width="${n3(Math.max(0.06 * k, 0.12))}"/>`,
         );
     }
     pg.pages.forEach((page, i) => {
         out.push(
-            patchMini(pg, i, shape, placed, hinges, ekey, T, colours[i % colours.length], k, false),
+            patchMini(pg, i, shape, placed, hinges, ekey, T, colors[i % colors.length], k, false),
         );
         // sheet number at the centroid of its region
         let cx = 0;

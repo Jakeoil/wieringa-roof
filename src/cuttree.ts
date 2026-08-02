@@ -24,7 +24,7 @@ import {
     intersectionArea,
     FACE_AREA,
     AREA_EPS,
-    analysePatch,
+    analyzePatch,
     placeSeed,
     placeAcross,
     ekey,
@@ -487,15 +487,15 @@ function enforceSaddles(
     return cuts;
 }
 
-// ── layers: continuation, not colouring ───────────────────────────
+// ── layers: continuation, not coloring ───────────────────────────
 //
 // The branch-cut picture taken literally. Where the development wants to wrap over
 // itself you do not have to cut — you can go up a z coordinate, which in complex
 // analysis is the next sheet of the Riemann surface and here is the next sheet of
 // paper.
 //
-// The obvious way to assign layers is to colour the overlap graph, and that is what
-// this did first. It minimises the *number* of layers, which turns out to be the
+// The obvious way to assign layers is to color the overlap graph, and that is what
+// this did first. It minimizes the *number* of layers, which turns out to be the
 // wrong objective: the promoted faces are individually chosen, so the upper layers
 // come out as scattered single rhombi. A sheet of confetti, optimal in a statistic
 // nobody cares about.
@@ -561,7 +561,7 @@ export function assignLayers(
     for (const id of order) {
         // Stay with the parent whenever possible — that is what keeps a layer
         // connected, and it is the whole point of continuation rather than
-        // colouring.
+        // coloring.
         const p = parentFace?.get(id);
         const home = p == null ? 0 : layer.get(p)!;
         let L: number;
@@ -626,7 +626,7 @@ function flattenByCutting(
 }
 
 // The reverse move, and the one that was missing. When two overlapping faces are
-// neighbours in the tiling across an edge that is currently *cut*, they reached
+// neighbors in the tiling across an edge that is currently *cut*, they reached
 // their positions by different routes and collided. Forcing that edge to be a
 // hinge makes overlap between them impossible — they become rigidly adjacent.
 //
@@ -699,7 +699,7 @@ export interface CutTreeResult extends UnfoldResult {
 
 export function cutTreeUnfold(opts: CutTreeOptions = {}): CutTreeResult {
     const t0 = Date.now();
-    const A = analysePatch(opts.flip);
+    const A = analyzePatch(opts.flip);
 
     // The budget is a *cap*, not a cost: the search returns the moment it reaches
     // zero overlaps, which almost every patch does in a fraction of it. So it has
@@ -808,7 +808,7 @@ export function cutTreeUnfold(opts: CutTreeOptions = {}): CutTreeResult {
         if (!pairs.length) break;
         const [x, y] = pairs[Math.floor(rnd() * pairs.length)];
 
-        // If the pair are tiling neighbours across a cut, try making that cut a
+        // If the pair are tiling neighbors across a cut, try making that cut a
         // hinge. It is the sharpest move available: it removes this overlap by
         // construction rather than hoping a reroute happens to separate them.
         const px = cur.dev.placed.get(x)!;

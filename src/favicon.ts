@@ -4,7 +4,7 @@
 // browser tab is produced by exactly the code that previews it — an icon that
 // disagrees with its preview is worse than no preview.
 //
-// At sixteen pixels almost nothing survives except silhouette and colour, so the
+// At sixteen pixels almost nothing survives except silhouette and color, so the
 // defaults drop strokes and lean on the cluster palette. The unfolding of a small
 // patch is a good subject precisely because it is *sparse*: Queen generation 1 fills
 // only 47% of its own bounding box, and that spidery outline still reads when the
@@ -25,7 +25,7 @@ export interface IconOpts {
     gen: number;
     /** "net" unfolds the patch; "tiling" uses the flat Penrose patch */
     subject: "net" | "tiling";
-    colour: "cluster" | "mosaic" | "classic" | "type" | "index" | "mono";
+    color: "cluster" | "mosaic" | "classic" | "type" | "index" | "mono";
     /** stroke width as a fraction of a rhomb edge; 0 for none */
     stroke: number;
     strokeColor: string;
@@ -41,7 +41,7 @@ export const ICON_DEFAULTS: IconOpts = {
     seed: "Deca",
     gen: 1,
     subject: "net",
-    colour: "cluster",
+    color: "cluster",
     stroke: 0,
     strokeColor: "#111111",
     background: null,
@@ -55,7 +55,7 @@ const CLUSTER: Record<string, string> = {
     Pe3: "#d8d15e",
     Pe1: "#e39a5c",
 };
-const INDEX_COLOURS = ["#2f6fb5", "#54a598", "#d9b463", "#c4643f"];
+const INDEX_COLORS = ["#2f6fb5", "#54a598", "#d9b463", "#c4643f"];
 
 type P2 = [number, number];
 
@@ -69,12 +69,12 @@ function subjectPolys(o: IconOpts): Array<{ poly: P2[]; fill: string }> {
 
     const out: Array<{ poly: P2[]; fill: string }> = [];
     const fillFor = (cluster: string, thick: boolean, lowIndex: number): string => {
-        if (o.colour === "mono") return "#333333";
-        if (o.colour === "mosaic") return MOSAIC_COLORS[cluster] ?? "#888888";
-        if (o.colour === "classic") return MOSAIC_CLASSIC[cluster] ?? "#888888";
-        if (o.colour === "type") return thick ? "#6f6fd0" : "#e39a5c";
-        if (o.colour === "index") {
-            return INDEX_COLOURS[Math.min(3, Math.max(0, lowIndex - 1))];
+        if (o.color === "mono") return "#333333";
+        if (o.color === "mosaic") return MOSAIC_COLORS[cluster] ?? "#888888";
+        if (o.color === "classic") return MOSAIC_CLASSIC[cluster] ?? "#888888";
+        if (o.color === "type") return thick ? "#6f6fd0" : "#e39a5c";
+        if (o.color === "index") {
+            return INDEX_COLORS[Math.min(3, Math.max(0, lowIndex - 1))];
         }
         return CLUSTER[cluster] ?? "#bbbbbb";
     };
@@ -126,8 +126,8 @@ export function iconSvg(opts: Partial<IconOpts> = {}): string {
         return { pts, fill: p.fill };
     });
 
-    // One square frame, the subject centred inside it. A favicon is square whatever
-    // the shape is, so fit the longer side and centre the other.
+    // One square frame, the subject centered inside it. A favicon is square whatever
+    // the shape is, so fit the longer side and center the other.
     const S = o.size;
     const inner = S * (1 - 2 * o.pad);
     const w = x1 - x0 || 1;

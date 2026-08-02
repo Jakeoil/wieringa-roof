@@ -10,7 +10,7 @@
 //
 // Restoring is deliberately forgiving. A saved value from an older build may name a
 // method or a mode that no longer exists, so every field is validated on the way in
-// and anything unrecognised falls back to the default rather than wedging the page.
+// and anything unrecognized falls back to the default rather than wedging the page.
 
 export function loadPrefs<T extends object>(key: string, fallback: T): T {
     try {

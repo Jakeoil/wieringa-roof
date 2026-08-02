@@ -115,12 +115,12 @@ const THICK_COLOR = new THREE.Color(0x8f8fdc);
 const THIN_COLOR = new THREE.Color(0xe2b184);
 
 // The penrose-mosaic plate palette, sampled from deca-shape-expansion.png. Darker
-// and more saturated than the screen colours, and meant to be seen with the height
+// and more saturated than the screen colors, and meant to be seen with the height
 // shading on — the plate's depth comes from a wide ramp inside each tile.
 const MOSAIC_3D: Record<string, THREE.Color> = Object.fromEntries(
     Object.entries(MOSAIC_COLORS).map(([k, v]) => [k, new THREE.Color(v)]),
 );
-// penrose-mosaic's start-up colours. Very saturated next to everything else here,
+// penrose-mosaic's start-up colors. Very saturated next to everything else here,
 // which is what makes them the classic look rather than a variant of it.
 const CLASSIC_3D: Record<string, THREE.Color> = Object.fromEntries(
     Object.entries(MOSAIC_CLASSIC).map(([k, v]) => [k, new THREE.Color(v)]),
@@ -206,7 +206,7 @@ function build(reframe: boolean): void {
             ? idxLo + idxHi - vertexList[vid].index
             : vertexList[vid].index;
         // −1 at the lowest vertex, +1 at the highest, 0 at mid-height, so the middle
-        // of the range keeps its own colour and only the extremes move.
+        // of the range keeps its own color and only the extremes move.
         const t = ((idx - idxLo) / span - 0.5) * 2;
         const k = shadeAmt * Math.abs(t) * 0.55;
         return c.clone().lerp(t >= 0 ? WHITE : BLACK, k);
@@ -225,7 +225,7 @@ function build(reframe: boolean): void {
             } else if (mode === "type") {
                 c = f.thick ? THICK_COLOR : THIN_COLOR;
             } else if (mode === "index") {
-                // colour by actual height, so flipping recolours too
+                // color by actual height, so flipping recolors too
                 const idx = flip ? idxLo + idxHi - vertexList[vid].index : vertexList[vid].index;
                 c = INDEX_COLORS[Math.min(3, Math.max(0, idx - 1))];
             } else {

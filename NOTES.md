@@ -227,7 +227,7 @@ St5 at generation 1 emits no rhombs, which is correct. But with no vertices the
 bounding sphere has radius 0, so the framing distance is 0 and
 `camera.position.normalize()` on a zero vector returns **NaN** — after which every
 frame is NaN and the view never recovers, whatever you select next. The 3D page now
-recognises an empty patch, says so, and leaves the camera alone.
+recognizes an empty patch, says so, and leaves the camera alone.
 
 ### Seed order is load-bearing
 
@@ -517,8 +517,8 @@ the result is.
 > A **net** is one connected unfolded piece.
 > The **cut tree** is the set of edges cut to produce it; over several nets, a
 > **cut forest**.
-> *Find a cut forest whose every component unfolds overlap-free, minimising the
-> number of connected components, and secondarily minimising orphans — the tiny
+> *Find a cut forest whose every component unfolds overlap-free, minimizing the
+> number of connected components, and secondarily minimizing orphans — the tiny
 > one- and two-rhomb pieces.*
 
 Hard constraint: each component overlap-free. Objective: fewest components. Tie
@@ -545,7 +545,7 @@ exactly the edges bounding the angular-defect wedges.
 Measured at generations 2–4: widened ribbons put 80–90% of a patch into one piece
 but leave many slivers; BFS gets fewer components overall but more of them big
 enough to be real work; strips are provably overlap-free at any length yet need
-5× the pieces. None of them optimises anything — they are all first-fit.
+5× the pieces. None of them optimizes anything — they are all first-fit.
 
 `src/sheet.ts` already does Stage B mechanically: `layoutSheets` shelf-packs and
 `renderSheet` draws at true size. What it lacks is the ability to *split* a net
@@ -624,7 +624,7 @@ around it form a cycle in the dual, and a forest has none — and the tree's
 branches run from interior vertices out to the boundary. They are branch cuts in
 the sense of `log` and `√`.
 
-So connectivity stops being something to optimise: it is guaranteed by
+So connectivity stops being something to optimize: it is guaranteed by
 construction, and the only remaining problem is overlap. That is a far better
 shaped search, because *every* candidate is already a valid one-piece net and can
 be graded by a count rather than a yes/no.

@@ -77,7 +77,7 @@ function rhombohedron(acute) {
             faces.push([off, add(off, a), add(add(off, a), b), add(off, b)]);
         }
     }
-    // centre it
+    // center it
     const mid = mul(add(add(v[0], v[1]), v[2]), 0.5);
     return faces.map((f) => f.map((q) => sub(q, mid)));
 }
@@ -100,7 +100,7 @@ function render(faces, opts) {
         const c = pts.reduce((s, q) => add(s, q), [0, 0, 0]).map((x) => x / 4);
         const n3 = norm(cross(sub(f[1], f[0]), sub(f[3], f[0])));
         const outward = dot(n3, f[0].map ? f[0] : n3) >= 0 ? n3 : mul(n3, -1);
-        return { pts, depth: c[2], n: outward, centre: c };
+        return { pts, depth: c[2], n: outward, center: c };
     });
 
     // convex: keep only faces whose outward normal points at the camera

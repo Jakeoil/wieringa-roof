@@ -1,4 +1,4 @@
-// Utilities page. Currently the icon designer; a place for colourings and settings
+// Utilities page. Currently the icon designer; a place for colorings and settings
 // to accumulate as they are wanted.
 
 import { seedTypes } from "./geometry.js";
@@ -14,7 +14,7 @@ const prefs = loadPrefs(PREFS_KEY, {
     seed: ICON_DEFAULTS.seed,
     gen: ICON_DEFAULTS.gen,
     subject: ICON_DEFAULTS.subject as string,
-    colour: ICON_DEFAULTS.colour as string,
+    color: ICON_DEFAULTS.color as string,
     background: "",
     stroke: ICON_DEFAULTS.stroke,
     strokeColor: ICON_DEFAULTS.strokeColor,
@@ -25,7 +25,7 @@ const prefs = loadPrefs(PREFS_KEY, {
 const seedSel = el<HTMLSelectElement>("seed");
 const genSel = el<HTMLSelectElement>("gen");
 const subjectSel = el<HTMLSelectElement>("subject");
-const colourSel = el<HTMLSelectElement>("colour");
+const colorSel = el<HTMLSelectElement>("color");
 const bgSel = el<HTMLSelectElement>("bg");
 const strokeIn = el<HTMLInputElement>("stroke");
 const padIn = el<HTMLInputElement>("pad");
@@ -51,7 +51,7 @@ seedSel.value = prefs.seed;
 if (!seedSel.value) seedSel.value = ICON_DEFAULTS.seed;
 genSel.value = String(prefs.gen);
 subjectSel.value = prefs.subject;
-colourSel.value = prefs.colour;
+colorSel.value = prefs.color;
 bgSel.value = prefs.background;
 strokeIn.value = String(prefs.stroke);
 strokeColSel.value = prefs.strokeColor;
@@ -64,7 +64,7 @@ function current(size: number): Partial<IconOpts> {
         seed: seedSel.value,
         gen: Number(genSel.value),
         subject: subjectSel.value as IconOpts["subject"],
-        colour: colourSel.value as IconOpts["colour"],
+        color: colorSel.value as IconOpts["color"],
         background: bgSel.value || null,
         stroke: Number(strokeIn.value),
         strokeColor: strokeColSel.value,
@@ -94,11 +94,11 @@ function draw(): void {
     el<HTMLElement>("status").textContent =
         `${nameOf(seedSel.value)} generation ${genSel.value}, ` +
         `${subjectSel.value === "net" ? "unfolded" : "flat"} — ${polys} rhombs, ` +
-        `${cols.size} colour${cols.size === 1 ? "" : "s"}, ${svg.length} bytes. ` +
+        `${cols.size} color${cols.size === 1 ? "" : "s"}, ${svg.length} bytes. ` +
         `Build ${BUILD_ID}.`;
 }
 
-for (const c of [seedSel, genSel, subjectSel, colourSel, bgSel, strokeColSel]) {
+for (const c of [seedSel, genSel, subjectSel, colorSel, bgSel, strokeColSel]) {
     c.addEventListener("change", draw);
 }
 for (const c of [strokeIn, padIn, rotIn]) {
@@ -133,7 +133,7 @@ function persist(): void {
         seed: seedSel.value,
         gen: Number(genSel.value),
         subject: subjectSel.value,
-        colour: colourSel.value,
+        color: colorSel.value,
         background: bgSel.value,
         stroke: Number(strokeIn.value),
         strokeColor: strokeColSel.value,

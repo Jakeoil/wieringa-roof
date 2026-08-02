@@ -141,7 +141,7 @@ export function renderSheet(
 ): string {
     const { pageW, pageH, margin } = o;
 
-    // centre the placed block within the usable area
+    // center the placed block within the usable area
     let usedW = 0;
     let usedH = 0;
     for (const pl of sheet.placements) {
