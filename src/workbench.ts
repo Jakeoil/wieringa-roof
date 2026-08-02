@@ -24,8 +24,6 @@ import {
     convexOverlap,
     shrink,
     ekey,
-    unfoldPatch,
-    ribbonGrowPatch,
 } from "./unfold.js";
 import { cutTreeUnfold, assignLayers } from "./cuttree.js";
 import {
@@ -1546,8 +1544,6 @@ let syncButtons: () => void = () => {};
 // True only while paginateBest is running, which is the yellow light on the sheets
 // button. Pagination is synchronous, so the paint has to happen before it starts.
 let sheetsBusy = false;
-// The Side box in the shared bar; the Sheets view mirrors it.
-let sharedSideInput: HTMLInputElement | null = null;
 /** Report the side on the Sheets view, which reads it but does not set it. */
 function showSide(): void {
     const out = document.getElementById("sheet-side");
@@ -3052,7 +3048,6 @@ function buildControls() {
     sideLabel.style.fontSize = "13px";
     sideLabel.appendChild(sideInput);
     shared.appendChild(sideLabel);
-    sharedSideInput = sideInput;
 
     // Layer selector. Hidden unless the net actually needs more than one, so it
     // stays out of the way on everything up to generation 3, which is one sheet.
