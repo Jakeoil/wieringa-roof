@@ -5,6 +5,18 @@ the project *is*; this is what we have argued about and what is still unsettled.
 
 ---
 
+## Preferences reset on every build
+
+Settings are stored with the build id that wrote them, and a different build starts
+from the defaults. Field-by-field validation catches a value whose *type* changed but
+not one whose *meaning* moved — a mode that no longer exists, a key renamed from
+colour to color, a generation that now means one more than it did. Those restore
+silently and wrongly, and the symptom is a page misbehaving for one person and nobody
+else. While the pages are still changing shape, losing a few dial positions on deploy
+is the cheaper mistake.
+
+---
+
 ## House style
 
 **American spellings, everywhere.** `color` not colour, `center` not centre, `gray`

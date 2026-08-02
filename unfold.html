@@ -363,16 +363,17 @@ All nine are here: the three <span class="mono">Pe</span> pentagons, the
 <span class="mono">St</span> star, boat and diamond, and the three composites
 <strong>Queen</strong>, <strong>Sun</strong> and <strong>Star</strong>. The patch
 controls stay live while watching, so you can switch seed or generation mid-replay;
-doing so starts the search again. Changing the patch on P1/P3 does not run a search,
+doing so starts the search again. Changing the patch on <strong>Penta vs Rhombs</strong>
+        does not run a search,
 since there is no net on screen there to route.
 
 </div>
     </details>
 
     <div class="viewtabs">
-        <button id="tab-work" aria-current="true">Workbench</button>
+        <button id="tab-work" aria-current="true">Tiling vs Net</button>
         <button id="tab-sheets">Sheets</button>
-        <button id="tab-p1">P1 / P3</button>
+        <button id="tab-p1">Penta vs Rhombs</button>
         <span class="info" id="tabnote"></span>
     </div>
 
@@ -414,16 +415,18 @@ since there is no net on screen there to route.
         </div>
         <div class="workspace" id="p1-panels">
             <div class="panel">
-                <h3>P1 — pentagons, stars, boats, diamonds</h3>
+                <h3>Pentas — pentagons, stars, boats, diamonds</h3>
                 <canvas id="p1canvas" width="500" height="500"></canvas>
             </div>
             <div class="panel" id="p3-panel">
-                <h3>P3 — the rhombs they produce</h3>
+                <h3>Rhombs — the tiles they produce</h3>
                 <canvas id="p3canvas" width="500" height="500"></canvas>
             </div>
         </div>
         <div class="note" style="margin-top:18px;max-width:900px">
-            Every rhomb belongs to exactly one P1 tile. The tiles that emit <em>no</em>
+            The pentagons are Penrose's <span class="mono">P1</span> tiling and the
+            rhombs are <span class="mono">P3</span>; every rhomb belongs to exactly one
+            penta tile. The tiles that emit <em>no</em>
             rhombs — stars, boats and diamonds — are the <strong>gaps</strong>, and they
             are invisible on the right precisely because they produce nothing. They are
             drawn on the left dashed, because those are the places a composite can be

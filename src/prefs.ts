@@ -11,13 +11,28 @@
 // Restoring is deliberately forgiving. A saved value from an older build may name a
 // method or a mode that no longer exists, so every field is validated on the way in
 // and anything unrecognized falls back to the default rather than wedging the page.
+//
+// Beyond that, **a new build starts from the defaults.** The stored build id is
+// checked first, and settings saved by any other build are dropped whole. While the
+// pages are still changing shape this is the honest behaviour: field-by-field
+// validation catches a value that changed type, but not one whose *meaning* moved —
+// a mode that no longer exists, a key renamed from colour to color, a generation
+// that now means one more than it did. Those restore silently and wrongly, and the
+// symptom is a page that behaves oddly for one person and nobody else. Losing a few
+// dial positions on deploy is much the cheaper mistake.
+
+import { BUILD_ID } from "./build-id.js";
+
+/** Written alongside the settings; not part of any page's own preferences. */
+const BUILD_FIELD = "__build";
 
 export function loadPrefs<T extends object>(key: string, fallback: T): T {
     try {
         const raw = localStorage.getItem(key);
         if (!raw) return { ...fallback };
-        const got = JSON.parse(raw) as Partial<T>;
+        const got = JSON.parse(raw) as Partial<T> & { __build?: string };
         if (!got || typeof got !== "object") return { ...fallback };
+        if (got[BUILD_FIELD] !== BUILD_ID) return { ...fallback };
         // Only keys the default knows about, and only if the type still matches.
         const out = { ...fallback };
         for (const k of Object.keys(fallback) as Array<keyof T>) {
@@ -34,7 +49,10 @@ export function loadPrefs<T extends object>(key: string, fallback: T): T {
 
 export function savePrefs<T extends object>(key: string, value: T): void {
     try {
-        localStorage.setItem(key, JSON.stringify(value));
+        localStorage.setItem(
+            key,
+            JSON.stringify({ ...value, [BUILD_FIELD]: BUILD_ID }),
+        );
     } catch {
         // Private browsing, a full quota — not worth breaking the page over.
     }
