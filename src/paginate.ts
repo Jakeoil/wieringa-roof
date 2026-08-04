@@ -548,6 +548,13 @@ export interface PageRenderOpts {
     // Which way up to render. The slider decides, except that a flat setting carries
     // no hills-or-dales information, so rendering falls back to hills.
     dales?: boolean;
+    // Drawn for the underside of the sheet. Shading is structural, so hills and dales
+    // cannot exchange on their own: seen from below a mountain is a valley, and the
+    // crease colors have to turn over with the shading or the sheet contradicts
+    // itself. `dales` carries the height half of that (it also carries the slider's
+    // own flip, which is a different thing and not undone here); this carries the
+    // fold half.
+    backside?: boolean;
     // Height index per tiling vertex, and the range, so paginate need not import the
     // tiling itself.
     indexOf?: (v: number) => number;
@@ -597,11 +604,24 @@ function hslHex(h: number, s: number, l: number): string {
     return `#${hx(rgb[0])}${hx(rgb[1])}${hx(rgb[2])}`;
 }
 
-// Light-to-dark along the height gradient. Kept at full strength for print: the
-// screen slider may be set shallow for looking at, but a printed sheet either shows
-// the relief legibly or should not bother.
-function shadeStops(fill: string): [string, string] {
-    return [mixHex(fill, "#ffffff", 0.5), mixHex(fill, "#000000", 0.4)];
+// Dark-to-light along the height gradient — structural shading, so a hill is light
+// and folds as a mountain, a dale is dark and folds as a valley. Kept at full
+// strength for print: the screen slider may be set shallow for looking at, but a
+// printed sheet either shows the relief legibly or should not bother.
+//
+// The ramp is **absolute**, fixed by the patch's whole index range rather than by
+// each tile's own two extremes. Per-tile stops made a tile spanning 1→3 print
+// identically to one spanning 2→4, so the shading said only which way a face tilted
+// and nothing about how high it sat — the same defect the canvas ramp was rebuilt to
+// fix, which the print never got.
+function shadeAt(
+    fill: string,
+    index: number,
+    idxLo: number,
+    idxHi: number,
+): string {
+    const t = Math.max(0, Math.min(1, (index - idxLo) / (idxHi - idxLo || 1)));
+    return mixHex(mixHex(fill, "#000000", 0.4), mixHex(fill, "#ffffff", 0.5), t);
 }
 
 function mixHex(a: string, b: string, t: number): string {
@@ -732,7 +752,8 @@ export function renderPage(
                     if (vidx[t] < vidx[cLo]) cLo = t;
                     if (vidx[t] > vidx[cHi]) cHi = t;
                 }
-                const [s0, s1] = shadeStops(base);
+                const s0 = shadeAt(base, vidx[cLo], idxLo, idxHi);
+                const s1 = shadeAt(base, vidx[cHi], idxLo, idxHi);
                 const gid = `g${scope}_${fid}`;
                 defs.push(
                     `<linearGradient id="${gid}" gradientUnits="userSpaceOnUse" ` +
@@ -837,9 +858,10 @@ export function renderPage(
             if (cr && neighborHere) {
                 if (drawn.has(key)) continue;
                 drawn.add(key);
+                const mountain = o.backside ? !cr.mountain : cr.mountain;
                 creaseLines.push(
                     `<line x1="${n3(a[0])}" y1="${n3(a[1])}" x2="${n3(b[0])}" y2="${n3(b[1])}" ` +
-                        `stroke="${cr.mountain ? M_COLOR : V_COLOR}" stroke-width="0.28" ` +
+                        `stroke="${mountain ? M_COLOR : V_COLOR}" stroke-width="0.28" ` +
                         `stroke-dasharray="${DASH[cr.fold] ?? "2 2"}"/>`,
                 );
             } else {

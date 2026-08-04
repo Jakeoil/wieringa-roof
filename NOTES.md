@@ -30,6 +30,32 @@ Also: **"Mathematics"**, never "The Maths".
 
 ---
 
+## Shading is structural
+
+Shading depicts height, and height decides the folds, so the two can never disagree.
+The rule, in one line:
+
+> **A hill is light and folds as a mountain; a dale is dark and folds as a valley.**
+
+Two consequences, both of which were wrong until this was written down:
+
+- **The ramp runs dark at the low index to light at the high one.** The 3D page had
+  always shaded that way; the workbench canvas and the printed sheets ran the other
+  way, which put every red mountain crease in the darkest tiles and every blue valley
+  in the lightest. A sheet lit from underneath, and it was found the only way such
+  things are found — by folding one.
+- **"Back side" turns over both halves.** Seen from below a ridge is a trough, so
+  inverting the shading without inverting the crease colors makes the underside
+  contradict itself. `dales` carries the height half, `backside` the fold half.
+
+The ramp is also **absolute** across the patch's whole index range rather than
+normalized per tile — otherwise a rhombus rising 1→3 draws identically to one rising
+2→4, and the shading says only which way a face tilts, never how high it sits. The
+canvas was rebuilt for this once; the print kept the per-tile version for a while
+longer.
+
+---
+
 ## Naming and vocabulary
 
 **Penrose vertex figures.** Conway named the seven vertex figures of the P2

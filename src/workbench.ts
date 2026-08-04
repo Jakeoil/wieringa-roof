@@ -199,12 +199,18 @@ function extremeCorners(idx: number[]): [number, number] {
     return [lo, hi];
 }
 
+// Shading is structural, so it has to agree with the creases: a hill is light and
+// carries mountain folds, a dale is dark and carries valleys. The ramp used to run
+// the other way — light at the low index, dark at the high one — which put every red
+// mountain in the darkest tiles and every blue valley in the lightest. That reads as
+// a relief lit from underneath, and it contradicted the 3D page, which has always
+// shaded high toward white.
 function shadeOf(fill: string, index: number): string {
     const span = idxHi - idxLo || 1;
     const t = Math.max(0, Math.min(1, (index - idxLo) / span));
-    // shadeDepth 0 leaves the tile flat; 1 is the full light-to-dark range
-    const lo = lerpColor(fill, "#ffffff", 0.55 * shadeDepth);
-    const hi = lerpColor(fill, "#000000", 0.42 * shadeDepth);
+    // shadeDepth 0 leaves the tile flat; 1 is the full dark-to-light range
+    const lo = lerpColor(fill, "#000000", 0.42 * shadeDepth);
+    const hi = lerpColor(fill, "#ffffff", 0.55 * shadeDepth);
     return lerpColor(lo, hi, t);
 }
 
@@ -2013,6 +2019,9 @@ function sheetOpts(sheet = 0) {
         // A flat height setting carries no hills-or-dales information, so rendering
         // falls back to hills; Back side swaps whatever that came to.
         dales: renderBackside ? !(shadeDepth !== 0 && flipHeight) : shadeDepth !== 0 && flipHeight,
+        // …and swaps mountain for valley with it. Turning the sheet over turns the
+        // whole reading over, shading and folds together.
+        backside: renderBackside,
         indexOf: (v: number) => vertexList[v]?.index ?? 1,
         indexRange: [idxLo, idxHi] as [number, number],
         tilingPoly,
