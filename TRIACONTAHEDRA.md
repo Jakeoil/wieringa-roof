@@ -569,10 +569,12 @@ zero gaps on Deca. Cluster with a tolerance before quoting these numbers again.*
    exactly φ³ everywhere (§5.4). Is φ³ attained only between same-side pairs, or also
    between a hat and a bowl? The centers form a point set of their own — is it a
    quasi-lattice, and which one?
-2a. **Why does a solid one axis away never hold two faces?** Partly answered in §5E: the long-diagonal minimum?** Partial solids come as
-   close as 1.7013 (§5C) and never closer, on both patches measured. That is the
-   golden rhombus's own long diagonal, which cannot be a coincidence; a two-line
-   proof probably exists and would pin the structure of the overlapping family.
+2a. **Why does a solid one axis away never hold a second face?** This is the residue
+   of §5E. The long-diagonal minimum reduces to it exactly: separations of 1 and
+   1.0515 are permitted by the lattice, permitted by the index window, and occur
+   between real centers — yet the nearer solid always ends up with exactly one face,
+   in every pair of every patch measured. Settle this and the minimum separation is a
+   theorem rather than an observation.
 3. **What is the material between the solids?** The roof is the boundary of a layer
    of the two golden rhombohedra (NOTES.md, "The rhombohedra are the real
    components"), and 10 + 10 of them make a triacontahedron. The complete caps
