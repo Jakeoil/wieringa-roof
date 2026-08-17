@@ -404,6 +404,103 @@ That reframes §5.4 rather than contradicting it: *completion* is what forces
 separation. A solid that shows the roof all ten of its available faces has claimed
 enough space that no other complete solid can come nearer than φ³.
 
+## 5E. Why the overlap minimum is the long diagonal
+
+Half answered, and the half that is answered also explains the missing group sizes.
+
+### It is not a lattice fact
+
+Both centers are all-odd points of the six-axis half-lattice, so their difference is
+`Σ k_i a_i` with `k ∈ Z⁶` — an ordinary lattice vector. That lattice contains vectors
+much shorter than 1.7013: a single axis has length **1**, and `a_i − a_j` with
+`a_i·a_j = +1/√5` has length **1.0515**, the golden rhombus's *short* diagonal. Both
+occur between real centers. Counting over **all** candidate centers, Deca gen 3:
+
+```
+separation 1.000000  ×685      k = a single axis
+separation 1.051462  ×180      k = ±a_i ∓ a_j        (short diagonal)
+separation 1.701302  ×1375     k = ±a_i ± a_j        (long diagonal)
+```
+
+So nothing forbids the shorter separations. The minimum is a fact about *which
+solids hold two or more faces*, not about where centers may sit.
+
+### What actually happens
+
+Break the same pairs down by how many faces each solid carries:
+
+| separation | face counts (min, max) seen |
+|---|---|
+| 1.000000 | 1,1 · 1,2 · 1,3 · 1,4 · 1,5 |
+| 1.051462 | 1,1 · 1,2 |
+| **1.701302** | 1,1 · 1,2 … **2,2 · 2,3 · 2,4 · 2,5 · 2,10 · 5,5** |
+
+**At both shorter separations, one of the two solids always has exactly one face** —
+every pair, both patches. A solid that close to a populated one can only ever pick up
+a single face, so it never counts as a solid at all. The long diagonal is simply the
+shortest separation at which *both* can be populated.
+
+And the minimal pairs have a clean signature: of the 290 long-diagonal pairs among
+≥2-face solids at Deca gen 3, **0 share a face and 290 share a roof vertex.** Two
+triacontahedra at the minimum separation are two solids meeting the roof at one
+common point.
+
+### The mechanism, as far as it goes: the index window
+
+This part is proved, and it is worth more than the minimum-separation question.
+
+Write `M = Σ_{i<5} m_i`, and let `T = Σ_{i ∉ {j,k}, i<5} σ_i` for a candidate face of
+orientation `{j,k}`. Computed over all ten orientations, **T is a constant of the
+rhomb type and the side**:
+
+| side | thick (\|Δj\|=1) | thin (\|Δj\|=2) |
+|---|---|---|
+| roof above the center (bowl) | T = +3 | T = +1 |
+| roof below the center (hat) | T = −3 | T = −1 |
+
+The face's low corner has index `(M − 2 − T)/2` up to the patch's global offset. A
+rhombus spans three index levels and **the roof has only four**, so the low corner
+must be 1 or 2 — exactly two admissible values — while thick and thin differ by one
+level. Therefore every solid falls into one of three classes per side:
+
+```
+thick only   →  at most 5 faces
+thick + thin →  up to 10          ← the only class that can complete
+thin only    →  at most 5 faces
+```
+
+Verified exactly. Deca gen 3, the six `(M, m₅)` classes partition with no leakage:
+
+```
+M=−1 m₅=−1   105 solids   sizes {1,2,3,4,5}   T {−3}       thick only
+M=+1 m₅=−1   104 solids   sizes {1,2,5,10}    T {−3,−1}    both  ← hats complete here
+M=+3 m₅=−1    95 solids   sizes {1,2}         T {−1}       thin only
+M=+3 m₅=+1    80 solids   sizes {1,2}         T {+1}       thin only
+M=+5 m₅=+1    99 solids   sizes {1,2,5,10}    T {+1,+3}    both  ← bowls complete here
+M=+7 m₅=+1    93 solids   sizes {1,2,3,4,5}   T {+3}       thick only
+```
+
+Equivalently in heights: a face centroid can only sit at two levels, and a hat's two
+tangency bands are `0.7236` and `1.1708` below its center, so a hat center takes one
+of exactly **three** heights, `1/√5` apart — the −0.2764 / 0.1708 / 0.6180 seen
+throughout §4.
+
+**This is most of the answer to the 6–9 gap.** A solid outside the middle class can
+draw on five orientations at most, full stop. Only the middle class can exceed five,
+and there the tiling supplies the whole Pe5 rosette and its ring together (§5.2). The
+residue — why the middle class never lands on 6, 7, 8 or 9 — still needs the vertex
+figures and is not settled here.
+
+### Still open
+
+The index window does not by itself forbid the shorter separations: a shift by one
+axis moves a solid to an adjacent height class, and a short-diagonal shift keeps it in
+the *same* class, and in both cases the neighbor could in principle hold two faces. It
+does not, in any patch measured. **That last step is empirical, not proved.** The
+right next move is probably to work out which face of a neighbor solid survives —
+the same orientation on the neighbor is the original face translated by `a_t`, so the
+question reduces to when that translate is present in the tiling.
+
 ## 5D. Stellation, glimpsed
 
 Deferred, but the supporting-plane column of §5A already shows why it will pay.
@@ -472,7 +569,7 @@ zero gaps on Deca. Cluster with a tolerance before quoting these numbers again.*
    exactly φ³ everywhere (§5.4). Is φ³ attained only between same-side pairs, or also
    between a hat and a bowl? The centers form a point set of their own — is it a
    quasi-lattice, and which one?
-2a. **Why is the overlap minimum exactly the long diagonal?** Partial solids come as
+2a. **Why does a solid one axis away never hold two faces?** Partly answered in §5E: the long-diagonal minimum?** Partial solids come as
    close as 1.7013 (§5C) and never closer, on both patches measured. That is the
    golden rhombus's own long diagonal, which cannot be a coincidence; a two-line
    proof probably exists and would pin the structure of the overlapping family.
