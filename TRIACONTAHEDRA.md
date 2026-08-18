@@ -545,6 +545,13 @@ zero gaps on Deca. Cluster with a tolerance before quoting these numbers again.*
 - **A common center does not imply a solid.** Concurrences occur at r/ρ = 1/φ³, √5,
   3, φ³ and beyond, all in `Z[φ]`, and all of them coincidental — their tangency
   sets never exceed five faces. Only r = ρ builds anything.
+- **A cross-check must not be statistical when it can be exact.** Check 8 in
+  `tools/centers.mjs` first asserted that ρ is the *most common* equal radius. True
+  on every real patch, and it failed on St1 gen 2 — three rhombi, one concurrence,
+  which happened to land at ρ/φ³. The check was wrong, not the geometry. It now
+  asserts set equality instead: the pairs the ρ-free pass finds at ρ are exactly the
+  co-solid pairs of check 7. That is a stronger claim *and* it is well defined on a
+  three-rhomb patch, where 0 = 0.
 - **The two candidate centers of a face are a set, not a labeled pair.** A sign
   error in the `σ_i` while deriving §3 swapped which center was called "above" per
   face and produced *identical* group statistics, because both signs are enumerated
@@ -667,12 +674,30 @@ should say so loudly rather than quietly).
 
 ### 8.4 Implementation
 
-New module `src/centers.ts`, pure geometry, no three.js:
+New module `src/centers.ts`, pure geometry, no three.js. **Built — see the order of
+work.** What it exports:
 
+```ts
+const A6: V3[]            // the six icosahedral axes, the five roof generators + e_z
+const RHO: number         // √(1 + 2/√5)
+function centerOf(m: number[]): V3
+
+interface Solid { id; m: number[]; c: V3; faces: number[]; thick; hat; complete }
+interface Face  { id; vids; c: V3; u: V3; pair: [number, number]; thick;
+                  solids: [number, number] }
+interface Centers { solids; faces; byRhomb; residual }
+
+function triacontahedra(): Centers          // reads the current patch, like roof3d.ts
+function assignLargestFirst(c): number[]    // a policy, deliberately not in the above
+function pe5Rosettes(): number[]
 ```
-interface Solid { m: number[]; c: V3; faces: number[]; side: 1 | -1; complete: boolean }
-function triacontahedra(): Solid[]
-```
+
+`hat` rather than `side: 1 | -1`, because "the center is below its faces" is what the
+caller actually wants to ask and the sign convention is an implementation detail —
+and a solid never shows the roof faces from both sides, so one face settles it.
+`assignLargestFirst` is separate because a face lies on two solids and nothing in the
+geometry prefers either: any single-valued coloring is a choice, and it should not be
+able to pass for a fact.
 
 built on `computeLift()` / `pos3D()` from `geometry.ts` exactly as `roof3d.ts` does,
 using the **integer** center of §3 so grouping is a `Map` keyed on
@@ -765,9 +790,12 @@ Card copy:
 
 ### 8.6 Order of work
 
-1. `src/centers.ts` + `tools/centers.mjs`, with the seven checks passing on all
-   27 seed/generation combinations, plus the agnostic cross-check to generation 3.
-   Nothing visual yet — if the checks fail the page is not worth building.
+1. ~~`src/centers.ts` + `tools/centers.mjs`~~ **done.** All eight checks pass on all
+   27 seed/generation combinations, to 16,475 rhombi, in 0.8 s. Residual runs
+   6.7e-16 to 3.0e-14; complete solids equal Pe5 rosettes everywhere; the ρ-free
+   pass recovers the co-solid pairs exactly (`425/425 at ρ` on Pe5 gen 3,
+   `2793/2793` on Pe3 gen 4) and is skipped above 1300 faces where O(F²) stops being
+   worth it. `node tools/centers.mjs`.
 2. Lift `triacontahedron()` into a shared module; `polyhedra3d.ts` uses it from there.
 3. `centers.html` + `src/centers3d.ts`: roof, centers, complete solids, group
    coloring — **and the wiring of §8.5 in the same step**, so the page is reachable
