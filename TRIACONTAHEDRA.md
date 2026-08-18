@@ -274,6 +274,45 @@ a triacontahedron has one face per orientation per side. Groups are usually but
 Pe3 gen 4 are split into pieces. A solid can show the roof two separated scraps of
 itself.
 
+### The nine makeups, and what a patch is entitled to classify
+
+Jeff's objection, and it was right: a solid can be short because the tiling is short
+there, or because the rhombi that would have closed it were cut off, and only the
+first is a class. A solid is **settled** when its whole ten-face footprint lies inside
+the patch — its ten candidate faces are fixed by its integer coordinates, so the
+question is answerable. Holes are a different matter and count as genuine absences:
+this generator draws rhombi from the P1 pentagons alone, so every star, boat and
+diamond leaves a gap, at a density that does not fall with generation (Sun: 35 gaps at
+gen 2, 240 at gen 3, 1665 at gen 4, against 365, 2440 and 16475 rhombi). **The rhomb
+layer is a permanently partial tiling, not an approximation to a complete one**, and a
+solid truncated by a gap is honestly truncated.
+
+*A test that was nearly circular, recorded so it is not repeated: requiring all forty
+corners of the ten candidate faces to be patch vertices reports that every settled
+solid is complete. Of course it does — that is very close to requiring the faces
+themselves. Use the outline, not the corners.*
+
+Settled classes, Sun gen 4 (14,516 of 14,886 solids settled):
+
+| class | makeup | count |
+|---|---|---|
+| 1 | 1T · 1t | 6235 · 2585 |
+| 2 | 2t · 2T | 1840 · **70** |
+| 3 | 3T | 995 |
+| 4 | 4T | 565 |
+| 5 | 3T+2t · 5T | 1315 · 240 |
+| 10 | 5T+5t | **671 = the Pe5 rosette count exactly** |
+
+**Only nine makeups ever occur.** No `1T+1t`, no `2T+1t`, no `3T+1t` — thick and thin
+mix only at `5=3T+2t` and at the complete ten. Class 2 is real, against the guess that
+it might not be, and it is overwhelmingly two *thin*.
+
+Projected to the plane the ten faces tile a **decagon** exactly — five thick round the
+pole in a Pe5 rosette, five thin filling the notches, 16 corners, area ratio
+1.000000000. So a class is a picture, which is what the page draws. The arrangements
+are nearly rigid too: each makeup has one pattern up to rotation, except `2=2t` and
+`3=3T`, which have two.
+
 ### Face classes, and the orphans
 
 Give each face the size of the larger of its two solids — which is what largest-first

@@ -22,8 +22,11 @@ import { loadPrefs, savePrefs, resetPrefs } from "./prefs.js";
 import { BUILD_ID } from "./build-id.js";
 import { seedTypes, generatePatch, allRhombs, vertexList } from "./geometry.js";
 import { buildRoof } from "./roofgeom.js";
+import { LineSegments2 } from "three/addons/lines/LineSegments2.js";
+import { LineSegmentsGeometry } from "three/addons/lines/LineSegmentsGeometry.js";
+import { LineMaterial } from "three/addons/lines/LineMaterial.js";
 import { createRoofView, CLUSTER_3D, CLUSTER_FALLBACK, PLAIN_COLOR } from "./roofview.js";
-import { triacontahedra, assignLargestFirst, pe5Rosettes, A6, RHO } from "./centers.js";
+import { triacontahedra, assignLargestFirst, pe5Rosettes, A6, RHO, CLASSES } from "./centers.js";
 import type { Solid } from "./centers.js";
 import { zonohedron, faceOutward, PHI } from "./solids.js";
 import type { V3 } from "./solids.js";
@@ -56,8 +59,8 @@ const nlenInput = el<HTMLInputElement>("nlen");
 const nlenOut = el<HTMLElement>("nlenOut");
 const sscaleInput = el<HTMLInputElement>("sscale");
 const sscaleOut = el<HTMLElement>("sscaleOut");
-const minInput = el<HTMLInputElement>("minsize");
-const minOut = el<HTMLElement>("minsizeOut");
+const unsettledChk = el<HTMLInputElement>("unsettled");
+const classBar = el<HTMLElement>("classbar");
 const sideSel = el<HTMLSelectElement>("side");
 const pickEl = el<HTMLElement>("pick");
 const markersChk = el<HTMLInputElement>("markers");
@@ -74,13 +77,20 @@ const PREF_DEFAULTS = {
     normals: false,
     nlen: Math.sqrt(1 + 2 / Math.sqrt(5)),
     sscale: 1,
-    minsize: 10,
     side: "both",
+    unsettled: false,
+    classOn: CLASSES.map((c) => c === 10),
+    classSize: CLASSES.map(() => 1),
     solids: true,
     markers: true,
     shade: true,
 };
 const prefs = loadPrefs(PREFS_KEY, PREF_DEFAULTS);
+
+// Twelve controls, built rather than written out: a checkbox and a size slider per
+// class, each carrying its own color so the bar doubles as the legend.
+interface ClassCtl { on: HTMLInputElement; size: HTMLInputElement; count: HTMLElement }
+const classCtl: ClassCtl[] = [];
 
 const rv = createRoofView(view);
 
@@ -164,7 +174,11 @@ const BALL_POS = BALL.getAttribute("position").array as ArrayLike<number>;
 
 // ── build ─────────────────────────────────────────────────────────
 
+/** LineMaterial needs the viewport in pixels, and needs telling when it changes. */
+let normalMats: LineMaterial[] = [];
+
 function build(reframe: boolean): void {
+    normalMats = [];
     const seedIdx = seedTypes.findIndex((s) => s.label === patchSel.value);
     const gen = Number(genSel.value);
     const t0 = performance.now();
@@ -219,17 +233,22 @@ function build(reframe: boolean): void {
     const complete = cen.solids.filter((s) => s.complete);
     const nlen = Number(nlenInput.value);
     const sscale = Number(sscaleInput.value);
-    const minSize = Number(minInput.value);
     const side = sideSel.value;
+    const wantUnsettled = unsettledChk.checked;
     last = { faces: d.faces };
 
     // One filter, applied to everything: markers, shells and normals all mean "the
     // solids currently under consideration", and having them disagree would make the
-    // picture impossible to read. At ten only the complete solids survive, which is
-    // where the page opens.
-    const passes = (s: Solid): boolean =>
-        s.faces.length >= minSize &&
-        (side === "both" || (side === "hat") === s.hat);
+    // picture impossible to read.
+    const classIdx = (n: number) => CLASSES.indexOf(n);
+    const passes = (s: Solid): boolean => {
+        const i = classIdx(s.faces.length);
+        if (i < 0 || !classCtl[i].on.checked) return false;
+        if (!s.settled && !wantUnsettled) return false;
+        return side === "both" || (side === "hat") === s.hat;
+    };
+    /** how big to draw this class's solids, 0 for not at all */
+    const sizeOf = (s: Solid) => Number(classCtl[classIdx(s.faces.length)].size.value) * sscale;
     const shown = cen.solids.filter(passes);
 
     // The normals themselves. Each face sends a segment both ways — above the map and
@@ -258,19 +277,29 @@ function build(reframe: boolean): void {
                 col.push(c.r, c.g, c.b, c.r, c.g, c.b);
             }
         }
-        const ng = new THREE.BufferGeometry();
-        ng.setAttribute("position", new THREE.Float32BufferAttribute(seg, 3));
-        ng.setAttribute("color", new THREE.Float32BufferAttribute(col, 3));
-        rv.add(
-            new THREE.LineSegments(
-                ng,
-                new THREE.LineBasicMaterial({
-                    vertexColors: true,
-                    transparent: true,
-                    opacity: 0.75,
-                }),
-            ),
-        );
+        // LineBasicMaterial ignores linewidth in WebGL — every normal came out one
+        // device pixel, which at devicePixelRatio 2 is half a CSS pixel and reads as
+        // gray haze rather than as a pencil of lines. LineSegments2 draws them as
+        // camera-facing quads, so a width in pixels means something. Same reasoning
+        // as the edges on polyhedra.html.
+        if (seg.length) {
+            const ng = new LineSegmentsGeometry();
+            ng.setPositions(seg);
+            ng.setColors(col);
+            const nm = new LineMaterial({
+                vertexColors: true,
+                linewidth: 2.1,
+                worldUnits: false,
+                alphaToCoverage: true,
+                transparent: true,
+                opacity: 0.92,
+            });
+            nm.resolution.set(view.clientWidth, view.clientHeight);
+            normalMats.push(nm);
+            const nl = new LineSegments2(ng, nm);
+            nl.renderOrder = 2;
+            rv.add(nl);
+        }
     }
 
     // The solids themselves. Only the complete ones: a partial group names a real
@@ -282,24 +311,23 @@ function build(reframe: boolean): void {
         const cols: number[] = [];
         const lines: number[] = [];
         for (const s of shown) {
+            const t = sizeOf(s);
+            if (t <= 0) continue;
             const p = place(s.c);
             const col = solidColor(s);
             for (let i = 0; i < RT_TRIS.length; i += 3) {
                 tris.push(
-                    RT_TRIS[i] * sscale + p[0],
-                    RT_TRIS[i + 1] * sscale + p[1],
-                    RT_TRIS[i + 2] * sscale + p[2],
+                    RT_TRIS[i] * t + p[0],
+                    RT_TRIS[i + 1] * t + p[1],
+                    RT_TRIS[i + 2] * t + p[2],
                 );
                 cols.push(col.r, col.g, col.b);
             }
             for (let i = 0; i < RT_EDGES.length; i += 3) {
-                lines.push(
-                    RT_EDGES[i] * sscale + p[0],
-                    RT_EDGES[i + 1] * sscale + p[1],
-                    RT_EDGES[i + 2] * sscale + p[2],
-                );
+                lines.push(RT_EDGES[i] * t + p[0], RT_EDGES[i + 1] * t + p[1], RT_EDGES[i + 2] * t + p[2]);
             }
         }
+        if (tris.length) {
         const sg = new THREE.BufferGeometry();
         sg.setAttribute("position", new THREE.Float32BufferAttribute(tris, 3));
         sg.setAttribute("color", new THREE.Float32BufferAttribute(cols, 3));
@@ -331,6 +359,7 @@ function build(reframe: boolean): void {
                 }),
             ),
         );
+        }
     }
 
     // A marker at every center that holds two faces or more. A center claimed by a
@@ -343,7 +372,7 @@ function build(reframe: boolean): void {
         for (const s of shown) {
             drawnMarkers++;
             const p = place(s.c);
-            const r = 0.05 + 0.022 * s.faces.length;
+            const r = (0.05 + 0.022 * s.faces.length) * Math.max(0.35, sizeOf(s));
             const col = solidColor(s);
             for (let i = 0; i < BALL_POS.length; i += 3) {
                 pts.push(
@@ -454,6 +483,15 @@ function build(reframe: boolean): void {
         cls[n] = (cls[n] ?? 0) + 1;
     }
     const clsText = CLASS_ORDER.filter((k) => cls[k]).map((k) => `${k}:${cls[k]}`).join(" ");
+    // how many solids of each class the patch is entitled to classify
+    const perClass = CLASSES.map(() => 0);
+    let unsettledCount = 0;
+    for (const s of cen.solids) {
+        if (!s.settled) { unsettledCount++; if (!wantUnsettled) continue; }
+        const i = CLASSES.indexOf(s.faces.length);
+        if (i >= 0) perClass[i]++;
+    }
+    CLASSES.forEach((_, i) => { classCtl[i].count.textContent = String(perClass[i]); });
     const hats = complete.filter((s) => s.hat).length;
     const pe5 = pe5Rosettes().length;
     const onCap = new Set<number>();
@@ -466,7 +504,9 @@ function build(reframe: boolean): void {
         `${complete.length === pe5 ? "" : ` ⚠ against ${pe5} Pe5 rosettes`} · ` +
         `${onCap.size} of ${allRhombs.length} faces on a complete cap ` +
         `(${((100 * onCap.size) / allRhombs.length).toFixed(0)}%) · ` +
-        `showing ${shown.length} · face classes ${clsText}` +
+        `showing ${shown.length} of ${cen.solids.length - (wantUnsettled ? 0 : unsettledCount)} classifiable ` +
+        `(${unsettledCount} edge-truncated${wantUnsettled ? ", included" : ", held back"}) · ` +
+        `face classes ${clsText}` +
         `${cls[1] ? ` — ${cls[1]} orphan${cls[1] === 1 ? "" : "s"}, all on the boundary` : ""} · ` +
         `normals ${(nlen / RHO).toFixed(2)}ρ · ${ms} ms`;
 }
@@ -505,27 +545,59 @@ flipChk.checked = prefs.flip;
 normalsChk.checked = prefs.normals;
 nlenInput.value = String(prefs.nlen);
 sscaleInput.value = String(prefs.sscale);
-minInput.value = String(prefs.minsize);
 sideSel.value = prefs.side;
+unsettledChk.checked = prefs.unsettled;
 if (!sideSel.value) sideSel.value = PREF_DEFAULTS.side;
 edgesChk.checked = prefs.edges;
 solidsChk.checked = prefs.solids;
 markersChk.checked = prefs.markers;
 shadeChk.checked = prefs.shade;
 
+// One row per class: a colored checkbox and a size slider, plus a live count. The bar
+// is the legend as well as the control — a color that means "class 3" is no use if
+// you have to look elsewhere to learn it.
+CLASSES.forEach((n, i) => {
+    const wrap = document.createElement("span");
+    wrap.className = "cls";
+    const top = document.createElement("label");
+    top.className = "top";
+    const on = document.createElement("input");
+    on.type = "checkbox";
+    on.checked = prefs.classOn[i] ?? n === 10;
+    const sw = document.createElement("span");
+    sw.className = "swatch";
+    sw.style.background = `#${CLASS_COLORS[n].getHexString()}`;
+    const name = document.createElement("span");
+    name.textContent = String(n);
+    top.append(on, sw, name);
+    const size = document.createElement("input");
+    size.type = "range";
+    size.min = "0";
+    size.max = "1";
+    size.step = "0.01";
+    size.value = String(prefs.classSize[i] ?? 1);
+    size.title = `How big to draw class ${n} solids`;
+    const count = document.createElement("span");
+    count.className = "count";
+    wrap.append(top, size, count);
+    classBar.appendChild(wrap);
+    classCtl.push({ on, size, count });
+    on.addEventListener("change", () => rebuild(false));
+    size.addEventListener("input", () => rebuild(false));
+});
+
 function rebuild(reframe: boolean): void {
     const nl = Number(nlenInput.value);
     nlenOut.textContent = `${(nl / RHO).toFixed(2)}ρ`;
     sscaleOut.textContent = `${Number(sscaleInput.value).toFixed(2)}×`;
-    minOut.textContent = `≥ ${minInput.value}`;
     rv.clear();
     build(reframe);
 }
 for (const c of [patchSel, genSel]) c.addEventListener("change", () => rebuild(true));
-for (const c of [colorSel, sideSel, flipChk, edgesChk, normalsChk, solidsChk, markersChk, shadeChk]) {
+for (const c of [colorSel, sideSel, flipChk, edgesChk, normalsChk, solidsChk, markersChk, shadeChk, unsettledChk]) {
     c.addEventListener("change", () => rebuild(false));
 }
-for (const c of [nlenInput, sscaleInput, minInput]) {
+for (const c of [nlenInput, sscaleInput]) {
     c.addEventListener("input", () => rebuild(false));
 }
 // Only the landing snaps, as on the 3D page's vertical slider. Dragging is free —
@@ -551,8 +623,10 @@ function persist(): void {
         normals: normalsChk.checked,
         nlen: Number(nlenInput.value),
         sscale: Number(sscaleInput.value),
-        minsize: Number(minInput.value),
         side: sideSel.value,
+        unsettled: unsettledChk.checked,
+        classOn: classCtl.map((c) => c.on.checked),
+        classSize: classCtl.map((c) => Number(c.size.value)),
         solids: solidsChk.checked,
         markers: markersChk.checked,
         shade: shadeChk.checked,
@@ -569,7 +643,10 @@ el<HTMLButtonElement>("reset").addEventListener("click", () => {
     }
 });
 
-window.addEventListener("resize", () => rv.resize());
+window.addEventListener("resize", () => {
+    rv.resize();
+    for (const m of normalMats) m.resolution.set(view.clientWidth, view.clientHeight);
+});
 
 // Picking. The surface is non-indexed with two triangles per rhombus, so a hit's
 // faceIndex >> 1 is the face's position in the build's own list — no separate index

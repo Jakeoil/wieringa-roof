@@ -67,6 +67,9 @@ export function centerOf(m: number[]): V3 {
 
 // ── types ─────────────────────────────────────────────────────────
 
+/** The six class sizes that occur. There are no others, at any patch or generation. */
+export const CLASSES = [1, 2, 3, 4, 5, 10];
+
 export interface Solid {
     id: number;
     /** six odd integers; the solid's identity, and the key it is grouped by */
@@ -84,6 +87,20 @@ export interface Solid {
     /** all ten available faces present: a whole triacontahedron, and always exactly
      *  the five thick rhombi of one Pe5 tile plus the five thin ones ringing them */
     complete: boolean;
+    /**
+     * True when the solid's whole ten-face footprint lies inside the patch, so its
+     * count is a **class** and not merely a lower bound.
+     *
+     * An unsettled solid may be short only because the rhombi that would have closed
+     * it were cut off, and there is no way to tell from this patch which. Holes are a
+     * different matter and are counted as the genuine absences they are: this
+     * generator draws rhombi from the P1 pentagons alone, so every star, boat and
+     * diamond leaves a gap, at a density that does not fall with generation. A solid
+     * truncated by a gap is honestly truncated.
+     */
+    settled: boolean;
+    /** e.g. `"5=3T+2t"`. Only nine of these ever occur — see TRIACONTAHEDRA.md. */
+    makeup: string;
 }
 
 export interface Face {
@@ -110,6 +127,86 @@ export interface Centers {
     /** largest residual between the integer center and the geometric one. A real
      *  number rather than an assertion so callers can report it; it runs ~2e-15. */
     residual: number;
+}
+
+// ── the ten candidate faces, and whether the patch can see them all ───
+
+/** The ten roof-facing orientations, with the upward normal of each. */
+const ORI = (() => {
+    const out: Array<{ j: number; k: number; u: V3; thick: boolean }> = [];
+    for (let j = 0; j < 5; j++) {
+        for (let k = j + 1; k < 5; k++) {
+            let u = norm(cross(A6[j], A6[k]));
+            if (u[2] < 0) u = mul(u, -1);
+            out.push({ j, k, u, thick: Math.min((j - k + 5) % 5, (k - j + 5) % 5) === 1 });
+        }
+    }
+    return out;
+})();
+
+/**
+ * The ten faces the solid `m` *could* show the roof, as lattice corners — present or
+ * not. Reading them off the integer coordinates rather than searching the tiling is
+ * what makes the settled test possible at all: you cannot ask whether a face is
+ * missing until you know where it would have been.
+ */
+function candidateCorners(m: number[]): Array<{ thick: boolean; corners: number[][] }> {
+    const sz = Math.sign(m[5]);
+    return ORI.map(({ j, k, u, thick }) => {
+        const n = new Array<number>(5);
+        for (let i = 0; i < 5; i++) {
+            n[i] =
+                i === j || i === k
+                    ? (m[i] - 1) / 2
+                    : (m[i] - (Math.sign(dot(mul(u, sz), A6[i])) || 1)) / 2;
+        }
+        const bump = (a: number[], i: number): number[] => {
+            const c = a.slice();
+            c[i]++;
+            return c;
+        };
+        return { thick, corners: [n, bump(n, j), bump(bump(n, j), k), bump(n, k)] };
+    });
+}
+
+type P2 = [number, number];
+const planar = (n: number[]): P2 => {
+    const p = pos3D(n);
+    return [p[0], p[1]];
+};
+
+/** Convex hull, counter-clockwise. The patch outline stands in for its outer boundary:
+ *  holes are interior to it, which is exactly right, since a gap is a real absence. */
+function convexHull(pts: P2[]): P2[] {
+    const p = [...pts].sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+    const crs2 = (o: P2, a: P2, b: P2) =>
+        (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]);
+    const half = (q: P2[]): P2[] => {
+        const h: P2[] = [];
+        for (const x of q) {
+            while (h.length > 1 && crs2(h[h.length - 2], h[h.length - 1], x) <= 0) h.pop();
+            h.push(x);
+        }
+        return h;
+    };
+    const lo = half(p);
+    const hi = half([...p].reverse());
+    lo.pop();
+    hi.pop();
+    return lo.concat(hi);
+}
+
+/** Signed distance into a counter-clockwise hull; negative outside. */
+function hullDepth(h: P2[], q: P2): number {
+    let best = Infinity;
+    for (let i = 0; i < h.length; i++) {
+        const a = h[i];
+        const b = h[(i + 1) % h.length];
+        const L = Math.hypot(b[0] - a[0], b[1] - a[1]);
+        const d = ((b[0] - a[0]) * (q[1] - a[1]) - (b[1] - a[1]) * (q[0] - a[0])) / L;
+        if (d < best) best = d;
+    }
+    return best;
 }
 
 // ── the construction ──────────────────────────────────────────────
@@ -194,6 +291,8 @@ export function triacontahedra(): Centers {
                     thick: 0,
                     hat: cc[2] < c[2],
                     complete: false,
+                    settled: false,
+                    makeup: "",
                 };
                 byKey.set(key, s);
                 solids.push(s);
@@ -216,7 +315,30 @@ export function triacontahedra(): Centers {
         byRhomb[r.id] = f;
     }
 
-    for (const s of solids) s.complete = s.faces.length === 10;
+    // Settledness. The cheap disc test decides almost every solid — only the ones
+    // straddling the outline need their forty corners looked at individually.
+    const hull = convexHull(faces.flatMap((f) => f.vids.map((v) => planar(lift.n[v]!))));
+    const FOOTPRINT = Math.max(
+        ...candidateCorners(solids[0]?.m ?? [1, 1, 1, 1, 1, 1]).flatMap((c) =>
+            c.corners.map((n) => {
+                const q = planar(n);
+                const c0 = solids[0] ? solids[0].c : [0, 0, 0];
+                return Math.hypot(q[0] - c0[0], q[1] - c0[1]);
+            }),
+        ),
+    );
+    for (const s of solids) {
+        s.complete = s.faces.length === 10;
+        const t = s.faces.filter((fid) => byRhomb[fid].thick).length;
+        s.makeup = `${s.faces.length}=${t}T+${s.faces.length - t}t`;
+        const d = hullDepth(hull, [s.c[0], s.c[1]]);
+        s.settled =
+            d >= FOOTPRINT ||
+            (d > 0 &&
+                candidateCorners(s.m).every((c) =>
+                    c.corners.every((n) => hullDepth(hull, planar(n)) > 1e-9),
+                ));
+    }
 
     return { solids, faces, byRhomb, residual };
 }
