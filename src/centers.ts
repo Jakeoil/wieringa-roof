@@ -102,6 +102,19 @@ export interface Solid {
     settled: boolean;
     /** e.g. `"5=3T+2t"`. Only nine of these ever occur — see TRIACONTAHEDRA.md. */
     makeup: string;
+    /**
+     * How many faces call this solid **home** — that is, have it as the larger of
+     * their two.
+     *
+     * Zero means a **nail head**: every face touching it is better explained by the
+     * solid on its other side. Every face necessarily names two centers, so a solid
+     * holding one face is usually just the far end of a normal whose point is
+     * somewhere else, and counting those as a class is double counting. Measured, it
+     * is not a small effect: 99.9% of one-face solids are nail heads, a complete cap
+     * generates ten of them, and over home solids alone class 3 vanishes entirely
+     * while classes 1 and 2 fall towards nothing.
+     */
+    homeCount: number;
 }
 
 export interface Face {
@@ -123,6 +136,9 @@ export interface Face {
 export interface Centers {
     solids: Solid[];
     faces: Face[];
+    /** rhomb id → the solid it calls home, the larger of its two. Ties go to
+     *  whichever was built first, which is arbitrary and affects only ties. */
+    home: number[];
     /** rhomb id → its Face. Rhomb ids are dense from 0, so this is an array. */
     byRhomb: Face[];
     /** largest residual between the integer center and the geometric one. A real
@@ -353,6 +369,7 @@ export function triacontahedra(): Centers {
                     complete: false,
                     settled: false,
                     makeup: "",
+                    homeCount: 0,
                 };
                 byKey.set(key, s);
                 solids.push(s);
@@ -380,6 +397,14 @@ export function triacontahedra(): Centers {
     const vpos = new Map<number, P2>();
     lift.n.forEach((nv, id) => { if (nv) vpos.set(id, planar(nv)); });
     const inside = insideTest(vpos);
+    // Home before settledness, so the two can be read together.
+    const home: number[] = [];
+    for (const f of faces) {
+        const [a, b] = f.solids;
+        home[f.id] = solids[a].faces.length >= solids[b].faces.length ? a : b;
+    }
+    for (const id of home) if (id !== undefined) solids[id].homeCount++;
+
     for (const s of solids) {
         s.complete = s.faces.length === 10;
         const t = s.faces.filter((fid) => byRhomb[fid].thick).length;
@@ -396,34 +421,21 @@ export function triacontahedra(): Centers {
         });
     }
 
-    return { solids, faces, byRhomb, residual };
+    return { solids, faces, byRhomb, home, residual };
 }
 
 // ── policies, kept visibly separate from the geometry ──────────────
 
 /**
- * One solid per face, largest group first.
+ * Rhomb id → the solid it calls home. Just `Centers.home`, kept as a function because
+ * that is how the page asked for it first.
  *
  * A face lies on exactly two solids and nothing in the geometry prefers either, so
- * any single-valued coloring of the roof is a *choice*. This is the obvious one and
- * it is not canonical: it covers a patch with far more solids than the complete caps
- * alone, and ties are broken by whatever order `solids` happens to be in. Kept out of
- * `triacontahedra()` so that it cannot be mistaken for a fact about the roof.
- *
- * Returns rhomb id → solid id.
+ * any single-valued coloring of the roof is a *choice*. Taking the larger of the two
+ * is the obvious one, and it is what makes "nail head" definable at all.
  */
 export function assignLargestFirst(cen: Centers): number[] {
-    const out: number[] = [];
-    const taken = new Set<number>();
-    const order = [...cen.solids].sort((a, b) => b.faces.length - a.faces.length);
-    for (const s of order) {
-        for (const fid of s.faces) {
-            if (taken.has(fid)) continue;
-            taken.add(fid);
-            out[fid] = s.id;
-        }
-    }
-    return out;
+    return cen.home;
 }
 
 /** The Pe5 tiles of the P1 layer that emitted a full five-rhomb rosette. Every one

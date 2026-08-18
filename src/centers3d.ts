@@ -60,6 +60,7 @@ const nlenOut = el<HTMLElement>("nlenOut");
 const sscaleInput = el<HTMLInputElement>("sscale");
 const sscaleOut = el<HTMLElement>("sscaleOut");
 const unsettledChk = el<HTMLInputElement>("unsettled");
+const headsChk = el<HTMLInputElement>("heads");
 const classBar = el<HTMLElement>("classbar");
 const sideSel = el<HTMLSelectElement>("side");
 const pickEl = el<HTMLElement>("pick");
@@ -79,6 +80,7 @@ const PREF_DEFAULTS = {
     sscale: 1,
     side: "both",
     unsettled: false,
+    heads: false,
     classOn: CLASSES.map((c) => c === 10),
     classSize: CLASSES.map(() => 1),
     solids: true,
@@ -235,6 +237,7 @@ function build(reframe: boolean): void {
     const sscale = Number(sscaleInput.value);
     const side = sideSel.value;
     const wantUnsettled = unsettledChk.checked;
+    const wantHeads = headsChk.checked;
     last = { faces: d.faces };
 
     // One filter, applied to everything: markers, shells and normals all mean "the
@@ -245,6 +248,11 @@ function build(reframe: boolean): void {
         const i = classIdx(s.faces.length);
         if (i < 0 || !classCtl[i].on.checked) return false;
         if (!s.settled && !wantUnsettled) return false;
+        // A solid no face calls home is the far end of a normal whose point is
+        // elsewhere — a nail head. Every face names two centers, so these are made by
+        // the construction rather than found in the roof, and they outnumber the real
+        // solids four to one. Counting them as classes is double counting.
+        if (s.homeCount === 0 && !wantHeads) return false;
         return side === "both" || (side === "hat") === s.hat;
     };
     /** how big to draw this class's solids, 0 for not at all */
@@ -256,17 +264,31 @@ function build(reframe: boolean): void {
     // a marker of its own color and the pencils belonging to one solid arrive
     // together. Past ρ they carry on through, which is the point: normals meet at
     // other radii too, and none of those builds anything.
+    const heads: V3[] = [];
     if (normalsChk.checked && nlen > 0) {
         const seg: number[] = [];
         const col: number[] = [];
         for (const rf of cen.faces) {
             const p = place(rf.c);
             const u: V3 = [rf.u[0], rf.u[1], rf.u[2] * zsign];
+            const homeId = cen.home[rf.id];
             for (const [dir, sid] of [
                 [1, rf.solids[0]],
                 [-1, rf.solids[1]],
             ] as Array<[number, number]>) {
-                if (!passes(cen.solids[sid])) continue;
+                if (!passes(cen.solids[sid])) {
+                    // The other end of a normal whose point is shown gets a small
+                    // white head, so a nail reads as a nail: you can see which end
+                    // means something and which is only the far side of the same face.
+                    if (sid !== homeId && passes(cen.solids[homeId])) {
+                        heads.push([
+                            p[0] + u[0] * nlen * dir,
+                            p[1] + u[1] * nlen * dir,
+                            p[2] + u[2] * nlen * dir,
+                        ]);
+                    }
+                    continue;
+                }
                 const c = solidColor(cen.solids[sid]);
                 seg.push(
                     p[0], p[1], p[2],
@@ -299,6 +321,31 @@ function build(reframe: boolean): void {
             const nl = new LineSegments2(ng, nm);
             nl.renderOrder = 2;
             rv.add(nl);
+        }
+        if (heads.length) {
+            const hp: number[] = [];
+            const R = 0.055;
+            for (const h of heads) {
+                for (let i = 0; i < BALL_POS.length; i += 3) {
+                    hp.push(BALL_POS[i] * R + h[0], BALL_POS[i + 1] * R + h[1], BALL_POS[i + 2] * R + h[2]);
+                }
+            }
+            const hg = new THREE.BufferGeometry();
+            hg.setAttribute("position", new THREE.Float32BufferAttribute(hp, 3));
+            hg.computeVertexNormals();
+            rv.add(
+                new THREE.Mesh(
+                    hg,
+                    new THREE.MeshStandardMaterial({
+                        color: 0xffffff,
+                        emissive: 0x8a8f9a,
+                        emissiveIntensity: 0.35,
+                        roughness: 0.35,
+                        metalness: 0,
+                        flatShading: true,
+                    }),
+                ),
+            );
         }
     }
 
@@ -486,8 +533,10 @@ function build(reframe: boolean): void {
     // how many solids of each class the patch is entitled to classify
     const perClass = CLASSES.map(() => 0);
     let unsettledCount = 0;
+    let headCount = 0;
     for (const s of cen.solids) {
         if (!s.settled) { unsettledCount++; if (!wantUnsettled) continue; }
+        if (s.homeCount === 0) { headCount++; if (!wantHeads) continue; }
         const i = CLASSES.indexOf(s.faces.length);
         if (i >= 0) perClass[i]++;
     }
@@ -504,8 +553,9 @@ function build(reframe: boolean): void {
         `${complete.length === pe5 ? "" : ` ⚠ against ${pe5} Pe5 rosettes`} · ` +
         `${onCap.size} of ${allRhombs.length} faces on a complete cap ` +
         `(${((100 * onCap.size) / allRhombs.length).toFixed(0)}%) · ` +
-        `showing ${shown.length} of ${cen.solids.length - (wantUnsettled ? 0 : unsettledCount)} classifiable ` +
-        `(${unsettledCount} edge-truncated${wantUnsettled ? ", included" : ", held back"}) · ` +
+        `showing ${shown.length} · ${perClass.reduce((a, b) => a + b, 0)} classifiable ` +
+        `(${headCount} nail heads${wantHeads ? ", included" : ""}, ` +
+        `${unsettledCount} edge-truncated${wantUnsettled ? ", included" : ""}) · ` +
         `face classes ${clsText}` +
         `${cls[1] ? ` — ${cls[1]} orphan${cls[1] === 1 ? "" : "s"}, all on the boundary` : ""} · ` +
         `normals ${(nlen / RHO).toFixed(2)}ρ · ${ms} ms`;
@@ -547,6 +597,7 @@ nlenInput.value = String(prefs.nlen);
 sscaleInput.value = String(prefs.sscale);
 sideSel.value = prefs.side;
 unsettledChk.checked = prefs.unsettled;
+headsChk.checked = prefs.heads;
 if (!sideSel.value) sideSel.value = PREF_DEFAULTS.side;
 edgesChk.checked = prefs.edges;
 solidsChk.checked = prefs.solids;
@@ -594,7 +645,7 @@ function rebuild(reframe: boolean): void {
     build(reframe);
 }
 for (const c of [patchSel, genSel]) c.addEventListener("change", () => rebuild(true));
-for (const c of [colorSel, sideSel, flipChk, edgesChk, normalsChk, solidsChk, markersChk, shadeChk, unsettledChk]) {
+for (const c of [colorSel, sideSel, flipChk, edgesChk, normalsChk, solidsChk, markersChk, shadeChk, unsettledChk, headsChk]) {
     c.addEventListener("change", () => rebuild(false));
 }
 for (const c of [nlenInput, sscaleInput]) {
@@ -625,6 +676,7 @@ function persist(): void {
         sscale: Number(sscaleInput.value),
         side: sideSel.value,
         unsettled: unsettledChk.checked,
+        heads: headsChk.checked,
         classOn: classCtl.map((c) => c.on.checked),
         classSize: classCtl.map((c) => Number(c.size.value)),
         solids: solidsChk.checked,

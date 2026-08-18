@@ -100,6 +100,7 @@
         <label><input type="checkbox" id="shade" checked> shading</label>
         <label><input type="checkbox" id="flip"> dales up</label>
         <label><input type="checkbox" id="unsettled"> edge-truncated</label>
+        <label><input type="checkbox" id="heads"> nail heads</label>
         <button id="reset" title="Forget saved settings and start again from the defaults">Reset</button>
     </span>
 </div>
@@ -259,6 +260,24 @@
     the field fills fast, which is what the solid-size slider is for. At one, every
     center is drawn, and there are about as many of those as there are faces, because
     each face names two of them and most are named only once.
+</p>
+<p>
+    <strong>Nail heads.</strong> Every face names two centers, one on each side, so
+    half of what the construction produces is the far end of something whose point is
+    elsewhere. A solid that no face calls <em>home</em> — home being the larger of a
+    face's two — is a nail head, and it is not a class: counting it is counting the
+    same face twice. This is not a small correction. A complete cap generates ten of
+    them; 99.9% of one-face solids are nail heads; and they outnumber the real solids
+    about four to one. Turn <em>normals</em> on and every drawn nail shows its head as
+    a small white bead at the far end, so you can see which end means something.
+</p>
+<p>
+    Held back, the classification changes shape completely. <strong>Class 3 disappears
+    entirely</strong> — every three-face solid is a nail head, without exception — and
+    classes 1 and 2 fall away with patch size: on Sun, class 1 runs 17.9%, 2.7%, 0.4%,
+    0.05% at generations 2 to 5. What is left is essentially three classes:
+    <strong>4 at about 18%, 5 at about 58%, and the complete 10 at about 23%</strong>,
+    agreeing across Sun, Star and Queen.
 </p>
 <p>
     <strong>Edge-truncated solids are held back by default.</strong> A solid's ten

@@ -313,6 +313,41 @@ pole in a Pe5 rosette, five thin filling the notches, 16 corners, area ratio
 are nearly rigid too: each makeup has one pattern up to rotation, except `2=2t` and
 `3=3T`, which have two.
 
+### Nail heads — half the population is the far end of something else
+
+Spotted by Jeff, looking at Sun gen 2: a complete cap's normals converge on one side,
+and on the other side each of those faces has its own separate class-1 centre. Those
+are not classes. Every face names **two** centres by construction, so a solid holding
+one face is usually just the far end of a normal whose point is somewhere else — a
+**nail head**.
+
+Define a face's **home** as the larger of its two solids. A solid no face calls home
+is a nail head. Measured, this is not a small correction:
+
+- a complete cap generates **ten** of them, one per face — all ten, not five;
+- **99.9%** of one-face solids are nail heads. Of Sun gen 4's 8,072 one-face solids
+  only **10** have a one-face solid on the far side too, and that number is constant
+  with generation — those ten are the true boundary orphans of the next section;
+- nail heads outnumber home solids roughly **four to one**.
+
+Held back, the classification changes shape completely:
+
+| home solids only | 1 | 2 | 3 | 4 | 5 | 10 |
+|---|---|---|---|---|---|---|
+| Sun gen 3 | 2.62% | 5.25% | **0** | 13.12% | 52.49% | 26.51% |
+| Sun gen 5 | 0.05% | 0.89% | **0** | 17.51% | 57.70% | 23.85% |
+| Star gen 5 | 0.00% | 1.79% | **0** | 18.13% | 57.28% | 22.80% |
+| Deca gen 5 | 0.07% | 1.87% | **0** | 17.90% | 57.10% | 23.06% |
+
+**Class 3 is empty — every three-face solid is a nail head, without exception.**
+Classes 1 and 2 fall away with patch size (Sun: 17.9, 2.7, 0.4, 0.05 percent at
+generations 2 to 5), so they look like boundary residue rather than classes. What
+survives is three: **4 at ≈18%, 5 at ≈58%, complete at ≈23%**, agreeing across three
+seeds.
+
+This supersedes the share table below, which counted every centre. That one is a
+statement about the construction; this one is about the roof.
+
 ### The asymptote, and what the substitution matrix pins exactly
 
 Jeff's point: for large patches the class frequencies should converge, since the
