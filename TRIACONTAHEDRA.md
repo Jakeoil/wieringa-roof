@@ -680,19 +680,47 @@ an assertion that the dominant equal radius comes out as ρ without ρ being sup
 It is O(F²) and so only runs to generation 3, which is enough — its job is to prove
 the fast integer path is not assuming its own answer.
 
-### 8.5 Order of work
+### 8.5 Wiring it in
 
-1. `src/centers.ts` + `tools/centers.mjs`, with the six checks passing on all
-   27 seed/generation combinations. Nothing visual yet — if the checks fail the page
-   is not worth building.
+Agreed with Jeff: **the index points at it.** A page reachable only by typing its
+URL is not finished, so the wiring lands with the page and not afterwards.
+
+| file | change |
+|---|---|
+| `index.html` | a seventh `.card`, placed after Polyhedra since it depends on it |
+| `index.html`, `roof3d.html`, `info.html`, `polyhedra.html`, `unfold.html`, `tools.html`, `utilities.html` | one more `<a>` in `<nav>` — seven identical edits |
+| `centers.html` | its own copy of the nav, `aria-current="page"` moved to its own entry |
+| `polyhedra.html` | a prose cross-link: the solid on that page is the one under the roof on this one |
+| `README.md`, `PLAN.md` | a row in each page table |
+
+The nav is hand-duplicated in all seven pages, and the way to get this wrong is to
+miss one. `grep -L "centers.html" *.html` afterwards should come back empty. It sets
+`flex-wrap: wrap`, so a ninth entry costs nothing; `.cards` is
+`auto-fit, minmax(230px, 1fr)`, so a seventh card reflows without touching the CSS.
+
+Card copy:
+
+```html
+<a class="card" href="./centers.html" draggable="false">
+    <h3>Centers</h3>
+    <p>Follow each face's normal and watch where they meet — every concurrence is a
+    triacontahedron the roof is the lid of.</p>
+</a>
+```
+
+### 8.6 Order of work
+
+1. `src/centers.ts` + `tools/centers.mjs`, with the seven checks passing on all
+   27 seed/generation combinations, plus the agnostic cross-check to generation 3.
+   Nothing visual yet — if the checks fail the page is not worth building.
 2. Lift `triacontahedron()` into a shared module; `polyhedra3d.ts` uses it from there.
 3. `centers.html` + `src/centers3d.ts`: roof, centers, complete solids, group
-   coloring. That is enough to look at the finding.
+   coloring — **and the wiring of §8.5 in the same step**, so the page is reachable
+   the first time it exists. That is enough to look at the finding.
 4. Normals layer and the length slider — the part that *shows* the argument rather
    than its conclusion.
 5. Threshold, side filter, click-to-inspect.
-6. Prose: §1, §2, §5.2 and §5.3, with the numbers, and a link from `polyhedra.html`
-   saying that the solid on that page is the one under the roof on this one.
+6. Prose: §1, §2, §5.2 and §5.3, with the numbers.
 
 Stages 1–3 are the deliverable; 4–6 are what make it a page rather than a probe.
 
@@ -700,9 +728,21 @@ Stages 1–3 are the deliverable; 4–6 are what make it a page rather than a pr
 
 ## Probe scripts
 
-The measurements above came from five throwaway scripts against `dist/geometry.js`:
-`rt-probe.mjs` (ρ, first clustering), `rt-probe2.mjs` (bands, hats and bowls),
-`rt-probe3.mjs` (the 36° equivalence), `rt-probe4.mjs`/`rt-probe5.mjs` (exact integer
-centers, the Pe5 correspondence, connectivity), `sweep.mjs` (all 27 combinations),
-`zono.mjs` (the isohedrality table), `packing.mjs` (separation). They should be
-folded into `tools/centers.mjs` at stage 1 rather than kept.
+Everything above was measured by throwaway scripts in `tools/probes/`, kept only
+until stage 1 folds them into `tools/centers.mjs`. They import `../../dist/geometry.js`,
+so `npm run build` first.
+
+| script | what it established |
+|---|---|
+| `rt-probe.mjs` | ρ, and the first clustering of candidate centers |
+| `rt-probe2.mjs` | the 5·5·10·5·5 banding, hats and bowls |
+| `rt-probe3.mjs` | the 36° fold equivalence |
+| `rt-probe4.mjs`, `rt-probe5.mjs` | exact integer centers, the Pe5 correspondence, connectivity |
+| `sweep.mjs` | all 27 seed/generation combinations |
+| `zono.mjs` | the isohedrality table of §1 |
+| `packing.mjs` | separation of the complete solids |
+| `agnostic2.mjs` | the ρ-free line intersection (§5A); exports `faces` and `meet` |
+| `balls.mjs` | concurrence clusters, tangency vs supporting-plane counts |
+| `weak.mjs` | uniqueness, the vertex triples, overlap, the plane arrangement |
+| `diag.mjs` | the shortest center separations and their lattice vectors |
+| `why.mjs`, `why2.mjs` | the index window (§5E) and the face counts at each separation |
