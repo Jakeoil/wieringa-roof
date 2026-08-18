@@ -628,11 +628,29 @@ labeled. A second mode colors by group *size* (1…10) on a single ramp.
   to 10 leaves only the complete solids, which is the picture worth printing.
 - **above / below / both**: hats only, bowls only, or everything. This is Jeff's
   "above or below the map" made into a control.
+- **hills up / dales up** — a two-state flip, **not** the 3D page's continuous
+  vertical slider. Decided with Jeff: scaling the vertical is an affine map, so the
+  roof stays honest at any setting, but a squashed triacontahedron is not a
+  triacontahedron — its normals stop meeting at a point, which is the page's entire
+  claim. Rather than grey the solids out between stops, the intermediate settings
+  simply do not exist here. Vertical scale is ±1 and nothing else.
+
+  Implementation: compute the lift and the centers **unflipped**, then negate z on
+  the whole scene — surface, centers and solids together. A mirrored triacontahedron
+  is still a triacontahedron, so this is exact, and it swaps every hat for a bowl,
+  which is what flipping the roof ought to mean.
+
+  Two consequences worth having: **shading loses its strength control** and becomes a
+  plain on/off, since the roof is never flat here and there is always height to shade
+  — no contradiction with the rule in NOTES.md, which only forbids shading a *flat*
+  sheet. And the snap animation, the `|u|^1.6` bias and the vscale preference all stay
+  behind on `roof3d.ts` instead of moving into the shared module.
 - **normal length**: 0 → ρ → beyond, so the pencils of normals can be watched
   converging. At exactly ρ every normal ends on its center, which is the moment the
   whole idea is visible in one frame. The slider should be marked at ρ, and it should
   keep going past it — the concurrences at ρ√5, 3ρ and ρφ³ are real (§5A) and worth
-  seeing fail the tangency test rather than being hidden.
+  seeing fail the tangency test rather than being hidden. This is the page's one
+  continuous control, and it moves the *rendering*, never the geometry.
 - **complete only / all solids**: the difference between §5.4 and §5C is the whole
   difference between "isolated grains" and "overlapping ping-pong balls", and it is
   one checkbox.
@@ -679,6 +697,43 @@ history: all-pairs line intersection with the two tolerances reported separately
 an assertion that the dominant equal radius comes out as ρ without ρ being supplied.
 It is O(F²) and so only runs to generation 3, which is enough — its job is to prove
 the fast integer path is not assuming its own answer.
+
+### 8.4a Sharing the viewer, and three traps
+
+The page is `roof3d.html` with more layers, and should read as its sibling — same
+`.bar` control strip, same `#view` at `min(70vh, 620px)`, same `#status` beneath,
+same import map. But of `roof3d.ts`'s 491 lines only about 100 are roof-specific:
+
+```
+scene / camera / renderer / controls / lights   42
+palettes                                        28
+mesh, color and the absolute shading ramp       83
+edge overlay                                    24
+isoglosses                                      55
+framing                                         10
+controls, prefs, snap                           77   ← stays on roof3d
+resize / persist / animation loop               39
+```
+
+Copying the file would put a second copy of the empty-patch NaN guard and the
+absolute shading ramp in the tree, which is the failure NOTES.md already records
+under "the same idea written twice, once right". So: extract `src/roofview.ts` —
+scene, framing, prefs, and the roof mesh with its edges and isoglosses, with hooks
+for extra layers and extra controls — **as its own commit that leaves `roof3d.html`
+behaving identically**. That commit is reviewable on its own and its test is that the
+3D page does not change. Only then build `centers3d.ts` on it.
+
+Three traps, all visible in the current code:
+
+1. **The recentering offset.** `build()` does `geo.translate(-c.x, -c.y, -c.z)` and
+   the edge and isogloss layers subtract the same `c` by hand. Centers, solids and
+   normals must subtract it too or they land φ away from where they belong. This is
+   the first thing that will go wrong.
+2. **Framing.** A solid reaches φ below the surface where the roof's whole relief is
+   1.342, so the bounding sphere roughly triples when the solids layer is on, and
+   `build()` reframes only on a patch change. Frame to the solids-on extent always,
+   rather than lurching when the box is ticked.
+3. **The vertical scale** — settled above: ±1 only.
 
 ### 8.5 Wiring it in
 
