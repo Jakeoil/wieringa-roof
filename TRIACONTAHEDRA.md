@@ -772,6 +772,17 @@ URL is not finished, so the wiring lands with the page and not afterwards.
 | `centers.html` | its own copy of the nav, `aria-current="page"` moved to its own entry |
 | `polyhedra.html` | a prose cross-link: the solid on that page is the one under the roof on this one |
 | `README.md`, `PLAN.md` | a row in each page table |
+| `centers.html` | a `<details>` "How it works", with the **build stamp in its `<summary>`** |
+
+The build stamp is the workbench's pattern, verbatim — `unfold.html:181` carries
+`<span class="mono" id="buildtag">` inside the `<summary>` and `workbench.ts` fills
+it with `· build HH:MM:SS`. The comment there earns it: working out whether the
+browser is running a stale script has cost this project three debugging sessions, and
+telling someone to open developer tools is not an answer. **`roof3d.html` does not
+have it and does not even log a build line**, so it is the one page that cannot
+answer the question — and the centers page would inherit that by being built on it.
+Fix both, but *after* stage 2: the extraction's whole test is that `roof3d.html` does
+not change, so the stamp goes on in its own commit once that has been shown.
 
 The nav is hand-duplicated in all seven pages, and the way to get this wrong is to
 miss one. `grep -L "centers.html" *.html` afterwards should come back empty. It sets
@@ -797,6 +808,11 @@ Card copy:
    `2793/2793` on Pe3 gen 4) and is skipped above 1300 faces where O(F²) stops being
    worth it. `node tools/centers.mjs`.
 2. Lift `triacontahedron()` into a shared module; `polyhedra3d.ts` uses it from there.
+   Same commit or the next: `src/roofview.ts`, whose test is that `roof3d.html` is
+   unchanged (§8.4a).
+2a. Then, deliberately visible: the build stamp on `roof3d.html` as well, and a
+   `console.log` build line from the shared viewer, so no page on the site can leave
+   you guessing whether the script is stale.
 3. `centers.html` + `src/centers3d.ts`: roof, centers, complete solids, group
    coloring — **and the wiring of §8.5 in the same step**, so the page is reachable
    the first time it exists. That is enough to look at the finding.
