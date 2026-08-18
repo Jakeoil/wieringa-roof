@@ -19,103 +19,21 @@ import { LineSegments2 } from "three/addons/lines/LineSegments2.js";
 import { LineSegmentsGeometry } from "three/addons/lines/LineSegmentsGeometry.js";
 import { LineMaterial } from "three/addons/lines/LineMaterial.js";
 
-type V3 = [number, number, number];
-type Face = V3[];
+import {
+    triacontahedron,
+    rhombohedron,
+    faceOutward,
+    add,
+    sub,
+    mul,
+    len,
+} from "./solids.js";
+import type { V3, Face } from "./solids.js";
 
-const PHI = (1 + Math.sqrt(5)) / 2;
-
-const sub = (a: V3, b: V3): V3 => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
-const add = (a: V3, b: V3): V3 => [a[0] + b[0], a[1] + b[1], a[2] + b[2]];
-const mul = (a: V3, s: number): V3 => [a[0] * s, a[1] * s, a[2] * s];
-const dot = (a: V3, b: V3) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
-const cross = (a: V3, b: V3): V3 => [
-    a[1] * b[2] - a[2] * b[1],
-    a[2] * b[0] - a[0] * b[2],
-    a[0] * b[1] - a[1] * b[0],
-];
-const len = (a: V3) => Math.hypot(a[0], a[1], a[2]);
-const norm = (a: V3): V3 => mul(a, 1 / len(a));
-
-// ── the solids ────────────────────────────────────────────────────
-
-function triacontahedron(): Face[] {
-    const g: V3[] = (
-        [
-            [0, 1, PHI],
-            [0, -1, PHI],
-            [1, PHI, 0],
-            [-1, PHI, 0],
-            [PHI, 0, 1],
-            [PHI, 0, -1],
-        ] as V3[]
-    ).map(norm);
-
-    // stand it on a five-fold axis so the banding is horizontal
-    const axis = g[0];
-    const v = cross(axis, [0, 0, 1]);
-    const c = dot(axis, [0, 0, 1]);
-    const k = 1 / (1 + c);
-    const spin = (p: V3): V3 =>
-        add(add(mul(p, c), cross(v, p)), mul(v, dot(v, p) * k));
-
-    const faces: Face[] = [];
-    for (let i = 0; i < 6; i++) {
-        for (let j = i + 1; j < 6; j++) {
-            for (const flip of [1, -1]) {
-                const n = mul(cross(g[i], g[j]), flip);
-                let base: V3 = [0, 0, 0];
-                for (let m = 0; m < 6; m++) {
-                    if (m === i || m === j) continue;
-                    base = add(base, mul(g[m], Math.sign(dot(n, g[m])) / 2));
-                }
-                const a = mul(g[i], 0.5);
-                const b = mul(g[j], 0.5);
-                faces.push(
-                    [
-                        sub(sub(base, a), b),
-                        add(sub(base, b), a),
-                        add(add(base, a), b),
-                        sub(add(base, b), a),
-                    ].map(spin),
-                );
-            }
-        }
-    }
-    return faces;
-}
-
-function rhombohedron(acute: boolean): Face[] {
-    const d = acute ? 1 / Math.sqrt(5) : -1 / Math.sqrt(5);
-    const cosA = Math.sqrt((d + 0.5) / 1.5);
-    const sinA = Math.sqrt(1 - cosA * cosA);
-    const v: V3[] = [0, 1, 2].map((i) => {
-        const t = (2 * Math.PI * i) / 3;
-        return [sinA * Math.cos(t), sinA * Math.sin(t), cosA] as V3;
-    });
-    const faces: Face[] = [];
-    for (let k = 0; k < 3; k++) {
-        const a = v[k];
-        const b = v[(k + 1) % 3];
-        const c = v[(k + 2) % 3];
-        for (const off of [[0, 0, 0] as V3, c]) {
-            faces.push([off, add(off, a), add(add(off, a), b), add(off, b)]);
-        }
-    }
-    const mid = mul(add(add(v[0], v[1]), v[2]), 0.5);
-    return faces.map((f) => f.map((q) => sub(q, mid)));
-}
-
-// All three solids are convex and centered on the origin, so a face is wound
-// outward exactly when its normal agrees with its own centroid. The zonohedron
-// construction flips the normal for each ± pair, leaving half the triacontahedron
-// wound inward: those faces were being culled outright by a FrontSide material,
-// and their flat-shaded normals pointed into the solid regardless. Fix it once
-// here rather than papering over it with DoubleSide.
-function faceOutward(f: Face): Face {
-    const n = cross(sub(f[1], f[0]), sub(f[3], f[0]));
-    const c = mul(f.reduce((a, p) => add(a, p), [0, 0, 0] as V3), 1 / 4);
-    return dot(n, c) >= 0 ? f : [f[0], f[3], f[2], f[1]];
-}
+// The three solids themselves now live in `solids.ts`, so the centers page can draw
+// the same triacontahedron in the roof's own frame rather than growing a second
+// copy of the zonohedron construction. Everything below is presentation: contours,
+// palette, and the viewer.
 
 // ── isoglosses ────────────────────────────────────────────────────
 //
