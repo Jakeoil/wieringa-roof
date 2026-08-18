@@ -816,12 +816,22 @@ Card copy:
 3. `centers.html` + `src/centers3d.ts`: roof, centers, complete solids, group
    coloring — **and the wiring of §8.5 in the same step**, so the page is reachable
    the first time it exists. That is enough to look at the finding.
-4. Normals layer and the length slider — the part that *shows* the argument rather
-   than its conclusion.
+4. ~~Normals layer and the length slider~~ **done**, with the shrink slider — Jeff's
+   idea, after looking at stage 3 and seeing the shells crowd. Each face sends a
+   segment both ways, colored by the solid at that end, and at exactly ρ every
+   endpoint lands on its own marker (verified to 2.7e-15, flipped and not).
+   **Shrinking a solid toward its center is safe where squashing the vertical is
+   not**: a shrunk triacontahedron is still a triacontahedron, its faces stay
+   parallel to the roof faces, and its normals still meet at the same point, so no
+   setting of that slider can show anything false. It also fixes a rendering fault
+   rather than only crowding — the shells are translucent, so where they overlap the
+   blending is order-dependent. Detents at φ⁻¹, φ⁻², φ⁻³, and on the normals at ρ.
 5. Threshold, side filter, click-to-inspect.
-6. Prose: §1, §2, §5.2 and §5.3, with the numbers.
+6. Prose: §1, §2, §5.2 and §5.3, with the numbers. (Stage 4 already carried the bulk
+   of it into the page's "How it works".)
 
-Stages 1–3 are the deliverable; 4–6 are what make it a page rather than a probe.
+Stages 1–4 are done. 5 and 6 are refinement: nothing in them changes what the page
+claims, only how much of it you can filter down to.
 
 ---
 

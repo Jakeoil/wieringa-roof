@@ -25,8 +25,18 @@ import { buildRoof } from "./roofgeom.js";
 import { createRoofView, CLUSTER_3D, CLUSTER_FALLBACK, PLAIN_COLOR } from "./roofview.js";
 import { triacontahedra, assignLargestFirst, pe5Rosettes, A6, RHO } from "./centers.js";
 import type { Solid } from "./centers.js";
-import { zonohedron, faceOutward } from "./solids.js";
+import { zonohedron, faceOutward, PHI } from "./solids.js";
 import type { V3 } from "./solids.js";
+
+// Detents. Only a handful of settings on either slider mean anything, so those are
+// the ones the control lands on; the travel between them is free, which is how the
+// normals are watched converging rather than merely found already converged.
+const NLEN_STOPS = [0, Math.sqrt(1 + 2 / Math.sqrt(5))];
+const SSCALE_STOPS = [0, 1 / PHI ** 3, 1 / PHI ** 2, 1 / PHI, 1];
+const snapTo = (v: number, stops: number[], tol: number): number => {
+    for (const s of stops) if (Math.abs(v - s) < tol) return s;
+    return v;
+};
 
 const el = <T extends HTMLElement>(id: string): T => {
     const found = document.getElementById(id);
@@ -40,7 +50,12 @@ const genSel = el<HTMLSelectElement>("gen");
 const colorSel = el<HTMLSelectElement>("color");
 const flipChk = el<HTMLInputElement>("flip");
 const edgesChk = el<HTMLInputElement>("edges");
+const normalsChk = el<HTMLInputElement>("normals");
 const solidsChk = el<HTMLInputElement>("solids");
+const nlenInput = el<HTMLInputElement>("nlen");
+const nlenOut = el<HTMLElement>("nlenOut");
+const sscaleInput = el<HTMLInputElement>("sscale");
+const sscaleOut = el<HTMLElement>("sscaleOut");
 const markersChk = el<HTMLInputElement>("markers");
 const shadeChk = el<HTMLInputElement>("shade");
 const statusEl = el<HTMLElement>("status");
@@ -52,6 +67,9 @@ const PREF_DEFAULTS = {
     color: "solid",
     flip: false,
     edges: true,
+    normals: false,
+    nlen: Math.sqrt(1 + 2 / Math.sqrt(5)),
+    sscale: 1,
     solids: true,
     markers: true,
     shade: true,
@@ -176,12 +194,54 @@ function build(reframe: boolean): void {
     });
 
     const complete = cen.solids.filter((s) => s.complete);
+    const nlen = Number(nlenInput.value);
+    const sscale = Number(sscaleInput.value);
+
+    // The normals themselves. Each face sends a segment both ways — above the map and
+    // below — colored by the solid at that end, so at exactly ρ every segment lands on
+    // a marker of its own color and the pencils belonging to one solid arrive
+    // together. Past ρ they carry on through, which is the point: normals meet at
+    // other radii too, and none of those builds anything.
+    if (normalsChk.checked && nlen > 0) {
+        const seg: number[] = [];
+        const col: number[] = [];
+        for (const rf of cen.faces) {
+            const p = place(rf.c);
+            const u: V3 = [rf.u[0], rf.u[1], rf.u[2] * zsign];
+            for (const [side, sid] of [
+                [1, rf.solids[0]],
+                [-1, rf.solids[1]],
+            ] as Array<[number, number]>) {
+                const c = solidColor(cen.solids[sid]);
+                seg.push(
+                    p[0], p[1], p[2],
+                    p[0] + u[0] * nlen * side,
+                    p[1] + u[1] * nlen * side,
+                    p[2] + u[2] * nlen * side,
+                );
+                col.push(c.r, c.g, c.b, c.r, c.g, c.b);
+            }
+        }
+        const ng = new THREE.BufferGeometry();
+        ng.setAttribute("position", new THREE.Float32BufferAttribute(seg, 3));
+        ng.setAttribute("color", new THREE.Float32BufferAttribute(col, 3));
+        rv.add(
+            new THREE.LineSegments(
+                ng,
+                new THREE.LineBasicMaterial({
+                    vertexColors: true,
+                    transparent: true,
+                    opacity: 0.75,
+                }),
+            ),
+        );
+    }
 
     // The solids themselves. Only the complete ones: a partial group names a real
     // triacontahedron too, but drawing all of them fills the view with overlapping
     // shells — they interpenetrate freely, centers as close as one long diagonal,
     // where the complete ones are never nearer than φ³ and read as separate objects.
-    if (solidsChk.checked && complete.length) {
+    if (solidsChk.checked && complete.length && sscale > 0) {
         const tris: number[] = [];
         const cols: number[] = [];
         const lines: number[] = [];
@@ -189,14 +249,18 @@ function build(reframe: boolean): void {
             const p = place(s.c);
             const col = solidColor(s);
             for (let i = 0; i < RT_TRIS.length; i += 3) {
-                tris.push(RT_TRIS[i] + p[0], RT_TRIS[i + 1] + p[1], RT_TRIS[i + 2] + p[2]);
+                tris.push(
+                    RT_TRIS[i] * sscale + p[0],
+                    RT_TRIS[i + 1] * sscale + p[1],
+                    RT_TRIS[i + 2] * sscale + p[2],
+                );
                 cols.push(col.r, col.g, col.b);
             }
             for (let i = 0; i < RT_EDGES.length; i += 3) {
                 lines.push(
-                    RT_EDGES[i] + p[0],
-                    RT_EDGES[i + 1] + p[1],
-                    RT_EDGES[i + 2] + p[2],
+                    RT_EDGES[i] * sscale + p[0],
+                    RT_EDGES[i + 1] * sscale + p[1],
+                    RT_EDGES[i + 2] * sscale + p[2],
                 );
             }
         }
@@ -274,11 +338,19 @@ function build(reframe: boolean): void {
         }
     }
 
-    // Frame to the solids whether or not they are showing, so ticking the box does
-    // not lurch the camera. A solid reaches φ below the surface where the roof's whole
-    // relief is 1.342, so the difference is not small.
+    // Framing is computed as though every solid were showing at full size, whatever
+    // the checkboxes and sliders currently say. Any control that moved the camera
+    // would lurch the view every time it was touched, and a solid reaches φ from its
+    // own center where the roof's whole relief is 1.342 — so the difference is not
+    // small enough to ignore either.
     if (reframe) {
-        rv.frame(solidsChk.checked || complete.length ? rv.roofRadius() + 1.9 : rv.roofRadius());
+        let reach = rv.roofRadius();
+        for (const s of cen.solids) {
+            if (s.faces.length < 2) continue;
+            const p = place(s.c);
+            reach = Math.max(reach, Math.hypot(p[0], p[1], p[2]) + (s.complete ? PHI : 0));
+        }
+        rv.frame(reach);
     }
 
     const hist: Record<number, number> = {};
@@ -295,7 +367,7 @@ function build(reframe: boolean): void {
         `${complete.length === pe5 ? "" : ` ⚠ against ${pe5} Pe5 rosettes`} · ` +
         `${onCap.size} of ${allRhombs.length} faces on a complete cap ` +
         `(${((100 * onCap.size) / allRhombs.length).toFixed(0)}%) · ` +
-        `ρ ${RHO.toFixed(4)} · ${ms} ms`;
+        `normals ${nlen.toFixed(3)} = ${(nlen / RHO).toFixed(2)}ρ · ${ms} ms`;
 }
 
 // ── controls ──────────────────────────────────────────────────────
@@ -329,19 +401,40 @@ if (!genSel.value) genSel.value = String(PREF_DEFAULTS.gen);
 colorSel.value = prefs.color;
 if (!colorSel.value) colorSel.value = PREF_DEFAULTS.color;
 flipChk.checked = prefs.flip;
+normalsChk.checked = prefs.normals;
+nlenInput.value = String(prefs.nlen);
+sscaleInput.value = String(prefs.sscale);
 edgesChk.checked = prefs.edges;
 solidsChk.checked = prefs.solids;
 markersChk.checked = prefs.markers;
 shadeChk.checked = prefs.shade;
 
 function rebuild(reframe: boolean): void {
+    const nl = Number(nlenInput.value);
+    nlenOut.textContent = `${(nl / RHO).toFixed(2)}ρ`;
+    sscaleOut.textContent = `${Number(sscaleInput.value).toFixed(2)}×`;
     rv.clear();
     build(reframe);
 }
 for (const c of [patchSel, genSel]) c.addEventListener("change", () => rebuild(true));
-for (const c of [colorSel, flipChk, edgesChk, solidsChk, markersChk, shadeChk]) {
+for (const c of [colorSel, flipChk, edgesChk, normalsChk, solidsChk, markersChk, shadeChk]) {
     c.addEventListener("change", () => rebuild(false));
 }
+for (const c of [nlenInput, sscaleInput]) {
+    c.addEventListener("input", () => rebuild(false));
+}
+// Only the landing snaps, as on the 3D page's vertical slider. Dragging is free —
+// watching the segments converge is the whole point of the control — but letting go
+// near ρ lands on ρ exactly, so the picture that makes the argument is not something
+// you have to hit by hand.
+nlenInput.addEventListener("change", () => {
+    nlenInput.value = String(snapTo(Number(nlenInput.value), NLEN_STOPS, 0.1));
+    rebuild(false);
+});
+sscaleInput.addEventListener("change", () => {
+    sscaleInput.value = String(snapTo(Number(sscaleInput.value), SSCALE_STOPS, 0.035));
+    rebuild(false);
+});
 
 function persist(): void {
     savePrefs(PREFS_KEY, {
@@ -350,6 +443,9 @@ function persist(): void {
         color: colorSel.value,
         flip: flipChk.checked,
         edges: edgesChk.checked,
+        normals: normalsChk.checked,
+        nlen: Number(nlenInput.value),
+        sscale: Number(sscaleInput.value),
         solids: solidsChk.checked,
         markers: markersChk.checked,
         shade: shadeChk.checked,

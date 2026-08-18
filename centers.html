@@ -14,6 +14,7 @@
     }
     .bar label { display: flex; flex-direction: column; gap: 3px; font-size: 12px; color: var(--ink-soft); }
     .bar select { font: inherit; font-size: 13px; padding: 5px 8px; border: 1px solid #ccc; border-radius: 4px; background: #fff; color: var(--ink); }
+    .bar input[type=range] { width: 132px; }
     .bar .checks { display: flex; gap: 12px; align-items: center; }
     .bar .checks label { flex-direction: row; align-items: center; gap: 5px; font-size: 13px; color: var(--ink); }
     #view {
@@ -59,7 +60,14 @@
         <option value="size">Faces per solid</option>
         <option value="cluster">Star / boat / diamond</option>
     </select></label>
+    <label>Normals <span id="nlenOut" class="mono"></span>
+        <input type="range" id="nlen" min="0" max="3" step="0.005" value="1.376">
+    </label>
+    <label>Solid size <span id="sscaleOut" class="mono"></span>
+        <input type="range" id="sscale" min="0" max="1" step="0.005" value="1">
+    </label>
     <span class="checks">
+        <label><input type="checkbox" id="normals"> normals</label>
         <label><input type="checkbox" id="solids" checked> solids</label>
         <label><input type="checkbox" id="markers" checked> centers</label>
         <label><input type="checkbox" id="edges" checked> edges</label>
@@ -137,6 +145,32 @@
     triacontahedron is not a triacontahedron, and its normals stop meeting at a point,
     which is this page's entire claim. So <em>dales up</em> is a flip and not a
     slider, applied by reflecting the whole scene, solids included.
+</p>
+<p>
+    <strong>The normals are the argument; everything else is its conclusion.</strong>
+    Turn them on and pull the length out. Each face sends a segment both ways, colored
+    by the solid it is heading for, and at exactly
+    <span class="mono">ρ = 1.3764</span> — where the slider detents — every one of
+    them lands on a center, on its own marker, in its own color. Ten arriving
+    together is a complete triacontahedron. Push past ρ and they carry on through and
+    out the other side: normals do meet at other distances, at
+    <span class="mono">ρ/φ³</span>, <span class="mono">ρ√5</span>,
+    <span class="mono">3ρ</span> and <span class="mono">ρφ³</span> among others, but
+    never more than a handful at once. Only ρ builds anything, and watching the rest
+    fail is worth more than being told.
+</p>
+<p>
+    <strong>Solid size</strong> shrinks each triacontahedron toward its own center.
+    This is safe in a way the vertical scale is not: a shrunk triacontahedron is
+    still a triacontahedron, its faces stay parallel to the roof faces they came
+    from, and its normals still meet at exactly the same point — so no setting of
+    this slider can show you something false. It also fixes a rendering problem
+    rather than only a crowding one, since the shells are translucent and where they
+    overlap the blending is order-dependent. At zero a solid is its center, which is
+    what the markers already draw. It detents at <span class="mono">φ⁻¹</span>,
+    <span class="mono">φ⁻²</span> and <span class="mono">φ⁻³</span> — φ³ being the
+    inflation factor of the tiling in three dimensions, so a solid shrunk that far is
+    the next one down in the hierarchy.
 </p>
 <p>
     <strong>Colors mean grouping and nothing else.</strong> A face lies on two solids
