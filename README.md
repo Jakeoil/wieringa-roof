@@ -16,6 +16,7 @@ supplies nothing but the pattern of which rhombus joins which, and at what angle
 | `roof3d.html` | orbit the surface itself |
 | `info.html` | the mathematics — the lift, fold angles, curvature |
 | `polyhedra.html` | the triacontahedron and the two golden rhombohedra |
+| `centers.html` | where the face normals meet — the triacontahedra under the roof |
 | `unfold.html` | unfold a net by hand, or replay an algorithm step by step |
 
 ## Running

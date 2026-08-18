@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Centers — Wieringa Roof</title>
+<link rel="stylesheet" href="./site.css">
+<link rel="icon" href="./favicon.svg">
+<style>
+    .bar {
+        display: flex; gap: 14px; align-items: flex-end; flex-wrap: wrap;
+        background: var(--panel); border: 1px solid var(--rule);
+        border-radius: 8px; padding: 12px 14px; margin: 18px 0 10px;
+    }
+    .bar label { display: flex; flex-direction: column; gap: 3px; font-size: 12px; color: var(--ink-soft); }
+    .bar select { font: inherit; font-size: 13px; padding: 5px 8px; border: 1px solid #ccc; border-radius: 4px; background: #fff; color: var(--ink); }
+    .bar .checks { display: flex; gap: 12px; align-items: center; }
+    .bar .checks label { flex-direction: row; align-items: center; gap: 5px; font-size: 13px; color: var(--ink); }
+    #view {
+        width: 100%; height: min(70vh, 620px);
+        border: 1px solid var(--rule); border-radius: 8px; overflow: hidden;
+        background: #f4f4f7;
+    }
+    #view canvas { display: block; width: 100%; height: 100%; cursor: grab; }
+    #view canvas:active { cursor: grabbing; }
+    #status { display: block; margin: 10px 0 0; line-height: 1.5; }
+</style>
+</head>
+<body>
+
+<nav>
+    <span class="brand">Wieringa Roof</span>
+    <a href="./index.html" draggable="false">Home</a>
+    <a href="./roof3d.html" draggable="false">3D</a>
+    <a href="./info.html" draggable="false">Mathematics</a>
+    <a href="./polyhedra.html" draggable="false">Polyhedra</a>
+    <a href="./centers.html" draggable="false" aria-current="page">Centers</a>
+    <a href="./unfold.html" draggable="false">Workbench</a>
+    <a href="./tools.html" draggable="false">Tools</a>
+    <a href="./utilities.html" draggable="false">Utilities</a>
+    <a href="./unfold.html#sheets" draggable="false">Sheets</a>
+</nav>
+
+<div class="wrap">
+
+<h1>Centers</h1>
+<p class="lede">
+    Follow each face's normal and see where they meet. A point where several concur
+    is the center of a rhombic triacontahedron, and the faces that named it are a
+    piece of that solid's surface. The roof stops being a surface and becomes a lid.
+</p>
+
+<div class="bar">
+    <label>Patch <select id="patch"></select></label>
+    <label>Generation <select id="gen"></select></label>
+    <label>Color <select id="color">
+        <option value="solid">Triacontahedron</option>
+        <option value="complete">Complete caps only</option>
+        <option value="size">Faces per solid</option>
+        <option value="cluster">Star / boat / diamond</option>
+    </select></label>
+    <span class="checks">
+        <label><input type="checkbox" id="solids" checked> solids</label>
+        <label><input type="checkbox" id="markers" checked> centers</label>
+        <label><input type="checkbox" id="edges" checked> edges</label>
+        <label><input type="checkbox" id="shade" checked> shading</label>
+        <label><input type="checkbox" id="flip"> dales up</label>
+        <button id="reset" title="Forget saved settings and start again from the defaults">Reset</button>
+    </span>
+</div>
+
+<div id="view"></div>
+<span class="info" id="status"></span>
+
+<details id="help">
+    <summary>How it works <span class="mono" id="buildtag" style="font-weight:400;color:#888"></span></summary>
+    <div class="helpbody">
+
+<p>
+    <strong>Why a normal finds a center at all.</strong> The rhombic triacontahedron
+    is <em>isohedral</em> — its symmetry group is transitive on its thirty faces — so
+    all thirty face planes are tangent to one insphere, and because each face has a
+    two-fold axis through its own middle, each touches that sphere at its centroid
+    rather than anywhere else. A golden rhombus that is a face of a triacontahedron
+    therefore fixes the solid's center to one of exactly two points,
+    <span class="mono">centroid ± ρ·n̂</span>, with
+    <span class="mono">ρ = √(1 + 2/√5) = 1.3763819</span>. One above the map, one
+    below.
+</p>
+<p>
+    This works for the triacontahedron and for nothing else in the family. Built on
+    the same axes but with fewer of them, the rhombic icosahedron, the Bilinski
+    dodecahedron and the two golden rhombohedra are none of them isohedral: their
+    face planes sit at two or three different distances from the center, and the
+    offset is not even parallel to the face normal. So a concurrence at ρ identifies a
+    triacontahedron <em>specifically</em>.
+</p>
+<p>
+    <strong>Ten is the ceiling.</strong> The roof lifts on five of the six icosahedral
+    five-fold axes; the sixth is vertical. A solid's thirty faces therefore split into
+    ten the roof can carry pointing up, ten pointing down, and ten that use the
+    vertical generator — and those ten stand exactly vertical, which a surface with
+    one height over each point of the plane can never contain. Of the ten it can
+    carry, the five <strong>thick</strong> rhombi are the solid's top cap, tilted
+    31.7175° from horizontal, and the five <strong>thin</strong> ones are the ring
+    below them at 58.2825°. Every solid on this page is a <em>translate</em> of every
+    other: the frame is fixed, so nothing is ever rotated.
+</p>
+<p>
+    <strong>A complete cap is a Pe5 pentagon.</strong> This is the thing worth
+    looking at. Wherever all ten faces are present, the five thick ones turn out to be
+    exactly the five rhombi of one <span class="mono">Pe5</span> tile of the P1 layer,
+    and the ring of five thin ones comes from its neighbors. The count of complete
+    solids equals the count of Pe5 rosettes in every patch tested — nine seeds,
+    generations 2 to 4, up to 16,475 rhombi, without exception. The rosette's hub is
+    the solid's own five-fold pole, exactly φ = 1.618 side lengths from the center,
+    straight up or straight down.
+</p>
+<p>
+    Whether the solid sits below the roof or above it follows from the hub: a hub at
+    the top of the patch's index range puts the solid underneath, a lid over
+    something; a hub at the bottom puts it above, the roof forming its floor. The
+    readout counts both.
+</p>
+<p>
+    <strong>The complete ones never touch.</strong> No two are closer than
+    φ³ = 4.236 side lengths, where mere face contact would need 2ρ = 2.753 — they are
+    isolated grains. The partial solids are another matter entirely: they
+    interpenetrate freely, with centers as close as 1.7013, the golden rhombus's own
+    long diagonal. Only the complete ones are drawn here, because drawing the rest
+    fills the view with overlapping shells.
+</p>
+<p>
+    <strong>Vertical scale is ±1 and nothing between.</strong> The 3D page will
+    flatten the roof continuously, which is honest there — scaling the vertical is an
+    affine map, so faces stay planar. It would not be honest here. A squashed
+    triacontahedron is not a triacontahedron, and its normals stop meeting at a point,
+    which is this page's entire claim. So <em>dales up</em> is a flip and not a
+    slider, applied by reflecting the whole scene, solids included.
+</p>
+<p>
+    <strong>Colors mean grouping and nothing else.</strong> A face lies on two solids
+    and no part of the geometry prefers either, so any single-valued coloring is a
+    choice — here, largest group first. Complete caps take their color at strength and
+    partial groups are washed toward gray, so the whole caps stand out of the field
+    without needing a legend.
+</p>
+<p>
+    See <a href="./polyhedra.html" draggable="false">Polyhedra</a> for the solid on
+    its own, and <a href="./info.html" draggable="false">Mathematics</a> for the lift
+    that puts it under the roof.
+</p>
+
+    </div>
+</details>
+
+</div>
+
+<script type="importmap">
+{
+    "imports": {
+        "three": "./vendor/three.module.js",
+        "three/addons/controls/OrbitControls.js": "./vendor/OrbitControls.js"
+    }
+}
+</script>
+<script type="module" src="./dist/centers3d.js"></script>
+<script src="./site.js"></script>
+</body>
+</html>
