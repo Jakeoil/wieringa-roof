@@ -313,6 +313,46 @@ pole in a Pe5 rosette, five thin filling the notches, 16 corners, area ratio
 are nearly rigid too: each makeup has one pattern up to rotation, except `2=2t` and
 `3=3T`, which have two.
 
+### The asymptote, and what the substitution matrix pins exactly
+
+Jeff's point: for large patches the class frequencies should converge, since the
+thick-to-thin ratio does. They do — but the convex hull had been hiding it. A Star or
+a Queen patch is deeply concave, the hull spans the bays, and solids sitting in open
+air were counted as settled with a bias that differed per seed. That is how the fault
+was found: for a substitution tiling the frequencies **must** agree in the limit, and
+Deca, Sun and Star did not. With the real outer boundary they agree to about half a
+point at generation 5:
+
+| gen 5 | class 1 | 2 | 3 | 4 | 5 | 10 |
+|---|---|---|---|---|---|---|
+| Deca, 31,360 rhombi | 60.62% | 12.95% | 6.07% | 3.72% | 11.86% | 4.79% |
+| Sun, 111,925 | 61.03% | 12.53% | 6.38% | 3.55% | 11.69% | 4.83% |
+| Star, 104,240 | 60.68% | 12.84% | 6.12% | 3.76% | 11.87% | 4.73% |
+
+Some of the limit is not merely measured. The substitution over the six P1 types, read
+straight off `geometry.ts`, has Perron eigenvalue **φ⁴ = 6.854102** and frequencies
+that are all powers of φ:
+
+```
+Pe1 = φ⁻²   Pe3 = φ⁻³   St1 = φ⁻⁴   St3 = φ⁻⁵   Pe5 = φ⁻³/√5   St5 = φ⁻⁵/√5
+```
+
+verified against the numerical eigenvector to 6e-17. From those:
+
+- **rhombi per P1 tile = φ² exactly** (`5·Pe5 + 4·Pe3 + 3·Pe1`);
+- **thick : thin = φ exactly** — `(5·Pe5 + 3·Pe3 + Pe1) / (Pe3 + 2·Pe1)`, difference
+  0.0e0, so Jeff's premise is a theorem here and not an observation. Finite patches
+  approach it slowly and from both sides: at generation 5, Pe3 is still at 1.76 and
+  Deca at 1.54;
+- **class-10 solids per rhomb = φ⁻⁵/√5 = 0.0403252**, exactly, because class 10 is
+  the Pe5 rosette count (§5.2) and Pe5 has that frequency. Measured: Sun 0.041393 →
+  0.040728 → 0.040527 at generations 3, 4, 5, and Star and Deca approach the same
+  number from below.
+
+The other five classes converge but no closed form has been derived for them. They
+depend on two-tile configurations rather than on tile frequencies alone, so the
+eigenvector is not enough.
+
 ### Face classes, and the orphans
 
 Give each face the size of the larger of its two solids — which is what largest-first

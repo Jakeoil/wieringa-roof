@@ -29,6 +29,7 @@ import {
     allRhombs,
     allP1Tiles,
     vertexMap,
+    edgeMap,
     roundKey,
     computeLift,
     pos3D,
@@ -175,38 +176,97 @@ const planar = (n: number[]): P2 => {
     return [p[0], p[1]];
 };
 
-/** Convex hull, counter-clockwise. The patch outline stands in for its outer boundary:
- *  holes are interior to it, which is exactly right, since a gap is a real absence. */
-function convexHull(pts: P2[]): P2[] {
-    const p = [...pts].sort((a, b) => a[0] - b[0] || a[1] - b[1]);
-    const crs2 = (o: P2, a: P2, b: P2) =>
-        (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]);
-    const half = (q: P2[]): P2[] => {
-        const h: P2[] = [];
-        for (const x of q) {
-            while (h.length > 1 && crs2(h[h.length - 2], h[h.length - 1], x) <= 0) h.pop();
-            h.push(x);
+/**
+ * The patch's outer boundary, and a grid that answers "is this point inside it".
+ *
+ * The convex hull will not do. A Star or a Queen patch is deeply concave, so the hull
+ * spans the bays and solids sitting in open air get counted as settled — and the bias
+ * differs per seed, which is how it was found: the class frequencies of Deca, Sun and
+ * Star disagreed at generation 5 when a substitution tiling says they must converge.
+ * With the real outline they agree to about half a percentage point.
+ *
+ * Holes are *not* excluded. They are boundary cycles too, but only the largest by area
+ * is taken as the outline, so a gap counts as the genuine absence it is.
+ */
+function insideTest(pts: Map<number, P2>): (q: P2) => boolean {
+    // boundary cycles, walked over edges rather than vertices — two cycles that share
+    // a vertex must not be spliced into one
+    const edges: Array<[number, number]> = [];
+    const inc = new Map<number, number[]>();
+    for (const e of edgeMap.values()) {
+        if (e.rhombIds.length !== 1) continue;
+        const id = edges.length;
+        edges.push([e.v1, e.v2]);
+        for (const v of [e.v1, e.v2]) {
+            if (!inc.has(v)) inc.set(v, []);
+            inc.get(v)!.push(id);
         }
-        return h;
-    };
-    const lo = half(p);
-    const hi = half([...p].reverse());
-    lo.pop();
-    hi.pop();
-    return lo.concat(hi);
-}
-
-/** Signed distance into a counter-clockwise hull; negative outside. */
-function hullDepth(h: P2[], q: P2): number {
-    let best = Infinity;
-    for (let i = 0; i < h.length; i++) {
-        const a = h[i];
-        const b = h[(i + 1) % h.length];
-        const L = Math.hypot(b[0] - a[0], b[1] - a[1]);
-        const d = ((b[0] - a[0]) * (q[1] - a[1]) - (b[1] - a[1]) * (q[0] - a[0])) / L;
-        if (d < best) best = d;
     }
-    return best;
+    const used = new Array<boolean>(edges.length).fill(false);
+    let outline: P2[] = [];
+    let bestArea = 0;
+    for (let s0 = 0; s0 < edges.length; s0++) {
+        if (used[s0]) continue;
+        used[s0] = true;
+        const ring = [edges[s0][0], edges[s0][1]];
+        let cur = edges[s0][1];
+        for (;;) {
+            const nxt = (inc.get(cur) ?? []).find((id) => !used[id]);
+            if (nxt === undefined) break;
+            used[nxt] = true;
+            const [a, b] = edges[nxt];
+            cur = a === cur ? b : a;
+            ring.push(cur);
+            if (cur === ring[0]) break;
+        }
+        if (ring.length < 4) continue;
+        const poly = ring.map((v) => pts.get(v)!).filter(Boolean);
+        let a2 = 0;
+        for (let i = 0; i < poly.length; i++) {
+            const p = poly[i];
+            const q = poly[(i + 1) % poly.length];
+            a2 += p[0] * q[1] - q[0] * p[1];
+        }
+        if (Math.abs(a2) > Math.abs(bestArea)) {
+            bestArea = a2;
+            outline = poly;
+        }
+    }
+    if (outline.length < 3) return () => false;
+
+    // Rasterize once. Point-in-polygon per candidate face would be O(outline) each,
+    // and there are ten per solid over tens of thousands of solids.
+    const xs = outline.map((p) => p[0]);
+    const ys = outline.map((p) => p[1]);
+    const x0 = Math.min(...xs);
+    const y0 = Math.min(...ys);
+    const CELL = 0.2; // a fifth of an edge; the footprint is two edges across
+    const W = Math.ceil((Math.max(...xs) - x0) / CELL) + 2;
+    const H = Math.ceil((Math.max(...ys) - y0) / CELL) + 2;
+    const grid = new Uint8Array(W * H);
+    for (let r = 0; r < H; r++) {
+        const y = y0 + (r + 0.5) * CELL;
+        const cuts: number[] = [];
+        for (let i = 0, j = outline.length - 1; i < outline.length; j = i++) {
+            const a = outline[i];
+            const b = outline[j];
+            if (a[1] > y !== b[1] > y) {
+                cuts.push(a[0] + ((y - a[1]) * (b[0] - a[0])) / (b[1] - a[1]));
+            }
+        }
+        cuts.sort((p, q) => p - q);
+        for (let k = 0; k + 1 < cuts.length; k += 2) {
+            const c0 = Math.max(0, Math.ceil((cuts[k] - x0) / CELL - 0.5));
+            const c1 = Math.min(W - 1, Math.floor((cuts[k + 1] - x0) / CELL - 0.5));
+            for (let c = c0; c <= c1; c++) grid[r * W + c] = 1;
+        }
+    }
+    return (q: P2) => {
+        const c = Math.round((q[0] - x0) / CELL - 0.5);
+        const r = Math.round((q[1] - y0) / CELL - 0.5);
+        if (c < 0 || r < 0 || c >= W || r >= H) return false;
+        return grid[r * W + c] === 1;
+    };
 }
 
 // ── the construction ──────────────────────────────────────────────
@@ -315,29 +375,25 @@ export function triacontahedra(): Centers {
         byRhomb[r.id] = f;
     }
 
-    // Settledness. The cheap disc test decides almost every solid — only the ones
-    // straddling the outline need their forty corners looked at individually.
-    const hull = convexHull(faces.flatMap((f) => f.vids.map((v) => planar(lift.n[v]!))));
-    const FOOTPRINT = Math.max(
-        ...candidateCorners(solids[0]?.m ?? [1, 1, 1, 1, 1, 1]).flatMap((c) =>
-            c.corners.map((n) => {
-                const q = planar(n);
-                const c0 = solids[0] ? solids[0].c : [0, 0, 0];
-                return Math.hypot(q[0] - c0[0], q[1] - c0[1]);
-            }),
-        ),
-    );
+    // Settledness, tested on the ten candidate face *centroids* rather than their
+    // corners: a face lying exactly along the outline should not be a coin toss.
+    const vpos = new Map<number, P2>();
+    lift.n.forEach((nv, id) => { if (nv) vpos.set(id, planar(nv)); });
+    const inside = insideTest(vpos);
     for (const s of solids) {
         s.complete = s.faces.length === 10;
         const t = s.faces.filter((fid) => byRhomb[fid].thick).length;
         s.makeup = `${s.faces.length}=${t}T+${s.faces.length - t}t`;
-        const d = hullDepth(hull, [s.c[0], s.c[1]]);
-        s.settled =
-            d >= FOOTPRINT ||
-            (d > 0 &&
-                candidateCorners(s.m).every((c) =>
-                    c.corners.every((n) => hullDepth(hull, planar(n)) > 1e-9),
-                ));
+        s.settled = candidateCorners(s.m).every((c) => {
+            let x = 0;
+            let y = 0;
+            for (const n of c.corners) {
+                const q = planar(n);
+                x += q[0] / 4;
+                y += q[1] / 4;
+            }
+            return inside([x, y]);
+        });
     }
 
     return { solids, faces, byRhomb, residual };
