@@ -97,6 +97,10 @@ export interface RoofView {
     drawRoof(d: RoofData, opts: DrawOptions): void;
     /** bounding-sphere radius of the last roof drawn, for framing */
     roofRadius(): number;
+    /** the surface mesh of the last roof drawn, for picking. Non-indexed and two
+     *  triangles per rhombus, so a raycast's `faceIndex >> 1` is the face's position
+     *  in `RoofData.faces`. */
+    surface(): THREE.Mesh | null;
     /** pull the camera back far enough to hold a sphere of this radius */
     frame(radius: number): void;
     resize(): void;
@@ -129,6 +133,7 @@ export function createRoofView(host: HTMLElement, background = 0xf4f4f7): RoofVi
 
     let drawn: THREE.Object3D[] = [];
     let radius = 0;
+    let surfaceMesh: THREE.Mesh | null = null;
 
     const disposeOne = (obj: THREE.Object3D) => {
         const any = obj as THREE.Mesh | THREE.LineSegments;
@@ -153,6 +158,7 @@ export function createRoofView(host: HTMLElement, background = 0xf4f4f7): RoofVi
                 });
             }
             drawn = [];
+            surfaceMesh = null;
         },
 
         add(obj) {
@@ -196,7 +202,8 @@ export function createRoofView(host: HTMLElement, background = 0xf4f4f7): RoofVi
                 polygonOffsetFactor: 1,
                 polygonOffsetUnits: 1,
             });
-            view.add(new THREE.Mesh(geo, mat));
+            surfaceMesh = new THREE.Mesh(geo, mat);
+            view.add(surfaceMesh);
 
             geo.computeBoundingSphere();
             radius = geo.boundingSphere!.radius;
@@ -235,6 +242,8 @@ export function createRoofView(host: HTMLElement, background = 0xf4f4f7): RoofVi
         },
 
         roofRadius: () => radius,
+
+        surface: () => surfaceMesh,
 
         frame(r) {
             if (!(r > 0)) return; // an empty patch must not normalize a zero vector

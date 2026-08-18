@@ -25,6 +25,7 @@
     #view canvas { display: block; width: 100%; height: 100%; cursor: grab; }
     #view canvas:active { cursor: grabbing; }
     #status { display: block; margin: 10px 0 0; line-height: 1.5; }
+    #pick { display: block; margin: 6px 0 0; line-height: 1.5; }
 </style>
 </head>
 <body>
@@ -66,6 +67,14 @@
     <label>Solid size <span id="sscaleOut" class="mono"></span>
         <input type="range" id="sscale" min="0" max="1" step="0.005" value="1">
     </label>
+    <label>Faces per solid <span id="minsizeOut" class="mono"></span>
+        <input type="range" id="minsize" min="1" max="10" step="1" value="10">
+    </label>
+    <label>Side <select id="side">
+        <option value="both">Above and below</option>
+        <option value="hat">Below the roof</option>
+        <option value="bowl">Above the roof</option>
+    </select></label>
     <span class="checks">
         <label><input type="checkbox" id="normals"> normals</label>
         <label><input type="checkbox" id="solids" checked> solids</label>
@@ -79,6 +88,7 @@
 
 <div id="view"></div>
 <span class="info" id="status"></span>
+<span class="info" id="pick">Click a face to see which triacontahedra it lies on.</span>
 
 <details id="help">
     <summary>How it works <span class="mono" id="buildtag" style="font-weight:400;color:#888"></span></summary>
@@ -171,6 +181,29 @@
     <span class="mono">φ⁻²</span> and <span class="mono">φ⁻³</span> — φ³ being the
     inflation factor of the tiling in three dimensions, so a solid shrunk that far is
     the next one down in the hierarchy.
+</p>
+<p>
+    <strong>Faces per solid</strong> is the filter. At ten you see only the complete
+    triacontahedra, which is the picture the page opens on and the one worth keeping.
+    Wind it down and the partial solids appear — the ones the roof only grazes — and
+    the field fills fast, which is what the solid-size slider is for. At one, every
+    center is drawn, and there are about as many of those as there are faces, because
+    each face names two of them and most are named only once.
+</p>
+<p>
+    <strong>Side</strong> separates the two answers a face gives. Every face lies on
+    one solid below the roof and one above it, so <em>below</em> shows the solids the
+    roof is a lid on and <em>above</em> shows the ones resting on it. A complete cap
+    is one or the other depending on whether its rosette hub sits at the top of the
+    patch's height range or the bottom.
+</p>
+<p>
+    <strong>Click any face</strong> and it will name both of its solids, whether
+    either is complete, and how many faces each holds — and draw them, together with
+    that face's two normals at full length, whatever the filters are set to. Two faces
+    are enough to pin a solid uniquely, so clicking a second one nearby is the quickest
+    way to see whether two rhombi belong to the same triacontahedron. They do exactly
+    when the fold between them is 36°.
 </p>
 <p>
     <strong>Colors mean grouping and nothing else.</strong> A face lies on two solids

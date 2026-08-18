@@ -826,7 +826,17 @@ Card copy:
    setting of that slider can show anything false. It also fixes a rendering fault
    rather than only crowding — the shells are translucent, so where they overlap the
    blending is order-dependent. Detents at φ⁻¹, φ⁻², φ⁻³, and on the normals at ρ.
-5. Threshold, side filter, click-to-inspect.
+5. ~~Threshold, side filter, click-to-inspect~~ **done.** One filter governs markers,
+   shells and normals together — having them disagree would make the picture
+   unreadable — so "faces per solid" at ten is the complete solids and the page opens
+   there. Winding it down on Pe3 gen 3 gives 6 → 12 → 32 → 51 → 137 solids at ≥10, 5,
+   3, 2, 1, which is what the solid-size slider is for. The side filter splits them by
+   `hat`. Picking works off the surface mesh directly: it is non-indexed with two
+   triangles per rhombus, so a raycast's `faceIndex >> 1` is the face's position in
+   the build's own list, with no second index to keep in step (verified over all 1220
+   triangles of Deca gen 3). The selection survives a rebuild and is drawn whatever
+   the filters hide, since the point of asking about one face is to get the answer
+   even when the filters have hidden it.
 6. Prose: §1, §2, §5.2 and §5.3, with the numbers. (Stage 4 already carried the bulk
    of it into the page's "How it works".)
 

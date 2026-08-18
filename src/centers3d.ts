@@ -56,6 +56,10 @@ const nlenInput = el<HTMLInputElement>("nlen");
 const nlenOut = el<HTMLElement>("nlenOut");
 const sscaleInput = el<HTMLInputElement>("sscale");
 const sscaleOut = el<HTMLElement>("sscaleOut");
+const minInput = el<HTMLInputElement>("minsize");
+const minOut = el<HTMLElement>("minsizeOut");
+const sideSel = el<HTMLSelectElement>("side");
+const pickEl = el<HTMLElement>("pick");
 const markersChk = el<HTMLInputElement>("markers");
 const shadeChk = el<HTMLInputElement>("shade");
 const statusEl = el<HTMLElement>("status");
@@ -70,6 +74,8 @@ const PREF_DEFAULTS = {
     normals: false,
     nlen: Math.sqrt(1 + 2 / Math.sqrt(5)),
     sscale: 1,
+    minsize: 10,
+    side: "both",
     solids: true,
     markers: true,
     shade: true,
@@ -77,6 +83,12 @@ const PREF_DEFAULTS = {
 const prefs = loadPrefs(PREFS_KEY, PREF_DEFAULTS);
 
 const rv = createRoofView(view);
+
+/** The rhomb the user last clicked, or null. Survives a rebuild, because changing a
+ *  filter should not throw away what you were looking at. */
+let selected: number | null = null;
+/** What the last build drew, so the pick handler can map a raycast onto a face. */
+let last: { faces: { id: number }[] } | null = null;
 
 // ── palette ───────────────────────────────────────────────────────
 //
@@ -91,6 +103,7 @@ const HUES = [
     0x8aa06a, 0x9f7b4f, 0x5f9e5a, 0xc07a7a, 0x7d8fa8, 0xa8894a,
 ].map((h) => new THREE.Color(h));
 
+const HILITE = new THREE.Color(0xd6402f);
 const SIZE_LO = new THREE.Color(0xe4e5ea);
 const SIZE_HI = new THREE.Color(0x2f5f9e);
 
@@ -196,6 +209,18 @@ function build(reframe: boolean): void {
     const complete = cen.solids.filter((s) => s.complete);
     const nlen = Number(nlenInput.value);
     const sscale = Number(sscaleInput.value);
+    const minSize = Number(minInput.value);
+    const side = sideSel.value;
+    last = { faces: d.faces };
+
+    // One filter, applied to everything: markers, shells and normals all mean "the
+    // solids currently under consideration", and having them disagree would make the
+    // picture impossible to read. At ten only the complete solids survive, which is
+    // where the page opens.
+    const passes = (s: Solid): boolean =>
+        s.faces.length >= minSize &&
+        (side === "both" || (side === "hat") === s.hat);
+    const shown = cen.solids.filter(passes);
 
     // The normals themselves. Each face sends a segment both ways — above the map and
     // below — colored by the solid at that end, so at exactly ρ every segment lands on
@@ -208,16 +233,17 @@ function build(reframe: boolean): void {
         for (const rf of cen.faces) {
             const p = place(rf.c);
             const u: V3 = [rf.u[0], rf.u[1], rf.u[2] * zsign];
-            for (const [side, sid] of [
+            for (const [dir, sid] of [
                 [1, rf.solids[0]],
                 [-1, rf.solids[1]],
             ] as Array<[number, number]>) {
+                if (!passes(cen.solids[sid])) continue;
                 const c = solidColor(cen.solids[sid]);
                 seg.push(
                     p[0], p[1], p[2],
-                    p[0] + u[0] * nlen * side,
-                    p[1] + u[1] * nlen * side,
-                    p[2] + u[2] * nlen * side,
+                    p[0] + u[0] * nlen * dir,
+                    p[1] + u[1] * nlen * dir,
+                    p[2] + u[2] * nlen * dir,
                 );
                 col.push(c.r, c.g, c.b, c.r, c.g, c.b);
             }
@@ -241,11 +267,11 @@ function build(reframe: boolean): void {
     // triacontahedron too, but drawing all of them fills the view with overlapping
     // shells — they interpenetrate freely, centers as close as one long diagonal,
     // where the complete ones are never nearer than φ³ and read as separate objects.
-    if (solidsChk.checked && complete.length && sscale > 0) {
+    if (solidsChk.checked && shown.length && sscale > 0) {
         const tris: number[] = [];
         const cols: number[] = [];
         const lines: number[] = [];
-        for (const s of complete) {
+        for (const s of shown) {
             const p = place(s.c);
             const col = solidColor(s);
             for (let i = 0; i < RT_TRIS.length; i += 3) {
@@ -303,10 +329,9 @@ function build(reframe: boolean): void {
     if (markersChk.checked) {
         const pts: number[] = [];
         const cols: number[] = [];
-        let shown = 0;
-        for (const s of cen.solids) {
-            if (s.faces.length < 2) continue;
-            shown++;
+        let drawnMarkers = 0;
+        for (const s of shown) {
+            drawnMarkers++;
             const p = place(s.c);
             const r = 0.05 + 0.022 * s.faces.length;
             const col = solidColor(s);
@@ -319,7 +344,7 @@ function build(reframe: boolean): void {
                 cols.push(col.r, col.g, col.b);
             }
         }
-        if (shown) {
+        if (drawnMarkers) {
             const mg = new THREE.BufferGeometry();
             mg.setAttribute("position", new THREE.Float32BufferAttribute(pts, 3));
             mg.setAttribute("color", new THREE.Float32BufferAttribute(cols, 3));
@@ -336,6 +361,62 @@ function build(reframe: boolean): void {
                 ),
             );
         }
+    }
+
+    // The clicked face, and the two solids it names — drawn whatever the filters say,
+    // since the point of asking about one face is to see the answer even when the
+    // filters have hidden it.
+    const sel = selected === null ? null : cen.byRhomb[selected];
+    if (sel) {
+        const hp: number[] = [];
+        const corners = sel.vids.map((v) => d.point(v));
+        for (let i = 0; i < 4; i++) {
+            const a = corners[i];
+            const b = corners[(i + 1) % 4];
+            hp.push(a[0], a[1], a[2], b[0], b[1], b[2]);
+        }
+        const p = place(sel.c);
+        const u: V3 = [sel.u[0], sel.u[1], sel.u[2] * zsign];
+        for (const dir of [1, -1]) {
+            hp.push(
+                p[0], p[1], p[2],
+                p[0] + u[0] * RHO * dir,
+                p[1] + u[1] * RHO * dir,
+                p[2] + u[2] * RHO * dir,
+            );
+        }
+        for (const sid of sel.solids) {
+            const c = place(cen.solids[sid].c);
+            const t = Math.max(sscale, 0.14);
+            for (let i = 0; i < RT_EDGES.length; i += 3) {
+                hp.push(RT_EDGES[i] * t + c[0], RT_EDGES[i + 1] * t + c[1], RT_EDGES[i + 2] * t + c[2]);
+            }
+        }
+        const hg = new THREE.BufferGeometry();
+        hg.setAttribute("position", new THREE.Float32BufferAttribute(hp, 3));
+        const hl = new THREE.LineSegments(
+            hg,
+            new THREE.LineBasicMaterial({ color: HILITE, depthTest: false }),
+        );
+        hl.renderOrder = 3;
+        rv.add(hl);
+
+        const say = (sid: number) => {
+            const s = cen.solids[sid];
+            return (
+                `#${s.id} holding ${s.faces.length} face${s.faces.length === 1 ? "" : "s"}` +
+                `${s.complete ? ", complete" : ""}, ${s.hat ? "below the roof" : "above it"}`
+            );
+        };
+        // `cluster` is a property of the tiling rather than of the solid, so it comes
+        // from the roof's own face list rather than from centers.ts.
+        const cluster = d.faces.find((f) => f.id === sel.id)?.cluster ?? "?";
+        pickEl.textContent =
+            `Rhomb ${sel.id}, ${sel.thick ? "thick" : "thin"}, from a ${cluster} tile · ` +
+            `lies on ${say(sel.solids[0])} · and on ${say(sel.solids[1])} · ` +
+            `two faces pin a solid uniquely, so a neighbor shares one exactly when the fold is 36°.`;
+    } else {
+        pickEl.textContent = "Click a face to see which triacontahedra it lies on.";
     }
 
     // Framing is computed as though every solid were showing at full size, whatever
@@ -367,7 +448,7 @@ function build(reframe: boolean): void {
         `${complete.length === pe5 ? "" : ` ⚠ against ${pe5} Pe5 rosettes`} · ` +
         `${onCap.size} of ${allRhombs.length} faces on a complete cap ` +
         `(${((100 * onCap.size) / allRhombs.length).toFixed(0)}%) · ` +
-        `normals ${nlen.toFixed(3)} = ${(nlen / RHO).toFixed(2)}ρ · ${ms} ms`;
+        `showing ${shown.length} · normals ${(nlen / RHO).toFixed(2)}ρ · ${ms} ms`;
 }
 
 // ── controls ──────────────────────────────────────────────────────
@@ -404,6 +485,9 @@ flipChk.checked = prefs.flip;
 normalsChk.checked = prefs.normals;
 nlenInput.value = String(prefs.nlen);
 sscaleInput.value = String(prefs.sscale);
+minInput.value = String(prefs.minsize);
+sideSel.value = prefs.side;
+if (!sideSel.value) sideSel.value = PREF_DEFAULTS.side;
 edgesChk.checked = prefs.edges;
 solidsChk.checked = prefs.solids;
 markersChk.checked = prefs.markers;
@@ -413,14 +497,15 @@ function rebuild(reframe: boolean): void {
     const nl = Number(nlenInput.value);
     nlenOut.textContent = `${(nl / RHO).toFixed(2)}ρ`;
     sscaleOut.textContent = `${Number(sscaleInput.value).toFixed(2)}×`;
+    minOut.textContent = `≥ ${minInput.value}`;
     rv.clear();
     build(reframe);
 }
 for (const c of [patchSel, genSel]) c.addEventListener("change", () => rebuild(true));
-for (const c of [colorSel, flipChk, edgesChk, normalsChk, solidsChk, markersChk, shadeChk]) {
+for (const c of [colorSel, sideSel, flipChk, edgesChk, normalsChk, solidsChk, markersChk, shadeChk]) {
     c.addEventListener("change", () => rebuild(false));
 }
-for (const c of [nlenInput, sscaleInput]) {
+for (const c of [nlenInput, sscaleInput, minInput]) {
     c.addEventListener("input", () => rebuild(false));
 }
 // Only the landing snaps, as on the 3D page's vertical slider. Dragging is free —
@@ -446,6 +531,8 @@ function persist(): void {
         normals: normalsChk.checked,
         nlen: Number(nlenInput.value),
         sscale: Number(sscaleInput.value),
+        minsize: Number(minInput.value),
+        side: sideSel.value,
         solids: solidsChk.checked,
         markers: markersChk.checked,
         shade: shadeChk.checked,
@@ -463,6 +550,41 @@ el<HTMLButtonElement>("reset").addEventListener("click", () => {
 });
 
 window.addEventListener("resize", () => rv.resize());
+
+// Picking. The surface is non-indexed with two triangles per rhombus, so a hit's
+// faceIndex >> 1 is the face's position in the build's own list — no separate index
+// to keep in step. A drag is an orbit and must not also be a click, so the pointer
+// has to come back up within a few pixels of where it went down.
+{
+    const ray = new THREE.Raycaster();
+    const ndc = new THREE.Vector2();
+    let downAt: { x: number; y: number } | null = null;
+
+    rv.renderer.domElement.addEventListener("pointerdown", (e) => {
+        downAt = { x: e.clientX, y: e.clientY };
+    });
+    rv.renderer.domElement.addEventListener("pointerup", (e) => {
+        if (!downAt) return;
+        const moved = Math.hypot(e.clientX - downAt.x, e.clientY - downAt.y);
+        downAt = null;
+        if (moved > 4) return;
+
+        const mesh = rv.surface();
+        if (!mesh || !last) return;
+        const r = rv.renderer.domElement.getBoundingClientRect();
+        ndc.x = ((e.clientX - r.left) / r.width) * 2 - 1;
+        ndc.y = -((e.clientY - r.top) / r.height) * 2 + 1;
+        ray.setFromCamera(ndc, rv.camera);
+        const hit = ray.intersectObject(mesh, false)[0];
+        const next =
+            hit && hit.faceIndex != null
+                ? (last.faces[hit.faceIndex >> 1]?.id ?? null)
+                : null;
+        // clicking the same face again lets go of it
+        selected = next !== null && next === selected ? null : next;
+        rebuild(false);
+    });
+}
 
 console.log(`centers build ${BUILD_ID}`);
 {
