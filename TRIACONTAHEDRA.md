@@ -274,6 +274,42 @@ a triacontahedron has one face per orientation per side. Groups are usually but
 Pe3 gen 4 are split into pieces. A solid can show the roof two separated scraps of
 itself.
 
+### Face classes, and the orphans
+
+Give each face the size of the larger of its two solids — which is what largest-first
+assignment gives it anyway — and the roof partitions into six classes, `1 2 3 4 5 10`,
+with nothing between five and ten here either:
+
+| patch | 1 | 2 | 3 | 4 | 5 | 10 |
+|---|---|---|---|---|---|---|
+| Pe5 gen 3 | — | — | 35 | 20 | 25 | 60 |
+| Pe3 gen 3 | **2** | 6 | 25 | 16 | 30 | 60 |
+| Pe1 gen 3 | **4** | 12 | 15 | 12 | 35 | 60 |
+| St5 gen 3 | — | 50 | — | 10 | 55 | 50 |
+| Deca gen 3 | **10** | 50 | — | 30 | 290 | 230 |
+| Sun gen 4 | **10** | 220 | 420 | 1340 | 7775 | 6710 |
+| Star gen 4 | **10** | 530 | — | 1000 | 7455 | 5850 |
+
+Pe5 patches have no class 1 and no class 2 at all: every face sits in a group of at
+least three.
+
+**Class 1 — orphans — are real, and they are entirely a boundary effect.** A class-1
+face lies on two triacontahedra and is the only face on either, so it shares a solid
+with nothing. Measured over all 27 seed/generation combinations, without exception:
+
+- every orphan is on the **patch boundary** (100 of 100);
+- every orphan is **thin**, with only **two of its four neighbors present**, meeting
+  both of them at **72° and 108°** — and 36° is the fold that makes two faces share a
+  solid (§5.1), so the two absent neighbors are precisely the ones that would have
+  given it one;
+- their number **does not grow with the patch**: Pe3 has 2 at generations 2, 3 and 4
+  alike, Pe1 has 2/4/4, Deca 4/10/10, Sun and Star 10 at every generation, against
+  face counts running from 23 to 16,475.
+
+A fixed count against a growing area means they are a feature of where the patch was
+cut, not of the tiling. **An unbounded Wieringa roof has no orphans**: every face
+shares a triacontahedron with at least one neighbor.
+
 A greedy largest-first assignment (each face to its bigger group) covers a patch
 completely: 31 solids for 140 faces at Pe5 gen 3, 190 for 878 at Pe3 gen 4, 935 for
 4430 at Deca gen 4. That is a segmentation, not a canonical decomposition, and

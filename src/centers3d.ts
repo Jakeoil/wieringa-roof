@@ -104,8 +104,20 @@ const HUES = [
 ].map((h) => new THREE.Color(h));
 
 const HILITE = new THREE.Color(0xd6402f);
-const SIZE_LO = new THREE.Color(0xe4e5ea);
-const SIZE_HI = new THREE.Color(0x2f5f9e);
+// Faces per solid is a classification, not a scale: the sizes that occur are
+// 1, 2, 3, 4, 5 and 10 and nothing else, ever, over every patch measured. So each
+// class gets its own color rather than a position on a ramp. Class 1 is deliberately
+// an alarm color — a face whose every solid holds only itself is worth being able to
+// find at a glance, and on any finite patch there are a handful of them.
+const CLASS_COLORS: Record<number, THREE.Color> = {
+    1: new THREE.Color(0xd6402f),
+    2: new THREE.Color(0xe08a3c),
+    3: new THREE.Color(0xd9b463),
+    4: new THREE.Color(0x7ba05b),
+    5: new THREE.Color(0x54a598),
+    10: new THREE.Color(0x2f5f9e),
+};
+const CLASS_ORDER = [1, 2, 3, 4, 5, 10];
 
 function solidColor(s: Solid): THREE.Color {
     const base = HUES[s.id % HUES.length];
@@ -192,10 +204,8 @@ function build(reframe: boolean): void {
             if (mode === "cluster") return CLUSTER_3D[f.cluster] ?? CLUSTER_FALLBACK;
             if (mode === "complete")
                 return s.complete ? solidColor(s) : WASH.clone();
-            if (mode === "size") {
-                const t = (s.faces.length - 1) / 9;
-                return SIZE_LO.clone().lerp(SIZE_HI, t);
-            }
+            if (mode === "class")
+                return CLASS_COLORS[s.faces.length] ?? CLUSTER_FALLBACK;
             return solidColor(s);
         },
         shade: shadeChk.checked ? 1 : 0,
@@ -436,6 +446,14 @@ function build(reframe: boolean): void {
 
     const hist: Record<number, number> = {};
     for (const s of cen.solids) hist[s.faces.length] = (hist[s.faces.length] ?? 0) + 1;
+    // The face classes: each rhomb takes the size of the larger of its two solids,
+    // which is what largest-first assignment gives it anyway.
+    const cls: Record<number, number> = {};
+    for (const f of d.faces) {
+        const n = cen.solids[assign[f.id]].faces.length;
+        cls[n] = (cls[n] ?? 0) + 1;
+    }
+    const clsText = CLASS_ORDER.filter((k) => cls[k]).map((k) => `${k}:${cls[k]}`).join(" ");
     const hats = complete.filter((s) => s.hat).length;
     const pe5 = pe5Rosettes().length;
     const onCap = new Set<number>();
@@ -448,7 +466,9 @@ function build(reframe: boolean): void {
         `${complete.length === pe5 ? "" : ` ⚠ against ${pe5} Pe5 rosettes`} · ` +
         `${onCap.size} of ${allRhombs.length} faces on a complete cap ` +
         `(${((100 * onCap.size) / allRhombs.length).toFixed(0)}%) · ` +
-        `showing ${shown.length} · normals ${(nlen / RHO).toFixed(2)}ρ · ${ms} ms`;
+        `showing ${shown.length} · face classes ${clsText}` +
+        `${cls[1] ? ` — ${cls[1]} orphan${cls[1] === 1 ? "" : "s"}, all on the boundary` : ""} · ` +
+        `normals ${(nlen / RHO).toFixed(2)}ρ · ${ms} ms`;
 }
 
 // ── controls ──────────────────────────────────────────────────────

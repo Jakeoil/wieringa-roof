@@ -58,7 +58,7 @@
     <label>Color <select id="color">
         <option value="solid">Triacontahedron</option>
         <option value="complete">Complete caps only</option>
-        <option value="size">Faces per solid</option>
+        <option value="class">Class — faces per solid</option>
         <option value="cluster">Star / boat / diamond</option>
     </select></label>
     <label>Normals <span id="nlenOut" class="mono"></span>
@@ -183,7 +183,29 @@
     the next one down in the hierarchy.
 </p>
 <p>
-    <strong>Faces per solid</strong> is the filter. At ten you see only the complete
+    <strong>Faces per solid is a classification, not a scale.</strong> The sizes that
+    occur are 1, 2, 3, 4, 5 and 10 — never 6, 7, 8 or 9, over every patch measured up
+    to 16,475 rhombi. So the <em>Class</em> coloring gives each its own color rather
+    than a position along a ramp: <span class="mono">1</span> red,
+    <span class="mono">2</span> orange, <span class="mono">3</span> gold,
+    <span class="mono">4</span> green, <span class="mono">5</span> teal,
+    <span class="mono">10</span> blue. A face takes the class of the larger of its two
+    solids. Pe5 patches have no class 1 or 2 at all: every face there sits in a group
+    of at least three.
+</p>
+<p>
+    <strong>Orphans — class 1 — are real, and they are all boundary.</strong> A face of
+    class 1 lies on two triacontahedra and is the only face on either of them, so it
+    shares a solid with nothing. Measured across every seed and generation, an orphan is
+    <em>always</em> a thin rhomb on the edge of the patch with only two of its four
+    neighbors present, meeting both at 72° and 108° — and the two missing neighbors are
+    exactly where its 36° folds would have been, 36° being the fold that makes two
+    faces share a solid. Their number does not grow with the patch either: Pe3 has two
+    at generations 2, 3 and 4 alike, and Sun has ten at all three. They are a feature
+    of where the patch was cut, not of the tiling. An unbounded roof has none.
+</p>
+<p>
+    <strong>Faces per solid</strong> is also the filter. At ten you see only the complete
     triacontahedra, which is the picture the page opens on and the one worth keeping.
     Wind it down and the partial solids appear — the ones the roof only grazes — and
     the field fills fast, which is what the solid-size slider is for. At one, every
