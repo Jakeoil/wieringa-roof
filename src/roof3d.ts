@@ -12,6 +12,7 @@
 
 import * as THREE from "three";
 import { loadPrefs, savePrefs, resetPrefs } from "./prefs.js";
+import { BUILD_ID } from "./build-id.js";
 import { seedTypes, generatePatch, allRhombs, vertexList } from "./geometry.js";
 import { buildRoof } from "./roofgeom.js";
 import {
@@ -247,6 +248,16 @@ el<HTMLButtonElement>("reset").addEventListener("click", () => {
 });
 
 window.addEventListener("resize", () => rv.resize());
+
+// On the page as well as in the console. Working out whether the browser is running
+// a stale script has cost this project three debugging sessions, and asking someone
+// to open developer tools to find out is not an answer. The workbench has said so
+// since it was written; this page was the one that could not answer the question.
+console.log(`roof3d build ${BUILD_ID}`);
+{
+    const tag = document.getElementById("buildtag");
+    if (tag) tag.textContent = `· build ${BUILD_ID}`;
+}
 
 rv.resize();
 rebuild(true);
