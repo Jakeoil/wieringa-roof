@@ -462,16 +462,32 @@ function build(reframe: boolean): void {
             if (!showRTFor(s)) continue;
             const t = sizeOf(s);
             if (t <= 0) continue;
-            const TRIS = rtCup ? (visuallyHat(s) ? RT_UP_TRIS : RT_DOWN_TRIS) : RT_TRIS;
-            const EDG = rtCup ? (visuallyHat(s) ? RT_UP_EDGES : RT_DOWN_EDGES) : RT_EDGES;
+            // Mirror the mesh with the scene, and pick the cup by the solid's own
+            // unflipped side. The triacontahedron is NOT symmetric under z → −z —
+            // only 10 of its 30 face centers map onto face centers; it takes a 36°
+            // turn as well, since the top and bottom caps are anti-aligned. Drawing
+            // the unmirrored mesh at a mirrored center therefore puts every solid a
+            // tenth of a turn out of register, which is exactly the daylight that
+            // appears with dales up and not otherwise. Mirroring the whole picture is
+            // both simpler and exact.
+            const TRIS = rtCup ? (s.hat ? RT_UP_TRIS : RT_DOWN_TRIS) : RT_TRIS;
+            const EDG = rtCup ? (s.hat ? RT_UP_EDGES : RT_DOWN_EDGES) : RT_EDGES;
             const p = place(s.c);
             const col = solidColor(s);
             for (let i = 0; i < TRIS.length; i += 3) {
-                tris.push(TRIS[i] * t + p[0], TRIS[i + 1] * t + p[1], TRIS[i + 2] * t + p[2]);
+                tris.push(
+                    TRIS[i] * t + p[0],
+                    TRIS[i + 1] * t + p[1],
+                    TRIS[i + 2] * t * zsign + p[2],
+                );
                 cols.push(col.r, col.g, col.b);
             }
             for (let i = 0; i < EDG.length; i += 3) {
-                lines.push(EDG[i] * t + p[0], EDG[i + 1] * t + p[1], EDG[i + 2] * t + p[2]);
+                lines.push(
+                    EDG[i] * t + p[0],
+                    EDG[i + 1] * t + p[1],
+                    EDG[i + 2] * t * zsign + p[2],
+                );
             }
         }
         if (tris.length) {

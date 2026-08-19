@@ -741,6 +741,19 @@ zero gaps on Deca. Cluster with a tolerance before quoting these numbers again.*
 - **Do not carry the ρ-tangency trick over to the rhombic icosahedron or the
   Bilinski dodecahedron.** Neither is isohedral and the construction is simply
   false for them (§1). If those solids are wanted, they need a different test.
+- **The triacontahedron is not symmetric under z → −z.** Only 10 of its 30 face
+  centers map; it takes a **36° turn as well**, because the top and bottom caps are
+  anti-aligned — `mirror(F) = R(−36°)·F`, verified 30 of 30. So a page that mirrors the
+  scene for dales-up must mirror the solid mesh too. Drawing the unmirrored mesh at a
+  mirrored center puts every solid a tenth of a turn out of register with the roof's
+  rosettes: the thin ring slips 0.7236 of an edge and the thick cap 0.4472, and because
+  a rotation slides faces *along* the rosette the symptom is cracks opening on one side
+  of each face rather than solids landing anywhere obviously wrong.
+
+  Jeff found it from the page — Sun gen 2, rhombi invisible, cups on, toggle dales up
+  and the cracks appear; toggle back and they are gone. Every numerical check in this
+  file ran unflipped, so the parity path had no test at all and the fault was invisible
+  to all of them. **Check both parities.**
 - **Get the closest-approach formula right.** The first agnostic run reported
   *zero* concurrences on every patch — a flatly impossible answer given §5, and the
   cause was a sign slip in the line-to-line closest approach, not a finding. Any
