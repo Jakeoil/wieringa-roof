@@ -41,6 +41,16 @@ const snapTo = (v: number, stops: number[], tol: number): number => {
     return v;
 };
 
+const cross = (a: V3, b: V3): V3 => [
+    a[1] * b[2] - a[2] * b[1],
+    a[2] * b[0] - a[0] * b[2],
+    a[0] * b[1] - a[1] * b[0],
+];
+const nrm = (a: V3): V3 => {
+    const L = Math.hypot(a[0], a[1], a[2]);
+    return [a[0] / L, a[1] / L, a[2] / L];
+};
+
 const el = <T extends HTMLElement>(id: string): T => {
     const found = document.getElementById(id);
     if (!found) throw new Error(`missing element #${id} (stale cached script?)`);
@@ -81,8 +91,8 @@ const PREF_DEFAULTS = {
     side: "both",
     unsettled: false,
     heads: false,
-    classOn: CLASSES.map((c) => c === 10),
-    classSize: CLASSES.map(() => 1),
+    classOn: [true, true, true, false],
+    classSize: [1, 1, 1, 1],
     solids: true,
     markers: true,
     shade: true,
@@ -116,19 +126,20 @@ const HUES = [
 ].map((h) => new THREE.Color(h));
 
 const HILITE = new THREE.Color(0xd6402f);
-// Faces per solid is a classification, not a scale: the sizes that occur are
-// 1, 2, 3, 4, 5 and 10 and nothing else, ever, over every patch measured. So each
-// class gets its own color rather than a position on a ramp. Class 1 is deliberately
-// an alarm color — a face whose every solid holds only itself is worth being able to
-// find at a glance, and on any finite patch there are a handful of them.
-const CLASS_COLORS: Record<number, THREE.Color> = {
-    1: new THREE.Color(0xd6402f),
-    2: new THREE.Color(0xe08a3c),
-    3: new THREE.Color(0xd9b463),
-    4: new THREE.Color(0x7ba05b),
-    5: new THREE.Color(0x54a598),
-    10: new THREE.Color(0x2f5f9e),
-};
+// Six sizes occur, but only three are classes once the nail heads are held back.
+// Class 3 is empty — every three-face solid is the far end of something else — and
+// classes 1 and 2 fall away with patch size (Sun: 17.9, 2.7, 0.4, 0.05 percent at
+// generations 2 to 5). They are not dropped, because on a small patch the residue is
+// real: Pe3 gen 3 is 27% class 1 and 2. They are gathered into one control instead,
+// so the bar says what the roof is made of rather than what the construction emits.
+interface ClassGroup { label: string; sizes: number[]; color: THREE.Color; hint: string }
+const CLASS_GROUPS: ClassGroup[] = [
+    { label: "4", sizes: [4], color: new THREE.Color(0x7ba05b), hint: "four of the five cap faces" },
+    { label: "5", sizes: [5], color: new THREE.Color(0x54a598), hint: "the rosette, or a run of five" },
+    { label: "10", sizes: [10], color: new THREE.Color(0x2f5f9e), hint: "complete — a whole triacontahedron" },
+    { label: "other", sizes: [1, 2, 3], color: new THREE.Color(0x9b93a3), hint: "classes 1–3: boundary residue, vanishing with patch size" },
+];
+const groupOf = (n: number): number => CLASS_GROUPS.findIndex((g) => g.sizes.includes(n));
 const CLASS_ORDER = [1, 2, 3, 4, 5, 10];
 
 function solidColor(s: Solid): THREE.Color {
@@ -220,8 +231,10 @@ function build(reframe: boolean): void {
             if (mode === "cluster") return CLUSTER_3D[f.cluster] ?? CLUSTER_FALLBACK;
             if (mode === "complete")
                 return s.complete ? solidColor(s) : WASH.clone();
-            if (mode === "class")
-                return CLASS_COLORS[s.faces.length] ?? CLUSTER_FALLBACK;
+            if (mode === "class") {
+                const gi = groupOf(s.faces.length);
+                return gi < 0 ? CLUSTER_FALLBACK : CLASS_GROUPS[gi].color;
+            }
             return solidColor(s);
         },
         shade: shadeChk.checked ? 1 : 0,
@@ -243,9 +256,8 @@ function build(reframe: boolean): void {
     // One filter, applied to everything: markers, shells and normals all mean "the
     // solids currently under consideration", and having them disagree would make the
     // picture impossible to read.
-    const classIdx = (n: number) => CLASSES.indexOf(n);
     const passes = (s: Solid): boolean => {
-        const i = classIdx(s.faces.length);
+        const i = groupOf(s.faces.length);
         if (i < 0 || !classCtl[i].on.checked) return false;
         if (!s.settled && !wantUnsettled) return false;
         // A solid no face calls home is the far end of a normal whose point is
@@ -256,7 +268,7 @@ function build(reframe: boolean): void {
         return side === "both" || (side === "hat") === s.hat;
     };
     /** how big to draw this class's solids, 0 for not at all */
-    const sizeOf = (s: Solid) => Number(classCtl[classIdx(s.faces.length)].size.value) * sscale;
+    const sizeOf = (s: Solid) => Number(classCtl[groupOf(s.faces.length)].size.value) * sscale;
     const shown = cen.solids.filter(passes);
 
     // The normals themselves. Each face sends a segment both ways — above the map and
@@ -264,7 +276,10 @@ function build(reframe: boolean): void {
     // a marker of its own color and the pencils belonging to one solid arrive
     // together. Past ρ they carry on through, which is the point: normals meet at
     // other radii too, and none of those builds anything.
-    const heads: V3[] = [];
+    // Nail heads: a small disk lying *on* the rhomb, on the face away from the normal
+    // being drawn. Single-sided, so it shows only from the side with no normal — which
+    // is the whole signal. Seen from the other side the nail is a nail, not a disk.
+    const heads: Array<{ c: V3; n: V3 }> = [];
     if (normalsChk.checked && nlen > 0) {
         const seg: number[] = [];
         const col: number[] = [];
@@ -281,11 +296,7 @@ function build(reframe: boolean): void {
                     // white head, so a nail reads as a nail: you can see which end
                     // means something and which is only the far side of the same face.
                     if (sid !== homeId && passes(cen.solids[homeId])) {
-                        heads.push([
-                            p[0] + u[0] * nlen * dir,
-                            p[1] + u[1] * nlen * dir,
-                            p[2] + u[2] * nlen * dir,
-                        ]);
+                        heads.push({ c: p, n: [u[0] * dir, u[1] * dir, u[2] * dir] });
                     }
                     continue;
                 }
@@ -323,29 +334,35 @@ function build(reframe: boolean): void {
             rv.add(nl);
         }
         if (heads.length) {
+            // A four-point disk of radius 0.05 — a tenth of a unit across — lifted off
+            // the face by a hair so it does not z-fight with it, and wound so its front
+            // faces the direction with no normal. FrontSide then does the hiding for
+            // free: no per-frame test, no sorting.
+            const R = 0.05;
+            const LIFT = 0.004;
             const hp: number[] = [];
-            const R = 0.055;
             for (const h of heads) {
-                for (let i = 0; i < BALL_POS.length; i += 3) {
-                    hp.push(BALL_POS[i] * R + h[0], BALL_POS[i + 1] * R + h[1], BALL_POS[i + 2] * R + h[2]);
-                }
+                const n = h.n;
+                // any perpendicular will do; the disk has no preferred orientation
+                const seed: V3 = Math.abs(n[2]) < 0.9 ? [0, 0, 1] : [1, 0, 0];
+                const a = nrm(cross(n, seed));
+                const b = cross(n, a); // (a, b, n) right-handed, so CCW from +n
+                const at = (t: number): V3 => [
+                    h.c[0] + n[0] * LIFT + (a[0] * Math.cos(t) + b[0] * Math.sin(t)) * R,
+                    h.c[1] + n[1] * LIFT + (a[1] * Math.cos(t) + b[1] * Math.sin(t)) * R,
+                    h.c[2] + n[2] * LIFT + (a[2] * Math.cos(t) + b[2] * Math.sin(t)) * R,
+                ];
+                const q = [0, 1, 2, 3].map((k) => at((k * Math.PI) / 2));
+                for (const v of [q[0], q[1], q[2], q[0], q[2], q[3]]) hp.push(v[0], v[1], v[2]);
             }
             const hg = new THREE.BufferGeometry();
             hg.setAttribute("position", new THREE.Float32BufferAttribute(hp, 3));
-            hg.computeVertexNormals();
-            rv.add(
-                new THREE.Mesh(
-                    hg,
-                    new THREE.MeshStandardMaterial({
-                        color: 0xffffff,
-                        emissive: 0x8a8f9a,
-                        emissiveIntensity: 0.35,
-                        roughness: 0.35,
-                        metalness: 0,
-                        flatShading: true,
-                    }),
-                ),
+            const hm = new THREE.Mesh(
+                hg,
+                new THREE.MeshBasicMaterial({ color: 0xf7f7fa, side: THREE.FrontSide }),
             );
+            hm.renderOrder = 1;
+            rv.add(hm);
         }
     }
 
@@ -531,16 +548,16 @@ function build(reframe: boolean): void {
     }
     const clsText = CLASS_ORDER.filter((k) => cls[k]).map((k) => `${k}:${cls[k]}`).join(" ");
     // how many solids of each class the patch is entitled to classify
-    const perClass = CLASSES.map(() => 0);
+    const perClass = CLASS_GROUPS.map(() => 0);
     let unsettledCount = 0;
     let headCount = 0;
     for (const s of cen.solids) {
         if (!s.settled) { unsettledCount++; if (!wantUnsettled) continue; }
         if (s.homeCount === 0) { headCount++; if (!wantHeads) continue; }
-        const i = CLASSES.indexOf(s.faces.length);
+        const i = groupOf(s.faces.length);
         if (i >= 0) perClass[i]++;
     }
-    CLASSES.forEach((_, i) => { classCtl[i].count.textContent = String(perClass[i]); });
+    CLASS_GROUPS.forEach((_, i) => { classCtl[i].count.textContent = String(perClass[i]); });
     const hats = complete.filter((s) => s.hat).length;
     const pe5 = pe5Rosettes().length;
     const onCap = new Set<number>();
@@ -607,19 +624,20 @@ shadeChk.checked = prefs.shade;
 // One row per class: a colored checkbox and a size slider, plus a live count. The bar
 // is the legend as well as the control — a color that means "class 3" is no use if
 // you have to look elsewhere to learn it.
-CLASSES.forEach((n, i) => {
+CLASS_GROUPS.forEach((grp, i) => {
     const wrap = document.createElement("span");
     wrap.className = "cls";
     const top = document.createElement("label");
     top.className = "top";
+    top.title = grp.hint;
     const on = document.createElement("input");
     on.type = "checkbox";
-    on.checked = prefs.classOn[i] ?? n === 10;
+    on.checked = prefs.classOn[i] ?? grp.label !== "other";
     const sw = document.createElement("span");
     sw.className = "swatch";
-    sw.style.background = `#${CLASS_COLORS[n].getHexString()}`;
+    sw.style.background = `#${grp.color.getHexString()}`;
     const name = document.createElement("span");
-    name.textContent = String(n);
+    name.textContent = grp.label;
     top.append(on, sw, name);
     const size = document.createElement("input");
     size.type = "range";
@@ -627,7 +645,7 @@ CLASSES.forEach((n, i) => {
     size.max = "1";
     size.step = "0.01";
     size.value = String(prefs.classSize[i] ?? 1);
-    size.title = `How big to draw class ${n} solids`;
+    size.title = `How big to draw class ${grp.label} solids`;
     const count = document.createElement("span");
     count.className = "count";
     wrap.append(top, size, count);
