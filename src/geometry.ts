@@ -379,6 +379,23 @@ function makeP1Shapes(wheels: WheelSet, gen: number): P1Shapes {
     };
 }
 
+/**
+ * Outline of a *recorded* P1 tile, in tiling coordinates, already translated to where
+ * it sits.
+ *
+ * The P1 layer knows where the tiling was laid down even where it emits no rhombi, and
+ * that is the only thing that does. The rhomb layer's own boundary cannot tell a gap
+ * from a cut: the star-family tiles leave bays that are open to the outside rather
+ * than islands, so the covered region is one deeply indented simply-connected patch
+ * and its outline runs right through the middle of the figure.
+ */
+function p1TileOutline(t: P1Tile): Pt[] {
+    // Looked up lazily: the tile types are declared further down the file.
+    const ty = ({ Pe5, Pe3, Pe1, St5, St3, St1 } as Record<string, TileType>)[t.type];
+    if (!ty) return [];
+    return p1Outline(ty, t.tenth, t.gen).map((q) => t.loc.tr(q));
+}
+
 /** Outline of a P1 tile, in tiling coordinates. */
 function p1Outline(type: TileType, tenth: number, gen: number): Pt[] {
     if (!p1Shapes.has(gen)) p1Shapes.set(gen, makeP1Shapes(wheels, gen));
@@ -1397,6 +1414,7 @@ export {
     allRhombs,
     allP1Tiles,
     p1Outline,
+    p1TileOutline,
     vertexList,
     vertexMap,
     edgeMap,

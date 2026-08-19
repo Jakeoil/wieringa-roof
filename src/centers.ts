@@ -28,8 +28,9 @@
 import {
     allRhombs,
     allP1Tiles,
+    p1TileOutline,
+    vertexList,
     vertexMap,
-    edgeMap,
     roundKey,
     computeLift,
     pos3D,
@@ -193,88 +194,75 @@ const planar = (n: number[]): P2 => {
 };
 
 /**
- * The patch's outer boundary, and a grid that answers "is this point inside it".
+ * Is a point inside the region the tiling was actually generated over?
  *
- * The convex hull will not do. A Star or a Queen patch is deeply concave, so the hull
- * spans the bays and solids sitting in open air get counted as settled — and the bias
- * differs per seed, which is how it was found: the class frequencies of Deca, Sun and
- * Star disagreed at generation 5 when a substitution tiling says they must converge.
- * With the real outline they agree to about half a percentage point.
+ * Not the rhomb layer's own boundary, which cannot answer this. The star-family tiles
+ * emit no rhombi, and their gaps turn out to be **bays rather than islands** — open to
+ * the outside, so the covered region is one deeply indented simply-connected patch
+ * whose boundary runs right through the middle of the figure. Measured: Sun gen 3 has
+ * exactly one boundary cycle, and it encloses 1590.5 against a covered area of
+ * 1590.5, so there is nothing enclosed that is not covered. Testing against that
+ * outline therefore calls a gap "outside the patch" and withholds every solid near
+ * one — which is the daylight seen in the middle of a large patch with the cups drawn.
  *
- * Holes are *not* excluded. They are boundary cycles too, but only the largest by area
- * is taken as the outline, so a gap counts as the genuine absence it is.
+ * The P1 layer does know. It records every tile laid down, including the ones that
+ * emit nothing, so the union of its outlines is the region the patch decided. A gap
+ * inside it is a genuine absence; only its outer edge is a cut.
+ *
+ * Rasterized once, because there are hundreds of tiles and tens of thousands of points
+ * to test.
  */
-function insideTest(pts: Map<number, P2>): (q: P2) => boolean {
-    // boundary cycles, walked over edges rather than vertices — two cycles that share
-    // a vertex must not be spliced into one
-    const edges: Array<[number, number]> = [];
-    const inc = new Map<number, number[]>();
-    for (const e of edgeMap.values()) {
-        if (e.rhombIds.length !== 1) continue;
-        const id = edges.length;
-        edges.push([e.v1, e.v2]);
-        for (const v of [e.v1, e.v2]) {
-            if (!inc.has(v)) inc.set(v, []);
-            inc.get(v)!.push(id);
-        }
+function insideP1Footprint(): (q: P2) => boolean {
+    const polys: P2[][] = [];
+    for (const t of allP1Tiles) {
+        const o = p1TileOutline(t);
+        if (o.length > 2) polys.push(o.map((q) => [q.x, q.y] as P2));
     }
-    const used = new Array<boolean>(edges.length).fill(false);
-    let outline: P2[] = [];
-    let bestArea = 0;
-    for (let s0 = 0; s0 < edges.length; s0++) {
-        if (used[s0]) continue;
-        used[s0] = true;
-        const ring = [edges[s0][0], edges[s0][1]];
-        let cur = edges[s0][1];
-        for (;;) {
-            const nxt = (inc.get(cur) ?? []).find((id) => !used[id]);
-            if (nxt === undefined) break;
-            used[nxt] = true;
-            const [a, b] = edges[nxt];
-            cur = a === cur ? b : a;
-            ring.push(cur);
-            if (cur === ring[0]) break;
-        }
-        if (ring.length < 4) continue;
-        const poly = ring.map((v) => pts.get(v)!).filter(Boolean);
-        let a2 = 0;
-        for (let i = 0; i < poly.length; i++) {
-            const p = poly[i];
-            const q = poly[(i + 1) % poly.length];
-            a2 += p[0] * q[1] - q[0] * p[1];
-        }
-        if (Math.abs(a2) > Math.abs(bestArea)) {
-            bestArea = a2;
-            outline = poly;
-        }
-    }
-    if (outline.length < 3) return () => false;
+    if (!polys.length) return () => false;
 
-    // Rasterize once. Point-in-polygon per candidate face would be O(outline) each,
-    // and there are ten per solid over tens of thousands of solids.
-    const xs = outline.map((p) => p[0]);
-    const ys = outline.map((p) => p[1]);
-    const x0 = Math.min(...xs);
-    const y0 = Math.min(...ys);
-    const CELL = 0.2; // a fifth of an edge; the footprint is two edges across
-    const W = Math.ceil((Math.max(...xs) - x0) / CELL) + 2;
-    const H = Math.ceil((Math.max(...ys) - y0) / CELL) + 2;
-    const grid = new Uint8Array(W * H);
-    for (let r = 0; r < H; r++) {
-        const y = y0 + (r + 0.5) * CELL;
-        const cuts: number[] = [];
-        for (let i = 0, j = outline.length - 1; i < outline.length; j = i++) {
-            const a = outline[i];
-            const b = outline[j];
-            if (a[1] > y !== b[1] > y) {
-                cuts.push(a[0] + ((y - a[1]) * (b[0] - a[0])) / (b[1] - a[1]));
-            }
+    let x0 = Infinity;
+    let y0 = Infinity;
+    let x1 = -Infinity;
+    let y1 = -Infinity;
+    for (const poly of polys) {
+        for (const q of poly) {
+            if (q[0] < x0) x0 = q[0];
+            if (q[0] > x1) x1 = q[0];
+            if (q[1] < y0) y0 = q[1];
+            if (q[1] > y1) y1 = q[1];
         }
-        cuts.sort((p, q) => p - q);
-        for (let k = 0; k + 1 < cuts.length; k += 2) {
-            const c0 = Math.max(0, Math.ceil((cuts[k] - x0) / CELL - 0.5));
-            const c1 = Math.min(W - 1, Math.floor((cuts[k + 1] - x0) / CELL - 0.5));
-            for (let c = c0; c <= c1; c++) grid[r * W + c] = 1;
+    }
+    // an eighth of an edge; the footprint is measured in tiling units, not lift units
+    const edge = vertexList.length > 1 ? p1Edge() : 1;
+    const CELL = Math.max(edge / 8, 1e-6);
+    const W = Math.ceil((x1 - x0) / CELL) + 2;
+    const H = Math.ceil((y1 - y0) / CELL) + 2;
+    const grid = new Uint8Array(W * H);
+    for (const poly of polys) {
+        let ylo = Infinity;
+        let yhi = -Infinity;
+        for (const q of poly) {
+            if (q[1] < ylo) ylo = q[1];
+            if (q[1] > yhi) yhi = q[1];
+        }
+        const r0 = Math.max(0, Math.floor((ylo - y0) / CELL));
+        const r1 = Math.min(H - 1, Math.ceil((yhi - y0) / CELL));
+        for (let r = r0; r <= r1; r++) {
+            const y = y0 + (r + 0.5) * CELL;
+            const cuts: number[] = [];
+            for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+                const a = poly[i];
+                const b = poly[j];
+                if (a[1] > y !== b[1] > y) {
+                    cuts.push(a[0] + ((y - a[1]) * (b[0] - a[0])) / (b[1] - a[1]));
+                }
+            }
+            cuts.sort((p, q) => p - q);
+            for (let k = 0; k + 1 < cuts.length; k += 2) {
+                const c0 = Math.max(0, Math.ceil((cuts[k] - x0) / CELL - 0.5));
+                const c1 = Math.min(W - 1, Math.floor((cuts[k + 1] - x0) / CELL - 0.5));
+                for (let c = c0; c <= c1; c++) grid[r * W + c] = 1;
+            }
         }
     }
     return (q: P2) => {
@@ -283,6 +271,14 @@ function insideTest(pts: Map<number, P2>): (q: P2) => boolean {
         if (c < 0 || r < 0 || c >= W || r >= H) return false;
         return grid[r * W + c] === 1;
     };
+}
+
+
+/** Mean tiling-coordinate edge length, which is not the lift's unit edge. */
+function p1Edge(): number {
+    const r = allRhombs[0];
+    if (!r) return 1;
+    return Math.hypot(r.verts[1].x - r.verts[0].x, r.verts[1].y - r.verts[0].y);
 }
 
 // ── the construction ──────────────────────────────────────────────
@@ -393,10 +389,24 @@ export function triacontahedra(): Centers {
     }
 
     // Settledness, tested on the ten candidate face *centroids* rather than their
-    // corners: a face lying exactly along the outline should not be a coin toss.
-    const vpos = new Map<number, P2>();
-    lift.n.forEach((nv, id) => { if (nv) vpos.set(id, planar(nv)); });
-    const inside = insideTest(vpos);
+    // corners: a face lying exactly along the edge should not be a coin toss. The
+    // centroids are mapped into tiling coordinates, where the P1 footprint lives —
+    // the lift's planar image is the same picture at a different scale and rotation.
+    const inside = insideP1Footprint();
+    const dirs = lift.dirs;
+    const L = lift.L;
+    const anchorN = lift.n[0];
+    const anchorP = vertexList[0]?.pos;
+    const tiling = (n: number[]): P2 => {
+        let x = 0;
+        let y = 0;
+        for (let i = 0; i < 5; i++) {
+            const d = n[i] - (anchorN ? anchorN[i] : 0);
+            x += d * Math.cos(dirs[i]) * L;
+            y += d * Math.sin(dirs[i]) * L;
+        }
+        return [x + (anchorP?.x ?? 0), y + (anchorP?.y ?? 0)];
+    };
     // Home before settledness, so the two can be read together.
     const home: number[] = [];
     for (const f of faces) {
@@ -413,7 +423,7 @@ export function triacontahedra(): Centers {
             let x = 0;
             let y = 0;
             for (const n of c.corners) {
-                const q = planar(n);
+                const q = tiling(n);
                 x += q[0] / 4;
                 y += q[1] / 4;
             }

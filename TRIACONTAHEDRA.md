@@ -352,6 +352,14 @@ rhomb is covered iff *its home solid is drawn*, and two kinds are held back:
 | home demoted (class 1) | 10 |
 | **total** | **1,270 = 7.7%** |
 
+**The daylight is all boundary, even where it looks interior.** Measured on Sun gen 4:
+every unsettled solid lies within **2 edges of a real boundary edge**, none further.
+It looks like the middle of the patch because the boundary is not the outline the eye
+draws: the star-family gaps are **bays open to the outside**, not islands, so the
+covered region is one deeply indented simply-connected patch and its boundary reaches
+far inside the convex hull. Sun gen 4 has 270 withheld solids more than 10 edges from
+the hull and *zero* more than 2 edges from the boundary — both true at once.
+
 Draw **every** home solid instead and coverage is **exactly 100%** — 0 uncovered on
 every patch — which is not luck: every rhomb has a home and a home's cup contains it.
 The gaps fall as the patch grows (38.8% → 13.5% → 7.7% on Pe3 gen 3, Sun gen 3, Sun
