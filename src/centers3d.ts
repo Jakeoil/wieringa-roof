@@ -170,7 +170,10 @@ const PROPER: ProperClass[] = [
     { key: "c10", label: "10", makeup: "10=5T+5t", color: new THREE.Color(0x2f6fb5),
       hint: "complete — a whole triacontahedron" },
 ];
-const DEMOTED = new THREE.Color(0xf0f0f3);
+// Colorless, but not invisible. A demoted solid drawn against a near-white page at
+// partial opacity disappears entirely, which reads as a rendering fault rather than as
+// "this is not a class".
+const DEMOTED = new THREE.Color(0xc9cad2);
 const properOf = (s: Solid): number => PROPER.findIndex((p) => p.makeup === s.makeup);
 
 function solidColor(s: Solid): THREE.Color {
@@ -450,6 +453,7 @@ function build(reframe: boolean): void {
     // where the complete ones are never nearer than φ³ and read as separate objects.
     const rtMode = rtSel.value;
     const rtCup = rtExtentSel.value === "cup";
+    const surfaceShown = rhombSel.value !== "invisible";
     if (rtMode !== "invisible" && sscale > 0) {
         const tris: number[] = [];
         const cols: number[] = [];
@@ -484,7 +488,13 @@ function build(reframe: boolean): void {
                     metalness: 0.02,
                     flatShading: true,
                     transparent: rtMode === "transparent",
-                    opacity: rtMode === "transparent" ? 0.38 : 1,
+                    // Transparency needs something to sit against. With the rhombi
+                    // drawn, a shell at 0.38 lies over a mid-tone surface and reads as
+                    // colored; with them invisible it lies over the near-white page
+                    // and washes out — #8b4fc8 composites to #ccb5e5, which looks like
+                    // no color at all. So the opacity follows the surface: heavier
+                    // when there is nothing behind it to tint.
+                    opacity: rtMode === "transparent" ? (surfaceShown ? 0.38 : 0.62) : 1,
                     depthWrite: rtMode !== "transparent",
                     side: THREE.DoubleSide,
                 }),
