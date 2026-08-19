@@ -130,6 +130,8 @@
     <span class="checks">
         <label><input type="checkbox" id="rtedges" checked> edges</label>
         <label><input type="checkbox" id="markers" checked> centers</label>
+        <label title="Solids whose home class is 1, 2 or 3 — not proper, drawn colorless"><input type="checkbox" id="rtdemoted"> demoted</label>
+        <label title="Solids whose ten-face footprint runs off the edge of the patch, so the count is a lower bound"><input type="checkbox" id="rttrunc"> truncated</label>
     </span>
     <label>Size <span id="sscaleOut" class="mono"></span>
         <input type="range" id="sscale" min="0" max="1" step="0.005" value="1">
@@ -284,6 +286,20 @@
 <p>
     <strong>Per class</strong> — show, normals, solids, and how big to draw them, with
     a live population count.
+</p>
+<p>
+    <strong>Daylight between the cups.</strong> With the surface invisible and every
+    class's cups at full size you might expect the roof to be entirely covered, and it
+    is not. That is not a gap in the geometry — a cup does contain every roof rhomb on
+    its own solid, always — but a rhomb is covered only if <em>its home solid is being
+    drawn</em>, and two kinds are held back by default. <em>Truncated</em> solids run
+    off the edge of the patch, so their count is a lower bound rather than a class;
+    they account for most of the daylight, and nearly all of it is the outer fringe.
+    <em>Demoted</em> solids are the class 1 and 2 homes, few but real in the interior:
+    Sun at generation 4 has ten of the first — the true orphans, and that ten does not
+    grow with the patch — and fifty of the second. Turn both on and the coverage is
+    total, necessarily: every rhomb has a home, and a home's cup contains it. The
+    readout counts what is left bare.
 </p>
 <p>
     <strong>Click any rhomb</strong> to see both of its solids, which is its home, and

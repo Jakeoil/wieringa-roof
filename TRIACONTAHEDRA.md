@@ -338,6 +338,26 @@ colorless — they are not a class, they are what is left.
 *(Recorded because it took a correction: Jeff's note wrote "5a (4 thick)", which reads
 as a slip for 5 thick, since 4 thick is class 4. Implemented as 5a = 5 thick.)*
 
+### Cup coverage: why there is daylight
+
+Reported by Jeff, with the surface invisible and every class's cups at full size. Not a
+gap in the geometry — measured, **every roof rhomb on a drawn solid lies in that
+solid's own cup, 0 exceptions**, so the ten-face selection is on the right side. A
+rhomb is covered iff *its home solid is drawn*, and two kinds are held back:
+
+| Sun gen 4, 16,475 rhombi | uncovered |
+|---|---|
+| home edge-truncated | 1,200 |
+| home demoted (class 2) | 60 |
+| home demoted (class 1) | 10 |
+| **total** | **1,270 = 7.7%** |
+
+Draw **every** home solid instead and coverage is **exactly 100%** — 0 uncovered on
+every patch — which is not luck: every rhomb has a home and a home's cup contains it.
+The gaps fall as the patch grows (38.8% → 13.5% → 7.7% on Pe3 gen 3, Sun gen 3, Sun
+gen 4) because they are dominated by the fringe. The interior residue is the class-1
+and class-2 homes, and the class-1 count is the constant ten.
+
 ### Nail heads — half the population is the far end of something else
 
 Spotted by Jeff, looking at Sun gen 2: a complete cap's normals converge on one side,
@@ -364,7 +384,10 @@ Held back, the classification changes shape completely:
 | Star gen 5 | 0.00% | 1.79% | **0** | 18.13% | 57.28% | 22.80% |
 | Deca gen 5 | 0.07% | 1.87% | **0** | 17.90% | 57.10% | 23.06% |
 
-**Class 3 is empty — every three-face solid is a nail head, without exception.**
+**Class 3 is empty among settled solids — no three-face solid is ever a home.** Near
+the cut it can be: unsettled class-3 homes number 50, 210 and 850 on Sun at generations
+3, 4 and 5, growing with the boundary rather than the area, and each is a truncation of
+something larger that the patch cannot see.
 Classes 1 and 2 fall away with patch size (Sun: 17.9, 2.7, 0.4, 0.05 percent at
 generations 2 to 5), so they look like boundary residue rather than classes. What
 survives is three: **4 at ≈18%, 5 at ≈58%, complete at ≈23%**, agreeing across three

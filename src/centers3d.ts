@@ -75,6 +75,8 @@ const rtSel = el<HTMLSelectElement>("rtmode");
 const rtExtentSel = el<HTMLSelectElement>("rtextent");
 const rtEdgesChk = el<HTMLInputElement>("rtedges");
 const markersChk = el<HTMLInputElement>("markers");
+const demotedChk = el<HTMLInputElement>("rtdemoted");
+const truncChk = el<HTMLInputElement>("rttrunc");
 const sscaleInput = el<HTMLInputElement>("sscale");
 const sscaleOut = el<HTMLElement>("sscaleOut");
 const classBar = el<HTMLElement>("classbar");
@@ -99,6 +101,8 @@ const PREF_DEFAULTS = {
     rtextent: "full",
     rtedges: true,
     markers: true,
+    rtdemoted: false,
+    rttrunc: false,
     sscale: 1,
     classOn: [true, true, true, true],
     classNorm: [true, true, true, true],
@@ -312,20 +316,37 @@ function build(reframe: boolean): void {
     // One filter, applied to everything: markers, shells and normals all mean "the
     // solids currently under consideration", and having them disagree would make the
     // picture impossible to read.
-    // What counts at all: a proper class, settled, with at least one face calling it
-    // home. A solid no face calls home is a nail head — the far end of a normal whose
-    // point is elsewhere — and they outnumber the real solids four to one.
+    // What counts at all. A solid no face calls home is a nail head — the far end of a
+    // normal whose point is elsewhere — and those never count. Beyond that, two
+    // deliberate exclusions, both of which leave daylight when the cups are drawn:
+    //
+    //   demoted   home class 1, 2 or 3, so not a proper rhomb;
+    //   truncated the ten-face footprint runs off the patch, so the count is a lower
+    //             bound rather than a class.
+    //
+    // Turn both on and coverage is total, necessarily: every rhomb has a home and a
+    // home's cup contains it. Verified at 0 uncovered on every patch.
+    const wantDemoted = demotedChk.checked;
+    const wantTrunc = truncChk.checked;
     const eligible = (s: Solid): boolean =>
-        properOf(s) >= 0 && s.settled && s.homeCount > 0;
+        s.homeCount > 0 &&
+        (s.settled || wantTrunc) &&
+        (properOf(s) >= 0 || wantDemoted);
     /** the side the solid sits on, as the eye sees it after the flip */
     const visuallyHat = (s: Solid) => (flip ? !s.hat : s.hat);
     const sided = (s: Solid) => (visuallyHat(s) ? wantBelow : wantAbove);
+    // Demoted solids have no class row, so the global settings are all they answer to.
+    const ctl = (s: Solid): ClassCtl | null => {
+        const i = properOf(s);
+        return i < 0 ? null : classCtl[i];
+    };
     const passes = (s: Solid): boolean =>
-        eligible(s) && sided(s) && classCtl[properOf(s)].on.checked;
+        eligible(s) && sided(s) && (ctl(s)?.on.checked ?? true);
     /** how big to draw this class's solids, 0 for not at all */
-    const sizeOf = (s: Solid) => Number(classCtl[properOf(s)].size.value) * sscale;
-    const showNormalsFor = (s: Solid) => passes(s) && classCtl[properOf(s)].norm.checked;
-    const showRTFor = (s: Solid) => passes(s) && classCtl[properOf(s)].rt.checked;
+    const sizeOf = (s: Solid) => Number(ctl(s)?.size.value ?? 1) * sscale;
+    const showNormalsFor = (s: Solid) =>
+        passes(s) && (ctl(s)?.norm.checked ?? normalsChk.checked);
+    const showRTFor = (s: Solid) => passes(s) && (ctl(s)?.rt.checked ?? true);
     const shown = cen.solids.filter(passes);
 
     // The normals themselves. Each face sends a segment both ways — above the map and
@@ -611,7 +632,15 @@ function build(reframe: boolean): void {
     const clsText = PROPER.map((p, i) => `${p.label}:${cls[i] ?? 0}`).join(" ");
     // how many solids of each class the patch is entitled to classify
     const perClass = PROPER.map(() => 0);
-    for (const s of cen.solids) if (eligible(s)) perClass[properOf(s)]++;
+    for (const s of cen.solids) {
+        const i = properOf(s);
+        if (i >= 0 && eligible(s)) perClass[i]++;
+    }
+    // Rhombi whose home solid is not being drawn — the daylight you see through the
+    // cups when the surface is invisible. Zero only when demoted and truncated are
+    // both on, and then necessarily zero.
+    let bare = 0;
+    for (const f of d.faces) if (!passes(cen.solids[cen.home[f.id]])) bare++;
     PROPER.forEach((_, i) => { classCtl[i].count.textContent = String(perClass[i]); });
     const hats = complete.filter((s) => s.hat).length;
     const pe5 = pe5Rosettes().length;
@@ -627,6 +656,7 @@ function build(reframe: boolean): void {
         `(${((100 * onCap.size) / allRhombs.length).toFixed(0)}%) · ` +
         `${shown.length} of ${perClass.reduce((a, b) => a + b, 0)} proper solids shown · ` +
         `rhombi by class ${clsText}, ${demoted} demoted · ` +
+        `${bare} rhombi with no cup over them${bare ? " (turn on demoted and truncated)" : ""} · ` +
         `normals ${(nlen / RHO).toFixed(2)}ρ · ${ms} ms`;
 }
 
@@ -677,6 +707,8 @@ rtSel.value = prefs.rtmode || PREF_DEFAULTS.rtmode;
 rtExtentSel.value = prefs.rtextent || PREF_DEFAULTS.rtextent;
 rtEdgesChk.checked = prefs.rtedges;
 markersChk.checked = prefs.markers;
+demotedChk.checked = prefs.rtdemoted;
+truncChk.checked = prefs.rttrunc;
 sscaleInput.value = String(prefs.sscale);
 
 // One row per proper class: show, its own normals and solids overrides, a size slider
@@ -752,7 +784,7 @@ function rebuild(reframe: boolean): void {
 }
 for (const c of [patchSel, genSel]) c.addEventListener("change", () => rebuild(true));
 for (const c of [colorSel, flipChk, aboveChk, belowChk, rhombSel, edgesChk, shadeChk,
-                 isoChk, normalsChk, rtSel, rtExtentSel, rtEdgesChk, markersChk]) {
+                 isoChk, normalsChk, rtSel, rtExtentSel, rtEdgesChk, markersChk, demotedChk, truncChk]) {
     c.addEventListener("change", () => rebuild(false));
 }
 for (const c of [nlenInput, sscaleInput]) {
@@ -789,6 +821,8 @@ function persist(): void {
         rtextent: rtExtentSel.value,
         rtedges: rtEdgesChk.checked,
         markers: markersChk.checked,
+        rtdemoted: demotedChk.checked,
+        rttrunc: truncChk.checked,
         sscale: Number(sscaleInput.value),
         classOn: classCtl.map((c) => c.on.checked),
         classNorm: classCtl.map((c) => c.norm.checked),
