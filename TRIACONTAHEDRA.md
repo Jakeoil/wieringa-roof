@@ -374,8 +374,78 @@ are not classes. Every face names **two** centres by construction, so a solid ho
 one face is usually just the far end of a normal whose point is somewhere else — a
 **nail head**.
 
-Define a face's **home** as the larger of its two solids. A solid no face calls home
-is a nail head. Measured, this is not a small correction:
+Define a face's **home** as whichever of its two solids holds more of the roof. A
+solid no face calls home is a nail head.
+
+**Jeff's objection, and he is right about the picture:** a rhomb wears one nail — head
+on the far face, shaft running ρ to the center of the solid it belongs to, one
+direction. Both points at ±ρ are centers of triacontahedra having that face, so the
+line does carry two candidates, but only one of them is normally a *proper* class:
+
+| Sun gen 4 | proper solids per rhomb |
+|---|---|
+| exactly one | **90.5%** |
+| none (demoted) | 3.9% |
+| **two** | **5.6%** — always `4=4T` against `5=3T+2t`, no other pairing |
+
+**Where they are, exactly.** The two-sided rhombi are not scattered through the two
+classes; they sit at named positions, and the rule has no exceptions.
+
+- **Every shared rhomb is thick.** 2320 of 2320 across four patches. No thin rhomb is
+  ever shared.
+- **In a class 4** — canonical pattern `0010101010`, four thick faces with the fifth
+  missing — the shared ones are the **two flanking the gap**, slots 2 and 8. Never the
+  two opposite it.
+- **In a class 5b** — canonical `0000111110`, a run `T t T t T` — the shared one is
+  always an **end of the run**, slot 4 or 8, both thick. Never the middle thick, never
+  either thin.
+- **Every settled class 4 shares exactly two faces**, one at each end of its gap:
+  460 of 460 on Sun gen 4, 500 of 500 on Star gen 4, no other count.
+- **Class 5b is not symmetric with it**: about half share nothing at all. Sun gen 4:
+  680 of 1315 share none, 350 share one, 285 share two.
+
+So a class 4 is always two of its corners into a pair of class 5b runs, while a 5b run
+may end against a class 4 or against nothing.
+
+**The two solids are glued face to face across the roof.** A shared rhomb is a face of
+both, so they sit on opposite sides of it with their centers exactly `2ρ = 2.752764`
+apart — measured, deviation 7e-15 — and **one is always above the roof while the other
+is below**, 920 of 920 on Sun gen 4 and 1000 of 1000 on Star gen 4. The roof passes
+between them. Which of the two is the hat is *not* fixed: the class 4 is below about
+half the time (500 of 920 on Sun, 570 of 1000 on Star), so there is no handedness rule.
+
+Two adjacency facts, both exceptionless:
+
+- **The two shared rhombi of a class 4 are never edge-adjacent to each other** — 0 of
+  460 on Sun gen 4, 0 of 500 on Star. The missing fifth face lies between them, so they
+  are the two ends of a broken rosette rather than a pair.
+- **A shared rhomb touches exactly two faces of its 5b solid across an edge, one thick
+  and one thin**, every time. That is what an end of the run `T t T t T` is adjacent
+  to, and it is the same for all 920 and all 1000.
+
+**Consequence for the coloring, and it is not cosmetic.** Home is the larger of a
+rhomb's two solids, and 5 beats 4, so a shared rhomb is drawn as class 5b. Every
+settled class-4 solid therefore has `homeCount = 2` exactly — 460 of 460 on Sun gen 4,
+500 of 500 on Star gen 4 — and renders as only the two amber faces opposite its gap,
+its other two showing in a neighbor's violet. **A class 4 drawn in its own color is
+always half a class 4.** Shared rhombi now take a color of their own on the page for
+this reason.
+
+So the one-nail model is right for nine rhombi in ten, and the exceptions are a single
+specific pairing rather than a spread. Two further tests of "which side is real" both
+came back negative and are recorded so they are not retried: the roof cuts through
+*both* candidate solids for 14% of rhombi and *neither* for 21%, and where it cuts
+exactly one, the clean side is the home only 57% of the time. Roof intrusion does not
+pick a side.
+
+On raw group size rather than class, it is *not* the case that one side is usually
+barren. On Sun gen 4, the quieter side holds exactly one rhomb
+for 54.9% of rhombi and **two or more for the other 45.1%** — so for nearly half, home
+is a choice between two real solids rather than between a solid and a scrap. Commonest
+pairings: 1+10, 1+5, 2+10, 3+5, 2+5, 1+4. About 1% tie, and those are broken
+arbitrarily.
+
+Measured, the correction is not small:
 
 - a complete cap generates **ten** of them, one per face — all ten, not five;
 - **99.9%** of one-face solids are nail heads. Of Sun gen 4's 8,072 one-face solids

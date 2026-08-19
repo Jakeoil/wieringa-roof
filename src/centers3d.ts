@@ -174,12 +174,23 @@ const PROPER: ProperClass[] = [
 // partial opacity disappears entirely, which reads as a rendering fault rather than as
 // "this is not a class".
 const DEMOTED = new THREE.Color(0xc9cad2);
+// Its own color, because it is its own thing: a rhomb whose two solids are BOTH a
+// proper class. Always the same pairing, a class 4 against a class 5b, and always a
+// thick rhomb — the two flanking the gap in the 4, the two ends of the run in the 5b.
+// Left uncolored they take the 5b violet, since home is the larger of the two, so
+// every class 4 renders as only two amber faces and its other two go to its neighbor.
+// About 5.6% of rhombi.
+const SHARED = new THREE.Color(0xd1477a);
 const properOf = (s: Solid): number => PROPER.findIndex((p) => p.makeup === s.makeup);
 
 function solidColor(s: Solid): THREE.Color {
     const i = properOf(s);
     return i < 0 ? DEMOTED.clone() : PROPER[i].color.clone();
 }
+
+/** A rhomb lying on two proper solids at once. */
+const isShared = (f: { solids: [number, number] }, solids: Solid[]): boolean =>
+    properOf(solids[f.solids[0]]) >= 0 && properOf(solids[f.solids[1]]) >= 0;
 
 // ── the triacontahedron, drawn in the roof's own frame ────────────
 //
@@ -296,7 +307,10 @@ function build(reframe: boolean): void {
             if (mode === "cluster") return CLUSTER_3D[f.cluster] ?? CLUSTER_FALLBACK;
             if (mode === "complete")
                 return s.complete ? solidColor(s) : WASH.clone();
-            if (mode === "class") return solidColor(s);
+            if (mode === "class") {
+                const rf = cen.byRhomb[f.id];
+                return rf && isShared(rf, cen.solids) ? SHARED : solidColor(s);
+            }
             if (mode === "type") return f.thick ? CLUSTER_3D.Pe5 ?? CLUSTER_FALLBACK : CLUSTER_FALLBACK;
             return solidColor(s);
         },
@@ -668,6 +682,9 @@ function build(reframe: boolean): void {
     let bare = 0;
     for (const f of d.faces) if (!passes(cen.solids[cen.home[f.id]])) bare++;
     PROPER.forEach((_, i) => { classCtl[i].count.textContent = String(perClass[i]); });
+    let sharedFaces = 0;
+    for (const f of cen.faces) if (isShared(f, cen.solids)) sharedFaces++;
+    sharedCount.textContent = String(sharedFaces);
     const hats = complete.filter((s) => s.hat).length;
     const pe5 = pe5Rosettes().length;
     const onCap = new Set<number>();
@@ -792,6 +809,29 @@ PROPER.forEach((p, i) => {
     for (const c of [on, norm, rt]) c.addEventListener("change", () => rebuild(false));
     size.addEventListener("input", () => rebuild(false));
 });
+
+// A legend chip rather than a control: "shared" is a property of a rhomb, not a class
+// of solid, so there is nothing to show or size — only something to recognize.
+const sharedCount = (() => {
+    const wrap = document.createElement("span");
+    wrap.className = "cls";
+    wrap.style.borderLeftColor = `#${SHARED.getHexString()}`;
+    wrap.title =
+        "Rhombi lying on two proper solids at once — always a class 4 against a class 5b, always thick";
+    const row = document.createElement("span");
+    row.className = "row";
+    const sw = document.createElement("span");
+    sw.className = "swatch";
+    sw.style.background = `#${SHARED.getHexString()}`;
+    const name = document.createElement("strong");
+    name.textContent = "shared";
+    const count = document.createElement("span");
+    count.className = "count";
+    row.append(sw, name, count);
+    wrap.append(row);
+    classBar.appendChild(wrap);
+    return count;
+})();
 
 // master switches
 normalsChk.addEventListener("change", () => {

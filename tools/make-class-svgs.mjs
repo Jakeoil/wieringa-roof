@@ -73,6 +73,8 @@ function isoglosses(f) {
 // colorless, as they are on the surface. 5a and 5b are the same size and quite
 // different shapes, so they are colored apart rather than together.
 const CLASS_COLORS = { c4:"#e0a12b", c5a:"#3f9d58", c5b:"#8b4fc8", c10:"#2f6fb5", other:"#ececed" };
+// Rhombi that lie on two proper solids at once, always a class 4 against a class 5b.
+const SHARED = "#d1477a";
 const shade = (hex, t) => {
     // t in -1..1; lighten above mid, darken below, the absolute ramp the roof uses
     const n = parseInt(hex.slice(1), 16);
@@ -82,7 +84,7 @@ const shade = (hex, t) => {
     return "#" + c.map((v) => Math.round(v + (to - v) * k).toString(16).padStart(2, "0")).join("");
 };
 
-function svg(pattern, cls) {
+function svg(pattern, cls, shared = [], sure = true) {
     const bits = pattern.split("").map(Number);
     const parts = [`<svg viewBox="0 0 ${SIZE} ${SIZE}" role="img">`];
     FACES.forEach((f, i) => {
@@ -110,6 +112,17 @@ function svg(pattern, cls) {
             parts.push(`<line x1="${X(p).toFixed(2)}" y1="${Y(p).toFixed(2)}" x2="${X(q).toFixed(2)}" y2="${Y(q).toFixed(2)}" stroke="#1d2026" stroke-width="0.45" opacity="0.5"/>`);
         }
         parts.push(`<path d="${d}" fill="none" stroke="#23262c" stroke-width="1.1"/>`);
+        if (shared.includes(i)) {
+            // Solid ring where the sharing is certain, dashed where it is only
+            // available: every class 4 shares both of its flanking faces, while a
+            // class 5b run may end against a class 4 or against nothing.
+            const c = f.pts.reduce((a, p) => [a[0] + X(p) / 4, a[1] + Y(p) / 4], [0, 0]);
+            parts.push(
+                `<path d="${d}" fill="none" stroke="${SHARED}" stroke-width="2.4"` +
+                `${sure ? "" : ' stroke-dasharray="4 3"'} stroke-linejoin="round"/>`,
+                `<circle cx="${c[0].toFixed(2)}" cy="${c[1].toFixed(2)}" r="3.1" fill="${SHARED}"/>`,
+            );
+        }
     });
     parts.push("</svg>");
     return parts.join("");
@@ -117,9 +130,11 @@ function svg(pattern, cls) {
 
 // the nine makeups, each with the arrangement measured in tools/probes/patterns.mjs
 const MAKEUPS = [
-    { cls: "c4",   makeup: "class 4 — 4 thick",           pattern: "0010101010", note: "four of the five cap faces, one short of the rosette" },
+    { cls: "c4",   makeup: "class 4 — 4 thick",           pattern: "0010101010", shared: [2, 8], sure: true,
+      note: "four of the five cap faces, one short of the rosette. The two ringed faces flank the gap, and both are always shared with a class 5b on the far side of the roof — every class 4 has exactly two." },
     { cls: "c5a",  makeup: "class 5a — 5 thick",          pattern: "1010101010", note: "the whole Pe5 rosette, with none of its ring" },
-    { cls: "c5b",  makeup: "class 5b — 3 thick + 2 thin", pattern: "0000111110", note: "a contiguous run of five: the only mixed class short of complete" },
+    { cls: "c5b",  makeup: "class 5b — 3 thick + 2 thin", pattern: "0000111110", shared: [4, 8], sure: false,
+      note: "a contiguous run of five: the only mixed class short of complete. Either end of the run — the ringed faces, both thick — may be shared with a class 4, but about half of all runs share neither." },
     { cls: "c10",  makeup: "class 10 — 5 thick + 5 thin", pattern: "1111111111", note: "complete. A Pe5 rosette and the ring that closes it — a whole triacontahedron" },
     { cls: "other", makeup: "3 thick",  pattern: "0010001010", note: "demoted: never anything's home. A run of three also occurs." },
     { cls: "other", makeup: "2 thin",   pattern: "0000010001", note: "demoted: two apart round the ring; a second arrangement puts them adjacent" },
@@ -131,7 +146,7 @@ const MAKEUPS = [
 const block =
     '<div class="classgrid">\n' +
     MAKEUPS.map((k) =>
-        `    <figure class="classfig"><div class="classsvg">${svg(k.pattern, k.cls)}</div>` +
+        `    <figure class="classfig"><div class="classsvg">${svg(k.pattern, k.cls, k.shared ?? [], k.sure ?? true)}</div>` +
         `<figcaption><strong>${k.makeup}</strong><span>${k.note}</span></figcaption></figure>`,
     ).join("\n") +
     "\n</div>";
