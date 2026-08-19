@@ -313,6 +313,31 @@ pole in a Pe5 rosette, five thin filling the notches, 16 corners, area ratio
 are nearly rigid too: each makeup has one pattern up to rotation, except `2=2t` and
 `3=3T`, which have two.
 
+### Proper rhombs, and the four classes
+
+Jeff's framing, and it is the right one: **a proper rhomb is a rhomb with all of its
+normals** — one whose home solid shows the roof a whole configuration rather than a
+scrap. There are exactly four, and they are told apart by *makeup* rather than by
+size, because class 5 comes in two quite different shapes:
+
+| class | makeup | share of proper solids |
+|---|---|---|
+| **4** | 4 thick | ≈18% |
+| **5a** | 5 thick — the whole rosette | see below |
+| **5b** | 3 thick + 2 thin | see below |
+| **10** | 5 thick + 5 thin — complete | ≈23% |
+
+5a and 5b together are ≈58%; splitting them is what the page now does, and the two are
+not close relatives — 5a is a bare Pe5 rosette, 5b a contiguous run of five round the
+decagon.
+
+Everything else is **demoted**: class 3 is never anything's home at all, and classes 1
+and 2 fall away with patch size. Demoted rhombi stay drawn, shaded and contoured, but
+colorless — they are not a class, they are what is left.
+
+*(Recorded because it took a correction: Jeff's note wrote "5a (4 thick)", which reads
+as a slip for 5 thick, since 4 thick is class 4. Implemented as 5a = 5 thick.)*
+
 ### Nail heads — half the population is the far end of something else
 
 Spotted by Jeff, looking at Sun gen 2: a complete cap's normals converge on one side,
@@ -987,11 +1012,15 @@ Card copy:
    triangles of Deca gen 3). The selection survives a rebuild and is drawn whatever
    the filters hide, since the point of asking about one face is to get the answer
    even when the filters have hidden it.
-6. Prose: §1, §2, §5.2 and §5.3, with the numbers. (Stage 4 already carried the bulk
-   of it into the page's "How it works".)
+6. ~~Prose~~ **done.** "How it works" rewritten against what the page actually does
+   after six stages, since it had drifted — it still described a faces-per-solid
+   threshold that no longer exists. Reorganized to match the controls: why a normal
+   finds a center, ten is the ceiling, proper rhombs and the four classes with the
+   nine illustrations, nail heads, then the controls themselves. `NOTES.md` now points
+   here, which nothing did before.
 
-Stages 1–4 are done. 5 and 6 are refinement: nothing in them changes what the page
-claims, only how much of it you can filter down to.
+All six stages are done. The controls were then reorganized into Global / Rhombs /
+Normals / Triacontahedra / per-class, on Jeff's layout.
 
 ---
 

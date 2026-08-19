@@ -996,3 +996,39 @@ instrumented rather than argued about:
   "am I even running this code" immediately.
 - `site.js` shows a red banner for any uncaught error, so a page that silently
   fails to start says why.
+
+---
+
+## The Centers page: the triacontahedra under the roof
+
+Full write-up, with the numbers and the open questions, is in
+[TRIACONTAHEDRA.md](TRIACONTAHEDRA.md). Nothing pointed at it for a while, which is
+how a research note becomes invisible. The short version:
+
+Every face of the roof is a face of a rhombic triacontahedron. The solid is isohedral,
+so all thirty face planes are tangent to one insphere and each touches at its own
+centroid — which means a face fixes its solid's center to exactly two points,
+`centroid ± ρ·n̂`, `ρ = √(1+2/√5)`. Faces of one solid name one point, and the grouping
+is the picture. `centers.html` draws it.
+
+**What is settled.** Complete ten-face caps correspond one-to-one with `Pe5` tiles of
+the P1 layer, in every patch measured; the rosette hub is the solid's own five-fold
+pole, exactly φ from the center. Centers are the all-odd points of the six-axis
+half-lattice, so grouping is integer equality with no tolerance. Two faces share a
+solid exactly when their fold is 36°, and no face pair ever shares two solids.
+
+**Three traps, each of which cost a round.** A test requiring all forty corners of the
+ten candidate faces to be present is nearly circular and reports everything complete.
+The convex hull is not the outer boundary of a concave patch, and using it biased the
+class frequencies differently per seed. And half of what the construction emits is a
+**nail head** — the far end of a rhomb whose home is on the other side — which
+inflated class 1 to 60% of the population until it was held back.
+
+**Four proper classes** survive that: 4, 5a (5 thick), 5b (3+2), 10. Class 3 is never
+a home; 1 and 2 are boundary residue that vanishes with patch size.
+
+Stages 1 to 6 of the build are listed in TRIACONTAHEDRA.md §8.6, all done.
+`tools/centers.mjs` runs eight checks over 27 patches; `tools/roofview-check.mjs`
+asserts the extracted roof geometry still matches the arithmetic that used to be
+inline in `roof3d.ts`, bit for bit.
+

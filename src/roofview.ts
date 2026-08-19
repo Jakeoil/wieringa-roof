@@ -82,6 +82,9 @@ export interface DrawOptions {
     transparent: boolean;
     edges: boolean;
     isoglosses: boolean;
+    /** draw only the overlays — the centers page can hide the surface and leave the
+     *  creases and contours standing, which is how the solids under it become visible */
+    skipSurface?: boolean;
 }
 
 export interface RoofView {
@@ -203,6 +206,10 @@ export function createRoofView(host: HTMLElement, background = 0xf4f4f7): RoofVi
                 polygonOffsetUnits: 1,
             });
             surfaceMesh = new THREE.Mesh(geo, mat);
+            if (opts.skipSurface) {
+                // still built, so picking and framing keep working with nothing drawn
+                surfaceMesh.visible = false;
+            }
             view.add(surfaceMesh);
 
             geo.computeBoundingSphere();

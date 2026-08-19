@@ -69,7 +69,10 @@ function isoglosses(f) {
     return out;
 }
 
-const CLASS_COLORS = { 1:"#9b93a3", 2:"#9b93a3", 3:"#9b93a3", 4:"#7ba05b", 5:"#54a598", 10:"#2f5f9e" };
+// The four proper classes carry the page's signature colors; the demoted ones are
+// colorless, as they are on the surface. 5a and 5b are the same size and quite
+// different shapes, so they are colored apart rather than together.
+const CLASS_COLORS = { c4:"#e0a12b", c5a:"#3f9d58", c5b:"#8b4fc8", c10:"#2f6fb5", other:"#ececed" };
 const shade = (hex, t) => {
     // t in -1..1; lighten above mid, darken below, the absolute ramp the roof uses
     const n = parseInt(hex.slice(1), 16);
@@ -92,7 +95,7 @@ function svg(pattern, cls) {
         // two stops along the height gradient, as on the workbench
         const t0 = ((Math.min(...f.idx) - idxLo) / (idxHi - idxLo) - 0.5) * 2;
         const t1 = ((Math.max(...f.idx) - idxLo) / (idxHi - idxLo) - 0.5) * 2;
-        const gid = `g${cls}_${i}`;
+        const gid = `g${String(cls).replace(/[^a-z0-9]/gi,"")}_${i}`;
         const lowP = f.pts[f.idx.indexOf(Math.min(...f.idx))];
         const hiP = f.pts[f.idx.indexOf(Math.max(...f.idx))];
         parts.push(
@@ -114,15 +117,15 @@ function svg(pattern, cls) {
 
 // the nine makeups, each with the arrangement measured in tools/probes/patterns.mjs
 const MAKEUPS = [
-    { cls: 4,  makeup: "4 = 4 thick",          pattern: "0010101010", note: "four of the five cap faces — one short of the rosette" },
-    { cls: 5,  makeup: "5 = 5 thick",          pattern: "1010101010", note: "the whole Pe5 rosette, with none of its ring" },
-    { cls: 5,  makeup: "5 = 3 thick + 2 thin", pattern: "0000111110", note: "a contiguous run of five — the only mixed class short of complete" },
-    { cls: 10, makeup: "10 = 5 thick + 5 thin", pattern: "1111111111", note: "complete: a Pe5 rosette and the ring that closes it. A whole triacontahedron." },
-    { cls: 1,  makeup: "1 = 1 thick",          pattern: "0000000010", note: "residue — a lone thick rhomb" },
-    { cls: 1,  makeup: "1 = 1 thin",           pattern: "0000000001", note: "residue — a lone thin rhomb" },
-    { cls: 2,  makeup: "2 = 2 thin",           pattern: "0000010001", note: "residue — two apart round the ring; a second arrangement puts them adjacent" },
-    { cls: 2,  makeup: "2 = 2 thick",          pattern: "0000001010", note: "residue — two adjacent thick, and rare: 70 against 1840 of the pair above" },
-    { cls: 3,  makeup: "3 = 3 thick",          pattern: "0010001010", note: "never a home: every three-face solid is a nail head. A run of three also occurs." },
+    { cls: "c4",   makeup: "class 4 — 4 thick",           pattern: "0010101010", note: "four of the five cap faces, one short of the rosette" },
+    { cls: "c5a",  makeup: "class 5a — 5 thick",          pattern: "1010101010", note: "the whole Pe5 rosette, with none of its ring" },
+    { cls: "c5b",  makeup: "class 5b — 3 thick + 2 thin", pattern: "0000111110", note: "a contiguous run of five: the only mixed class short of complete" },
+    { cls: "c10",  makeup: "class 10 — 5 thick + 5 thin", pattern: "1111111111", note: "complete. A Pe5 rosette and the ring that closes it — a whole triacontahedron" },
+    { cls: "other", makeup: "3 thick",  pattern: "0010001010", note: "demoted: never anything's home. A run of three also occurs." },
+    { cls: "other", makeup: "2 thin",   pattern: "0000010001", note: "demoted: two apart round the ring; a second arrangement puts them adjacent" },
+    { cls: "other", makeup: "2 thick",  pattern: "0000001010", note: "demoted, and rare — 70 against 1840 of the pair above" },
+    { cls: "other", makeup: "1 thick",  pattern: "0000000010", note: "demoted: a lone thick rhomb" },
+    { cls: "other", makeup: "1 thin",   pattern: "0000000001", note: "demoted: a lone thin rhomb" },
 ];
 
 const block =

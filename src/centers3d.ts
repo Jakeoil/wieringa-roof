@@ -26,7 +26,7 @@ import { LineSegments2 } from "three/addons/lines/LineSegments2.js";
 import { LineSegmentsGeometry } from "three/addons/lines/LineSegmentsGeometry.js";
 import { LineMaterial } from "three/addons/lines/LineMaterial.js";
 import { createRoofView, CLUSTER_3D, CLUSTER_FALLBACK, PLAIN_COLOR } from "./roofview.js";
-import { triacontahedra, assignLargestFirst, pe5Rosettes, A6, RHO, CLASSES } from "./centers.js";
+import { triacontahedra, pe5Rosettes, A6, RHO } from "./centers.js";
 import type { Solid } from "./centers.js";
 import { zonohedron, faceOutward, PHI } from "./solids.js";
 import type { V3 } from "./solids.js";
@@ -62,46 +62,64 @@ const patchSel = el<HTMLSelectElement>("patch");
 const genSel = el<HTMLSelectElement>("gen");
 const colorSel = el<HTMLSelectElement>("color");
 const flipChk = el<HTMLInputElement>("flip");
+const aboveChk = el<HTMLInputElement>("above");
+const belowChk = el<HTMLInputElement>("below");
+const rhombSel = el<HTMLSelectElement>("rhombmode");
 const edgesChk = el<HTMLInputElement>("edges");
+const shadeChk = el<HTMLInputElement>("shade");
+const isoChk = el<HTMLInputElement>("isogloss");
 const normalsChk = el<HTMLInputElement>("normals");
-const solidsChk = el<HTMLInputElement>("solids");
 const nlenInput = el<HTMLInputElement>("nlen");
 const nlenOut = el<HTMLElement>("nlenOut");
+const rtSel = el<HTMLSelectElement>("rtmode");
+const rtExtentSel = el<HTMLSelectElement>("rtextent");
+const rtEdgesChk = el<HTMLInputElement>("rtedges");
+const markersChk = el<HTMLInputElement>("markers");
 const sscaleInput = el<HTMLInputElement>("sscale");
 const sscaleOut = el<HTMLElement>("sscaleOut");
-const unsettledChk = el<HTMLInputElement>("unsettled");
-const headsChk = el<HTMLInputElement>("heads");
 const classBar = el<HTMLElement>("classbar");
-const sideSel = el<HTMLSelectElement>("side");
 const pickEl = el<HTMLElement>("pick");
-const markersChk = el<HTMLInputElement>("markers");
-const shadeChk = el<HTMLInputElement>("shade");
 const statusEl = el<HTMLElement>("status");
 
 const PREFS_KEY = "wr-centers";
 const PREF_DEFAULTS = {
     patch: "Pe3",
     gen: 3,
-    color: "solid",
+    color: "class",
     flip: false,
+    above: true,
+    below: true,
+    rhombmode: "solid",
     edges: true,
+    shade: true,
+    isogloss: false,
     normals: false,
     nlen: Math.sqrt(1 + 2 / Math.sqrt(5)),
-    sscale: 1,
-    side: "both",
-    unsettled: false,
-    heads: false,
-    classOn: [true, true, true, false],
-    classSize: [1, 1, 1, 1],
-    solids: true,
+    rtmode: "transparent",
+    rtextent: "full",
+    rtedges: true,
     markers: true,
-    shade: true,
+    sscale: 1,
+    classOn: [true, true, true, true],
+    classNorm: [true, true, true, true],
+    classRT: [true, true, true, true],
+    classSize: [1, 1, 1, 1],
 };
 const prefs = loadPrefs(PREFS_KEY, PREF_DEFAULTS);
 
 // Twelve controls, built rather than written out: a checkbox and a size slider per
 // class, each carrying its own color so the bar doubles as the legend.
-interface ClassCtl { on: HTMLInputElement; size: HTMLInputElement; count: HTMLElement }
+/** Per class: whether to show it at all, its own normals and solids overrides, how big
+ *  to draw the solids, and a live population count. The globals above are master
+ *  switches — flipping one writes through to all four, and after that the class
+ *  controls are the truth, so an individual class really does override. */
+interface ClassCtl {
+    on: HTMLInputElement;
+    norm: HTMLInputElement;
+    rt: HTMLInputElement;
+    size: HTMLInputElement;
+    count: HTMLElement;
+}
 const classCtl: ClassCtl[] = [];
 
 const rv = createRoofView(view);
@@ -120,31 +138,40 @@ let last: { faces: { id: number }[] } | null = null;
 // gray, so the ten-face caps stand out of the field without a legend.
 
 const WASH = new THREE.Color(0xd8d9de);
-const HUES = [
-    0x4a7fb5, 0xc4643f, 0x54a598, 0xb1618f, 0xd9b463, 0x6a6fc0,
-    0x8aa06a, 0x9f7b4f, 0x5f9e5a, 0xc07a7a, 0x7d8fa8, 0xa8894a,
-].map((h) => new THREE.Color(h));
 
 const HILITE = new THREE.Color(0xd6402f);
-// Six sizes occur, but only three are classes once the nail heads are held back.
-// Class 3 is empty — every three-face solid is the far end of something else — and
-// classes 1 and 2 fall away with patch size (Sun: 17.9, 2.7, 0.4, 0.05 percent at
-// generations 2 to 5). They are not dropped, because on a small patch the residue is
-// real: Pe3 gen 3 is 27% class 1 and 2. They are gathered into one control instead,
-// so the bar says what the roof is made of rather than what the construction emits.
-interface ClassGroup { label: string; sizes: number[]; color: THREE.Color; hint: string }
-const CLASS_GROUPS: ClassGroup[] = [
-    { label: "4", sizes: [4], color: new THREE.Color(0x7ba05b), hint: "four of the five cap faces" },
-    { label: "5", sizes: [5], color: new THREE.Color(0x54a598), hint: "the rosette, or a run of five" },
-    { label: "10", sizes: [10], color: new THREE.Color(0x2f5f9e), hint: "complete — a whole triacontahedron" },
-    { label: "other", sizes: [1, 2, 3], color: new THREE.Color(0x9b93a3), hint: "classes 1–3: boundary residue, vanishing with patch size" },
+// A **proper** rhomb is one with all of its normals — one whose home solid shows the
+// roof a whole configuration rather than a scrap. Four of the nine makeups qualify,
+// and they are told apart by makeup and not by size alone: class 5 comes in two quite
+// different shapes and lumping them would hide that.
+//
+// Everything else — sizes 1, 2 and 3 — is demoted. Class 3 is never anything's home
+// at all, and 1 and 2 fall away with patch size (Sun: 17.9, 2.7, 0.4, 0.05 percent at
+// generations 2 to 5), so they are boundary residue rather than classes. They stay
+// drawn, shaded and contoured, but colorless.
+interface ProperClass {
+    key: string;
+    label: string;
+    makeup: string;
+    color: THREE.Color;
+    hint: string;
+}
+const PROPER: ProperClass[] = [
+    { key: "c4", label: "4", makeup: "4=4T+0t", color: new THREE.Color(0xe0a12b),
+      hint: "four of the five cap faces — one short of the rosette" },
+    { key: "c5a", label: "5a", makeup: "5=5T+0t", color: new THREE.Color(0x3f9d58),
+      hint: "5 thick: the whole Pe5 rosette, with none of its ring" },
+    { key: "c5b", label: "5b", makeup: "5=3T+2t", color: new THREE.Color(0x8b4fc8),
+      hint: "3 thick + 2 thin: a contiguous run of five, the only mixed class short of complete" },
+    { key: "c10", label: "10", makeup: "10=5T+5t", color: new THREE.Color(0x2f6fb5),
+      hint: "complete — a whole triacontahedron" },
 ];
-const groupOf = (n: number): number => CLASS_GROUPS.findIndex((g) => g.sizes.includes(n));
-const CLASS_ORDER = [1, 2, 3, 4, 5, 10];
+const DEMOTED = new THREE.Color(0xf0f0f3);
+const properOf = (s: Solid): number => PROPER.findIndex((p) => p.makeup === s.makeup);
 
 function solidColor(s: Solid): THREE.Color {
-    const base = HUES[s.id % HUES.length];
-    return s.complete ? base.clone() : base.clone().lerp(WASH, 0.7);
+    const i = properOf(s);
+    return i < 0 ? DEMOTED.clone() : PROPER[i].color.clone();
 }
 
 // ── the triacontahedron, drawn in the roof's own frame ────────────
@@ -159,6 +186,37 @@ const RT_TRIS: number[] = [];
 for (const f of RT_FACES) {
     for (const q of [f[0], f[1], f[2], f[0], f[2], f[3]]) RT_TRIS.push(q[0], q[1], q[2]);
 }
+
+// The **cup**: just the ten faces a roof can lie on, which is all of a solid the roof
+// ever sees. The other twenty are the ten vertical ones — those use the sixth,
+// vertical generator, and a surface with one height per point can never contain them —
+// and the ten facing away. Face centers band at ±1.1708, ±0.7236 and 0, so the sign of
+// the centroid's height picks a cup cleanly.
+const faceZ = (f: V3[]) => (f[0][2] + f[1][2] + f[2][2] + f[3][2]) / 4;
+const cupTris = (up: boolean): number[] => {
+    const out: number[] = [];
+    for (const f of RT_FACES) {
+        if (up ? faceZ(f) < 0.1 : faceZ(f) > -0.1) continue;
+        for (const q of [f[0], f[1], f[2], f[0], f[2], f[3]]) out.push(q[0], q[1], q[2]);
+    }
+    return out;
+};
+const cupEdges = (up: boolean): number[] => {
+    const out: number[] = [];
+    for (const f of RT_FACES) {
+        if (up ? faceZ(f) < 0.1 : faceZ(f) > -0.1) continue;
+        for (let i = 0; i < 4; i++) {
+            const a = f[i];
+            const b = f[(i + 1) % 4];
+            out.push(a[0], a[1], a[2], b[0], b[1], b[2]);
+        }
+    }
+    return out;
+};
+const RT_UP_TRIS = cupTris(true);
+const RT_DOWN_TRIS = cupTris(false);
+const RT_UP_EDGES = cupEdges(true);
+const RT_DOWN_EDGES = cupEdges(false);
 const RT_EDGES: number[] = (() => {
     const out: number[] = [];
     const seen = new Set<string>();
@@ -212,7 +270,7 @@ function build(reframe: boolean): void {
     }
 
     const cen = triacontahedra();
-    const assign = assignLargestFirst(cen);
+    const assign = cen.home;
     const mode = colorSel.value;
 
     // Scene coordinates for anything that is not the surface. The centers are
@@ -231,44 +289,43 @@ function build(reframe: boolean): void {
             if (mode === "cluster") return CLUSTER_3D[f.cluster] ?? CLUSTER_FALLBACK;
             if (mode === "complete")
                 return s.complete ? solidColor(s) : WASH.clone();
-            if (mode === "class") {
-                const gi = groupOf(s.faces.length);
-                return gi < 0 ? CLUSTER_FALLBACK : CLASS_GROUPS[gi].color;
-            }
+            if (mode === "class") return solidColor(s);
+            if (mode === "type") return f.thick ? CLUSTER_3D.Pe5 ?? CLUSTER_FALLBACK : CLUSTER_FALLBACK;
             return solidColor(s);
         },
         shade: shadeChk.checked ? 1 : 0,
-        useVertexColors: true,
+        useVertexColors: mode !== "plain" || shadeChk.checked,
         flatColor: PLAIN_COLOR,
-        transparent: false,
+        transparent: rhombSel.value === "transparent",
         edges: edgesChk.checked,
-        isoglosses: false,
+        isoglosses: isoChk.checked,
+        skipSurface: rhombSel.value === "invisible",
     });
 
     const complete = cen.solids.filter((s) => s.complete);
     const nlen = Number(nlenInput.value);
     const sscale = Number(sscaleInput.value);
-    const side = sideSel.value;
-    const wantUnsettled = unsettledChk.checked;
-    const wantHeads = headsChk.checked;
+    const wantAbove = aboveChk.checked;
+    const wantBelow = belowChk.checked;
     last = { faces: d.faces };
 
     // One filter, applied to everything: markers, shells and normals all mean "the
     // solids currently under consideration", and having them disagree would make the
     // picture impossible to read.
-    const passes = (s: Solid): boolean => {
-        const i = groupOf(s.faces.length);
-        if (i < 0 || !classCtl[i].on.checked) return false;
-        if (!s.settled && !wantUnsettled) return false;
-        // A solid no face calls home is the far end of a normal whose point is
-        // elsewhere — a nail head. Every face names two centers, so these are made by
-        // the construction rather than found in the roof, and they outnumber the real
-        // solids four to one. Counting them as classes is double counting.
-        if (s.homeCount === 0 && !wantHeads) return false;
-        return side === "both" || (side === "hat") === s.hat;
-    };
+    // What counts at all: a proper class, settled, with at least one face calling it
+    // home. A solid no face calls home is a nail head — the far end of a normal whose
+    // point is elsewhere — and they outnumber the real solids four to one.
+    const eligible = (s: Solid): boolean =>
+        properOf(s) >= 0 && s.settled && s.homeCount > 0;
+    /** the side the solid sits on, as the eye sees it after the flip */
+    const visuallyHat = (s: Solid) => (flip ? !s.hat : s.hat);
+    const sided = (s: Solid) => (visuallyHat(s) ? wantBelow : wantAbove);
+    const passes = (s: Solid): boolean =>
+        eligible(s) && sided(s) && classCtl[properOf(s)].on.checked;
     /** how big to draw this class's solids, 0 for not at all */
-    const sizeOf = (s: Solid) => Number(classCtl[groupOf(s.faces.length)].size.value) * sscale;
+    const sizeOf = (s: Solid) => Number(classCtl[properOf(s)].size.value) * sscale;
+    const showNormalsFor = (s: Solid) => passes(s) && classCtl[properOf(s)].norm.checked;
+    const showRTFor = (s: Solid) => passes(s) && classCtl[properOf(s)].rt.checked;
     const shown = cen.solids.filter(passes);
 
     // The normals themselves. Each face sends a segment both ways — above the map and
@@ -291,11 +348,11 @@ function build(reframe: boolean): void {
                 [1, rf.solids[0]],
                 [-1, rf.solids[1]],
             ] as Array<[number, number]>) {
-                if (!passes(cen.solids[sid])) {
+                if (!showNormalsFor(cen.solids[sid])) {
                     // The other end of a normal whose point is shown gets a small
                     // white head, so a nail reads as a nail: you can see which end
                     // means something and which is only the far side of the same face.
-                    if (sid !== homeId && passes(cen.solids[homeId])) {
+                    if (sid !== homeId && showNormalsFor(cen.solids[homeId])) {
                         heads.push({ c: p, n: [u[0] * dir, u[1] * dir, u[2] * dir] });
                     }
                     continue;
@@ -370,25 +427,26 @@ function build(reframe: boolean): void {
     // triacontahedron too, but drawing all of them fills the view with overlapping
     // shells — they interpenetrate freely, centers as close as one long diagonal,
     // where the complete ones are never nearer than φ³ and read as separate objects.
-    if (solidsChk.checked && shown.length && sscale > 0) {
+    const rtMode = rtSel.value;
+    const rtCup = rtExtentSel.value === "cup";
+    if (rtMode !== "invisible" && sscale > 0) {
         const tris: number[] = [];
         const cols: number[] = [];
         const lines: number[] = [];
         for (const s of shown) {
+            if (!showRTFor(s)) continue;
             const t = sizeOf(s);
             if (t <= 0) continue;
+            const TRIS = rtCup ? (visuallyHat(s) ? RT_UP_TRIS : RT_DOWN_TRIS) : RT_TRIS;
+            const EDG = rtCup ? (visuallyHat(s) ? RT_UP_EDGES : RT_DOWN_EDGES) : RT_EDGES;
             const p = place(s.c);
             const col = solidColor(s);
-            for (let i = 0; i < RT_TRIS.length; i += 3) {
-                tris.push(
-                    RT_TRIS[i] * t + p[0],
-                    RT_TRIS[i + 1] * t + p[1],
-                    RT_TRIS[i + 2] * t + p[2],
-                );
+            for (let i = 0; i < TRIS.length; i += 3) {
+                tris.push(TRIS[i] * t + p[0], TRIS[i + 1] * t + p[1], TRIS[i + 2] * t + p[2]);
                 cols.push(col.r, col.g, col.b);
             }
-            for (let i = 0; i < RT_EDGES.length; i += 3) {
-                lines.push(RT_EDGES[i] * t + p[0], RT_EDGES[i + 1] * t + p[1], RT_EDGES[i + 2] * t + p[2]);
+            for (let i = 0; i < EDG.length; i += 3) {
+                lines.push(EDG[i] * t + p[0], EDG[i + 1] * t + p[1], EDG[i + 2] * t + p[2]);
             }
         }
         if (tris.length) {
@@ -404,13 +462,14 @@ function build(reframe: boolean): void {
                     roughness: 0.7,
                     metalness: 0.02,
                     flatShading: true,
-                    transparent: true,
-                    opacity: 0.38,
-                    depthWrite: false,
+                    transparent: rtMode === "transparent",
+                    opacity: rtMode === "transparent" ? 0.38 : 1,
+                    depthWrite: rtMode !== "transparent",
                     side: THREE.DoubleSide,
                 }),
             ),
         );
+        if (rtEdgesChk.checked) {
         const lg = new THREE.BufferGeometry();
         lg.setAttribute("position", new THREE.Float32BufferAttribute(lines, 3));
         rv.add(
@@ -423,6 +482,7 @@ function build(reframe: boolean): void {
                 }),
             ),
         );
+        }
         }
     }
 
@@ -542,22 +602,17 @@ function build(reframe: boolean): void {
     // The face classes: each rhomb takes the size of the larger of its two solids,
     // which is what largest-first assignment gives it anyway.
     const cls: Record<number, number> = {};
+    let demoted = 0;
     for (const f of d.faces) {
-        const n = cen.solids[assign[f.id]].faces.length;
-        cls[n] = (cls[n] ?? 0) + 1;
+        const i = properOf(cen.solids[assign[f.id]]);
+        if (i < 0) demoted++;
+        else cls[i] = (cls[i] ?? 0) + 1;
     }
-    const clsText = CLASS_ORDER.filter((k) => cls[k]).map((k) => `${k}:${cls[k]}`).join(" ");
+    const clsText = PROPER.map((p, i) => `${p.label}:${cls[i] ?? 0}`).join(" ");
     // how many solids of each class the patch is entitled to classify
-    const perClass = CLASS_GROUPS.map(() => 0);
-    let unsettledCount = 0;
-    let headCount = 0;
-    for (const s of cen.solids) {
-        if (!s.settled) { unsettledCount++; if (!wantUnsettled) continue; }
-        if (s.homeCount === 0) { headCount++; if (!wantHeads) continue; }
-        const i = groupOf(s.faces.length);
-        if (i >= 0) perClass[i]++;
-    }
-    CLASS_GROUPS.forEach((_, i) => { classCtl[i].count.textContent = String(perClass[i]); });
+    const perClass = PROPER.map(() => 0);
+    for (const s of cen.solids) if (eligible(s)) perClass[properOf(s)]++;
+    PROPER.forEach((_, i) => { classCtl[i].count.textContent = String(perClass[i]); });
     const hats = complete.filter((s) => s.hat).length;
     const pe5 = pe5Rosettes().length;
     const onCap = new Set<number>();
@@ -570,11 +625,8 @@ function build(reframe: boolean): void {
         `${complete.length === pe5 ? "" : ` ⚠ against ${pe5} Pe5 rosettes`} · ` +
         `${onCap.size} of ${allRhombs.length} faces on a complete cap ` +
         `(${((100 * onCap.size) / allRhombs.length).toFixed(0)}%) · ` +
-        `showing ${shown.length} · ${perClass.reduce((a, b) => a + b, 0)} classifiable ` +
-        `(${headCount} nail heads${wantHeads ? ", included" : ""}, ` +
-        `${unsettledCount} edge-truncated${wantUnsettled ? ", included" : ""}) · ` +
-        `face classes ${clsText}` +
-        `${cls[1] ? ` — ${cls[1]} orphan${cls[1] === 1 ? "" : "s"}, all on the boundary` : ""} · ` +
+        `${shown.length} of ${perClass.reduce((a, b) => a + b, 0)} proper solids shown · ` +
+        `rhombi by class ${clsText}, ${demoted} demoted · ` +
         `normals ${(nlen / RHO).toFixed(2)}ρ · ${ms} ms`;
 }
 
@@ -612,47 +664,83 @@ flipChk.checked = prefs.flip;
 normalsChk.checked = prefs.normals;
 nlenInput.value = String(prefs.nlen);
 sscaleInput.value = String(prefs.sscale);
-sideSel.value = prefs.side;
-unsettledChk.checked = prefs.unsettled;
-headsChk.checked = prefs.heads;
-if (!sideSel.value) sideSel.value = PREF_DEFAULTS.side;
+flipChk.checked = prefs.flip;
+aboveChk.checked = prefs.above;
+belowChk.checked = prefs.below;
+rhombSel.value = prefs.rhombmode || PREF_DEFAULTS.rhombmode;
 edgesChk.checked = prefs.edges;
-solidsChk.checked = prefs.solids;
-markersChk.checked = prefs.markers;
 shadeChk.checked = prefs.shade;
+isoChk.checked = prefs.isogloss;
+normalsChk.checked = prefs.normals;
+nlenInput.value = String(prefs.nlen);
+rtSel.value = prefs.rtmode || PREF_DEFAULTS.rtmode;
+rtExtentSel.value = prefs.rtextent || PREF_DEFAULTS.rtextent;
+rtEdgesChk.checked = prefs.rtedges;
+markersChk.checked = prefs.markers;
+sscaleInput.value = String(prefs.sscale);
 
-// One row per class: a colored checkbox and a size slider, plus a live count. The bar
-// is the legend as well as the control — a color that means "class 3" is no use if
-// you have to look elsewhere to learn it.
-CLASS_GROUPS.forEach((grp, i) => {
+// One row per proper class: show, its own normals and solids overrides, a size slider
+// and a live population. The three globals above are master switches — flipping one
+// writes through to every class, and the class controls are the state from then on, so
+// an individual class genuinely overrides rather than being ANDed into silence.
+PROPER.forEach((p, i) => {
     const wrap = document.createElement("span");
     wrap.className = "cls";
-    const top = document.createElement("label");
-    top.className = "top";
-    top.title = grp.hint;
+    wrap.style.borderLeftColor = `#${p.color.getHexString()}`;
+    wrap.title = p.hint;
+
+    const row1 = document.createElement("span");
+    row1.className = "row";
     const on = document.createElement("input");
     on.type = "checkbox";
-    on.checked = prefs.classOn[i] ?? grp.label !== "other";
+    on.checked = prefs.classOn[i] ?? true;
     const sw = document.createElement("span");
     sw.className = "swatch";
-    sw.style.background = `#${grp.color.getHexString()}`;
-    const name = document.createElement("span");
-    name.textContent = grp.label;
-    top.append(on, sw, name);
+    sw.style.background = `#${p.color.getHexString()}`;
+    const name = document.createElement("strong");
+    name.textContent = p.label;
+    const count = document.createElement("span");
+    count.className = "count";
+    row1.append(on, sw, name, count);
+
+    const row2 = document.createElement("span");
+    row2.className = "row";
+    const mk = (label: string, checked: boolean) => {
+        const l = document.createElement("label");
+        l.className = "row";
+        const c = document.createElement("input");
+        c.type = "checkbox";
+        c.checked = checked;
+        l.append(c, document.createTextNode(label));
+        row2.appendChild(l);
+        return c;
+    };
+    const norm = mk("N", prefs.classNorm[i] ?? true);
+    norm.title = `Normals for class ${p.label}`;
+    const rt = mk("RT", prefs.classRT[i] ?? true);
+    rt.title = `Triacontahedra for class ${p.label}`;
+
     const size = document.createElement("input");
     size.type = "range";
     size.min = "0";
     size.max = "1";
     size.step = "0.01";
     size.value = String(prefs.classSize[i] ?? 1);
-    size.title = `How big to draw class ${grp.label} solids`;
-    const count = document.createElement("span");
-    count.className = "count";
-    wrap.append(top, size, count);
+    size.title = `How big to draw class ${p.label} solids`;
+
+    wrap.append(row1, row2, size);
     classBar.appendChild(wrap);
-    classCtl.push({ on, size, count });
-    on.addEventListener("change", () => rebuild(false));
+    classCtl.push({ on, norm, rt, size, count });
+    for (const c of [on, norm, rt]) c.addEventListener("change", () => rebuild(false));
     size.addEventListener("input", () => rebuild(false));
+});
+
+// master switches
+normalsChk.addEventListener("change", () => {
+    for (const c of classCtl) c.norm.checked = normalsChk.checked;
+});
+rtSel.addEventListener("change", () => {
+    if (rtSel.value !== "invisible") for (const c of classCtl) c.rt.checked = true;
 });
 
 function rebuild(reframe: boolean): void {
@@ -663,7 +751,8 @@ function rebuild(reframe: boolean): void {
     build(reframe);
 }
 for (const c of [patchSel, genSel]) c.addEventListener("change", () => rebuild(true));
-for (const c of [colorSel, sideSel, flipChk, edgesChk, normalsChk, solidsChk, markersChk, shadeChk, unsettledChk, headsChk]) {
+for (const c of [colorSel, flipChk, aboveChk, belowChk, rhombSel, edgesChk, shadeChk,
+                 isoChk, normalsChk, rtSel, rtExtentSel, rtEdgesChk, markersChk]) {
     c.addEventListener("change", () => rebuild(false));
 }
 for (const c of [nlenInput, sscaleInput]) {
@@ -688,18 +777,23 @@ function persist(): void {
         gen: Number(genSel.value),
         color: colorSel.value,
         flip: flipChk.checked,
+        above: aboveChk.checked,
+        below: belowChk.checked,
+        rhombmode: rhombSel.value,
         edges: edgesChk.checked,
+        shade: shadeChk.checked,
+        isogloss: isoChk.checked,
         normals: normalsChk.checked,
         nlen: Number(nlenInput.value),
-        sscale: Number(sscaleInput.value),
-        side: sideSel.value,
-        unsettled: unsettledChk.checked,
-        heads: headsChk.checked,
-        classOn: classCtl.map((c) => c.on.checked),
-        classSize: classCtl.map((c) => Number(c.size.value)),
-        solids: solidsChk.checked,
+        rtmode: rtSel.value,
+        rtextent: rtExtentSel.value,
+        rtedges: rtEdgesChk.checked,
         markers: markersChk.checked,
-        shade: shadeChk.checked,
+        sscale: Number(sscaleInput.value),
+        classOn: classCtl.map((c) => c.on.checked),
+        classNorm: classCtl.map((c) => c.norm.checked),
+        classRT: classCtl.map((c) => c.rt.checked),
+        classSize: classCtl.map((c) => Number(c.size.value)),
     });
 }
 window.addEventListener("beforeunload", persist);
