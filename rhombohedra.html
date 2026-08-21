@@ -49,11 +49,12 @@
 </p>
 
 <div class="bar">
-    <label>Explode <span id="explodeOut" class="mono"></span>
+    <label title="Scroll over the slider to work it; hold shift for fine steps">Explode <span id="explodeOut" class="mono"></span>
         <input type="range" id="explode" min="0" max="1" step="0.005" value="0">
     </label>
     <label>Color <select id="color">
         <option value="type">Acute / obtuse</option>
+        <option value="five">Kowalewski five</option>
         <option value="cell">One hue per cell</option>
         <option value="axis">By axis</option>
     </select></label>
@@ -62,8 +63,14 @@
         <option value="acute">The ten acute</option>
         <option value="obtuse">The ten obtuse</option>
     </select></label>
+    <label>Faces <select id="facemode">
+        <option value="transparent">Transparent</option>
+        <option value="solid">Solid</option>
+        <option value="invisible">Invisible</option>
+    </select></label>
     <span class="checks">
-        <label><input type="checkbox" id="faces" checked> faces</label>
+        <label><input type="checkbox" id="edges" checked> edges</label>
+        <label><input type="checkbox" id="cage" checked> cage</label>
         <label><input type="checkbox" id="spin" checked> turn</label>
         <button id="reset" title="Forget saved settings and start again from the defaults">Reset</button>
     </span>
@@ -108,6 +115,28 @@
     spreads. Faces go translucent while the cells are still close, because assembled
     they share every internal face and opaque ones would hide the whole dissection
     behind the solid's own surface.
+</p>
+<p>
+    <strong>The Kowalewski five.</strong> There is a five-colouring of the
+    triacontahedron's thirty faces in which <em>every rosette shows all five colours</em>,
+    and it is forced rather than designed. A face is spanned by a <strong>pair</strong> of
+    the six axes, and the five faces round a five-valent vertex are exactly the five
+    pairs containing that vertex's axis — so "all five in every rosette" says that pairs
+    sharing an axis must differ, which is a <strong>proper edge colouring of K₆</strong>.
+    K₆ needs exactly five colours, and a colour class is a perfect matching of three
+    pairs.
+</p>
+<p>
+    Three things Jeff described then follow without being asked for. Opposite faces of
+    the solid share an axis pair, so they share a colour. A hexahedron's six faces come
+    in three opposite pairs, one per axis pair of its triple, so
+    <strong>opposite faces of each hexahedron are the same colour automatically</strong>.
+    And the three pairs of a triple share an axis pairwise, so every hexahedron wears
+    exactly <strong>three</strong> of the five — with <span class="mono">C(5,3) = 10</span>
+    such triples, each borne once by an acute cell and once by an obtuse one. That is
+    the labelling of the classical <strong>Kowalewski</strong> puzzle, whose
+    colour-matching assemblies George Hart counts at 320. All of it is checked in
+    <span class="mono">tools/dissect.mjs</span>.
 </p>
 <p>
     See <a href="./polyhedra.html" draggable="false">Polyhedra</a> for the solid intact

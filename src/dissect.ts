@@ -136,6 +136,104 @@ export function dissection(): Cell[] {
     return cached;
 }
 
+// ── the five-colouring ────────────────────────────────────────────
+//
+// Each face of the triacontahedron is spanned by a **pair** of the six axes, and the
+// five faces around a five-valent vertex are exactly the five pairs containing that
+// vertex's axis. So "every rosette shows all five colours" says that pairs sharing an
+// axis must differ — which is a **proper edge colouring of K₆**, and K₆ needs exactly
+// five colours (χ′(K₂ₙ) = 2n − 1). A colour class is then a perfect matching, three
+// pairs each, five classes covering all fifteen.
+//
+// Everything Jeff described follows without being imposed:
+//
+//   * opposite faces of the solid share an axis pair, so they share a colour;
+//   * a cell's six faces come in three opposite pairs, one per axis pair of its triple,
+//     so **opposite faces of a hexahedron are the same colour** — automatic, not a
+//     constraint;
+//   * the three pairs of a triple share an axis pairwise, so a cell shows exactly
+//     **three distinct colours**;
+//   * and there are C(5,3) = 10 such triples, borne once by an acute cell and once by
+//     an obtuse one. That is the labelling of the classical Kowalewski puzzle, whose
+//     colour-matching assemblies George Hart counts at 320.
+//
+// Construction: the pentagon 0–4 with axis 5 at the centre. Colour k matches 5 with k
+// and the two pairs straddling k.
+const PAIR_COLOR: Record<string, number> = (() => {
+    const out: Record<string, number> = {};
+    const put = (a: number, b: number, k: number) => {
+        out[`${Math.min(a, b)},${Math.max(a, b)}`] = k;
+    };
+    for (let k = 0; k < 5; k++) {
+        put(5, k, k);
+        put((k + 1) % 5, (k + 4) % 5, k);
+        put((k + 2) % 5, (k + 3) % 5, k);
+    }
+    return out;
+})();
+
+/** Colour 0–4 of the face spanned by axes `i` and `j`. */
+export function pairColor(i: number, j: number): number {
+    return PAIR_COLOR[`${Math.min(i, j)},${Math.max(i, j)}`];
+}
+
+/** Colour 0–4 of face `f` of a cell. Faces `2q` and `2q+1` are the opposite pair
+ *  perpendicular to the cell's `q`-th edge, and are spanned by the other two axes —
+ *  which is why they come out the same colour. */
+export function faceColor(c: Cell, f: number): number {
+    const q = f >> 1;
+    return pairColor(c.triple[(q + 1) % 3], c.triple[(q + 2) % 3]);
+}
+
+/** The three colours a cell wears, sorted — one of the ten 3-subsets of five. */
+export function cellColors(c: Cell): number[] {
+    return [0, 2, 4].map((f) => faceColor(c, f)).sort((a, b) => a - b);
+}
+
+// ── the shell ─────────────────────────────────────────────────────
+
+export interface ShellFace {
+    corners: [V3, V3, V3, V3];
+    /** the two axes the face is spanned by — which is what gives it its colour */
+    i: number;
+    j: number;
+}
+
+/**
+ * The thirty faces of the triacontahedron itself, each with the axis pair that spans
+ * it. Built here rather than taken from `solids.ts` because the pair is the point: it
+ * is what the five-colouring keys on, and a bare list of corners has lost it.
+ */
+export function shellFaces(): ShellFace[] {
+    const out: ShellFace[] = [];
+    for (let i = 0; i < 6; i++) {
+        for (let j = i + 1; j < 6; j++) {
+            for (const flip of [1, -1]) {
+                const n = cross(A6[i], A6[j]).map((x) => x * flip) as V3;
+                const base: V3 = [0, 0, 0];
+                for (let m = 0; m < 6; m++) {
+                    if (m === i || m === j) continue;
+                    const s = Math.sign(dot(n, A6[m]));
+                    for (let d = 0; d < 3; d++) base[d] += (s * A6[m][d]) / 2;
+                }
+                const a = A6[i].map((x) => x / 2) as V3;
+                const b = A6[j].map((x) => x / 2) as V3;
+                out.push({
+                    i,
+                    j,
+                    corners: [
+                        [base[0] - a[0] - b[0], base[1] - a[1] - b[1], base[2] - a[2] - b[2]],
+                        [base[0] + a[0] - b[0], base[1] + a[1] - b[1], base[2] + a[2] - b[2]],
+                        [base[0] + a[0] + b[0], base[1] + a[1] + b[1], base[2] + a[2] + b[2]],
+                        [base[0] - a[0] + b[0], base[1] - a[1] + b[1], base[2] - a[2] + b[2]],
+                    ],
+                });
+            }
+        }
+    }
+    return out;
+}
+
 /** Total cell volume, which must be the triacontahedron's own. */
 export const RT_VOLUME = 4 * Math.sqrt(5 + 2 * Math.sqrt(5));
 export { disjoint };
