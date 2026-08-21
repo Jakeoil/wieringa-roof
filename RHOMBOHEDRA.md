@@ -154,21 +154,53 @@ since 160 is not a multiple of 60 — and that contradiction is what exposed it.
 was to stop using floats: a symmetry is reduced to a **signed permutation of the six
 axes**, and the action on a dissection is integer arithmetic from there.
 
-### Part 2 — the intersections found in `centers.html`
+### Part 2 — the intersections found in `centers.html` · **done, and the answer is no**
 
-The offsets that actually occur in the packing, and what each shares. One is already
-exact (§1); the other two are open:
+The offsets that actually occur in the packing, with the shared region computed exactly
+— vertex enumeration over the thirty bounding planes and a sum of face pyramids, not
+sampling. The method validates itself on the case already known: it returns exactly half
+the triacontahedron's volume, on 22 vertices and 20 faces, which is the rhombic
+icosahedron and nothing else.
 
-| offset | \|t\| | shared | identified? |
+| offset | \|t\| | shared | vertices | faces | is it a zonohedron? |
+|---|---|---|---|---|---|
+| one axis `aᵢ` | 1.0000 | **6.155367 — exactly ½** | 22 | 20, all parallelograms | **yes — the rhombic icosahedron** |
+| short diagonal `aᵢ−aⱼ` | 1.0515 | 5.836483 (47.41%) | 30 | 28 quads, only 20 parallelograms | no |
+| long diagonal `aᵢ+aⱼ` | 1.7013 | 2.655892 (21.57%) | 16 | 10 parallelograms + **8 triangles** | no |
+| face contact `2ρ·n̂` | 2.7528 | 0 | — | — | they only touch |
+
+**Only the one-axis intersection is a named solid.** A three-dimensional polytope is a
+zonotope exactly when all its faces are centrally symmetric, and the other two fail
+that: the long diagonal has eight triangular faces outright, and the short diagonal has
+eight quadrilaterals that are not parallelograms. Which is why neither volume has a
+closed form — searching `(a + b√5)/c` over small integers finds nothing for either,
+where every zonohedral volume in this chapter is such a number.
+
+The one-axis result has a clean reason behind it, and the others do not: translating a
+zonohedron by one of its own generators and intersecting **deletes that generator**,
+leaving the zonohedron on the other five. No such statement is available for a diagonal
+offset, because a diagonal is not a generator.
+
+#### And they are not unions of cells
+
+The sharp question this part was posed to answer — *are the intersections unions of
+whole cells, so that chapter 3's packing and chapter 4's dissection are the same
+combinatorics twice?* — comes back **no**, for every offset and for both dissections:
+
+| offset | cells wholly in | wholly out | **split** |
 |---|---|---|---|
-| one axis `aᵢ` | 1.0000 | 50% | **yes — the rhombic icosahedron** |
-| short diagonal | 1.0515 | ≈47% | no |
-| long diagonal | 1.7013 | ≈22% | no |
-| face contact | 2.7528 | 0% | — |
+| one axis | 9 | 1 | **10** |
+| short diagonal | 1 | 2 | **17** |
+| long diagonal | 4 | 5 | **11** |
 
-The question for this part: **are those intersections unions of whole cells?** If they
-are, the packing of chapter 3 and the dissection of chapter 4 are the same
-combinatorics twice, and that is the link Jeff is after.
+Identical for the symmetric and the chiral dissection, so it is not an artifact of which
+one is chosen.
+
+Even the good case fails, and instructively. The one-axis intersection *is* the rhombic
+icosahedron — but it is the icosahedron translated by `aᵢ/2`, **half** an axis, so it
+sits half a cell out of step with the dissection and cuts ten of the twenty. The
+packing and the dissection are built on the same six axes and are not the same
+combinatorics; they are offset from one another by a half-lattice step.
 
 ### Part 3 — construction
 
