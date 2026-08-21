@@ -197,6 +197,19 @@ export interface ShellFace {
     /** the two axes the face is spanned by — which is what gives it its colour */
     i: number;
     j: number;
+    /** on the solid's own surface, rather than inside it. Exactly the faces belonging
+     *  to one cell instead of two: thirty out of the seventy-five. */
+    outer: boolean;
+    /**
+     * Per edge `k` (from corner `k` to `k+1`), whether that edge lies on the solid's
+     * surface.
+     *
+     * Needed because dropping the outer *faces* does not drop the outer *outline*: an
+     * internal face can reach the surface along an edge, and 54 of the solid's 60 edges
+     * are drawn that way. Filtering faces leaves the silhouette behind; filtering edges
+     * is what actually strips it.
+     */
+    edgeOuter: [boolean, boolean, boolean, boolean];
 }
 
 /**
@@ -224,6 +237,8 @@ export function shellFaces(): ShellFace[] {
                 out.push({
                     i,
                     j,
+                    outer: true,
+                    edgeOuter: [true, true, true, true],
                     corners: [
                         [base[0] - a[0] - b[0], base[1] - a[1] - b[1], base[2] - a[2] - b[2]],
                         [base[0] + a[0] - b[0], base[1] + a[1] - b[1], base[2] + a[2] - b[2]],
@@ -249,25 +264,57 @@ export function shellFaces(): ShellFace[] {
  * face z-fight, which looks like a rendering fault.
  */
 export function cageFaces(): ShellFace[] {
-    const out: ShellFace[] = [];
-    const seen = new Set<string>();
+    const byKey = new Map<string, { face: ShellFace; n: number }>();
     for (const c of dissection()) {
         c.faces.forEach((f, fi) => {
             const mid = [0, 1, 2].map((d) => f.reduce((s, q) => s + q[d], 0) / 4);
             const key = mid.map((x) => Math.round(x * 1e6)).join(",");
-            if (seen.has(key)) return;
-            seen.add(key);
+            const hit = byKey.get(key);
+            if (hit) {
+                hit.n++;
+                return;
+            }
             // faces 2q and 2q+1 are spanned by the two axes of the triple other than q
             const q = fi >> 1;
-            out.push({
-                i: c.triple[(q + 1) % 3],
-                j: c.triple[(q + 2) % 3],
-                corners: [f[0], f[1], f[2], f[3]] as [V3, V3, V3, V3],
+            byKey.set(key, {
+                n: 1,
+                face: {
+                    i: c.triple[(q + 1) % 3],
+                    j: c.triple[(q + 2) % 3],
+                    outer: false,
+                    edgeOuter: [false, false, false, false],
+                    corners: [f[0], f[1], f[2], f[3]] as [V3, V3, V3, V3],
+                },
             });
         });
     }
-    return out;
+    // A face belonging to one cell is on the surface; one belonging to two is inside.
+    // That is what tells the shell from the interior, and it needs no geometry.
+    return [...byKey.values()].map(({ face, n }) => {
+        const eo = [0, 1, 2, 3].map((k) => {
+            const a = face.corners[k];
+            const b = face.corners[(k + 1) % 4];
+            const mid: V3 = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2, (a[2] + b[2]) / 2];
+            return onSurface(a) && onSurface(b) && onSurface(mid);
+        }) as [boolean, boolean, boolean, boolean];
+        return { ...face, outer: n === 1, edgeOuter: eo };
+    });
 }
+
+/** Is a point on the solid's surface — that is, extreme in some face direction? */
+function onSurface(p: V3): boolean {
+    for (let i = 0; i < 6; i++) {
+        for (let j = i + 1; j < 6; j++) {
+            const n = cross(A6[i], A6[j]);
+            const L = Math.hypot(n[0], n[1], n[2]);
+            const h = (Math.abs(dot(p, n)) / L);
+            if (Math.abs(h - RT_INRADIUS) < 1e-9) return true;
+        }
+    }
+    return false;
+}
+
+const RT_INRADIUS = Math.sqrt(1 + 2 / Math.sqrt(5));
 
 /** Total cell volume, which must be the triacontahedron's own. */
 export const RT_VOLUME = 4 * Math.sqrt(5 + 2 * Math.sqrt(5));

@@ -101,6 +101,41 @@ Exploding moves each cell along the direction of its own centre, so zero reassem
 exactly and full travel is the same arrangement magnified. Faces go translucent while
 the cells are close, since assembled they share every internal face.
 
+### The interior has no symmetry at all
+
+Noticed by Jeff, looking at the inner cage: *"a rosette but otherwise very little
+symmetry."* Measured, and it is starker than that.
+
+The triacontahedron's own rotation group has order 60. Applied to the pieces of the
+page's dissection:
+
+| | preserved by |
+|---|---|
+| the shell, 30 outer faces | **60 of 60** — everything |
+| the inner cage, 45 internal faces | **1 of 60** — the identity alone |
+| the 20 cell centres | **1 of 60** |
+
+**The exterior is forced and the interior is chosen**, and this choice keeps none of the
+solid's symmetry whatever. The rosette Jeff can see is local — five cells meeting round
+one five-fold axis — and does not extend to a global symmetry, because there is none to
+extend to.
+
+### Open, and a failed attempt worth recording
+
+The natural next question, and the one Jeff's source file says has no clean published
+answer: **how many dissections are there?**
+
+I enumerated them under the parameterization this module uses — one cell per triple,
+each cell offset by `½Σ_{m∉T} σₘaₘ` with `σₘ = ±1` — and got **160**, all with trivial
+symmetry. **That answer is wrong**, and the check that caught it is worth keeping: the
+rotation group acts on the set of dissections, so with trivial stabilizers the count
+would have to be a multiple of 60, and 160 is not. Testing directly, rotating one
+dissection lands outside the enumerated set **58 times out of 60**.
+
+So the parameterization is incomplete — either cells can sit at offsets other than ±1,
+or a dissection need not use each triple exactly once, or both. Until that is settled
+there is no count here, and 160 should not be quoted.
+
 ### Part 2 — the intersections found in `centers.html`
 
 The offsets that actually occur in the packing, and what each shares. One is already

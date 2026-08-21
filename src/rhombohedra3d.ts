@@ -31,13 +31,13 @@ const explodeOut = el<HTMLElement>("explodeOut");
 const colorSel = el<HTMLSelectElement>("color");
 const showSel = el<HTMLSelectElement>("show");
 const faceSel = el<HTMLSelectElement>("facemode");
-const edgesChk = el<HTMLInputElement>("edges");
-const cageChk = el<HTMLInputElement>("cage");
+const edgeSel = el<HTMLSelectElement>("edgemode");
+const cageSel = el<HTMLSelectElement>("cagemode");
 const spinChk = el<HTMLInputElement>("spin");
 const statusEl = el<HTMLElement>("status");
 
 const PREFS_KEY = "wr-rhombohedra";
-const PREF_DEFAULTS = { explode: 0, color: "five", show: "all", facemode: "solid", edges: true, cage: true, spin: true };
+const PREF_DEFAULTS = { explode: 0, color: "five", show: "all", facemode: "solid", edgemode: "edges", cagemode: "cage", spin: true };
 const prefs = loadPrefs(PREFS_KEY, PREF_DEFAULTS);
 
 const scene = new THREE.Scene();
@@ -81,6 +81,28 @@ const AXIS = Array.from({ length: 6 }, (_, i) => new THREE.Color().setHSL(i / 6,
 const FIVE = [0xd94f3d, 0xe8a33d, 0x4f9d4a, 0x3d7fc4, 0x9b59b6].map((h) => new THREE.Color(h));
 const CAGE = new THREE.Color(0x8a8578);
 
+// A metallic surface with nothing to reflect renders black — metalness is a statement
+// about *reflection*, and an empty scene reflects nothing. So the rods and beads get a
+// small gradient sky to work against. Applied to that material alone rather than to
+// `scene.environment`, which would also relight the faces and the cage.
+const METAL_ENV = (() => {
+    const c = document.createElement("canvas");
+    c.width = 8;
+    c.height = 64;
+    const g = c.getContext("2d")!;
+    const grad = g.createLinearGradient(0, 0, 0, 64);
+    grad.addColorStop(0, "#ffffff");
+    grad.addColorStop(0.45, "#cdd2da");
+    grad.addColorStop(0.62, "#8d939d");
+    grad.addColorStop(1, "#3f434b");
+    g.fillStyle = grad;
+    g.fillRect(0, 0, 8, 64);
+    const tex = new THREE.CanvasTexture(c);
+    tex.mapping = THREE.EquirectangularReflectionMapping;
+    tex.colorSpace = THREE.SRGBColorSpace;
+    return tex;
+})();
+
 const cells = dissection();
 const cage = cageFaces();
 let drawn: THREE.Object3D[] = [];
@@ -121,6 +143,13 @@ function build(): void {
     const u = Number(explodeInput.value);
     const t = Math.pow(u, 2.2) * 12;
     const faceMode = faceSel.value;
+    const edgeMode = edgeSel.value;
+    // Corners and edges of each cell, for the ball-and-stick frame. Taken per cell
+    // rather than deduplicated: assembled, neighbouring cells share corners and the
+    // beads coincide exactly, which looks like one bead — and once exploded they must
+    // travel with their own cell anyway.
+    const beads: V3[] = [];
+    const rods: Array<[V3, V3]> = [];
 
     const tris: number[] = [];
     const cols: number[] = [];
@@ -132,6 +161,22 @@ function build(): void {
         if (!visible(c)) continue;
         shown++;
         const o: V3 = [c.center[0] * t, c.center[1] * t, c.center[2] * t];
+        if (edgeMode === "ballstick") {
+            for (const q of c.corners) beads.push([q[0] + o[0], q[1] + o[1], q[2] + o[2]]);
+            // the twelve edges: each corner joined to the three that differ in one sign
+            for (let b = 0; b < 8; b++) {
+                for (let q = 0; q < 3; q++) {
+                    const b2 = b | (1 << q);
+                    if (b2 === b) continue;
+                    const p1 = c.corners[b];
+                    const p2 = c.corners[b2];
+                    rods.push([
+                        [p1[0] + o[0], p1[1] + o[1], p1[2] + o[2]],
+                        [p2[0] + o[0], p2[1] + o[1], p2[2] + o[2]],
+                    ]);
+                }
+            }
+        }
         c.faces.forEach((f, fi) => {
             const col = colorOf(c, fi);
             if (faceMode !== "invisible") {
@@ -140,7 +185,7 @@ function build(): void {
                     cols.push(col.r, col.g, col.b);
                 }
             }
-            if (edgesChk.checked) {
+            if (edgeMode === "edges") {
                 for (let i = 0; i < 4; i++) {
                     const a = f[i];
                     const b = f[(i + 1) % 4];
@@ -203,16 +248,58 @@ function build(): void {
         drawn.push(lines);
     }
 
+    if (beads.length) {
+        const mat = new THREE.MeshStandardMaterial({
+            color: 0xd8dae0,
+            metalness: 0.92,
+            roughness: 0.24,
+            envMap: METAL_ENV,
+            envMapIntensity: 1.0,
+        });
+        const bg = new THREE.IcosahedronGeometry(0.062, 2);
+        const bm = new THREE.InstancedMesh(bg, mat, beads.length);
+        const m4 = new THREE.Matrix4();
+        beads.forEach((p, i) => bm.setMatrixAt(i, m4.makeTranslation(p[0], p[1], p[2])));
+        bm.instanceMatrix.needsUpdate = true;
+        scene.add(bm);
+        drawn.push(bm);
+
+        // A cylinder's own axis is +Y, so each rod is a rotation carrying Y onto the
+        // edge, scaled to its length and dropped at its midpoint.
+        const rg = new THREE.CylinderGeometry(0.026, 0.026, 1, 10, 1);
+        const rm = new THREE.InstancedMesh(rg, mat, rods.length);
+        const up = new THREE.Vector3(0, 1, 0);
+        const dir = new THREE.Vector3();
+        const quat = new THREE.Quaternion();
+        const pos = new THREE.Vector3();
+        const scl = new THREE.Vector3();
+        rods.forEach(([a, b], i) => {
+            dir.set(b[0] - a[0], b[1] - a[1], b[2] - a[2]);
+            const len = dir.length();
+            quat.setFromUnitVectors(up, dir.clone().normalize());
+            pos.set((a[0] + b[0]) / 2, (a[1] + b[1]) / 2, (a[2] + b[2]) / 2);
+            scl.set(1, len, 1);
+            rm.setMatrixAt(i, m4.compose(pos, quat, scl));
+        });
+        rm.instanceMatrix.needsUpdate = true;
+        scene.add(rm);
+        drawn.push(rm);
+    }
+
     // The cage: **every** face of the assembled dissection as an open window with a
     // narrow rim — all seventy-five of them, the thirty outside and the forty-five
     // within, not merely the shell. So it is the whole internal skeleton, and each cell
     // has a socket in it shaped exactly like itself. It does not explode: it is what
     // the pieces come out of, and watching them leave it is the point.
-    if (cageChk.checked) {
+    // `inner` drops the thirty faces on the solid's own surface and keeps the
+    // forty-five within, which is the internal skeleton with nothing wrapped round it.
+    const cageMode = cageSel.value;
+    if (cageMode !== "none") {
         const W = 0.15;
         const cp: number[] = [];
         const cc: number[] = [];
         for (const f of cage) {
+            if (cageMode === "inner" && f.outer) continue;
             const col = colorSel.value === "five" ? FIVE[pairColor(f.i, f.j)] : CAGE;
             const mid: V3 = [0, 0, 0];
             for (const q of f.corners) for (let d = 0; d < 3; d++) mid[d] += q[d] / 4;
@@ -224,6 +311,10 @@ function build(): void {
                 ] as V3,
             );
             for (let k = 0; k < 4; k++) {
+                // Dropping the outer faces is not enough to drop the outer outline: an
+                // internal face reaches the surface along an edge, and 54 of the solid's
+                // 60 edges are drawn that way. So the filter is per strip, not per face.
+                if (cageMode === "inner" && f.edgeOuter[k]) continue;
                 const a = f.corners[k], b = f.corners[(k + 1) % 4];
                 const c2 = inner[(k + 1) % 4], d2 = inner[k];
                 for (const q of [a, b, c2, a, c2, d2]) {
@@ -232,6 +323,7 @@ function build(): void {
                 }
             }
         }
+        if (cp.length) {
         const g = new THREE.BufferGeometry();
         g.setAttribute("position", new THREE.Float32BufferAttribute(cp, 3));
         g.setAttribute("color", new THREE.Float32BufferAttribute(cc, 3));
@@ -248,6 +340,7 @@ function build(): void {
         );
         scene.add(mesh);
         drawn.push(mesh);
+        }
     }
 
     const nAcute = cells.filter((c) => visible(c) && c.acute).length;
@@ -264,8 +357,8 @@ explodeInput.value = String(prefs.explode);
 colorSel.value = prefs.color || PREF_DEFAULTS.color;
 showSel.value = prefs.show || PREF_DEFAULTS.show;
 faceSel.value = prefs.facemode || PREF_DEFAULTS.facemode;
-edgesChk.checked = prefs.edges;
-cageChk.checked = prefs.cage;
+edgeSel.value = prefs.edgemode || PREF_DEFAULTS.edgemode;
+cageSel.value = prefs.cagemode || PREF_DEFAULTS.cagemode;
 spinChk.checked = prefs.spin;
 controls.autoRotate = spinChk.checked;
 
@@ -274,7 +367,7 @@ function rebuild(): void {
     build();
 }
 explodeInput.addEventListener("input", rebuild);
-for (const c of [colorSel, showSel, faceSel, edgesChk, cageChk]) c.addEventListener("change", rebuild);
+for (const c of [colorSel, showSel, faceSel, edgeSel, cageSel]) c.addEventListener("change", rebuild);
 
 // Scrolling over the slider works it, which is what a slider under the pointer ought to
 // do. Bound non-passively so the page does not scroll away underneath.
@@ -294,8 +387,8 @@ spinChk.addEventListener("change", () => { controls.autoRotate = spinChk.checked
 function persist(): void {
     savePrefs(PREFS_KEY, {
         explode: Number(explodeInput.value), color: colorSel.value,
-        show: showSel.value, facemode: faceSel.value, edges: edgesChk.checked,
-        cage: cageChk.checked,
+        show: showSel.value, facemode: faceSel.value, edgemode: edgeSel.value,
+        cagemode: cageSel.value,
         spin: spinChk.checked,
     });
 }
