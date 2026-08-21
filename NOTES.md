@@ -1032,3 +1032,52 @@ Stages 1 to 6 of the build are listed in TRIACONTAHEDRA.md §8.6, all done.
 asserts the extracted roof geometry still matches the arithmetic that used to be
 inline in `roof3d.ts`, bit for bit.
 
+---
+
+## Generation N sits inside generation N+1 — but the parity depends on the seed
+
+Jeff's conjecture: *the new patch contains the old one, with opposite parity.* The
+containment half is unconditional; the parity half is not, and which way it goes is a
+property of the seed's own symmetry.
+
+Tested by brute force in `tools/probes/parity-gen4.mjs` — every rigid motion of the
+tiling (ten rotations, with and without a mirror, against every translation carrying
+one rhomb onto another), keeping only the placements that put **all** of generation N
+inside generation N+1, and reporting the index relation for each:
+
+| seed | placements that fit | parity |
+|---|---|---|
+| **Pe5** | 10 | **all reversed**, none kept |
+| **Sun** | 10 | **all reversed**, none kept |
+| **Star** | 10 | **all reversed**, none kept |
+| Pe3 | 6 | all kept, none reversed |
+| Pe1 | 8 | all kept, none reversed |
+| St5 | 60 | 10 reversed, 50 kept — **either** |
+| St3 | 40 | 10 reversed, 30 kept — either |
+| St1 | 24 | 10 reversed, 14 kept — either |
+| Deca | 10 | 4 reversed, 6 kept — either |
+
+So:
+
+- **Containment is universal.** Generation N is always wholly inside generation N+1,
+  for every seed, up to a rigid motion. Never partially.
+- **Reversal is forced exactly for the three five-fold seeds** — Pe5, Sun and Star.
+  For those the conjecture is a theorem: there is no way to embed the old patch in the
+  new one that preserves parity.
+- **For Pe3 and Pe1 the reverse is forced** — no parity-reversing placement exists at
+  all.
+- **For the star family and the Queen it is a choice**, both kinds of placement being
+  available.
+
+Where the reversal is forced, the ten placements alternate: rotation by an even
+multiple of 36° *with* a mirror, odd multiples *without*. That is the same 36°-plus-
+reflection structure as `mirror(F) = R(−36°)·F` for the triacontahedron itself
+([[wieringa-roof-triacontahedra]] and TRIACONTAHEDRA.md §6) — the two are presumably
+the same fact seen at two scales, though that is not proved here.
+
+The mechanism in the generator is visible but only half the story: `expandPenta` places
+its central child with `!isHeads` (`geometry.ts:730`) while `expandStar` keeps
+`isHeads` (`:800`). That flip is what makes reversal *available*; whether it is
+*forced* depends on whether the patch's own symmetry group contains something that can
+undo it, which is why the answer tracks the seed's symmetry rather than its family.
+
