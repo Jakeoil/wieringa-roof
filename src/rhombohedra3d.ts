@@ -16,7 +16,7 @@ import { LineSegmentsGeometry } from "three/addons/lines/LineSegmentsGeometry.js
 import { LineMaterial } from "three/addons/lines/LineMaterial.js";
 import { loadPrefs, savePrefs, resetPrefs } from "./prefs.js";
 import { BUILD_ID } from "./build-id.js";
-import { dissection, faceColor, shellFaces, pairColor } from "./dissect.js";
+import { dissection, faceColor, cageFaces, pairColor } from "./dissect.js";
 import type { Cell } from "./dissect.js";
 import type { V3 } from "./solids.js";
 
@@ -37,7 +37,7 @@ const spinChk = el<HTMLInputElement>("spin");
 const statusEl = el<HTMLElement>("status");
 
 const PREFS_KEY = "wr-rhombohedra";
-const PREF_DEFAULTS = { explode: 0, color: "type", show: "all", facemode: "transparent", edges: true, cage: true, spin: true };
+const PREF_DEFAULTS = { explode: 0, color: "five", show: "all", facemode: "solid", edges: true, cage: true, spin: true };
 const prefs = loadPrefs(PREFS_KEY, PREF_DEFAULTS);
 
 const scene = new THREE.Scene();
@@ -82,7 +82,7 @@ const FIVE = [0xd94f3d, 0xe8a33d, 0x4f9d4a, 0x3d7fc4, 0x9b59b6].map((h) => new T
 const CAGE = new THREE.Color(0x8a8578);
 
 const cells = dissection();
-const shell = shellFaces();
+const cage = cageFaces();
 let drawn: THREE.Object3D[] = [];
 let edgeMats: LineMaterial[] = [];
 
@@ -111,10 +111,15 @@ const visible = (c: Cell): boolean =>
 
 function build(): void {
     clear();
-    // Biased so the early travel is spread out: the interesting part is the moment the
-    // cells separate, not the far end where they are just scattered.
+    // Far enough that every cell actually leaves the cage, which needs more travel than
+    // it looks: a cell moves along its own centre, and centre magnitudes run 0.2814 to
+    // 1.1920, so the innermost goes only a quarter as far as the outermost. Clearing a
+    // cage of radius 1.6180 with cells of radius up to 1.1920 therefore takes t ≈ 10 for
+    // the worst of them, where the old limit of 2.6 stranded it inside. Squared travel
+    // keeps the near end — where the cells separate, and the part worth watching — as
+    // fine as it was, and accelerates the rest off screen.
     const u = Number(explodeInput.value);
-    const t = Math.pow(u, 1.4) * 2.6;
+    const t = Math.pow(u, 2.2) * 12;
     const faceMode = faceSel.value;
 
     const tris: number[] = [];
@@ -178,32 +183,36 @@ function build(): void {
 
     // The cage itself: every cell edge, drawn as camera-facing quads so the width means
     // something. LineBasicMaterial ignores linewidth in WebGL.
-    if (!seg.length) return;
-    const eg = new LineSegmentsGeometry();
-    eg.setPositions(seg);
-    eg.setColors(segCol);
-    const em = new LineMaterial({
-        vertexColors: true,
-        linewidth: 2.0,
-        worldUnits: false,
-        alphaToCoverage: true,
-    });
-    em.resolution.set(view.clientWidth || 1, view.clientHeight || 1);
-    edgeMats.push(em);
-    const lines = new LineSegments2(eg, em);
-    lines.renderOrder = 2;
-    scene.add(lines);
-    drawn.push(lines);
+    // Guarded, not returned from. An early return here skipped everything below it —
+    // which included the cage, so turning the cells' edges off took the cage with them.
+    if (seg.length) {
+        const eg = new LineSegmentsGeometry();
+        eg.setPositions(seg);
+        eg.setColors(segCol);
+        const em = new LineMaterial({
+            vertexColors: true,
+            linewidth: 2.0,
+            worldUnits: false,
+            alphaToCoverage: true,
+        });
+        em.resolution.set(view.clientWidth || 1, view.clientHeight || 1);
+        edgeMats.push(em);
+        const lines = new LineSegments2(eg, em);
+        lines.renderOrder = 2;
+        scene.add(lines);
+        drawn.push(lines);
+    }
 
-    // The cage: the triacontahedron's own thirty faces as open windows with a narrow
-    // rim, so the shell keeps its shape and its colouring while you can see straight
-    // through it. It does **not** explode — it is the box the pieces come out of, and
-    // watching them leave it is the point.
+    // The cage: **every** face of the assembled dissection as an open window with a
+    // narrow rim — all seventy-five of them, the thirty outside and the forty-five
+    // within, not merely the shell. So it is the whole internal skeleton, and each cell
+    // has a socket in it shaped exactly like itself. It does not explode: it is what
+    // the pieces come out of, and watching them leave it is the point.
     if (cageChk.checked) {
         const W = 0.15;
         const cp: number[] = [];
         const cc: number[] = [];
-        for (const f of shell) {
+        for (const f of cage) {
             const col = colorSel.value === "five" ? FIVE[pairColor(f.i, f.j)] : CAGE;
             const mid: V3 = [0, 0, 0];
             for (const q of f.corners) for (let d = 0; d < 3; d++) mid[d] += q[d] / 4;

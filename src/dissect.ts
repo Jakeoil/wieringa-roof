@@ -203,6 +203,9 @@ export interface ShellFace {
  * The thirty faces of the triacontahedron itself, each with the axis pair that spans
  * it. Built here rather than taken from `solids.ts` because the pair is the point: it
  * is what the five-colouring keys on, and a bare list of corners has lost it.
+ *
+ * Note this is the **shell** only. The cage on the page is a different and larger
+ * thing — see `cageFaces`.
  */
 export function shellFaces(): ShellFace[] {
     const out: ShellFace[] = [];
@@ -230,6 +233,38 @@ export function shellFaces(): ShellFace[] {
                 });
             }
         }
+    }
+    return out;
+}
+
+/**
+ * Every distinct face of the assembled dissection — the **cage**.
+ *
+ * Not the shell. This is all six faces of all twenty cells, at their home positions,
+ * which is the whole internal skeleton and not merely the outside. Adjacent cells share
+ * their common face, so the 120 cell-faces collapse to **75 distinct** ones: the 30 of
+ * the shell, belonging to one cell each, and 45 internal, belonging to two.
+ *
+ * Deduplicating matters rather than being tidy — two coincident copies of an internal
+ * face z-fight, which looks like a rendering fault.
+ */
+export function cageFaces(): ShellFace[] {
+    const out: ShellFace[] = [];
+    const seen = new Set<string>();
+    for (const c of dissection()) {
+        c.faces.forEach((f, fi) => {
+            const mid = [0, 1, 2].map((d) => f.reduce((s, q) => s + q[d], 0) / 4);
+            const key = mid.map((x) => Math.round(x * 1e6)).join(",");
+            if (seen.has(key)) return;
+            seen.add(key);
+            // faces 2q and 2q+1 are spanned by the two axes of the triple other than q
+            const q = fi >> 1;
+            out.push({
+                i: c.triple[(q + 1) % 3],
+                j: c.triple[(q + 2) % 3],
+                corners: [f[0], f[1], f[2], f[3]] as [V3, V3, V3, V3],
+            });
+        });
     }
     return out;
 }
