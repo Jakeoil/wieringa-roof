@@ -979,12 +979,31 @@ zero gaps on Deca. Cluster with a tolerance before quoting these numbers again.*
    exactly φ³ everywhere (§5.4). Is φ³ attained only between same-side pairs, or also
    between a hat and a bowl? The centers form a point set of their own — is it a
    quasi-lattice, and which one?
-2a. **Why does a solid one axis away never hold a second face?** This is the residue
-   of §5E. The long-diagonal minimum reduces to it exactly: separations of 1 and
-   1.0515 are permitted by the lattice, permitted by the index window, and occur
-   between real centers — yet the nearer solid always ends up with exactly one face,
-   in every pair of every patch measured. Settle this and the minimum separation is a
-   theorem rather than an observation.
+2a. **Why does a shift by one axis always land on a nail head?** The residue of §5E,
+   restated after two measurements that narrowed it considerably.
+
+   The raw observation: two centers exactly one axis apart — separation 1.0, not 2ρ —
+   never both hold two or more faces. Confirmed at **0 of 18,460** such pairs on Sun
+   gen 4. The long-diagonal minimum of §5C reduces to exactly this.
+
+   **It is not an edge effect** — the obvious first guess, and it is wrong. Of the
+   18,460 single-face partners, **16,588 are settled**, which is to say deep in the
+   interior. Nor is it about the lattice or the index window, both of which permit the
+   pairing.
+
+   What it *is* about is homes. Of the 12,730 cases where a populated solid has a
+   one-axis neighbour holding one face, that neighbour is a **nail head 12,720 times**
+   — 11,520 of 11,520 on Star gen 4 — and its single face never calls it home, nor is
+   that face ever shared with the populated solid. So the question is not "why can the
+   neighbour not be populated" but:
+
+   > **Why does a shift by one axis always land on a nail head?**
+
+   That is more tractable, because nail-headedness is governed by the index window
+   (§5E) rather than by counting. Shifting `m` by `2·e_i` moves `M` by 2, which moves
+   the solid between the thick-only, both, and thin-only bands — and the conjecture to
+   test is that a one-axis shift always lands outside the "both" band, which is the
+   only band a home can occupy. Measured in `tools/probes/oneaxis.mjs`.
 3. **What is the material between the solids?** The roof is the boundary of a layer
    of the two golden rhombohedra (NOTES.md, "The rhombohedra are the real
    components"), and 10 + 10 of them make a triacontahedron. The complete caps
@@ -1213,7 +1232,7 @@ Card copy:
 2. Lift `triacontahedron()` into a shared module; `polyhedra3d.ts` uses it from there.
    Same commit or the next: `src/roofview.ts`, whose test is that `roof3d.html` is
    unchanged (§8.4a).
-2a. Then, deliberately visible: the build stamp on `roof3d.html` as well, and a
+2b. Then, deliberately visible: the build stamp on `roof3d.html` as well, and a
    `console.log` build line from the shared viewer, so no page on the site can leave
    you guessing whether the script is stale.
 3. `centers.html` + `src/centers3d.ts`: roof, centers, complete solids, group
