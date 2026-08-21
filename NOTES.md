@@ -1081,3 +1081,46 @@ its central child with `!isHeads` (`geometry.ts:730`) while `expandStar` keeps
 *forced* depends on whether the patch's own symmetry group contains something that can
 undo it, which is why the answer tracks the seed's symmetry rather than its family.
 
+---
+
+## Chapters
+
+Jeff's organization of the project, recorded because the pages had grown past the point
+where their order was obvious:
+
+1. **Construction** — the roof itself, its lift, and the nets. `index`, `roof3d`,
+   `info`, `unfold`, `tools`.
+2. **The golden rhombi** — which triacontahedron each rhomb belongs to, the four proper
+   classes, the normals. `polyhedra`, `centers`. Write-up in TRIACONTAHEDRA.md.
+3. **The Penrose ping-pong packing** — the inspheres as an object in their own right.
+   `packing`. **This was the point of the exercise; the triacontahedra were the means of
+   finding the balls.**
+4. **The rhombohedra** — not built. Dissections and intersections of the oblate and
+   acute golden rhombohedra, which are the actual space-filling components (NOTES,
+   "The rhombohedra are the real components"). Ten of each make a triacontahedron.
+
+### What chapter 3 measured
+
+`src/packing.ts`, checked by `tools/packing.mjs` — six checks over all 27 patches,
+including that the bucketed neighbour search agrees with a plain O(n²) sweep exactly.
+
+- **One radius, not fitted.** ρ = √(1 + 2/√5), the triacontahedron's insphere, tangent
+  to the roof at the exact center of every rhomb its solid carries.
+- **Every contact is face to face.** All 4,055 on Sun gen 4 lie along a face normal, so
+  balls never kiss where the polyhedra would interpenetrate.
+- **Coordination is only ever 0, 2, 3 or 4** — never 1, never above 4, on any patch.
+  Far short of the kissing number 12, so this is a sparse network, not a dense packing.
+  The balls do overlap freely: 4,645 overlapping pairs against 4,055 contacts.
+- **The roof sees about a quarter of it.** 920 of 4,055 contacts happen on a roof
+  rhomb — those are exactly the shared rhombi of TRIACONTAHEDRA.md §5B, and the kiss
+  lands on the rhomb's own center. The rest are on faces the surface never reaches.
+- **The contact graph is fragmented**: 410 components at Sun gen 4, largest 41%.
+
+### Open: is there a kissing-circle connection?
+
+Jeff's suggestion. Descartes' theorem and the Apollonian gasket need circles of
+*varying* radius, and every ball here has the same one, so the curvature relation
+degenerates rather than applying. The promising direction is the reverse: **slice the
+packing with a plane** and tangent spheres become tangent circles of varying radius,
+which is where Descartes would bite. Not tried.
+

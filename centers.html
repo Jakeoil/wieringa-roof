@@ -67,6 +67,7 @@
     <a href="./info.html" draggable="false">Mathematics</a>
     <a href="./polyhedra.html" draggable="false">Polyhedra</a>
     <a href="./centers.html" draggable="false" aria-current="page">Centers</a>
+    <a href="./packing.html" draggable="false">Packing</a>
     <a href="./unfold.html" draggable="false">Workbench</a>
     <a href="./tools.html" draggable="false">Tools</a>
     <a href="./utilities.html" draggable="false">Utilities</a>
@@ -386,6 +387,16 @@
 <p>
     <strong>Per class</strong> — show, normals, solids, and how big to draw them, with
     a live population count.
+</p>
+<p>
+    <strong>Generation 5</strong> is available, and on the two big composites it is
+    genuinely big: the Sun is 111,925 rhombi and about two seconds to generate, its
+    triacontahedra included. That happens once per patch and is then cached, so the
+    controls stay responsive afterwards — but the solids themselves will not all draw.
+    19,056 proper solids at the full thirty faces is 3.4 million vertices rebuilt on
+    every change, so past a budget the page says so instead of hanging.
+    <em>Inscribed sphere</em> has no such limit — it is one instanced mesh however many
+    there are, which is what makes it the right extent at this size.
 </p>
 <p>
     <strong>Daylight between the cups.</strong> With the surface invisible and every

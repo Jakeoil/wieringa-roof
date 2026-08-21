@@ -15,6 +15,7 @@ golden rhombi for physical models.
 | `info.html` | "Mathematics" — golden rhombus, heights, fold angles, defects | done |
 | `polyhedra.html` | triacontahedron + the two rhombohedra, generated diagrams | done |
 | `centers.html` | the triacontahedra the roof is a lid on, found from the face normals | done |
+| `packing.html` | chapter 3 — the balls as a packing: contacts, coordination, kiss points | done |
 | `unfold.html` | **Workbench** and **Sheets**, two views of one page | done |
 | `tools.html` | true-size templates, fold gauges, forming jigs, kit list | done |
 | `utilities.html` | odds and ends; currently the favicon designer | done |

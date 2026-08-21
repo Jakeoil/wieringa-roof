@@ -802,6 +802,36 @@ Contact would need 2ρ = 2.7528. So the complete solids are a scatter of isolate
 grains that never so much as touch, and the intersecting ping-pong balls are the
 partial classes — centers as close as the golden rhombus's own long diagonal.
 
+### The kissing network — and the shared rhombi are where it meets the roof
+
+Two balls whose centers are exactly 2ρ apart are externally tangent, and the point of
+contact is the midpoint. On Sun gen 4, among the 2,686 proper balls:
+
+| | |
+|---|---|
+| kissing pairs (centers exactly 2ρ) | **4,055** |
+| …touching along a face normal | **4,055 — all of them** |
+| …touching at an actual roof rhomb | **920** |
+
+Two things follow, and the second is the one worth having.
+
+**Every contact is face to face.** All 4,055 touch along a face-normal direction, so
+the balls never kiss at a point where the polyhedra would interpenetrate. A ball
+tangency is always a genuine face tangency.
+
+**The shared rhombi are exactly the kisses that land on the roof.** The 920 kissing
+pairs that share a roof rhomb are precisely the 920 shared rhombi of §5B, and the kiss
+point is that rhomb's own center — verified to 1.6e-14. So the whole class-4-against-
+class-5b structure has a one-line statement in ball language:
+
+> **A shared rhomb is where two ping-pong balls kiss, and they kiss on the roof, at the
+> rhomb's exact center.**
+
+The remaining 3,135 contacts happen *off* the roof, on faces the surface never reaches
+— the vertical ones it cannot carry, or faces pointing away from it. So the balls form
+a contact network that is much richer than the roof shows: the roof is a slice through
+it, and the shared rhombi are the slice's intersection with the contacts.
+
 ## 5D. Stellation, glimpsed
 
 Deferred, but the supporting-plane column of §5A already shows why it will pay.

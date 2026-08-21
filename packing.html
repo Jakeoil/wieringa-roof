@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Packing — Wieringa Roof</title>
+<link rel="stylesheet" href="./site.css">
+<link rel="icon" href="./favicon.svg">
+<style>
+    .bar {
+        display: flex; gap: 14px; align-items: flex-end; flex-wrap: wrap;
+        background: var(--panel); border: 1px solid var(--rule);
+        border-radius: 8px; padding: 12px 14px; margin: 18px 0 10px;
+    }
+    .bar .grp { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-faint); align-self: center; }
+    .bar label { display: flex; flex-direction: column; gap: 3px; font-size: 12px; color: var(--ink-soft); }
+    .bar select { font: inherit; font-size: 13px; padding: 5px 8px; border: 1px solid #ccc; border-radius: 4px; background: #fff; color: var(--ink); }
+    .bar input[type=range] { width: 140px; }
+    .bar .checks { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+    .bar .checks label { flex-direction: row; align-items: center; gap: 5px; font-size: 13px; color: var(--ink); }
+    #view {
+        width: 100%; height: min(70vh, 620px);
+        border: 1px solid var(--rule); border-radius: 8px; overflow: hidden; background: #f7f6f2;
+    }
+    #view canvas { display: block; width: 100%; height: 100%; cursor: grab; }
+    #view canvas:active { cursor: grabbing; }
+    #status { display: block; margin: 10px 0 0; line-height: 1.5; }
+</style>
+</head>
+<body>
+
+<nav>
+    <span class="brand">Wieringa Roof</span>
+    <a href="./index.html" draggable="false">Home</a>
+    <a href="./roof3d.html" draggable="false">3D</a>
+    <a href="./info.html" draggable="false">Mathematics</a>
+    <a href="./polyhedra.html" draggable="false">Polyhedra</a>
+    <a href="./centers.html" draggable="false">Centers</a>
+    <a href="./packing.html" draggable="false" aria-current="page">Packing</a>
+    <a href="./unfold.html" draggable="false">Workbench</a>
+    <a href="./tools.html" draggable="false">Tools</a>
+    <a href="./utilities.html" draggable="false">Utilities</a>
+    <a href="./unfold.html#sheets" draggable="false">Sheets</a>
+</nav>
+
+<div class="wrap">
+
+<h1>Packing</h1>
+<p class="lede">
+    The ping-pong balls, on their own terms. Every triacontahedron under the roof has an
+    insphere, all of one radius, and this page is about how those balls sit against each
+    other rather than about what they explain. The roof turns out to be a slice through
+    a contact network larger than itself.
+</p>
+
+<div class="bar">
+    <span class="grp">Patch</span>
+    <label>Seed <select id="patch"></select></label>
+    <label>Generation <select id="gen"></select></label>
+
+    <span class="grp">Balls</span>
+    <label>Color <select id="color">
+        <option value="coord">Coordination</option>
+        <option value="class">Proper class</option>
+        <option value="side">Which side of the roof</option>
+    </select></label>
+    <label>Radius <span id="sizeOut" class="mono"></span>
+        <input type="range" id="size" min="0" max="1" step="0.01" value="1">
+    </label>
+
+    <span class="grp">Show</span>
+    <span class="checks">
+        <label><input type="checkbox" id="contacts" checked> contacts</label>
+        <label><input type="checkbox" id="kiss" checked> kiss points</label>
+        <label><input type="checkbox" id="roofonly"> only balls touching on the roof</label>
+        <label><input type="checkbox" id="biggest"> largest component only</label>
+        <label><input type="checkbox" id="roof"> roof</label>
+        <button id="reset" title="Forget saved settings and start again from the defaults">Reset</button>
+    </span>
+</div>
+
+<div id="view"></div>
+<span class="info" id="status"></span>
+
+<details id="help">
+    <summary>How it works <span class="mono" id="buildtag" style="font-weight:400;color:#888"></span></summary>
+    <div class="helpbody">
+
+<p>
+    <strong>One radius, and it is not chosen.</strong> The rhombic triacontahedron is
+    isohedral, so all thirty of its face planes are tangent to a single insphere, each
+    touching at its own face's centroid. Every ball here is that insphere, so they are
+    all the same size — <span class="mono">ρ = √(1 + 2/√5) = 1.3763819</span> — and each
+    touches the roof at the exact center of every rhomb its solid carries.
+    <a href="./centers.html" draggable="false">Centers</a> is where that comes from.
+</p>
+<p>
+    <strong>Contacts.</strong> Two balls whose centers are exactly
+    <span class="mono">2ρ</span> apart are externally tangent. Measured across every
+    patch, <em>every</em> such contact lies along a face normal, so the polyhedra meet
+    face to face and a ball tangency is always a genuine face tangency — the balls never
+    kiss at a point where the solids would interpenetrate.
+</p>
+<p>
+    <strong>Coordination is only ever 0, 2, 3 or 4.</strong> Never one, never more than
+    four, on any patch measured. That is far short of the kissing number 12 for equal
+    spheres, so this is a sparse contact network rather than a dense packing — and the
+    balls are free to overlap, which they do: on the Sun at generation 4 there are 4,055
+    contacts against 4,645 overlapping pairs.
+</p>
+<p>
+    <strong>The roof is a slice.</strong> A contact whose shared face is an actual rhomb
+    of the roof is what the Centers page calls a <em>shared rhomb</em>, and the two balls
+    kiss at that rhomb's exact center. But those are the minority — 920 of 4,055 on the
+    Sun at generation 4. The rest happen on faces the surface never reaches: the vertical
+    ones a single-valued roof cannot carry, and the ones facing away from it. So the
+    packing is a three-dimensional object of which the roof sees about a quarter.
+    <em>Only balls touching on the roof</em> isolates that quarter.
+</p>
+<p>
+    <strong>The network is fragmented.</strong> 410 components at Sun generation 4, the
+    largest holding 41% of the balls. <em>Largest component only</em> shows its shape.
+</p>
+<p>
+    <strong>Kissing circles.</strong> Whether this connects to the classical tangent-circle
+    results is open and worth chasing. Descartes' theorem and the Apollonian gasket need
+    circles of <em>varying</em> radius, and every ball here has the same one, so the
+    curvature relation degenerates rather than applying. The more promising direction is
+    the other way round: slice the packing with a plane and tangent spheres become tangent
+    circles of varying radius. That has not been tried.
+</p>
+<p>
+    See <a href="./polyhedra.html" draggable="false">Polyhedra</a> for the solid these
+    are inscribed in, and <a href="./info.html" draggable="false">Mathematics</a> for the
+    lift underneath all of it.
+</p>
+
+    </div>
+</details>
+
+</div>
+
+<script type="importmap">
+{
+    "imports": {
+        "three": "./vendor/three.module.js",
+        "three/addons/controls/OrbitControls.js": "./vendor/OrbitControls.js"
+    }
+}
+</script>
+<script type="module" src="./dist/packing3d.js"></script>
+<script src="./site.js"></script>
+</body>
+</html>

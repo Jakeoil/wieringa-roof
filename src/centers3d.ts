@@ -102,7 +102,11 @@ const PREF_DEFAULTS = {
     normals: false,
     nlen: Math.sqrt(1 + 2 / Math.sqrt(5)),
     rtmode: "transparent",
-    rtextent: "full",
+    // Spheres by default. The balls were the object of the exercise and the
+    // triacontahedra the means of finding them — and the sphere is also the only
+    // extent that survives generation 5, being one instanced mesh however many there
+    // are. One dropdown away from the polyhedra when the faces are what you want.
+    rtextent: "sphere",
     rtedges: true,
     markers: true,
     rtdemoted: false,
@@ -537,6 +541,7 @@ function build(reframe: boolean): void {
     // triacontahedron too, but drawing all of them fills the view with overlapping
     // shells — they interpenetrate freely, centers as close as one long diagonal,
     // where the complete ones are never nearer than φ³ and read as separate objects.
+    let rtNote = "";
     const rtMode = rtSel.value;
     const rtExtent = rtExtentSel.value;
     const rtCup = rtExtent === "cup";
@@ -574,7 +579,21 @@ function build(reframe: boolean): void {
             rv.add(mesh);
         }
 
-        for (const s of rtExtent === "sphere" ? [] : shown) {
+        // A budget, because generation 5 can ask for more than is reasonable: 19,056
+        // proper solids on the Sun, which at the full thirty faces is 3.4 million
+        // vertices rebuilt on every control change. Refuse and say so rather than
+        // hanging. Spheres are exempt — they are one instanced mesh however many there
+        // are, which is what makes them the answer at this size.
+        const drawCount = shown.filter((s) => showRTFor(s) && sizeOf(s) > 0).length;
+        const vertsWanted = drawCount * (rtCup ? 10 : 30) * 6;
+        const overBudget = rtExtent !== "sphere" && vertsWanted > 1_500_000;
+        if (overBudget) {
+            rtNote =
+                ` · ${drawCount.toLocaleString()} solids at ${rtCup ? "cup" : "full"} extent ` +
+                `is ${(vertsWanted / 1e6).toFixed(1)}M vertices — too many to draw. ` +
+                `Switch Extent to inscribed sphere, or show fewer classes.`;
+        }
+        for (const s of rtExtent === "sphere" || overBudget ? [] : shown) {
             if (!showRTFor(s)) continue;
             const t = sizeOf(s);
             if (t <= 0) continue;
@@ -795,7 +814,7 @@ function build(reframe: boolean): void {
         `${shown.length} of ${perClass.reduce((a, b) => a + b, 0)} proper solids shown · ` +
         `rhombi by class ${clsText}, ${demoted} demoted · ` +
         `${bare} rhombi with no cup over them${bare ? " (turn on demoted and truncated)" : ""} · ` +
-        `normals ${(nlen / RHO).toFixed(2)}ρ · ${ms} ms`;
+        `normals ${(nlen / RHO).toFixed(2)}ρ · ${ms} ms${rtNote}`;
 }
 
 // ── controls ──────────────────────────────────────────────────────
@@ -817,7 +836,7 @@ for (const [code, nick] of [
     patchSel.appendChild(o);
 }
 patchSel.value = prefs.patch;
-for (const g of [1, 2, 3, 4]) {
+for (const g of [1, 2, 3, 4, 5]) {
     const o = document.createElement("option");
     o.value = String(g);
     o.textContent = `Generation ${g}`;
@@ -943,6 +962,17 @@ function rebuild(reframe: boolean): void {
     const nl = Number(nlenInput.value);
     nlenOut.textContent = `${(nl / RHO).toFixed(2)}ρ`;
     sscaleOut.textContent = `${Number(sscaleInput.value).toFixed(2)}×`;
+    // Generating a patch and finding its triacontahedra takes about two seconds at
+    // generation 5 — the Sun is 112,000 rhombi — and it blocks the thread. Announce it
+    // and yield a frame so the message actually paints first, which is the same
+    // treatment the workbench gives its search.
+    if (`${patchSel.value}|${genSel.value}` !== patchKey) {
+        rv.clear();
+        statusEl.textContent = `building ${patchSel.value} generation ${genSel.value}…`;
+        rv.renderer.render(rv.scene, rv.camera);
+        requestAnimationFrame(() => build(reframe));
+        return;
+    }
     rv.clear();
     build(reframe);
 }
