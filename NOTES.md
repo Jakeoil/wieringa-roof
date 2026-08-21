@@ -1124,3 +1124,22 @@ degenerates rather than applying. The promising direction is the reverse: **slic
 packing with a plane** and tangent spheres become tangent circles of varying radius,
 which is where Descartes would bite. Not tried.
 
+## Settled: no de Bruijn generator
+
+Proposed for the large-radius work and withdrawn, on Jeff's objection, which is the
+better argument.
+
+The pentagrid takes five offsets `γⱼ` and is *regular* — no three lines concurrent —
+only for generic offsets. The tilings with exact five-fold symmetry are precisely the
+**singular** pentagrids, where three lines do meet and the tiling stays ambiguous until
+a limiting or tie-breaking rule is imposed. Sun and Star are those two tilings, so the
+straightforward generic recipe cannot produce them; and the Queen is not a pentagrid
+tiling at all, being a composite arrangement of this project's own. A de Bruijn
+generator would return generic tilings, which is what this project is not about.
+
+It is also unnecessary. Generation 6 of the existing seeds reaches patch radius 110
+(Pe5, 33,820 rhombi) and 354 (Queen, 218,930 rhombi), against a largest probed radius
+of about 46 — and at that size every concurrence radius except ρ still caps at five
+faces. Growing the seed gives arbitrarily large patches of the actual symmetric
+figures, which is simpler and is the thing that was wanted.
+
