@@ -22,6 +22,14 @@
 //   7  no two faces share two solids
 //   8  intersecting the normal lines with rho NOT supplied finds exactly the same
 //      face pairs, at radius rho
+//   9  a solid's cup lands on its own roof faces — AT BOTH PARITIES
+//
+// Check 9 exists because everything else in this project ran hills-up, so the flipped
+// path had no test at all — and a real fault lived there for a week. The
+// triacontahedron is not symmetric under z to -z: it takes a 36 degree turn as well,
+// so a mirrored scene needs a mirrored solid, and drawing the unmirrored one put every
+// solid a tenth of a turn out of register. Invisible at one parity, obvious at the
+// other. Check both.
 //
 // Check 8 exists because checks 1-7 all start from rho and could in principle be
 // confirming their own premise. It starts from nothing but the lines, and it is an
@@ -40,7 +48,8 @@ import {
     computeLift,
     pos3D,
 } from "../dist/geometry.js";
-import { triacontahedra, pe5Rosettes, RHO } from "../dist/centers.js";
+import { triacontahedra, pe5Rosettes, cupIndices, solidFace, RHO } from "../dist/centers.js";
+import { buildRoof } from "../dist/roofgeom.js";
 
 const arg = (k, d) => {
     const hit = process.argv.find((a) => a.startsWith(`--${k}=`));
@@ -208,6 +217,31 @@ for (const seed of seeds) {
             }
         }
         if (twice) fail(patch, `${twice} face pairs lie on two solids`);
+
+        // 9 · the cup lands on the roof, hills up and dales up alike
+        for (const flip of [false, true]) {
+            const d = buildRoof(1, flip);
+            if (!d) continue;
+            let worst = 0;
+            for (const s of cen.solids) {
+                if (!s.complete) continue;
+                const cup = cupIndices(s).map((i) => solidFace(s, i, flip, 1, d.offset));
+                const mid = (f) => [0, 1, 2].map((k) => f.reduce((a, p) => a + p[k], 0) / f.length);
+                for (const fid of s.faces) {
+                    const corners = cen.byRhomb[fid].vids.map((v) => d.point(v));
+                    const c = mid(corners);
+                    let best = Infinity;
+                    for (const cf of cup) {
+                        const q = mid(cf);
+                        best = Math.min(best, Math.hypot(q[0] - c[0], q[1] - c[1], q[2] - c[2]));
+                    }
+                    worst = Math.max(worst, best);
+                }
+            }
+            if (!(worst < 1e-9)) {
+                fail(patch, `cup misses the roof by ${worst.toFixed(4)} ${flip ? "with dales up" : "with hills up"}`);
+            }
+        }
 
         // 8 · the same pairs, found without rho
         let ag = "—";

@@ -26,7 +26,7 @@ import { LineSegments2 } from "three/addons/lines/LineSegments2.js";
 import { LineSegmentsGeometry } from "three/addons/lines/LineSegmentsGeometry.js";
 import { LineMaterial } from "three/addons/lines/LineMaterial.js";
 import { createRoofView, CLUSTER_3D, CLUSTER_FALLBACK, PLAIN_COLOR } from "./roofview.js";
-import { triacontahedra, pe5Rosettes, A6, RHO } from "./centers.js";
+import { triacontahedra, pe5Rosettes, cupIndices, solidFace, RT_FACES, A6, RHO } from "./centers.js";
 import type { Solid } from "./centers.js";
 import { zonohedron, faceOutward, PHI } from "./solids.js";
 import type { V3 } from "./solids.js";
@@ -199,63 +199,19 @@ const isShared = (f: { solids: [number, number] }, solids: Solid[]): boolean =>
 // five generators plus the vertical *are* the six axes, so every solid on this page
 // is a translate of this one, never a rotation.
 
-const RT_FACES = zonohedron(A6).map(faceOutward);
-const RT_TRIS: number[] = [];
-for (const f of RT_FACES) {
-    for (const q of [f[0], f[1], f[2], f[0], f[2], f[3]]) RT_TRIS.push(q[0], q[1], q[2]);
-}
+// The mesh and its placement live in centers.ts, so that the page and
+// tools/centers.mjs are running the same code. Everything below is drawing.
+const ALL_FACES = RT_FACES.map((_, i) => i);
 
-// The **cup**: just the ten faces a roof can lie on, which is all of a solid the roof
-// ever sees. The other twenty are the ten vertical ones — those use the sixth,
-// vertical generator, and a surface with one height per point can never contain them —
-// and the ten facing away. Face centers band at ±1.1708, ±0.7236 and 0, so the sign of
-// the centroid's height picks a cup cleanly.
-const faceZ = (f: V3[]) => (f[0][2] + f[1][2] + f[2][2] + f[3][2]) / 4;
-const cupTris = (up: boolean): number[] => {
-    const out: number[] = [];
-    for (const f of RT_FACES) {
-        if (up ? faceZ(f) < 0.1 : faceZ(f) > -0.1) continue;
-        for (const q of [f[0], f[1], f[2], f[0], f[2], f[3]]) out.push(q[0], q[1], q[2]);
-    }
-    return out;
-};
-const cupEdges = (up: boolean): number[] => {
-    const out: number[] = [];
-    for (const f of RT_FACES) {
-        if (up ? faceZ(f) < 0.1 : faceZ(f) > -0.1) continue;
-        for (let i = 0; i < 4; i++) {
-            const a = f[i];
-            const b = f[(i + 1) % 4];
-            out.push(a[0], a[1], a[2], b[0], b[1], b[2]);
-        }
-    }
-    return out;
-};
-const RT_UP_TRIS = cupTris(true);
-const RT_DOWN_TRIS = cupTris(false);
-const RT_UP_EDGES = cupEdges(true);
-const RT_DOWN_EDGES = cupEdges(false);
-const RT_EDGES: number[] = (() => {
-    const out: number[] = [];
-    const seen = new Set<string>();
-    const key = (a: V3, b: V3) => {
-        const r = (p: V3) => p.map((x) => x.toFixed(5)).join(",");
-        const ka = r(a);
-        const kb = r(b);
-        return ka < kb ? `${ka}|${kb}` : `${kb}|${ka}`;
-    };
-    for (const f of RT_FACES) {
-        for (let i = 0; i < 4; i++) {
-            const a = f[i];
-            const b = f[(i + 1) % 4];
-            const k = key(a, b);
-            if (seen.has(k)) continue;
-            seen.add(k);
-            out.push(a[0], a[1], a[2], b[0], b[1], b[2]);
-        }
-    }
-    return out;
-})();
+// The insphere, as a mesh. ρ is not a fitted radius — the triacontahedron is
+// isohedral, so all thirty face planes are tangent to one sphere and each touches at
+// its own face's centroid. So a ball of radius ρ at a solid's center touches the roof
+// at the middle of every rhomb that solid carries, and nowhere else. That tangency is
+// the whole basis of this page, made literal.
+//
+// A sphere needs no parity handling at all — it is its own mirror image — so unlike
+// the polyhedron it can be placed from the center alone.
+const BALL_GEO = new THREE.IcosahedronGeometry(1, 4);
 
 // a low-poly ball for the center markers
 const BALL = new THREE.IcosahedronGeometry(1, 1);
@@ -466,42 +422,58 @@ function build(reframe: boolean): void {
     // shells — they interpenetrate freely, centers as close as one long diagonal,
     // where the complete ones are never nearer than φ³ and read as separate objects.
     const rtMode = rtSel.value;
-    const rtCup = rtExtentSel.value === "cup";
+    const rtExtent = rtExtentSel.value;
+    const rtCup = rtExtent === "cup";
     const surfaceShown = rhombSel.value !== "invisible";
     if (rtMode !== "invisible" && sscale > 0) {
         const tris: number[] = [];
         const cols: number[] = [];
         const lines: number[] = [];
-        for (const s of shown) {
+        // Spheres go up as one instanced mesh rather than a merged buffer: at 671
+        // complete solids on Sun gen 4 a merged ball of this tessellation would be
+        // over a million vertices, and they are all the same ball.
+        const balls = shown.filter((s) => showRTFor(s) && sizeOf(s) > 0);
+        if (rtExtent === "sphere" && balls.length) {
+            const mesh = new THREE.InstancedMesh(
+                BALL_GEO,
+                new THREE.MeshStandardMaterial({
+                    roughness: 0.42,
+                    metalness: 0.03,
+                    transparent: rtMode === "transparent",
+                    opacity: rtMode === "transparent" ? (surfaceShown ? 0.42 : 0.66) : 1,
+                    depthWrite: rtMode !== "transparent",
+                }),
+                balls.length,
+            );
+            const m = new THREE.Matrix4();
+            balls.forEach((s, i) => {
+                const r = RHO * sizeOf(s);
+                const c = place(s.c);
+                m.makeScale(r, r, r).setPosition(c[0], c[1], c[2]);
+                mesh.setMatrixAt(i, m);
+                mesh.setColorAt(i, solidColor(s));
+            });
+            mesh.instanceMatrix.needsUpdate = true;
+            if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+            rv.add(mesh);
+        }
+
+        for (const s of rtExtent === "sphere" ? [] : shown) {
             if (!showRTFor(s)) continue;
             const t = sizeOf(s);
             if (t <= 0) continue;
-            // Mirror the mesh with the scene, and pick the cup by the solid's own
-            // unflipped side. The triacontahedron is NOT symmetric under z → −z —
-            // only 10 of its 30 face centers map onto face centers; it takes a 36°
-            // turn as well, since the top and bottom caps are anti-aligned. Drawing
-            // the unmirrored mesh at a mirrored center therefore puts every solid a
-            // tenth of a turn out of register, which is exactly the daylight that
-            // appears with dales up and not otherwise. Mirroring the whole picture is
-            // both simpler and exact.
-            const TRIS = rtCup ? (s.hat ? RT_UP_TRIS : RT_DOWN_TRIS) : RT_TRIS;
-            const EDG = rtCup ? (s.hat ? RT_UP_EDGES : RT_DOWN_EDGES) : RT_EDGES;
-            const p = place(s.c);
             const col = solidColor(s);
-            for (let i = 0; i < TRIS.length; i += 3) {
-                tris.push(
-                    TRIS[i] * t + p[0],
-                    TRIS[i + 1] * t + p[1],
-                    TRIS[i + 2] * t * zsign + p[2],
-                );
-                cols.push(col.r, col.g, col.b);
-            }
-            for (let i = 0; i < EDG.length; i += 3) {
-                lines.push(
-                    EDG[i] * t + p[0],
-                    EDG[i + 1] * t + p[1],
-                    EDG[i + 2] * t * zsign + p[2],
-                );
+            for (const i of rtCup ? cupIndices(s) : ALL_FACES) {
+                const f = solidFace(s, i, flip, t, d.offset);
+                for (const v of [f[0], f[1], f[2], f[0], f[2], f[3]]) {
+                    tris.push(v[0], v[1], v[2]);
+                    cols.push(col.r, col.g, col.b);
+                }
+                for (let k = 0; k < 4; k++) {
+                    const a = f[k];
+                    const b = f[(k + 1) % 4];
+                    lines.push(a[0], a[1], a[2], b[0], b[1], b[2]);
+                }
             }
         }
         if (tris.length) {
@@ -610,10 +582,17 @@ function build(reframe: boolean): void {
             );
         }
         for (const sid of sel.solids) {
-            const c = place(cen.solids[sid].c);
+            // Through solidFace like everything else. Drawn from the raw mesh table
+            // this had its own copy of the parity bug — a highlight a tenth of a turn
+            // off the solid it is highlighting.
             const t = Math.max(sscale, 0.14);
-            for (let i = 0; i < RT_EDGES.length; i += 3) {
-                hp.push(RT_EDGES[i] * t + c[0], RT_EDGES[i + 1] * t + c[1], RT_EDGES[i + 2] * t + c[2]);
+            for (let i = 0; i < RT_FACES.length; i++) {
+                const face = solidFace(cen.solids[sid], i, flip, t, d.offset);
+                for (let k = 0; k < 4; k++) {
+                    const a = face[k];
+                    const b = face[(k + 1) % 4];
+                    hp.push(a[0], a[1], a[2], b[0], b[1], b[2]);
+                }
             }
         }
         const hg = new THREE.BufferGeometry();

@@ -126,6 +126,7 @@
     <label>Extent <select id="rtextent">
         <option value="full">Whole solid</option>
         <option value="cup">Cup only</option>
+        <option value="sphere">Inscribed sphere</option>
     </select></label>
     <span class="checks">
         <label><input type="checkbox" id="rtedges" checked> edges</label>
@@ -325,7 +326,23 @@
     ρ/φ³, ρ√5, 3ρ and ρφ³, and none of those gathers more than a handful of faces.
     Only ρ builds anything, and watching the rest fail is worth more than being told.
     <em>Cup only</em> draws the ten faces the roof can touch instead of all thirty,
-    which is all of a solid the roof ever sees. <em>Size</em> shrinks each solid toward
+    which is all of a solid the roof ever sees. <em>Inscribed sphere</em> draws the
+    insphere instead of the polyhedron — the ping-pong ball. Its radius is not fitted:
+    the triacontahedron is isohedral, so all thirty face planes are tangent to one
+    sphere of radius ρ, each touching at its own face's centroid. So the ball touches
+    the roof at the exact middle of every rhomb that solid carries, and nowhere else —
+    verified to 4e-15, with the nearest rhomb corner standing 0.097 clear of the
+    surface. It is the tangency the whole page rests on, made literal. Being its own
+    mirror image, the sphere also needs no parity handling, so it is drawn from the
+    center alone.
+</p>
+<p>
+    The balls show the two populations apart at a glance. <strong>Complete solids never
+    touch</strong>: 0 intersecting pairs of 224,785 on Sun at generation 4, no two
+    centers closer than φ³ = 4.236 against the 2ρ = 2.753 that contact would need — a
+    scatter of isolated grains. Turn the other classes on and the picture changes
+    completely: 4,645 intersecting pairs, with centers as close as 1.7013, the golden
+    rhombus's own long diagonal. <em>Those</em> are the intersecting ping-pong balls. <em>Size</em> shrinks each solid toward
     its own center: safe, unlike the vertical scale, because a shrunk triacontahedron
     is still one and its normals still meet at the same point — and it fixes a
     rendering fault as well as crowding, since the shells are translucent and where

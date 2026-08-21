@@ -38,6 +38,7 @@ import {
     SQRT5,
 } from "./geometry.js";
 import type { V3 } from "./geometry.js";
+import { zonohedron, faceOutward } from "./solids.js";
 
 // ── the six axes ──────────────────────────────────────────────────
 
@@ -65,6 +66,53 @@ export function centerOf(m: number[]): V3 {
     let c: V3 = [0, 0, 0];
     for (let i = 0; i < 6; i++) c = add(c, mul(A6[i], m[i] / 2));
     return c;
+}
+
+// ── placing a solid in the scene ──────────────────────────────────
+//
+// This lives here, not in the page, because the page is the one place a mistake in it
+// cannot be tested — and one duly got through. The triacontahedron is **not**
+// symmetric under z → −z: only 10 of its 30 face centers map, and it takes a 36° turn
+// as well, because the top and bottom caps are anti-aligned. Drawing an unmirrored
+// mesh at a mirrored center therefore puts every solid a tenth of a turn out of
+// register with the roof, which is invisible to any check that runs at one parity.
+//
+// So: mirror the whole picture. Negate z on the mesh along with the scene, and select
+// the cup by the solid's own unflipped side.
+
+/** The thirty faces of a unit triacontahedron in the roof's own frame, wound outward. */
+export const RT_FACES: V3[][] = zonohedron(A6).map(faceOutward) as V3[][];
+
+const faceHeight = (f: V3[]): number => (f[0][2] + f[1][2] + f[2][2] + f[3][2]) / 4;
+
+/** Indices into `RT_FACES` of the ten faces a roof can lie on — the solid's **cup**.
+ *  The other twenty are the ten vertical ones, which use the sixth generator and which
+ *  a single-valued surface can never contain, and the ten facing away. */
+export function cupIndices(s: Solid): number[] {
+    const out: number[] = [];
+    for (let i = 0; i < RT_FACES.length; i++) {
+        const h = faceHeight(RT_FACES[i]);
+        if (s.hat ? h > 0.1 : h < -0.1) out.push(i);
+    }
+    return out;
+}
+
+/** Face `i` of solid `s` as it belongs in the scene: scaled about its own center,
+ *  mirrored with the scene when `flip`, and recentered by the roof's own offset. */
+export function solidFace(
+    s: Solid,
+    i: number,
+    flip: boolean,
+    scale: number,
+    offset: V3,
+): V3[] {
+    const z = flip ? -1 : 1;
+    const cx = s.c[0] - offset[0];
+    const cy = s.c[1] - offset[1];
+    const cz = s.c[2] * z - offset[2];
+    return RT_FACES[i].map(
+        (v) => [v[0] * scale + cx, v[1] * scale + cy, v[2] * scale * z + cz] as V3,
+    );
 }
 
 // ── types ─────────────────────────────────────────────────────────

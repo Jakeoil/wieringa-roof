@@ -777,6 +777,31 @@ right next move is probably to work out which face of a neighbor solid survives 
 the same orientation on the neighbor is the original face translated by `a_t`, so the
 question reduces to when that translate is present in the tiling.
 
+## 5F. The inscribed spheres
+
+Jeff's original picture — "I always think of these as intersecting ping-pong balls" —
+is now an extent option on the page, drawing each solid's insphere instead of its
+polyhedron.
+
+The radius is not fitted. The triacontahedron is isohedral, so all thirty face planes
+are tangent to one sphere of radius ρ and each touches at its own face's **centroid**
+(§1). So the ball touches the roof at the exact middle of every rhomb its solid
+carries, and nowhere else — verified over 4,880 tangencies at both parities, worst
+`|distance − ρ|` of **4.4e-15**, with the nearest rhomb corner standing **0.0970**
+clear of the surface. The sphere is its own mirror image, so unlike the polyhedron it
+needs no parity handling (§6).
+
+The two populations separate cleanly, Sun gen 4:
+
+| | balls | min center distance | intersecting pairs |
+|---|---|---|---|
+| complete only | 671 | φ³ = 4.2361 | **0** of 224,785 |
+| all proper classes | 2,686 | 1.7013 | **4,645** of 3,605,955 |
+
+Contact would need 2ρ = 2.7528. So the complete solids are a scatter of isolated
+grains that never so much as touch, and the intersecting ping-pong balls are the
+partial classes — centers as close as the golden rhombus's own long diagonal.
+
 ## 5D. Stellation, glimpsed
 
 Deferred, but the supporting-plane column of §5A already shows why it will pay.
