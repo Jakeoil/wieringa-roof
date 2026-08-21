@@ -250,7 +250,9 @@ let flip = false;
 // nothing is looking.
 let vmag = 1;
 let anim = 0;
-const atRest = () => vmag >= 1 - 1e-6;
+// Flat is both a place to stop and a place to pass through, so "am I moving" cannot be
+// read off the depth — it needs saying.
+let animating = false;
 
 /** LineMaterial needs the viewport in pixels, and needs telling when it changes. */
 let normalMats: LineMaterial[] = [];
@@ -292,11 +294,13 @@ function animateTo(target: number, then?: () => void): void {
     const dur = 420 * Math.abs(target - from);
     if (dur < 8) {
         vmag = target;
+        animating = false;
         then?.();
         rebuild(false);
         return;
     }
     const t0 = performance.now();
+    animating = true;
     const step = (now: number) => {
         const k = Math.min(1, (now - t0) / dur);
         vmag = from + (target - from) * (1 - Math.pow(1 - k, 3));
@@ -305,8 +309,11 @@ function animateTo(target: number, then?: () => void): void {
             anim = requestAnimationFrame(step);
         } else {
             vmag = target;
+            // Only the last leg ends the motion: a parity switch passes through flat
+            // and keeps going, and `then` is what launches the second leg.
+            animating = false;
             then?.();
-            rebuild(false);
+            if (!animating) rebuild(false);
         }
     };
     anim = requestAnimationFrame(step);
@@ -327,30 +334,6 @@ function build(reframe: boolean): void {
         return;
     }
 
-    // The shadow: the roof alone, at whatever depth the animation has reached. No
-    // solids, no normals, no markers — those belong to the real roof, and the real roof
-    // is not on screen. Shading strength is |vscale|, so it goes out with the depth
-    // rather than lying about a flat sheet.
-    if (!atRest()) {
-        rv.drawRoof(d, {
-            colorOf: () => new THREE.Color(PLAIN_COLOR),
-            shade: shadeChk.checked ? vmag : 0,
-            useVertexColors: shadeChk.checked,
-            flatColor: PLAIN_COLOR,
-            transparent: false,
-            edges: edgesChk.checked,
-            isoglosses: isoChk.checked,
-            skipSurface: rhombSel.value === "invisible",
-        });
-        statusEl.textContent =
-            vmag < 1e-6
-                ? `${allRhombs.length} rhombi · flat — the roof collapsed into its own shadow, ` +
-                  `the Penrose tiling it is a lift of. Solids and normals belong to the roof, ` +
-                  `so they are not here.`
-                : `${allRhombs.length} rhombi · turning over — ${(100 * vmag).toFixed(0)}% of full depth`;
-        return;
-    }
-
     if (!cenCache) cenCache = triacontahedra();
     const cen = cenCache;
     const assign = cen.home;
@@ -366,6 +349,9 @@ function build(reframe: boolean): void {
         c[2] * zsign - d.offset[2],
     ];
 
+    // The shadow keeps the roof's colors. A rhomb's class, its cluster, whether it is
+    // shared — none of that depends on how deep the roof is, or on which way up it is,
+    // so flattening the surface is no reason to discard what it is colored by.
     rv.drawRoof(d, {
         colorOf: (f) => {
             const s = cen.solids[assign[f.id]];
@@ -379,7 +365,9 @@ function build(reframe: boolean): void {
             if (mode === "type") return f.thick ? CLUSTER_3D.Pe5 ?? CLUSTER_FALLBACK : CLUSTER_FALLBACK;
             return solidColor(s);
         },
-        shade: shadeChk.checked ? 1 : 0,
+        // Shading strength is the depth, so it goes out with it rather than lying
+        // about a flat sheet.
+        shade: shadeChk.checked ? vmag : 0,
         useVertexColors: mode !== "plain" || shadeChk.checked,
         flatColor: PLAIN_COLOR,
         transparent: rhombSel.value === "transparent",
@@ -387,6 +375,18 @@ function build(reframe: boolean): void {
         isoglosses: isoChk.checked,
         skipSurface: rhombSel.value === "invisible",
     });
+
+    // Moving, the roof travels alone: the solids would visibly spin a tenth of a turn
+    // at the parity switch, mirroring a triacontahedron being a 36° rotation and not
+    // the identity. Stopped — at flat as much as at a parity — everything comes back.
+    // At flat that is worth seeing rather than hiding: the solids and normals sit at
+    // their true heights while the surface lies flat beneath them, so the structure
+    // stands with its roof taken away.
+    if (animating) {
+        statusEl.textContent =
+            `${allRhombs.length} rhombi · turning over — ${(100 * vmag).toFixed(0)}% of full depth`;
+        return;
+    }
 
     const complete = cen.solids.filter((s) => s.complete);
     const nlen = Number(nlenInput.value);

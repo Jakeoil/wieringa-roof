@@ -312,13 +312,34 @@
 
 <h3>The controls</h3>
 <p>
-    <strong>Global.</strong> Patch and generation. <em>Dales up</em> is parity — the
-    same roof reflected, every hill a dale, which is a second and equally valid Wieringa
-    roof over the same tiling. It is a flip and not a slider, deliberately: scaling the
-    vertical is affine and stays honest on the 3D page, but a squashed triacontahedron
-    is not a triacontahedron and its normals stop meeting at a point. <em>Above</em> and
-    <em>below</em> select which side a solid sits on — every rhomb offers one of each,
-    so below shows what the roof is a lid on and above what rests on it.
+    <strong>Global, and the z-orientation.</strong> Patch and generation, then the
+    orientation block. <strong>Heads</strong> is the default and it is definable rather
+    than merely chosen: every generator has <span class="mono">z = +1/√5</span>, so a
+    vertex sits at exactly <span class="mono">index · s/√5</span> and heads is the
+    orientation in which the index runs <em>upward</em>. <strong>Tails</strong> is its
+    reflection — a second, equally valid Wieringa roof over the same tiling, with every
+    hill a dale. Nothing about the surface itself tells them apart, since it has hills
+    and dales either way; the anchor is the index, the one part of all this that carries
+    no semantics of its own.
+</p>
+<p>
+    <strong>Flat</strong> collapses the roof into its own shadow — and that is not a
+    metaphor, it is the Penrose tiling this whole site is a lift of. Switching parity
+    runs down to flat, turns the roof over, and runs back out. During the motion the
+    roof travels alone, because the solids would visibly spin a tenth of a turn at the
+    switch: mirroring a triacontahedron is a 36° rotation, not the identity. Stopped at
+    flat they come back, and they are worth seeing there — the solids and normals stand
+    at their true heights while the surface lies flat beneath them, which is the
+    structure with its roof taken away. The rhombi keep their colors throughout; what a
+    rhomb <em>is</em> does not depend on how deep the roof is.
+</p>
+<p>
+    <strong>Heads solids</strong> sit above the roof in the default orientation,
+    <strong>tail solids</strong> below it. The distinction is intrinsic and does not
+    move: turn the roof over and you see the same solids from underneath, rather than
+    being handed the other set. Beware the hub, which runs the other way — a solid below
+    the roof has its rosette hub at the <em>top</em> index, 396 of 396 measured — so
+    this cannot be defined by where the hub sits.
 </p>
 <p>
     <strong>Rhombs.</strong> Surface solid, transparent or invisible — invisible leaves
