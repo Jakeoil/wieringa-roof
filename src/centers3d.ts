@@ -960,8 +960,13 @@ for (const r of [headsRadio, tailsRadio]) {
         const want = tailsRadio.checked;
         if (want === flip) return;
         if (vmag < 1e-6) {
+            // Already flat: asking for the other parity is asking to see it, so leave
+            // flat rather than sitting there in the new orientation. It also puts the
+            // 36° re-render back under cover — the solids turn over while the motion
+            // has them hidden, instead of spinning in place with nothing to hide behind.
             flip = want;
-            rebuild(false);
+            flatChk.checked = false;
+            animateTo(1);
             return;
         }
         // `flat` is a destination, not a waypoint: it does not tick on the way past.
