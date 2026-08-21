@@ -979,31 +979,54 @@ zero gaps on Deca. Cluster with a tolerance before quoting these numbers again.*
    exactly φ³ everywhere (§5.4). Is φ³ attained only between same-side pairs, or also
    between a hat and a bowl? The centers form a point set of their own — is it a
    quasi-lattice, and which one?
-2a. **Why does a shift by one axis always land on a nail head?** The residue of §5E,
-   restated after two measurements that narrowed it considerably.
+2a. **One-axis pairs: half proved, half reduced to a statement about the tiling.**
 
-   The raw observation: two centers exactly one axis apart — separation 1.0, not 2ρ —
-   never both hold two or more faces. Confirmed at **0 of 18,460** such pairs on Sun
-   gen 4. The long-diagonal minimum of §5C reduces to exactly this.
+   *The window, stated exactly.* A solid's thin-face candidates sit at some low-corner
+   index `t`, and its thick candidates at `t ± 1` — always adjacent, since
+   `index = (M − 2 − T)/2` and `T` differs by 2 between the types. The roof has four
+   index levels and a rhombus spans three, so a legal low corner is **1 or 2** and
+   nothing else. Three bands follow, and only three:
 
-   **It is not an edge effect** — the obvious first guess, and it is wrong. Of the
-   18,460 single-face partners, **16,588 are settled**, which is to say deep in the
-   interior. Nor is it about the lattice or the index window, both of which permit the
-   pairing.
+   ```
+   t = 0   thick legal, thin not     thickOnly    at most 5 faces
+   t = 1   both legal                both         up to 10 — the only completing band
+   t = 2   thin legal, thick not     thinOnly     at most 2 faces, measured
+   ```
 
-   What it *is* about is homes. Of the 12,730 cases where a populated solid has a
-   one-axis neighbour holding one face, that neighbour is a **nail head 12,720 times**
-   — 11,520 of 11,520 on Star gen 4 — and its single face never calls it home, nor is
-   that face ever shared with the populated solid. So the question is not "why can the
-   neighbour not be populated" but:
+   Confirmed exactly: every patch has six `(M, m₅)` classes, three per side, in that
+   order, with no leakage. Sun gen 4 — thickOnly 2,760 solids max 5, both 2,136 max 10,
+   thinOnly 1,835 max 2, then the same three for the other side.
 
-   > **Why does a shift by one axis always land on a nail head?**
+   *What that proves.* A one-axis shift is `m → m ± 2e_i`, which moves `M` by ±2 for a
+   horizontal axis and flips the side for the vertical — either way **`t` changes by
+   exactly one**. So a one-axis neighbour is always in an adjacent band, and therefore:
 
-   That is more tractable, because nail-headedness is governed by the index window
-   (§5E) rather than by counting. Shifting `m` by `2·e_i` moves `M` by 2, which moves
-   the solid between the thick-only, both, and thin-only bands — and the conjecture to
-   test is that a one-axis shift always lands outside the "both" band, which is the
-   only band a home can occupy. Measured in `tools/probes/oneaxis.mjs`.
+   > **both → thickOnly or thinOnly, never both → both;
+   > thickOnly → both or empty, never thickOnly → thickOnly.**
+
+   Measured over every one-axis pair on Sun gen 3, Sun gen 4 and Star gen 4: the only
+   combinations that occur are `both + thickOnly`, `both + thinOnly`, and
+   `thinOnly + thinOnly` across the vertical axis. Never `both + both`, never
+   `thickOnly + thickOnly`. **So at most one of a one-axis pair can complete, and the
+   long-diagonal minimum of §5C follows.** That much is closed.
+
+   *What it does not prove.* The window permits `both(10) + thickOnly(5)` — two
+   populated solids one axis apart — and that never happens. Measured, **0 of 18,460
+   pairs** have both holding two or more; one of the two always holds exactly **one**,
+   never zero. The joint distribution is stark: `both(5) + thickOnly(1)` occurs 2,630
+   times and `both(1) + thickOnly(3)` 1,710 times, but `both(5) + thickOnly(3)` never.
+
+   *Where the residue actually lives.* Shifting by `+a_ℓ` carries a face of `S` with low
+   corner `n` to a same-orientation candidate of `T` at `n + e_ℓ` — the faces of the two
+   solids are in bijection **as candidates**, differing only by which are realized as
+   actual rhombi of the tiling. So the remaining question is not about the lattice or
+   the window at all:
+
+   > **Why can the tiling never realize two or more candidates on both solids at once?**
+
+   That is a statement about which rhombi exist, which is why an argument from the index
+   window cannot reach it. `tools/probes/window.mjs`, `tools/probes/oneaxis.mjs`.
+
 3. **What is the material between the solids?** The roof is the boundary of a layer
    of the two golden rhombohedra (NOTES.md, "The rhombohedra are the real
    components"), and 10 + 10 of them make a triacontahedron. The complete caps
