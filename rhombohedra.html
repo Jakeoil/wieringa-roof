@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cage — Wieringa Roof</title>
+<link rel="stylesheet" href="./site.css">
+<link rel="icon" href="./favicon.svg">
+<style>
+    .bar { display: flex; gap: 16px; align-items: flex-end; flex-wrap: wrap;
+        background: var(--panel); border: 1px solid var(--rule);
+        border-radius: 8px; padding: 12px 14px; margin: 18px 0 10px; }
+    .bar label { display: flex; flex-direction: column; gap: 3px; font-size: 12px; color: var(--ink-soft); }
+    .bar select { font: inherit; font-size: 13px; padding: 5px 8px; border: 1px solid #ccc; border-radius: 4px; background: #fff; color: var(--ink); }
+    .bar input[type=range] { width: 190px; }
+    .bar .checks { display: flex; gap: 12px; align-items: center; }
+    .bar .checks label { flex-direction: row; align-items: center; gap: 5px; font-size: 13px; color: var(--ink); }
+    #view { width: 100%; height: min(72vh, 640px); border: 1px solid var(--rule);
+        border-radius: 8px; overflow: hidden; background: #f4f1e8; }
+    #view canvas { display: block; width: 100%; height: 100%; cursor: grab; }
+    #view canvas:active { cursor: grabbing; }
+    #status { display: block; margin: 10px 0 0; line-height: 1.5; }
+</style>
+</head>
+<body>
+
+<nav>
+    <span class="brand">Wieringa Roof</span>
+    <a href="./index.html" draggable="false">Home</a>
+    <a href="./roof3d.html" draggable="false">3D</a>
+    <a href="./info.html" draggable="false">Mathematics</a>
+    <a href="./polyhedra.html" draggable="false">Polyhedra</a>
+    <a href="./centers.html" draggable="false">Centers</a>
+    <a href="./packing.html" draggable="false">Packing</a>
+    <a href="./rhombohedra.html" draggable="false" aria-current="page">Cage</a>
+    <a href="./unfold.html" draggable="false">Workbench</a>
+    <a href="./tools.html" draggable="false">Tools</a>
+    <a href="./utilities.html" draggable="false">Utilities</a>
+    <a href="./unfold.html#sheets" draggable="false">Sheets</a>
+</nav>
+
+<div class="wrap">
+
+<h1>Cage</h1>
+<p class="lede">
+    The triacontahedron opened up. It falls into exactly twenty golden rhombic
+    hexahedra — ten acute and ten obtuse — and this is them, as a cage you can turn and
+    pull apart. Chapter 4 begins here.
+</p>
+
+<div class="bar">
+    <label>Explode <span id="explodeOut" class="mono"></span>
+        <input type="range" id="explode" min="0" max="1" step="0.005" value="0">
+    </label>
+    <label>Color <select id="color">
+        <option value="type">Acute / obtuse</option>
+        <option value="cell">One hue per cell</option>
+        <option value="axis">By axis</option>
+    </select></label>
+    <label>Show <select id="show">
+        <option value="all">All twenty</option>
+        <option value="acute">The ten acute</option>
+        <option value="obtuse">The ten obtuse</option>
+    </select></label>
+    <span class="checks">
+        <label><input type="checkbox" id="faces" checked> faces</label>
+        <label><input type="checkbox" id="spin" checked> turn</label>
+        <button id="reset" title="Forget saved settings and start again from the defaults">Reset</button>
+    </span>
+</div>
+
+<div id="view"></div>
+<span class="info" id="status"></span>
+
+<details id="help">
+    <summary>How it works <span class="mono" id="buildtag" style="font-weight:400;color:#888"></span></summary>
+    <div class="helpbody">
+
+<p>
+    <strong>Twenty cells, and the count is forced.</strong> A zonohedron on <em>n</em>
+    generators falls into <span class="mono">C(n,3)</span> parallelepipeds, one for each
+    triple of generators — the cell those three span. The triacontahedron is the
+    zonohedron on the six icosahedral five-fold axes, so
+    <span class="mono">C(6,3) = 20</span>, and because every pairwise dot product of
+    those axes is <span class="mono">±1/√5</span> every cell comes out a golden rhombic
+    hexahedron. Ten are obtuse with volume 0.470228 and ten acute with 0.760845, in the
+    ratio φ, and they sum to <span class="mono">4√(5+2√5) = 12.310734</span> — the
+    triacontahedron's own volume, exactly.
+</p>
+<p>
+    So the classical "ten of each" is not an arrangement anybody had to find. The count
+    comes from the triples and the shapes come from the axes.
+</p>
+<p>
+    <strong>The dissection is a choice; the cells are not.</strong> A point of the solid
+    is <span class="mono">½Σcₘaₘ</span> with every <span class="mono">cₘ</span> in
+    <span class="mono">[−1,1]</span>, and a cell fixes <span class="mono">cₘ = ±1</span>
+    on three axes while letting the other three run. A cell is therefore a triple plus a
+    sign vector, and a dissection is one sign choice per triple with no two cells
+    overlapping. <strong>Many dissections exist.</strong> This page shows one, found by
+    search rather than asserted, and checked: no two cells overlap, and 93,809 sampled
+    interior points each lie in exactly one cell.
+</p>
+<p>
+    <strong>Exploding</strong> moves each cell outward along the direction of its own
+    center, so at zero they reassemble exactly and at full travel they hold the same
+    arrangement, magnified. Nothing turns and nothing is reordered — the picture only
+    spreads. Faces go translucent while the cells are still close, because assembled
+    they share every internal face and opaque ones would hide the whole dissection
+    behind the solid's own surface.
+</p>
+<p>
+    See <a href="./polyhedra.html" draggable="false">Polyhedra</a> for the solid intact
+    and the two hexahedra on their own, and
+    <a href="./centers.html" draggable="false">Centers</a> for where these solids sit
+    under the roof.
+</p>
+
+    </div>
+</details>
+
+</div>
+
+<script type="importmap">
+{
+    "imports": {
+        "three": "./vendor/three.module.js",
+        "three/addons/controls/OrbitControls.js": "./vendor/OrbitControls.js",
+        "three/addons/lines/LineSegments2.js": "./vendor/LineSegments2.js",
+        "three/addons/lines/LineSegmentsGeometry.js": "./vendor/LineSegmentsGeometry.js",
+        "three/addons/lines/LineMaterial.js": "./vendor/LineMaterial.js"
+    }
+}
+</script>
+<script type="module" src="./dist/rhombohedra3d.js"></script>
+<script src="./site.js"></script>
+</body>
+</html>

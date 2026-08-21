@@ -30,21 +30,15 @@ is ±1/√5, every cell is a golden rhombohedron. Measured:
 So the classical "ten of each" is not an arrangement someone found; it is forced by the
 triple count, and the shapes are forced by the axes.
 
-### A 5 + 5 split inside the acute ten
+### Ten and ten — settled
 
-Sorting the cells by the signs of their three mutual dot products:
+**Ten obtuse and ten acute golden rhombic hexahedra (parallelepipeds).** Jeff's "5 × 2"
+was a slip and is withdrawn; the measurement above stands as the statement.
 
-```
-obtuse   one negative dot     10 cells
-acute    two negative dots     5 cells
-acute    no negative dots      5 cells
-```
-
-The ten acute cells fall into **two fives**, distinguished by orientation signature
-rather than by shape — they are congruent, but they sit in the solid two different
-ways. *(Jeff wrote "5 × 2 rhombihexahedra"; this 5-and-5 is the only natural such
-split I can find, and the total is 10 + 10 = 20. Worth settling which reading was
-meant before the page names anything.)*
+There is a secondary structure worth noting but not naming anything after: sorting by
+the signs of the three mutual dot products gives obtuse with one negative dot (10),
+acute with two (5), and acute with none (5). The acute ten are congruent but seated in
+the solid two different ways.
 
 ### The nested family, and the sub-zonohedra are the same cells
 
@@ -87,35 +81,56 @@ the one-axis case suggests they might be.
 
 ---
 
-## 2. What to build, in order
+## 2. The four parts
 
-**A.** `src/rhombohedra.ts` — the dissection as data, with `tools/rhombohedra.mjs`
-checking it: 20 cells, volumes summing to the RT's, the 10/10 split, the 5/5 signature
-split, and cells that tile the solid without gap or overlap. No page until that passes,
-as with chapters 2 and 3.
+Jeff's organization.
 
-**B.** **The cage.** A 3D triacontahedron showing the dissection as a wireframe of the
-twenty cells — Jeff: *"That shape alone is worth the price of admission."* Reuses
-`createRoofView` and `solids.ts`.
+### Part 1 — the cage · **built**
 
-**C.** **The exploding diagram.** One slider moving the twenty cells out along their
-own centroid directions, from assembled to fully separated. The same control shows the
-nested family if it drives axis count instead — 6 axes to 5 to 4 — which is worth
-trying as a second mode.
+`rhombohedra.html`, nav label **Cage**. The twenty cells as a wireframe you can turn and
+pull apart: explode slider, colour by acute/obtuse or one hue per cell or by axis, show
+either family alone, faces on or off, auto-turn.
 
-**D.** **The workbench.** Coloring schemes for the RT and the rhombohedra: by cell type
-(acute/obtuse), by the 5/5 signature, by which axes a cell uses, by shell. The schemes
-are the point — they are what the nets are printed from.
+`src/dissect.ts` holds the dissection and `tools/dissect.mjs` checks it — twenty cells
+one per triple, ten and ten, ratio φ, volumes summing to `4√(5+2√5)`, every corner
+inside the solid, **no two cells overlapping**, and 93,809 sampled interior points each
+in exactly one cell. The dissection is found by backtracking and the module says so
+rather than pretending it is canonical: many dissections exist, this is one.
 
-**E.** **Nets.** For the RT and for each rhombohedron, per coloring scheme, printed at
-true size through the existing `sheet.ts` machinery. Chapter 1 already knows how to put
-golden rhombi on paper.
+Exploding moves each cell along the direction of its own centre, so zero reassembles
+exactly and full travel is the same arrangement magnified. Faces go translucent while
+the cells are close, since assembled they share every internal face.
 
-**F.** **The roof from rhombohedra** — the eventual chapter page. The roof is the
-boundary of a layer of these cells, and this is where that becomes constructible rather
-than asserted.
+### Part 2 — the intersections found in `centers.html`
 
----
+The offsets that actually occur in the packing, and what each shares. One is already
+exact (§1); the other two are open:
+
+| offset | \|t\| | shared | identified? |
+|---|---|---|---|
+| one axis `aᵢ` | 1.0000 | 50% | **yes — the rhombic icosahedron** |
+| short diagonal | 1.0515 | ≈47% | no |
+| long diagonal | 1.7013 | ≈22% | no |
+| face contact | 2.7528 | 0% | — |
+
+The question for this part: **are those intersections unions of whole cells?** If they
+are, the packing of chapter 3 and the dissection of chapter 4 are the same
+combinatorics twice, and that is the link Jeff is after.
+
+### Part 3 — construction
+
+The colouring workbench and the nets. Schemes for the triacontahedron and for the two
+hexahedra — by cell type, by seating signature, by axis, by shell — printed at true size
+through the existing `sheet.ts` machinery, which already knows how to put golden rhombi
+on paper.
+
+### Part 4 — the roof from hexahedra
+
+A roof page built from the cells rather than from the surface. Jeff: *"well known.
+nothing to do with RT's, but here's hoping."* The classical construction is that the
+roof is the boundary of a layer of acute and obtuse rhombohedra, which is prior work;
+what would be new is any link back to the triacontahedra, and there is no reason yet to
+expect one.
 
 ## 3. Open questions
 
