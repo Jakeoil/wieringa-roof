@@ -120,21 +120,39 @@ solid's symmetry whatever. The rosette Jeff can see is local — five cells meet
 one five-fold axis — and does not extend to a global symmetry, because there is none to
 extend to.
 
-### Open, and a failed attempt worth recording
+### Settled: there are exactly two dissections
 
-The natural next question, and the one Jeff's source file says has no clean published
-answer: **how many dissections are there?**
+The open question in Jeff's source file — how many dissections there are, which he
+could find no clean published count for — now has an answer, and it is small.
 
-I enumerated them under the parameterization this module uses — one cell per triple,
-each cell offset by `½Σ_{m∉T} σₘaₘ` with `σₘ = ±1` — and got **160**, all with trivial
-symmetry. **That answer is wrong**, and the check that caught it is worth keeping: the
-rotation group acts on the set of dissections, so with trivial stabilizers the count
-would have to be a multiple of 60, and 160 is not. Testing directly, rotating one
-dissection lands outside the enumerated set **58 times out of 60**.
+| | |
+|---|---|
+| dissections with positions fixed in space | **160** |
+| distinct up to rotation and reflection | **2** |
+| in the symmetric orbit (a three-fold axis) | 40 |
+| in the chiral orbit (no symmetry at all) | 120 |
 
-So the parameterization is incomplete — either cells can sit at offsets other than ±1,
-or a dissection need not use each triple exactly once, or both. Until that is settled
-there is no count here, and 160 should not be quoted.
+160 = 120 + 40, orbit sizes divide the group order 120, and the set is verifiably
+closed under the group — 120 of 120 images listed. Jeff's recollection of "only one"
+was very nearly right.
+
+**And the two differ by a single flip.** Their shells are identical, all thirty faces;
+their inner cages share 39 of 45 faces and differ in **six**. Those six belong to
+exactly **four** cells, those cells use exactly **four** axes, and they occupy volume
+2.462147 — which is precisely the **Bilinski dodecahedron**, the zonohedron on four
+axes, with its four cells and its six internal faces. A four-axis zonohedron admits
+exactly two tilings of its own, and swapping between them is the elementary local move:
+the **phason flip** of the quasicrystal literature, and the only difference between the
+two dissections of the whole solid. The page offers it as a toggle for that reason.
+
+*A wrong answer, kept because the way it failed is instructive.* The first attempt
+compared rotated dissections by rounded coordinate keys and concluded the set was not
+closed under rotation — 58 images of 60 "not listed". That was entirely an artifact of
+the keys: a rotation perturbs the fifteenth digit, which is enough to flip a rounding
+boundary. It also produced 160 with all stabilizers trivial, which is self-contradictory
+since 160 is not a multiple of 60 — and that contradiction is what exposed it. The fix
+was to stop using floats: a symmetry is reduced to a **signed permutation of the six
+axes**, and the action on a dissection is integer arithmetic from there.
 
 ### Part 2 — the intersections found in `centers.html`
 

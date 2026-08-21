@@ -17,6 +17,7 @@ import { LineMaterial } from "three/addons/lines/LineMaterial.js";
 import { loadPrefs, savePrefs, resetPrefs } from "./prefs.js";
 import { BUILD_ID } from "./build-id.js";
 import { dissection, faceColor, cageFaces, pairColor } from "./dissect.js";
+import type { DissectionKind } from "./dissect.js";
 import type { Cell } from "./dissect.js";
 import type { V3 } from "./solids.js";
 
@@ -33,11 +34,12 @@ const showSel = el<HTMLSelectElement>("show");
 const faceSel = el<HTMLSelectElement>("facemode");
 const edgeSel = el<HTMLSelectElement>("edgemode");
 const cageSel = el<HTMLSelectElement>("cagemode");
+const flipChk = el<HTMLInputElement>("flip");
 const spinChk = el<HTMLInputElement>("spin");
 const statusEl = el<HTMLElement>("status");
 
 const PREFS_KEY = "wr-rhombohedra";
-const PREF_DEFAULTS = { explode: 0, color: "five", show: "all", facemode: "solid", edgemode: "edges", cagemode: "cage", spin: true };
+const PREF_DEFAULTS = { explode: 0, color: "five", show: "all", facemode: "solid", edgemode: "edges", cagemode: "cage", flip: false, spin: true };
 const prefs = loadPrefs(PREFS_KEY, PREF_DEFAULTS);
 
 const scene = new THREE.Scene();
@@ -103,8 +105,15 @@ const METAL_ENV = (() => {
     return tex;
 })();
 
-const cells = dissection();
-const cage = cageFaces();
+// Both dissections, cached on first use. There are exactly two up to rotation and
+// reflection — see dissect.ts — and the page can show either.
+const KINDS: DissectionKind[] = ["symmetric", "chiral"];
+const CELLS: Record<string, ReturnType<typeof dissection>> = {};
+const CAGES: Record<string, ReturnType<typeof cageFaces>> = {};
+for (const k of KINDS) {
+    CELLS[k] = dissection(k);
+    CAGES[k] = cageFaces(k);
+}
 let drawn: THREE.Object3D[] = [];
 let edgeMats: LineMaterial[] = [];
 
@@ -144,6 +153,12 @@ function build(): void {
     const t = Math.pow(u, 2.2) * 12;
     const faceMode = faceSel.value;
     const edgeMode = edgeSel.value;
+    // Only two dissections exist up to symmetry, and they differ by a single flip
+    // inside one Bilinski dodecahedron — four cells and six internal faces, everything
+    // else identical. So the choice is a toggle rather than a list.
+    const kind: DissectionKind = flipChk.checked ? "chiral" : "symmetric";
+    const cells = CELLS[kind];
+    const cage = CAGES[kind];
     // Corners and edges of each cell, for the ball-and-stick frame. Taken per cell
     // rather than deduplicated: assembled, neighbouring cells share corners and the
     // beads coincide exactly, which looks like one bead — and once exploded they must
@@ -344,13 +359,16 @@ function build(): void {
     }
 
     const nAcute = cells.filter((c) => visible(c) && c.acute).length;
+    const kindNote = kind === "symmetric"
+        ? " · unflipped — the dissection that keeps a three-fold axis"
+        : " · flipped — one Bilinski dodecahedron turned over, and the three-fold axis is gone";
     const note = colorSel.value === "five"
         ? " · Kowalewski five: every rosette shows all five, opposite faces of each hexahedron agree, each wears three of the five"
         : "";
     statusEl.textContent =
         `${shown} of 20 cells — ${nAcute} acute at 0.760845, ${shown - nAcute} obtuse at 0.470228, ` +
         `in the ratio φ · together 4√(5+2√5) = 12.310734, the triacontahedron's own volume · ` +
-        `explode ${(100 * u).toFixed(0)}%${note}`;
+        `explode ${(100 * u).toFixed(0)}%${kindNote}${note}`;
 }
 
 explodeInput.value = String(prefs.explode);
@@ -359,6 +377,7 @@ showSel.value = prefs.show || PREF_DEFAULTS.show;
 faceSel.value = prefs.facemode || PREF_DEFAULTS.facemode;
 edgeSel.value = prefs.edgemode || PREF_DEFAULTS.edgemode;
 cageSel.value = prefs.cagemode || PREF_DEFAULTS.cagemode;
+flipChk.checked = prefs.flip;
 spinChk.checked = prefs.spin;
 controls.autoRotate = spinChk.checked;
 
@@ -367,7 +386,7 @@ function rebuild(): void {
     build();
 }
 explodeInput.addEventListener("input", rebuild);
-for (const c of [colorSel, showSel, faceSel, edgeSel, cageSel]) c.addEventListener("change", rebuild);
+for (const c of [colorSel, showSel, faceSel, edgeSel, cageSel, flipChk]) c.addEventListener("change", rebuild);
 
 // Scrolling over the slider works it, which is what a slider under the pointer ought to
 // do. Bound non-passively so the page does not scroll away underneath.
@@ -388,7 +407,7 @@ function persist(): void {
     savePrefs(PREFS_KEY, {
         explode: Number(explodeInput.value), color: colorSel.value,
         show: showSel.value, facemode: faceSel.value, edgemode: edgeSel.value,
-        cagemode: cageSel.value,
+        cagemode: cageSel.value, flip: flipChk.checked,
         spin: spinChk.checked,
     });
 }

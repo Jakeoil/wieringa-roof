@@ -106,35 +106,170 @@ function makeCell(triple: number[], sign: number[], id: number): Cell {
     };
 }
 
-let cached: Cell[] | null = null;
+const TRIPLES: number[][] = (() => {
+    const t: number[][] = [];
+    for (let i = 0; i < 6; i++) for (let j = i + 1; j < 6; j++) for (let k = j + 1; k < 6; k++) t.push([i, j, k]);
+    return t;
+})();
+const TRIPLE_INDEX = new Map(TRIPLES.map((T, i) => [T.join(""), i]));
 
-/** One dissection of the triacontahedron into its twenty cells. Cached. */
-export function dissection(): Cell[] {
-    if (cached) return cached;
-    const triples: number[][] = [];
-    for (let i = 0; i < 6; i++) for (let j = i + 1; j < 6; j++) for (let k = j + 1; k < 6; k++) triples.push([i, j, k]);
-    const options = triples.map((T, ti) => {
-        const out: Cell[] = [];
-        for (let s = 0; s < 8; s++) {
-            out.push(makeCell(T, [s & 1 ? 1 : -1, s & 2 ? 1 : -1, s & 4 ? 1 : -1], ti));
+/** All eight placements of the cell on each triple. */
+const OPTIONS: Cell[][] = TRIPLES.map((T, ti) =>
+    [0, 1, 2, 3, 4, 5, 6, 7].map((s) =>
+        makeCell(T, [s & 1 ? 1 : -1, s & 2 ? 1 : -1, s & 4 ? 1 : -1], ti),
+    ),
+);
+
+/** Every dissection, as a choice of placement per triple. There are 160. */
+function allDissections(): number[][] {
+    const okAB: boolean[][][][] = [];
+    for (let i = 0; i < 20; i++) {
+        okAB[i] = [];
+        for (let a = 0; a < 8; a++) {
+            okAB[i][a] = [];
+            for (let j = 0; j < 20; j++) {
+                okAB[i][a][j] = [];
+                for (let b = 0; b < 8; b++) {
+                    okAB[i][a][j][b] = i === j ? a === b : disjoint(OPTIONS[i][a], OPTIONS[j][b]);
+                }
+            }
         }
-        return out;
-    });
-    const chosen: Cell[] = [];
-    const solve = (i: number): boolean => {
-        if (i === options.length) return true;
-        for (const c of options[i]) {
-            if (!chosen.every((p) => disjoint(p, c))) continue;
-            chosen.push(c);
-            if (solve(i + 1)) return true;
-            chosen.pop();
+    }
+    const out: number[][] = [];
+    const pick = new Array<number>(20);
+    const go = (i: number): void => {
+        if (i === 20) {
+            out.push(pick.slice());
+            return;
         }
-        return false;
+        for (let a = 0; a < 8; a++) {
+            let good = true;
+            for (let j = 0; j < i && good; j++) if (!okAB[i][a][j][pick[j]]) good = false;
+            if (good) {
+                pick[i] = a;
+                go(i + 1);
+            }
+        }
     };
-    if (!solve(0)) throw new Error("no dissection found — the search is wrong, not the solid");
-    cached = chosen.map((c, i) => ({ ...c, id: i }));
-    return cached;
+    go(0);
+    return out;
 }
+
+/**
+ * The solid's symmetry group, reduced to signed permutations of the six axes — which
+ * is what lets a dissection be acted on in integers rather than in floats. Comparing
+ * rotated dissections by rounded coordinates is what made an earlier count wrong.
+ */
+const GROUP: Array<{ pi: number[]; ep: number[] }> = (() => {
+    const signed: Array<{ v: V3; m: number; s: number }> = [];
+    for (let i = 0; i < 6; i++) for (const s of [1, -1]) signed.push({ v: A6[i].map((x) => x * s) as V3, m: i, s });
+    const seen = new Set<string>();
+    const out: Array<{ pi: number[]; ep: number[] }> = [];
+    for (const u of signed) {
+        for (const v of signed) {
+            if (Math.abs(dot(u.v, v.v) - dot(A6[0], A6[1])) > 1e-9) continue;
+            for (const hand of [1, -1]) {
+                const B = [A6[0], A6[1], cross(A6[0], A6[1])];
+                const C = [u.v, v.v, cross(u.v, v.v).map((x) => x * hand) as V3];
+                const det = dot(B[0], cross(B[1], B[2]));
+                const inv = [cross(B[1], B[2]), cross(B[2], B[0]), cross(B[0], B[1])].map(
+                    (r) => r.map((x) => x / det) as V3,
+                );
+                const M = [0, 1, 2].map((r) =>
+                    [0, 1, 2].map((c) => C[0][r] * inv[0][c] + C[1][r] * inv[1][c] + C[2][r] * inv[2][c]),
+                );
+                const apply = (p: V3): V3 =>
+                    [0, 1, 2].map((r) => M[r][0] * p[0] + M[r][1] * p[1] + M[r][2] * p[2]) as V3;
+                const pi: number[] = [];
+                const ep: number[] = [];
+                let good = true;
+                for (let m = 0; m < 6 && good; m++) {
+                    const w = apply(A6[m]);
+                    const hit = signed.find(
+                        (t) => Math.hypot(w[0] - t.v[0], w[1] - t.v[1], w[2] - t.v[2]) < 1e-9,
+                    );
+                    if (!hit) good = false;
+                    else {
+                        pi[m] = hit.m;
+                        ep[m] = hit.s;
+                    }
+                }
+                if (!good || new Set(pi).size !== 6) continue;
+                const k = pi.join("") + "|" + ep.join("");
+                if (seen.has(k)) continue;
+                seen.add(k);
+                out.push({ pi, ep });
+            }
+        }
+    }
+    return out;
+})();
+
+/** A dissection as a canonical string, for comparison under the group. */
+function canonical(sol: number[]): string {
+    return sol
+        .map((a, ti) => {
+            const c = OPTIONS[ti][a];
+            const rest = [0, 1, 2, 3, 4, 5].filter((m) => !c.triple.includes(m));
+            return `${c.triple.join("")}:${rest.map((m, q) => `${m}${c.sign[q] > 0 ? "+" : "-"}`).join("")}`;
+        })
+        .sort()
+        .join("|");
+}
+
+function actOn(sol: number[], g: { pi: number[]; ep: number[] }): number[] {
+    const out = new Array<number>(20);
+    sol.forEach((a, ti) => {
+        const c = OPTIONS[ti][a];
+        const T2 = c.triple.map((m) => g.pi[m]).sort((x, y) => x - y);
+        const ti2 = TRIPLE_INDEX.get(T2.join(""))!;
+        const rest = [0, 1, 2, 3, 4, 5].filter((m) => !c.triple.includes(m));
+        const rest2 = [0, 1, 2, 3, 4, 5].filter((m) => !T2.includes(m));
+        const s2 = new Array<number>(3);
+        rest.forEach((m, q) => {
+            s2[rest2.indexOf(g.pi[m])] = c.sign[q] * g.ep[m];
+        });
+        let bits = 0;
+        s2.forEach((v, q) => {
+            if (v > 0) bits |= 1 << q;
+        });
+        out[ti2] = bits;
+    });
+    return out;
+}
+
+/** How many of the solid's 120 symmetries a dissection keeps. */
+export function stabilizerOrder(sol: number[]): number {
+    const k = canonical(sol);
+    return GROUP.filter((g) => canonical(actOn(sol, g)) === k).length;
+}
+
+export type DissectionKind = "chiral" | "symmetric";
+
+const cached = new Map<DissectionKind, Cell[]>();
+
+/**
+ * A dissection of the triacontahedron into its twenty cells.
+ *
+ * **There are exactly two, up to rotation and reflection** — 160 with positions fixed
+ * in space, falling into orbits of 120 and 40 under the solid's group of order 120.
+ * The large orbit keeps no symmetry at all; the small one keeps a **three-fold axis**.
+ * Both are ten acute and ten obtuse.
+ */
+export function dissection(kind: DissectionKind = "chiral"): Cell[] {
+    const hit = cached.get(kind);
+    if (hit) return hit;
+    const all = allDissections();
+    const want = kind === "symmetric" ? 3 : 1;
+    const sol = all.find((s) => stabilizerOrder(s) === want);
+    if (!sol) throw new Error(`no ${kind} dissection found — the search is wrong, not the solid`);
+    const cells = sol.map((a, ti) => ({ ...OPTIONS[ti][a], id: ti }));
+    cached.set(kind, cells);
+    return cells;
+}
+
+/** All 160, for counting. */
+export { allDissections };
 
 // ── the five-colouring ────────────────────────────────────────────
 //
@@ -263,9 +398,9 @@ export function shellFaces(): ShellFace[] {
  * Deduplicating matters rather than being tidy — two coincident copies of an internal
  * face z-fight, which looks like a rendering fault.
  */
-export function cageFaces(): ShellFace[] {
+export function cageFaces(kind: DissectionKind = "chiral"): ShellFace[] {
     const byKey = new Map<string, { face: ShellFace; n: number }>();
-    for (const c of dissection()) {
+    for (const c of dissection(kind)) {
         c.faces.forEach((f, fi) => {
             const mid = [0, 1, 2].map((d) => f.reduce((s, q) => s + q[d], 0) / 4);
             const key = mid.map((x) => Math.round(x * 1e6)).join(",");
