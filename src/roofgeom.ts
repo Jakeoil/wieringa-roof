@@ -59,35 +59,17 @@ export interface TriRef {
     vid: number;
 }
 
-/**
- * Lift the current patch. Returns `null` for an empty patch, which is a legitimate
- * answer — the star family emits no rhombs until a generation later — and which the
- * caller must handle rather than framing a zero-radius bounding sphere and poisoning
- * the camera with NaN for the rest of the session.
- */
-export function buildRoof(vscale: number, flip: boolean): RoofData | null {
-    if (allRhombs.length === 0) return null;
-
-    const lift = computeLift();
-    const k = Math.abs(vscale);
-    const P: (V3 | null)[] = lift.n.map((nv) => (nv ? pos3D(nv, flip) : null));
-
-    const faces: RoofFaceInfo[] = allRhombs.map((r) => ({
-        id: r.id,
-        vids: r.verts.map((pt) => vertexMap.get(roundKey(pt))!.id),
-        thick: r.thick,
-        cluster: r.cluster,
-    }));
-
-    let idxLo = Infinity;
-    let idxHi = -Infinity;
-    for (const v of vertexList) {
-        if (v.index < idxLo) idxLo = v.index;
-        if (v.index > idxHi) idxHi = v.index;
-    }
-
-    // Bounding box over every triangle corner, which is every face corner — the same
-    // set the mesh measures, so the offset is the same number the mesh would produce.
+/** Everything that does not depend on the vertical scale, computed once. */
+function assemble(
+    P: (V3 | null)[],
+    faces: RoofFaceInfo[],
+    idxLo: number,
+    idxHi: number,
+    flip: boolean,
+    k: number,
+): RoofData {
+    // Bounding box over every face corner — the same set the mesh measures, so the
+    // offset is the number the mesh itself would produce.
     const lo: V3 = [Infinity, Infinity, Infinity];
     const hi: V3 = [-Infinity, -Infinity, -Infinity];
     for (const f of faces) {
@@ -121,6 +103,47 @@ export function buildRoof(vscale: number, flip: boolean): RoofData | null {
             return [p[0] - offset[0], p[1] - offset[1], p[2] * k - offset[2]];
         },
     };
+}
+
+/**
+ * The same roof at a different vertical scale, without re-lifting it.
+ *
+ * `computeLift` is the expensive half — 31 ms at 16,475 rhombi — and the scale does
+ * not touch it: the lift is the same integer vectors whatever the depth. Only the
+ * scale factor and the recentering offset move. That is what makes the flattening
+ * animation affordable at every generation the page offers.
+ */
+export function rescale(d: RoofData, vscale: number): RoofData {
+    return assemble(d.P, d.faces, d.idxLo, d.idxHi, d.flip, Math.abs(vscale));
+}
+
+/**
+ * Lift the current patch. Returns `null` for an empty patch, which is a legitimate
+ * answer — the star family emits no rhombs until a generation later — and which the
+ * caller must handle rather than framing a zero-radius bounding sphere and poisoning
+ * the camera with NaN for the rest of the session.
+ */
+export function buildRoof(vscale: number, flip: boolean): RoofData | null {
+    if (allRhombs.length === 0) return null;
+
+    const lift = computeLift();
+    const P: (V3 | null)[] = lift.n.map((nv) => (nv ? pos3D(nv, flip) : null));
+
+    const faces: RoofFaceInfo[] = allRhombs.map((r) => ({
+        id: r.id,
+        vids: r.verts.map((pt) => vertexMap.get(roundKey(pt))!.id),
+        thick: r.thick,
+        cluster: r.cluster,
+    }));
+
+    let idxLo = Infinity;
+    let idxHi = -Infinity;
+    for (const v of vertexList) {
+        if (v.index < idxLo) idxLo = v.index;
+        if (v.index > idxHi) idxHi = v.index;
+    }
+
+    return assemble(P, faces, idxLo, idxHi, flip, Math.abs(vscale));
 }
 
 /**

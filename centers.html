@@ -31,6 +31,10 @@
         background: var(--panel); border: 1px solid var(--rule);
         border-radius: 8px; padding: 10px 14px; margin: 0 0 10px;
     }
+    .zgrp { display: flex; flex-direction: column; gap: 2px; }
+    .zrow { display: flex; gap: 12px; align-items: center; }
+    .zrow label { display: flex; align-items: center; gap: 4px; font-size: 13px; color: var(--ink); }
+    .zrow:last-child label { font-size: 12px; color: var(--ink-soft); }
     .bar .grp, .classbar .grp {
         font-size: 11px; text-transform: uppercase; letter-spacing: .06em;
         color: var(--ink-faint); align-self: center; margin: 0 2px 3px 0;
@@ -88,10 +92,19 @@
         <option value="type">Thick / thin</option>
         <option value="plain">Plain</option>
     </select></label>
+    <span class="zgrp">
+        <span class="grp">Z-orientation</span>
+        <span class="zrow">
+            <label title="The reflection: index runs downward"><input type="radio" name="parity" id="ptails"> tails</label>
+            <label title="Collapse the roof into its own shadow, the flat Penrose tiling"><input type="checkbox" id="flat"> flat</label>
+            <label title="The default: index runs upward"><input type="radio" name="parity" id="pheads" checked> heads</label>
+        </span>
+        <span class="zrow">
+            <label title="Solids below the roof in the default orientation"><input type="checkbox" id="tailsolids" checked> tail solids</label>
+            <label title="Solids above the roof in the default orientation"><input type="checkbox" id="headsolids" checked> heads solids</label>
+        </span>
+    </span>
     <span class="checks">
-        <label><input type="checkbox" id="flip"> dales up</label>
-        <label><input type="checkbox" id="above" checked> above</label>
-        <label><input type="checkbox" id="below" checked> below</label>
         <button id="reset" title="Forget saved settings and start again from the defaults">Reset</button>
     </span>
 </div>

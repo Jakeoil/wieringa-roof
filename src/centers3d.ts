@@ -21,7 +21,8 @@ import * as THREE from "three";
 import { loadPrefs, savePrefs, resetPrefs } from "./prefs.js";
 import { BUILD_ID } from "./build-id.js";
 import { seedTypes, generatePatch, allRhombs, vertexList } from "./geometry.js";
-import { buildRoof } from "./roofgeom.js";
+import { buildRoof, rescale } from "./roofgeom.js";
+import type { RoofData } from "./roofgeom.js";
 import { LineSegments2 } from "three/addons/lines/LineSegments2.js";
 import { LineSegmentsGeometry } from "three/addons/lines/LineSegmentsGeometry.js";
 import { LineMaterial } from "three/addons/lines/LineMaterial.js";
@@ -61,9 +62,11 @@ const view = el<HTMLDivElement>("view");
 const patchSel = el<HTMLSelectElement>("patch");
 const genSel = el<HTMLSelectElement>("gen");
 const colorSel = el<HTMLSelectElement>("color");
-const flipChk = el<HTMLInputElement>("flip");
-const aboveChk = el<HTMLInputElement>("above");
-const belowChk = el<HTMLInputElement>("below");
+const headsRadio = el<HTMLInputElement>("pheads");
+const tailsRadio = el<HTMLInputElement>("ptails");
+const flatChk = el<HTMLInputElement>("flat");
+const headSolidsChk = el<HTMLInputElement>("headsolids");
+const tailSolidsChk = el<HTMLInputElement>("tailsolids");
 const rhombSel = el<HTMLSelectElement>("rhombmode");
 const edgesChk = el<HTMLInputElement>("edges");
 const shadeChk = el<HTMLInputElement>("shade");
@@ -88,9 +91,10 @@ const PREF_DEFAULTS = {
     patch: "Pe3",
     gen: 3,
     color: "class",
-    flip: false,
-    above: true,
-    below: true,
+    parity: "heads",
+    flat: false,
+    headsolids: true,
+    tailsolids: true,
     rhombmode: "solid",
     edges: true,
     shade: true,
@@ -219,22 +223,102 @@ const BALL_POS = BALL.getAttribute("position").array as ArrayLike<number>;
 
 // ── build ─────────────────────────────────────────────────────────
 
+// ── z orientation ─────────────────────────────────────────────────
+//
+// **Heads is the default**, and it is definable rather than merely declared: every
+// generator has z = +1/√5, so a vertex sits at exactly `index · s/√5` and heads is the
+// orientation in which the index runs *upward*. Tails is its reflection. Nothing about
+// the surface itself distinguishes them — it has hills and dales either way — so the
+// anchor is the index, the one part of all this that carries no semantics.
+//
+// `flip` stays the code's word for the reflection; the UI's word is tails.
+let flip = false;
+
+// **The shadow.** At rest at a parity the real roof is drawn, with its solids and its
+// normals. Flat, and every frame of the transition, is a *different object*: the roof's
+// own shadow, which at zero is literally the Penrose tiling the whole site is built on.
+// The real roof is invisible throughout, and that is what makes the turn cheap — three
+// separate things are free at zero, because there is nothing on screen to see them
+// happen:
+//
+//   * the parity flip — a flat sheet is its own mirror image;
+//   * the shading inversion — shading strength is |vscale|, so there is none;
+//   * the re-render of the solids, which otherwise visibly spin a tenth of a turn,
+//     since mirroring a triacontahedron is a 36° rotation and not the identity.
+//
+// So the solids never have to be caught mid-change. They are simply rebuilt while
+// nothing is looking.
+let vmag = 1;
+let anim = 0;
+const atRest = () => vmag >= 1 - 1e-6;
+
 /** LineMaterial needs the viewport in pixels, and needs telling when it changes. */
 let normalMats: LineMaterial[] = [];
 
+// Caches. The patch and its triacontahedra depend only on the selection, never on the
+// orientation or the scale, and `triacontahedra()` costs 192 ms at 16,475 rhombi — far
+// too much to repeat per animation frame. The lift is cached too, and intermediate
+// frames come from `rescale`, which is 0.5 ms against buildRoof's 31 ms.
+let patchKey = "";
+let cenCache: ReturnType<typeof triacontahedra> | null = null;
+let roofCache: { key: string; d: RoofData } | null = null;
+
+function ensurePatch(): void {
+    const key = `${patchSel.value}|${genSel.value}`;
+    if (patchKey === key) return;
+    const quiet = console.log;
+    console.log = () => {};
+    generatePatch(seedTypes.findIndex((s) => s.label === patchSel.value), true, Number(genSel.value));
+    console.log = quiet;
+    patchKey = key;
+    cenCache = null;
+    roofCache = null;
+}
+
+function roofAt(v: number): RoofData | null {
+    const key = `${patchKey}|${flip}`;
+    if (!roofCache || roofCache.key !== key) {
+        const base = buildRoof(1, flip);
+        if (!base) return null;
+        roofCache = { key, d: base };
+    }
+    return rescale(roofCache.d, v);
+}
+
+/** Ease the roof to a new depth, then do whatever has to happen at the far end. */
+function animateTo(target: number, then?: () => void): void {
+    cancelAnimationFrame(anim);
+    const from = vmag;
+    const dur = 420 * Math.abs(target - from);
+    if (dur < 8) {
+        vmag = target;
+        then?.();
+        rebuild(false);
+        return;
+    }
+    const t0 = performance.now();
+    const step = (now: number) => {
+        const k = Math.min(1, (now - t0) / dur);
+        vmag = from + (target - from) * (1 - Math.pow(1 - k, 3));
+        rebuild(false);
+        if (k < 1) {
+            anim = requestAnimationFrame(step);
+        } else {
+            vmag = target;
+            then?.();
+            rebuild(false);
+        }
+    };
+    anim = requestAnimationFrame(step);
+}
+
 function build(reframe: boolean): void {
     normalMats = [];
-    const seedIdx = seedTypes.findIndex((s) => s.label === patchSel.value);
     const gen = Number(genSel.value);
     const t0 = performance.now();
 
-    const quiet = console.log;
-    console.log = () => {};
-    generatePatch(seedIdx, true, gen);
-    console.log = quiet;
-
-    const flip = flipChk.checked;
-    const d = buildRoof(1, flip);
+    ensurePatch();
+    const d = roofAt(vmag);
     if (!d) {
         statusEl.textContent =
             `${patchSel.value} generation ${gen}: no rhombs at this generation. ` +
@@ -243,7 +327,32 @@ function build(reframe: boolean): void {
         return;
     }
 
-    const cen = triacontahedra();
+    // The shadow: the roof alone, at whatever depth the animation has reached. No
+    // solids, no normals, no markers — those belong to the real roof, and the real roof
+    // is not on screen. Shading strength is |vscale|, so it goes out with the depth
+    // rather than lying about a flat sheet.
+    if (!atRest()) {
+        rv.drawRoof(d, {
+            colorOf: () => new THREE.Color(PLAIN_COLOR),
+            shade: shadeChk.checked ? vmag : 0,
+            useVertexColors: shadeChk.checked,
+            flatColor: PLAIN_COLOR,
+            transparent: false,
+            edges: edgesChk.checked,
+            isoglosses: isoChk.checked,
+            skipSurface: rhombSel.value === "invisible",
+        });
+        statusEl.textContent =
+            vmag < 1e-6
+                ? `${allRhombs.length} rhombi · flat — the roof collapsed into its own shadow, ` +
+                  `the Penrose tiling it is a lift of. Solids and normals belong to the roof, ` +
+                  `so they are not here.`
+                : `${allRhombs.length} rhombi · turning over — ${(100 * vmag).toFixed(0)}% of full depth`;
+        return;
+    }
+
+    if (!cenCache) cenCache = triacontahedra();
+    const cen = cenCache;
     const assign = cen.home;
     const mode = colorSel.value;
 
@@ -282,8 +391,8 @@ function build(reframe: boolean): void {
     const complete = cen.solids.filter((s) => s.complete);
     const nlen = Number(nlenInput.value);
     const sscale = Number(sscaleInput.value);
-    const wantAbove = aboveChk.checked;
-    const wantBelow = belowChk.checked;
+    const wantHeadSolids = headSolidsChk.checked;
+    const wantTailSolids = tailSolidsChk.checked;
     last = { faces: d.faces };
 
     // One filter, applied to everything: markers, shells and normals all mean "the
@@ -305,9 +414,16 @@ function build(reframe: boolean): void {
         s.homeCount > 0 &&
         (s.settled || wantTrunc) &&
         (properOf(s) >= 0 || wantDemoted);
-    /** the side the solid sits on, as the eye sees it after the flip */
-    const visuallyHat = (s: Solid) => (flip ? !s.hat : s.hat);
-    const sided = (s: Solid) => (visuallyHat(s) ? wantBelow : wantAbove);
+    // A **heads solid** sits above the roof in the default orientation, a **tails
+    // solid** below it. Intrinsic, and deliberately so: turning the roof over shows you
+    // the same solids from underneath rather than swapping them for the other set,
+    // which is what turning something over means. `s.hat` is computed unflipped and
+    // never moves.
+    //
+    // Note the hub runs the other way — a hat sits below the roof but its rosette hub
+    // is at the *top* index, 396 of 396 measured — so anyone tempted to define this by
+    // hub index gets the opposite set.
+    const sided = (s: Solid) => (s.hat ? wantTailSolids : wantHeadSolids);
     // Demoted solids have no class row, so the global settings are all they answer to.
     const ctl = (s: Solid): ClassCtl | null => {
         const i = properOf(s);
@@ -712,13 +828,16 @@ if (!patchSel.value) patchSel.value = PREF_DEFAULTS.patch;
 if (!genSel.value) genSel.value = String(PREF_DEFAULTS.gen);
 colorSel.value = prefs.color;
 if (!colorSel.value) colorSel.value = PREF_DEFAULTS.color;
-flipChk.checked = prefs.flip;
 normalsChk.checked = prefs.normals;
 nlenInput.value = String(prefs.nlen);
 sscaleInput.value = String(prefs.sscale);
-flipChk.checked = prefs.flip;
-aboveChk.checked = prefs.above;
-belowChk.checked = prefs.below;
+flip = prefs.parity === "tails";
+headsRadio.checked = !flip;
+tailsRadio.checked = flip;
+flatChk.checked = prefs.flat;
+vmag = flatChk.checked ? 0 : 1;
+headSolidsChk.checked = prefs.headsolids;
+tailSolidsChk.checked = prefs.tailsolids;
 rhombSel.value = prefs.rhombmode || PREF_DEFAULTS.rhombmode;
 edgesChk.checked = prefs.edges;
 shadeChk.checked = prefs.shade;
@@ -828,10 +947,31 @@ function rebuild(reframe: boolean): void {
     build(reframe);
 }
 for (const c of [patchSel, genSel]) c.addEventListener("change", () => rebuild(true));
-for (const c of [colorSel, flipChk, aboveChk, belowChk, rhombSel, edgesChk, shadeChk,
+for (const c of [colorSel, headSolidsChk, tailSolidsChk, rhombSel, edgesChk, shadeChk,
                  isoChk, normalsChk, rtSel, rtExtentSel, rtEdgesChk, markersChk, demotedChk, truncChk]) {
     c.addEventListener("change", () => rebuild(false));
 }
+
+// Switching parity runs the roof down to flat, turns it over while nothing is on
+// screen, and runs it back out. Already flat, there is nothing to animate — the parity
+// simply becomes the one it will rise into.
+for (const r of [headsRadio, tailsRadio]) {
+    r.addEventListener("change", () => {
+        const want = tailsRadio.checked;
+        if (want === flip) return;
+        if (vmag < 1e-6) {
+            flip = want;
+            rebuild(false);
+            return;
+        }
+        // `flat` is a destination, not a waypoint: it does not tick on the way past.
+        animateTo(0, () => {
+            flip = want;
+            animateTo(1);
+        });
+    });
+}
+flatChk.addEventListener("change", () => animateTo(flatChk.checked ? 0 : 1));
 for (const c of [nlenInput, sscaleInput]) {
     c.addEventListener("input", () => rebuild(false));
 }
@@ -853,9 +993,10 @@ function persist(): void {
         patch: patchSel.value,
         gen: Number(genSel.value),
         color: colorSel.value,
-        flip: flipChk.checked,
-        above: aboveChk.checked,
-        below: belowChk.checked,
+        parity: flip ? "tails" : "heads",
+        flat: flatChk.checked,
+        headsolids: headSolidsChk.checked,
+        tailsolids: tailSolidsChk.checked,
         rhombmode: rhombSel.value,
         edges: edgesChk.checked,
         shade: shadeChk.checked,
