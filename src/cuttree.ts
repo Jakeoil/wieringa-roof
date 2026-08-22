@@ -249,6 +249,7 @@ function developFromCuts(
         placed.set(seedId, {
             faceId: seedId,
             thick: seed.thick,
+            pair: seed.pair,
             cluster: seed.cluster,
             poly: placeSeed(seed, P),
             verts: seed.v.slice(),
@@ -277,6 +278,7 @@ function developFromCuts(
                 placed.set(link.other, {
                     faceId: link.other,
                     thick: byId.get(link.other)!.thick,
+                    pair: byId.get(link.other)!.pair,
                     cluster: byId.get(link.other)!.cluster,
                     poly: cand.poly,
                     verts: cand.verts,

@@ -199,6 +199,7 @@ export function renderSheet(
                 p.cluster,
                 p.thick,
                 idxOf ? Math.min(...p.verts.map(idxOf)) : 1,
+                p.pair,
             );
             if (fill) {
                 fills.push(

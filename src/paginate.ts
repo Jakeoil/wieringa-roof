@@ -740,6 +740,7 @@ export function renderPage(
             p.cluster,
             p.thick,
             Math.min(...vidx0),
+            p.pair,
         );
         if (base) {
             const shape = pts.map((q) => `${n3(q[0])},${n3(q[1])}`).join(" ");

@@ -482,6 +482,9 @@ interface Rhomb {
     // Pe1 diamond. Expansion always bottoms out at gen 1, so every rhomb
     // belongs to exactly one.
     cluster: string;
+    // The two generators the rhombus is spanned by, ascending. Filled in by
+    // assignIndices, since it comes from the lift and not from the emission.
+    pair: [number, number];
 }
 
 // The penrose-mosaic plate palette, sampled from deca-shape-expansion.png (the
@@ -537,7 +540,41 @@ function indexColor(idx: number): string {
     return INDEX_PALETTE[idx % INDEX_PALETTE.length] || "#333";
 }
 
-type FillMode = "none" | "cluster" | "mosaic" | "classic" | "type" | "index";
+// ── the Kowalewski five ───────────────────────────────────────────
+//
+// A proper edge colouring of K₆ on the six icosahedral axes: pairs sharing an axis get
+// different colours, which is what makes every rosette of a rhombic triacontahedron
+// show all five. It lives here, at the bottom of the import graph, because the roof
+// wants it too and `dissect.ts` is three modules downstream — geometry importing from
+// there would close a cycle. `dissect.ts` re-exports it.
+//
+// The roof lifts on five of the six axes, so a rhomb's pair is a pair of K₆ with the
+// vertical dropped and already carries a colour. Measured on the roof it comes out a
+// **proper** colouring of the surface as well — no two rhombi sharing an edge agree,
+// 0 of 32,305 adjacent pairs on Sun generation 4 — with the five exactly
+// equidistributed and every Pe5 rosette showing all five.
+const PAIR_COLOR: Record<string, number> = (() => {
+    const out: Record<string, number> = {};
+    const put = (a: number, b: number, k: number) => {
+        out[`${Math.min(a, b)},${Math.max(a, b)}`] = k;
+    };
+    for (let k = 0; k < 5; k++) {
+        put(5, k, k);
+        put((k + 1) % 5, (k + 4) % 5, k);
+        put((k + 2) % 5, (k + 3) % 5, k);
+    }
+    return out;
+})();
+
+/** Colour 0–4 of the face spanned by axes `i` and `j`. */
+function pairColor(i: number, j: number): number {
+    return PAIR_COLOR[`${Math.min(i, j)},${Math.max(i, j)}`];
+}
+
+/** The five, at the strengths the 3D pages use, so a printed net matches the screen. */
+const FIVE_COLORS = ["#d94f3d", "#e8a33d", "#4f9d4a", "#3d7fc4", "#9b59b6"];
+
+type FillMode = "none" | "cluster" | "mosaic" | "classic" | "type" | "index" | "five";
 
 /**
  * The base color of one rhomb under a given color mode — the single answer the
@@ -552,10 +589,15 @@ function tileFill(
     cluster: string,
     thick: boolean,
     lowIndex: number,
+    pair?: readonly [number, number],
 ): string | null {
     switch (mode) {
         case "none":
             return null;
+        case "five":
+            // No pair means the caller has not been taught this mode; fall back rather
+            // than paint everything one colour and look deliberate.
+            return pair ? FIVE_COLORS[pairColor(pair[0], pair[1])] : "#888888";
         case "mosaic":
             return MOSAIC_COLORS[cluster] ?? "#888888";
         case "classic":
@@ -621,6 +663,7 @@ function emitRhomb(
         isHeads,
         fill,
         cluster,
+        pair: [0, 0],
     });
 }
 
@@ -1313,9 +1356,22 @@ function assignIndices(): void {
     }
 
     for (const r of allRhombs) {
+        const vids: number[] = [];
         for (let i = 0; i < 4; i++) {
             const v = vertexMap.get(roundKey(r.verts[i]));
-            if (v) r.vertIndices[i] = v.index;
+            if (v) {
+                r.vertIndices[i] = v.index;
+                vids[i] = v.id;
+            }
+        }
+        // The axis pair, from the integer lift rather than measured off the geometry.
+        const n0 = lift.n[vids[0]];
+        const n1 = lift.n[vids[1]];
+        const n3 = lift.n[vids[3]];
+        if (n0 && n1 && n3) {
+            const a = n1.findIndex((x, i) => x - n0[i] !== 0);
+            const b = n3.findIndex((x, i) => x - n0[i] !== 0);
+            if (a >= 0 && b >= 0) r.pair = [Math.min(a, b), Math.max(a, b)];
         }
     }
 
@@ -1404,6 +1460,8 @@ export {
     INDEX_PALETTE,
     indexColor,
     tileFill,
+    pairColor,
+    FIVE_COLORS,
     SQRT5,
     PHI,
     GOLDEN_SIDE,

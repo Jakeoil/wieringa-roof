@@ -78,7 +78,7 @@ function biasedHeight(u: number): number {
 
 // Face coloring in the tiling view. "Colored by type or by vertex index" was in
 // the original spec and never got built.
-type TileColor = "cluster" | "mosaic" | "classic" | "type" | "index";
+type TileColor = "cluster" | "mosaic" | "classic" | "type" | "index" | "five";
 let tileColor: TileColor = prefs.color as TileColor;
 
 function faceIndexLow(r: Rhomb): number {
@@ -331,8 +331,11 @@ function drawTiling() {
             // Same tileFill the sheets ask, so a mode added in one place cannot
             // quietly go missing in the other. Flat modes stay flat: thick/thin and
             // height already *are* the information, and ramping them muddles it.
-            const base = tileFill(tileColor, r.cluster, r.thick, vi[cLo]) ?? r.fill;
-            if (tileColor === "type" || tileColor === "index") return base;
+            const base = tileFill(tileColor, r.cluster, r.thick, vi[cLo], r.pair) ?? r.fill;
+            // These modes carry their own meaning in the flat colour and must not be
+            // shaded away — the five-colouring least of all, since two rhombi differing
+            // only by shade would read as the same colour.
+            if (tileColor === "type" || tileColor === "index" || tileColor === "five") return base;
             return makeGradient(ctx, base, sv[cLo], sv[cHi], vi[cLo], vi[cHi]);
         };
         // The search's own colors — yellow placed, red rejected, violet current —
@@ -690,6 +693,7 @@ function netAsPlaced(): Map<number, Placed> {
         m.set(nr.sourceId, {
             faceId: nr.sourceId,
             thick: src.thick,
+            pair: src.pair,
             cluster: src.cluster,
             poly: nr.poly,
             verts: nr.verts,
@@ -1168,6 +1172,7 @@ function asPlaced(nr: NetRhomb): Placed {
     return {
         faceId: nr.sourceId,
         thick: src.thick,
+        pair: src.pair,
         cluster: src.cluster,
         poly: nr.poly,
         verts: nr.verts,
@@ -1405,7 +1410,7 @@ function drawNet() {
         const [nLo, nHi] = extremeCorners(nvi);
         ctx.fillStyle = makeGradient(
             ctx,
-            tileFill(tileColor, src.cluster, src.thick, nvi[nLo]) ?? src.fill,
+            tileFill(tileColor, src.cluster, src.thick, nvi[nLo], src.pair) ?? src.fill,
             { x: sv[nLo].x, y: sv[nLo].y },
             { x: sv[nHi].x, y: sv[nHi].y },
             nvi[nLo],
@@ -3021,6 +3026,7 @@ function buildControls() {
         ["classic", "Mosaic classic"],
         ["type", "Thick / thin"],
         ["index", "Height index"],
+        ["five", "Kowalewski five"],
     ] as Array<[TileColor, string]>) {
         const opt = document.createElement("option");
         opt.value = v;

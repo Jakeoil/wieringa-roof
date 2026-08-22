@@ -14,6 +14,7 @@
 // finds one by backtracking rather than pretending it is canonical.
 
 import { A6 } from "./centers.js";
+import { pairColor } from "./geometry.js";
 import type { V3 } from "./solids.js";
 
 export interface Cell {
@@ -298,23 +299,9 @@ export { allDissections };
 //
 // Construction: the pentagon 0–4 with axis 5 at the centre. Colour k matches 5 with k
 // and the two pairs straddling k.
-const PAIR_COLOR: Record<string, number> = (() => {
-    const out: Record<string, number> = {};
-    const put = (a: number, b: number, k: number) => {
-        out[`${Math.min(a, b)},${Math.max(a, b)}`] = k;
-    };
-    for (let k = 0; k < 5; k++) {
-        put(5, k, k);
-        put((k + 1) % 5, (k + 4) % 5, k);
-        put((k + 2) % 5, (k + 3) % 5, k);
-    }
-    return out;
-})();
-
-/** Colour 0–4 of the face spanned by axes `i` and `j`. */
-export function pairColor(i: number, j: number): number {
-    return PAIR_COLOR[`${Math.min(i, j)},${Math.max(i, j)}`];
-}
+// The colouring itself lives in `geometry.ts`, at the bottom of the import graph, so
+// the roof and the printed nets can reach it without closing a cycle back through here.
+export { pairColor };
 
 /** Colour 0–4 of face `f` of a cell. Faces `2q` and `2q+1` are the opposite pair
  *  perpendicular to the cell's `q`-th edge, and are spanned by the other two axes —
