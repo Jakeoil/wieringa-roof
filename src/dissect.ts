@@ -276,42 +276,42 @@ export function dissection(kind: DissectionKind = "chiral"): Cell[] {
 /** All 160, for counting. */
 export { allDissections };
 
-// ── the five-colouring ────────────────────────────────────────────
+// ── the five-coloring ────────────────────────────────────────────
 //
 // Each face of the triacontahedron is spanned by a **pair** of the six axes, and the
 // five faces around a five-valent vertex are exactly the five pairs containing that
-// vertex's axis. So "every rosette shows all five colours" says that pairs sharing an
-// axis must differ — which is a **proper edge colouring of K₆**, and K₆ needs exactly
-// five colours (χ′(K₂ₙ) = 2n − 1). A colour class is then a perfect matching, three
+// vertex's axis. So "every rosette shows all five colors" says that pairs sharing an
+// axis must differ — which is a **proper edge coloring of K₆**, and K₆ needs exactly
+// five colors (χ′(K₂ₙ) = 2n − 1). A color class is then a perfect matching, three
 // pairs each, five classes covering all fifteen.
 //
 // Everything Jeff described follows without being imposed:
 //
-//   * opposite faces of the solid share an axis pair, so they share a colour;
+//   * opposite faces of the solid share an axis pair, so they share a color;
 //   * a cell's six faces come in three opposite pairs, one per axis pair of its triple,
-//     so **opposite faces of a hexahedron are the same colour** — automatic, not a
+//     so **opposite faces of a hexahedron are the same color** — automatic, not a
 //     constraint;
 //   * the three pairs of a triple share an axis pairwise, so a cell shows exactly
-//     **three distinct colours**;
+//     **three distinct colors**;
 //   * and there are C(5,3) = 10 such triples, borne once by an acute cell and once by
 //     an obtuse one. That is the labelling of the classical Kowalewski puzzle, whose
-//     colour-matching assemblies George Hart counts at 320.
+//     color-matching assemblies George Hart counts at 320.
 //
-// Construction: the pentagon 0–4 with axis 5 at the centre. Colour k matches 5 with k
+// Construction: the pentagon 0–4 with axis 5 at the center. Color k matches 5 with k
 // and the two pairs straddling k.
-// The colouring itself lives in `geometry.ts`, at the bottom of the import graph, so
+// The coloring itself lives in `geometry.ts`, at the bottom of the import graph, so
 // the roof and the printed nets can reach it without closing a cycle back through here.
 export { pairColor };
 
-/** Colour 0–4 of face `f` of a cell. Faces `2q` and `2q+1` are the opposite pair
+/** Color 0–4 of face `f` of a cell. Faces `2q` and `2q+1` are the opposite pair
  *  perpendicular to the cell's `q`-th edge, and are spanned by the other two axes —
- *  which is why they come out the same colour. */
+ *  which is why they come out the same color. */
 export function faceColor(c: Cell, f: number): number {
     const q = f >> 1;
     return pairColor(c.triple[(q + 1) % 3], c.triple[(q + 2) % 3]);
 }
 
-/** The three colours a cell wears, sorted — one of the ten 3-subsets of five. */
+/** The three colors a cell wears, sorted — one of the ten 3-subsets of five. */
 export function cellColors(c: Cell): number[] {
     return [0, 2, 4].map((f) => faceColor(c, f)).sort((a, b) => a - b);
 }
@@ -320,7 +320,7 @@ export function cellColors(c: Cell): number[] {
 
 export interface ShellFace {
     corners: [V3, V3, V3, V3];
-    /** the two axes the face is spanned by — which is what gives it its colour */
+    /** the two axes the face is spanned by — which is what gives it its color */
     i: number;
     j: number;
     /** on the solid's own surface, rather than inside it. Exactly the faces belonging
@@ -341,7 +341,7 @@ export interface ShellFace {
 /**
  * The thirty faces of the triacontahedron itself, each with the axis pair that spans
  * it. Built here rather than taken from `solids.ts` because the pair is the point: it
- * is what the five-colouring keys on, and a bare list of corners has lost it.
+ * is what the five-coloring keys on, and a bare list of corners has lost it.
  *
  * Note this is the **shell** only. The cage on the page is a different and larger
  * thing — see `cageFaces`.

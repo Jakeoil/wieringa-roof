@@ -62,31 +62,31 @@ for (let s = 0; s < 300000; s++) {
 if (none) fail(`${none} of ${tested} interior points in no cell`);
 if (many) fail(`${many} of ${tested} interior points in more than one cell`);
 
-// 7 · the five-colouring is a proper edge colouring of K6
+// 7 · the five-coloring is a proper edge coloring of K6
 let rosetteBad = 0;
 for (let i = 0; i < 6; i++) {
     const seen = new Set();
     for (let j = 0; j < 6; j++) if (i !== j) seen.add(pairColor(i, j));
     if (seen.size !== 5) rosetteBad++;
 }
-if (rosetteBad) fail(`${rosetteBad} of 6 rosettes do not show all five colours`);
+if (rosetteBad) fail(`${rosetteBad} of 6 rosettes do not show all five colors`);
 
-// 8 · opposite faces of every cell share a colour, and each cell wears three
+// 8 · opposite faces of every cell share a color, and each cell wears three
 let oppBad = 0, triBad = 0;
 for (const c of cells) {
     for (let q = 0; q < 3; q++) if (faceColor(c, 2*q) !== faceColor(c, 2*q+1)) oppBad++;
     if (new Set(cellColors(c)).size !== 3) triBad++;
 }
-if (oppBad) fail(`${oppBad} opposite face pairs differ in colour`);
-if (triBad) fail(`${triBad} cells do not wear exactly three colours`);
+if (oppBad) fail(`${oppBad} opposite face pairs differ in color`);
+if (triBad) fail(`${triBad} cells do not wear exactly three colors`);
 
 // 9 · the ten acute and the ten obtuse carry the same ten 3-subsets, C(5,3) = 10
 const sigA = new Set(acute.map((c) => cellColors(c).join("")));
 const sigB = new Set(obtuse.map((c) => cellColors(c).join("")));
-if (sigA.size !== 10 || sigB.size !== 10) fail(`colour-triples: ${sigA.size} acute, ${sigB.size} obtuse, expected 10 each`);
-if ([...sigA].sort().join("|") !== [...sigB].sort().join("|")) fail("acute and obtuse carry different colour-triple sets");
+if (sigA.size !== 10 || sigB.size !== 10) fail(`color-triples: ${sigA.size} acute, ${sigB.size} obtuse, expected 10 each`);
+if ([...sigA].sort().join("|") !== [...sigB].sort().join("|")) fail("acute and obtuse carry different color-triple sets");
 
-console.log(`five-colouring: all 6 rosettes show all 5 · opposite faces agree · ${sigA.size} colour-triples on each family, the same ten`);
+console.log(`five-coloring: all 6 rosettes show all 5 · opposite faces agree · ${sigA.size} color-triples on each family, the same ten`);
 console.log(`20 cells: ${acute.length} acute at ${acute[0].volume.toFixed(6)}, ${obtuse.length} obtuse at ${obtuse[0].volume.toFixed(6)}, ratio ${ratio.toFixed(9)}`);
 console.log(`total volume ${total.toFixed(6)} = 4√(5+2√5) = ${RT_VOLUME.toFixed(6)}`);
 console.log(`${tested} interior points sampled: all in exactly one cell` + (none || many ? " — NO" : ""));

@@ -48,7 +48,7 @@ touching the net and each is unfolded across the shared edge. Hovering shows eve
 landing place a rhomb could take, green where it lands clean and red where every
 route from there overlaps, so the dead ends are visible before you commit; clicking
 an edge rather than the rhomb names the hinge. Overlaps are allowed anyway, alt-click
-removes, ⌘Z steps back, and the net is oriented and centred on the sheet
+removes, ⌘Z steps back, and the net is oriented and centered on the sheet
 automatically.
 
 **Watch an algorithm**: replay any of the three methods with transport controls.
@@ -79,7 +79,7 @@ vertex `Σ n_j ζ^j` lifts to `Σ n_j E_j`. From that:
 Three, selectable on the net page:
 
 - **Widened ribbons** (default) — take the longest de Bruijn ribbon as a backbone,
-  then accrete neighbours onto it. Gathers 80–90% of a patch into one piece.
+  then accrete neighbors onto it. Gathers 80–90% of a patch into one piece.
 - **BFS** — spread outward in rings from a seed. Fewest pieces overall, but more
   evenly sized, so more real joins.
 - **Ribbon strips** — pure de Bruijn ribbons. Every crease in a strip is parallel
@@ -104,4 +104,4 @@ seed without five-fold symmetry, having instead a single mirror axis.
 
 The recursive P1 expansion is ported from
 [penrose-mosaic](https://github.com/Jakeoil/penrose-mosaic), including the
-star/boat/diamond cluster colours and the isogloss contour lines.
+star/boat/diamond cluster colors and the isogloss contour lines.

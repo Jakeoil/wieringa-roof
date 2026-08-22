@@ -76,7 +76,7 @@ rim.position.set(-6, 4, -2);
 scene.add(rim);
 
 // A face of the shared body lies on a plane of one parent or the other — or, where the
-// two coincide, of both. Colouring by that says at a glance which solid is doing the
+// two coincide, of both. Coloring by that says at a glance which solid is doing the
 // cutting, and the split is always even, as central symmetry requires.
 const FROM_A = new THREE.Color(0x3d7fc4);
 const FROM_B = new THREE.Color(0xd98d3a);
@@ -225,7 +225,7 @@ function build(): void {
     const byParent: Record<string, number> = {};
     for (const f of r.faces) byParent[f.from] = (byParent[f.from] ?? 0) + 1;
     statusEl.textContent =
-        `centres ${Math.hypot(t[0], t[1], t[2]).toFixed(4)} apart${at} · ` +
+        `centers ${Math.hypot(t[0], t[1], t[2]).toFixed(4)} apart${at} · ` +
         `shared ${r.volume.toFixed(6)} of ${RT_VOLUME.toFixed(6)} ` +
         `(${((100 * r.volume) / RT_VOLUME).toFixed(2)}%) · ` +
         `${r.vertices} vertices, ${r.faces.length} faces ` +

@@ -1,172 +1,112 @@
-// Chapter 4, part 4 — the roof as the boundary of a layer of golden rhombohedra.
+// Chapter 4, part 4 — the roof as the boundary of a layer of golden hexahedra.
 //
-// The local fact is exact and is not in doubt (jake/Triacontrahedrons are golden.md):
-// every generator pair meets at 63.4349° or 116.5651°, so **any three** of the five
-// lifting axes span a golden rhombohedron, and every roof rhomb is a face of one. The
-// open question there is global — *"which third edge vector is chosen for each cell"* —
-// and that is what this module attempts.
+// **One hexahedron per rhomb, and there is no choice to make.** A roof rhomb spans two
+// of the five lifting axes; the third edge of its cell is the **vertical**, which is the
+// sixth icosahedral axis. Every generator satisfies `|E_j| = 1` and `E_j · e_z = 1/√5`
+// exactly, so `{E_j, E_k, e_z}` is a golden rhombohedron like any other triple of the
+// six — and the cell hangs straight down from the rhomb rather than leaning along some
+// other generator.
 //
-// A rhomb spans axes {j,k}; extruding it by −E_l for one of the three remaining axes
-// puts a cell directly beneath it. Every generator points up, all sharing z = +1/√5, so
-// −E_l is the only way down. The choice of l is free per rhomb, and the cells must not
-// overlap.
+// Everything follows from that:
 //
-// **It does not close.** Greedily, about 57% of rhombi can be given a cell; the rest
-// have no free choice left. That is measured, not proved — a greedy assignment is not a
-// proof of impossibility — but it is the honest state of the question, and it matches
-// the file's own guess that the answer would be "almost" rather than "exactly".
+//   * **thick → acute, thin → obtuse.** For a thick rhomb `E_j · E_k = +1/√5`, so all
+//     three pairwise dots are positive and the cell is the prolate one, volume 0.760845.
+//     For a thin rhomb the pair dot is negative and the cell is oblate, 0.470228. So the
+//     acute-to-obtuse ratio is the thick-to-thin ratio, which tends to φ.
+//   * **The cells never overlap, by construction rather than by search.** Each is a
+//     vertical prism under its own rhomb, and the rhombi project to a tiling of the
+//     plane — disjoint shadows, therefore disjoint prisms, whatever their heights.
+//   * **The lower surface is the roof itself, translated down by `e_z`.** The bottom
+//     faces are the top faces moved one unit vertically, so the second Penrose surface
+//     beneath is congruent to the first and exactly parallel to it.
+//
+// An earlier version of this module searched for a third axis among the other four
+// generators and got 57% coverage by greedy assignment. That was the wrong question:
+// the third axis is the vertical one, and the answer is complete and forced.
 
 import { allRhombs, vertexMap, roundKey, computeLift, pos3D, E5 } from "./geometry.js";
 import type { V3 } from "./geometry.js";
 
+/** Volume of the parallelepiped on three edge vectors. */
+const det3 = (e: [V3, V3, V3]): number =>
+    e[0][0] * (e[1][1] * e[2][2] - e[1][2] * e[2][1]) -
+    e[0][1] * (e[1][0] * e[2][2] - e[1][2] * e[2][0]) +
+    e[0][2] * (e[1][0] * e[2][1] - e[1][1] * e[2][0]);
+
+/** The vertical — the sixth icosahedral axis, and the one the roof surface never uses. */
+export const EZ: V3 = [0, 0, 1];
+
 export interface HexCell {
-    /** the roof rhomb this cell hangs from */
+    /** the roof rhomb it hangs from, one to one */
     rhomb: number;
-    /** the three axes it is spanned by */
-    triple: [number, number, number];
-    /** centre, and the three half-edge vectors */
+    /** the two lifting axes of that rhomb; the third edge is always `EZ` */
+    pair: [number, number];
     center: V3;
     e: [V3, V3, V3];
     corners: V3[];
     faces: V3[][];
+    /** prolate for a thick rhomb, oblate for a thin one */
     acute: boolean;
+    volume: number;
 }
 
 export interface HexLayer {
     cells: HexCell[];
-    /** rhombi that got a cell, by rhomb id */
-    covered: Set<number>;
-    total: number;
-}
-
-const dot = (a: V3, b: V3) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
-const cross = (a: V3, b: V3): V3 => [
-    a[1] * b[2] - a[2] * b[1],
-    a[2] * b[0] - a[0] * b[2],
-    a[0] * b[1] - a[1] * b[0],
-];
-const sub = (a: V3, b: V3): V3 => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
-
-/** Interiors only — cells of a layer are meant to meet along faces. */
-function disjoint(P: HexCell, Q: HexCell): boolean {
-    const axes: V3[] = [];
-    for (const p of [P, Q]) for (let i = 0; i < 3; i++) axes.push(cross(p.e[i], p.e[(i + 1) % 3]));
-    for (const u of P.e) for (const v of Q.e) axes.push(cross(u, v));
-    const d = sub(Q.center, P.center);
-    for (const L of axes) {
-        const n = Math.hypot(L[0], L[1], L[2]);
-        if (n < 1e-12) continue;
-        const u: V3 = [L[0] / n, L[1] / n, L[2] / n];
-        const r1 = P.e.reduce((s, e) => s + Math.abs(dot(e, u)), 0);
-        const r2 = Q.e.reduce((s, e) => s + Math.abs(dot(e, u)), 0);
-        if (Math.abs(dot(d, u)) > r1 + r2 - 1e-7) return true;
-    }
-    return false;
-}
-
-function makeCell(rhomb: number, m: number[], triple: [number, number, number]): HexCell {
-    const base = pos3D(m);
-    const e = triple.map((a) => E5[a].map((x) => x / 2) as V3) as [V3, V3, V3];
-    const center: V3 = [0, 1, 2].map((d) => base[d] + e[0][d] + e[1][d] + e[2][d]) as V3;
-    const corners: V3[] = [];
-    for (let b = 0; b < 8; b++) {
-        const p: V3 = [...center];
-        for (let q = 0; q < 3; q++) {
-            const s = b & (1 << q) ? 1 : -1;
-            for (let d = 0; d < 3; d++) p[d] += s * e[q][d];
-        }
-        corners.push(p);
-    }
-    const faces: V3[][] = [];
-    for (let q = 0; q < 3; q++) {
-        const [u, v] = [0, 1, 2].filter((x) => x !== q).map((x) => e[x]);
-        for (const s of [1, -1]) {
-            const o: V3 = [
-                center[0] + s * e[q][0],
-                center[1] + s * e[q][1],
-                center[2] + s * e[q][2],
-            ];
-            faces.push([
-                [o[0] - u[0] - v[0], o[1] - u[1] - v[1], o[2] - u[2] - v[2]],
-                [o[0] + u[0] - v[0], o[1] + u[1] - v[1], o[2] + u[2] - v[2]],
-                [o[0] + u[0] + v[0], o[1] + u[1] + v[1], o[2] + u[2] + v[2]],
-                [o[0] - u[0] + v[0], o[1] - u[1] + v[1], o[2] - u[2] + v[2]],
-            ]);
-        }
-    }
-    // Acute when the three axes are pairwise adjacent in the five-fold order — the same
-    // sign-of-the-dot-products test the triacontahedron's cells use, read off the gaps.
-    const gaps = [
-        [0, 1],
-        [0, 2],
-        [1, 2],
-    ]
-        .map(([x, y]) => {
-            const a = triple[x];
-            const b = triple[y];
-            return Math.min((a - b + 5) % 5, (b - a + 5) % 5);
-        })
-        .sort()
-        .join("");
-    return { rhomb, triple, center, e, corners, faces, acute: gaps === "111" || gaps === "122" };
+    acute: number;
+    obtuse: number;
+    /** the roof's own faces, translated down by `e_z` — the surface underneath */
+    floor: V3[][];
 }
 
 /**
- * A layer of cells hung beneath the roof, one per rhomb where one will fit.
+ * The layer under the current patch. Call after `generatePatch()`.
  *
- * Greedy, most-constrained first. Call after `generatePatch()`.
+ * Linear in the rhomb count, with nothing to search: every rhomb gets exactly one cell.
  */
 export function hexLayer(): HexLayer {
     const lift = computeLift();
-    const options: HexCell[][] = allRhombs.map((r) => {
-        const vids = r.verts.map((pt) => vertexMap.get(roundKey(pt))!.id);
-        const nlo = vids
-            .map((v) => lift.n[v]!)
-            .reduce((a, b) => a.map((x, i) => Math.min(x, b[i])));
-        const [j, k] = r.pair;
-        const out: HexCell[] = [];
-        for (let l = 0; l < 5; l++) {
-            if (l === j || l === k) continue;
-            const m = nlo.slice();
-            m[l]--;
-            out.push(makeCell(r.id, m, [j, k, l]));
-        }
-        return out;
-    });
-
-    const order = allRhombs.map((_, i) => i).sort((a, b) => options[a].length - options[b].length);
     const cells: HexCell[] = [];
-    const covered = new Set<number>();
-    // Bucketed, because the naive check is quadratic and a generation-4 patch would ask
-    // for a hundred million comparisons. A cell reaches at most 1.192 from its centre,
-    // so nothing outside the neighbouring cells of a 2.5 grid can touch it.
-    const CELL = 2.5;
-    const grid = new Map<string, HexCell[]>();
-    const keyOf = (c: V3) =>
-        `${Math.floor(c[0] / CELL)},${Math.floor(c[1] / CELL)},${Math.floor(c[2] / CELL)}`;
-    const near = (c: HexCell): HexCell[] => {
-        const [a, b, d] = [0, 1, 2].map((i) => Math.floor(c.center[i] / CELL));
-        const out: HexCell[] = [];
-        for (let x = a - 1; x <= a + 1; x++)
-            for (let y = b - 1; y <= b + 1; y++)
-                for (let z = d - 1; z <= d + 1; z++) {
-                    const hit = grid.get(`${x},${y},${z}`);
-                    if (hit) out.push(...hit);
-                }
-        return out;
-    };
-    for (const i of order) {
-        for (const c of options[i]) {
-            if (near(c).every((p) => disjoint(p, c))) {
-                cells.push(c);
-                covered.add(c.rhomb);
-                const k = keyOf(c.center);
-                const cur = grid.get(k);
-                if (cur) cur.push(c);
-                else grid.set(k, [c]);
-                break;
-            }
+    const floor: V3[][] = [];
+    let acute = 0;
+
+    for (const r of allRhombs) {
+        const vids = r.verts.map((pt) => vertexMap.get(roundKey(pt))!.id);
+        const top = vids.map((v) => pos3D(lift.n[v]!));
+        const bottom = top.map((p) => [p[0], p[1], p[2] - 1] as V3);
+        floor.push(bottom);
+
+        // The three edge vectors, at full length: two lifting axes and the vertical.
+        // Each is a unit vector, and all three pairwise dots are ±1/√5, which is what
+        // makes the cell a golden rhombohedron.
+        const [j, k] = r.pair;
+        const e: [V3, V3, V3] = [E5[j], E5[k], [0, 0, -1]];
+        const center: V3 = [
+            (top[0][0] + top[2][0]) / 2,
+            (top[0][1] + top[2][1]) / 2,
+            (top[0][2] + top[2][2]) / 2 - 0.5,
+        ];
+        // The six faces: the rhomb on top, its translate beneath, and four vertical
+        // sides. The sides stand perpendicular to the horizontal plane, with their edges
+        // running straight down — which is what makes the cell a prism and the shadows
+        // disjoint.
+        const faces: V3[][] = [top, bottom];
+        for (let i = 0; i < 4; i++) {
+            const a = top[i];
+            const b = top[(i + 1) % 4];
+            faces.push([a, b, [b[0], b[1], b[2] - 1], [a[0], a[1], a[2] - 1]]);
         }
+        const corners = [...top, ...bottom];
+        if (r.thick) acute++;
+        cells.push({
+            rhomb: r.id,
+            pair: [j, k],
+            center,
+            e,
+            corners,
+            faces,
+            acute: r.thick,
+            volume: Math.abs(det3(e)),
+        });
     }
-    return { cells, covered, total: allRhombs.length };
+    return { cells, acute, obtuse: cells.length - acute, floor };
 }

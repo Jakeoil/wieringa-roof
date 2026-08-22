@@ -4,7 +4,7 @@
 //
 // Six checks. The last is the one that matters most: the bucketed search must agree
 // with a plain O(n^2) sweep exactly, not merely approximately, because a grid that
-// misses a neighbour fails silently and looks like a finding.
+// misses a neighbor fails silently and looks like a finding.
 
 import { seedTypes, generatePatch, allRhombs } from "../dist/geometry.js";
 import { triacontahedra, RHO, A6 } from "../dist/centers.js";
@@ -55,10 +55,10 @@ for (const seed of seedTypes.map((s) => s.label)) {
             fail(patch, `on-roof contacts ${onRoof.length} against ${shared.size} shared rhombi`);
         }
 
-        // 4 · and they kiss at that rhomb's own centre
+        // 4 · and they kiss at that rhomb's own center
         let kissErr = 0;
         for (const c of p.contacts) if (c.onRoof !== null) kissErr = Math.max(kissErr, d3(c.at, cen.byRhomb[c.onRoof].c));
-        if (kissErr > 1e-9) fail(patch, `kiss point ${kissErr.toExponential(1)} off the rhomb centre`);
+        if (kissErr > 1e-9) fail(patch, `kiss point ${kissErr.toExponential(1)} off the rhomb center`);
 
         // 5 · coordination is only ever 0, 2, 3 or 4
         const bad = p.degree.filter((d) => ![0, 2, 3, 4].includes(d));

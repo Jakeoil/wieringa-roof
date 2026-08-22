@@ -28,7 +28,7 @@ export interface RoofFaceInfo {
     cluster: string;
     /** the two generators the rhombus is spanned by, ascending. The roof lifts on five
      *  of the six icosahedral axes, so this is a pair of K₆ with the sixth — the
-     *  vertical — never used, which is what lets the triacontahedron's five-colouring
+     *  vertical — never used, which is what lets the triacontahedron's five-coloring
      *  be read straight off it. */
     pair: [number, number];
 }

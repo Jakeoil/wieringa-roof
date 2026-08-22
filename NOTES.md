@@ -10,7 +10,7 @@ the project *is*; this is what we have argued about and what is still unsettled.
 Settings are stored with the build id that wrote them, and a different build starts
 from the defaults. Field-by-field validation catches a value whose *type* changed but
 not one whose *meaning* moved — a mode that no longer exists, a key renamed from
-colour to color, a generation that now means one more than it did. Those restore
+color to color, a generation that now means one more than it did. Those restore
 silently and wrongly, and the symptom is a page misbehaving for one person and nobody
 else. While the pages are still changing shape, losing a few dial positions on deploy
 is the cheaper mistake.
@@ -159,7 +159,7 @@ measurement and the symptom are looking at different things.
 
 Hence the diagnostics now in place: every build stamps `src/build-id.ts` and the
 workbench logs it, so a stale script is one glance to spot; and `generate()`
-reports colour mode, shade depth, index range and the equal-stop count **for both
+reports color mode, shade depth, index range and the equal-stop count **for both
 canvases**.
 
 **Done:** isogloss contours are on the workbench too, drawn on both canvases and
@@ -184,9 +184,9 @@ first is an icon designer, and `src/favicon.ts` is shared with
 previews it — an icon disagreeing with its preview is worse than no preview.
 
 **An unfolding makes a good favicon because it is sparse.** At sixteen pixels only
-silhouette and colour survive. Queen generation 1 unfolds to ten rhombi filling 47%
+silhouette and color survive. Queen generation 1 unfolds to ten rhombi filling 47%
 of their own bounding box, and that spidery outline still reads when the individual
-rhombi do not. Two colours only, since gen-1 Queen is `Pe1` and `Pe3` with no `Pe5`.
+rhombi do not. Two colors only, since gen-1 Queen is `Pe1` and `Pe3` with no `Pe5`.
 
 The page swaps its **own** `<link rel="icon">` on demand, which is the only honest
 preview: a browser rendering an icon at 16 px does not look like a 16 px image sitting
@@ -198,7 +198,7 @@ look rather than a correctness question.
 
 ## Sun and Star: the three wholes
 
-`Deca` is now labelled **Queen**, and two 5-fold composites join it. Both are
+`Deca` is now labeled **Queen**, and two 5-fold composites join it. Both are
 specified by what they *emit*, since the star family emits nothing:
 
 | | composition | gen 1 | 5-fold | mirrors | disc fill (gen 1/2/3) |
@@ -225,8 +225,8 @@ contribution and the reason the figure fills where St5 does not.
 
 ### Read the arrangement, do not derive it
 
-Both were read off a real tiling — centred on a `Pe5`, the neighbours at radius
-14.414 are exactly five `Pe3`; centred on an `St5`, radius 14.414 holds five `Pe1`
+Both were read off a real tiling — centered on a `Pe5`, the neighbors at radius
+14.414 are exactly five `Pe3`; centered on an `St5`, radius 14.414 holds five `Pe1`
 and radius 23.322 holds five `Pe3` beside five `St3`.
 
 But **only the arrangement transfers, not the orientations.** The tiles around a
@@ -247,7 +247,7 @@ Every ring of the Star was placed at the right *position* with the wrong
 *orientation*. At generation 1 that was invisible: the boats emit no rhombs, so the
 only symptom was a P1 overlap nobody was looking at. From generation 2 the boats
 emit, and the figure came apart — 30 duplicate rhombs, and a growing hole where the
-centre should fill in.
+center should fill in.
 
 **The check that found it was P1 tile overlap**, not rhomb duplication. Rhombs can
 be perfectly disjoint while the tiles that produced them overlap, because a tile
@@ -314,7 +314,7 @@ pentagon circumradius == rhomb edge length
 ```
 
 which puts adjacent pentagons exactly two apothems apart, edge to edge, as P1
-requires. Measured: circumradius 8.9081 against rhomb edge 8.9081, centre-to-centre
+requires. Measured: circumradius 8.9081 against rhomb edge 8.9081, center-to-center
 14.4137 against 2 × apothem 14.4137.
 
 **Verified: no P1 tile overlaps another**, on every seed at generations 2 and 3 —
@@ -327,7 +327,7 @@ requires. Measured: circumradius 8.9081 against rhomb edge 8.9081, centre-to-cen
 rhombs from the five pentagons. The right-hand panel shows none of it. That is the
 "Star contains St5, with bigger cracks" claim, visible.
 
-It also settles what sits at the centre of a Star: **a star-shaped gap**, not five
+It also settles what sits at the center of a Star: **a star-shaped gap**, not five
 diamonds meeting at a point.
 
 A useful thing fell out: `Pe5` gen 2 is six pentagons and *zero* gap tiles, so its
@@ -350,7 +350,7 @@ middle of the travel it is zero and the shading is simply gone; every position i
 between gets its share, and no control can contradict the geometry.
 
 Within a patch the ramp is signed about **mid-height**, not about the bottom:
-`t = ((idx − lo)/span − 0.5) × 2`, so the middle of the range keeps its own colour
+`t = ((idx − lo)/span − 0.5) × 2`, so the middle of the range keeps its own color
 and only the extremes move — lighter above, darker below. Flip is applied to the
 index first, so inverting the roof inverts the shading with it rather than leaving
 the highlights on what are now the low points.
@@ -400,7 +400,7 @@ boat and diamond.
 
 What confused it: the rhombs a `Pe` tile carries at generation 1 *resemble* the
 `St` tiles — `Pe5`'s make a star outline, `Pe3`'s a boat, `Pe1`'s a diamond — so
-the cluster colours were named for the shapes they look like. Formally they are
+the cluster colors were named for the shapes they look like. Formally they are
 `Pe*`. The measurement agrees and now makes sense: `Pe5`'s convex hull is a regular
 pentagon at every generation because `Pe5` *is* a pentagon; its star look comes
 from the rhomb overlay reaching past the hull.
@@ -411,7 +411,7 @@ are offered on every page: `Pe5`/`Pe3`/`Pe1` pentagons, `St5` star, `St3` boat,
 
 Two further facts from Jeff worth keeping: the `St*` tiles emit **no rhombs at
 generation 1** and first contribute a generation later; and the three `Pe` groups
-constitute three new shapes that tile the plane periodically, a colouring he
+constitute three new shapes that tile the plane periodically, a coloring he
 doubts he was first to find. Mapping the full correspondence needs the gen-3 rhombs
 of `St*` as well as of `Pe*` — the `Pe*` alone are not sufficient.
 
@@ -464,13 +464,13 @@ The **side is always the rhombus edge**, never a diagonal. At 1 in the diagonals
 1.7013 in and 1.0515 in.
 
 The help text on `unfold.html` went on advertising 1.118" long after the code
-changed, which is worse than a stale comment: it is a visible claim about behaviour,
+changed, which is worse than a stale comment: it is a visible claim about behavior,
 and it fooled me into repeating it in PLAN.md and telling Jeff the default still
 needed changing when it had been right all along. Prose that states a default has to
 be checked against the default.
 
 `GOLDEN_SIDE = √5/2` remains in `geometry.ts`, but that is the tiling's internal
-planar unit and has nothing to do with print size — the development normalises every
+planar unit and has nothing to do with print size — the development normalizes every
 edge to exactly 1 and `renderSheet` scales by the requested side. `sheets.html` uses
 1 in for every generation-2 model, so the two pages agree.
 
@@ -811,7 +811,7 @@ candidates are built (`enforceSaddles`) rather than left for the search to
 rediscover by luck.
 
 **3. The move set was one-sided.** Every move added a cut. But when two overlapping
-faces are neighbours in the tiling across an edge that is currently *cut*, they got
+faces are neighbors in the tiling across an edge that is currently *cut*, they got
 where they are by different routes and collided — and the sharp fix is the
 opposite move: make that edge a **hinge**, which removes the overlap by
 construction, since hinged faces cannot overlap. Removing an edge from a spanning
@@ -895,7 +895,7 @@ net on screen so the control still works. Whoever picks this up should start the
 Interim step before Stage B, and the visualization asked for. Where the net wraps
 over itself it need not be cut — the offending faces can climb a level, which is
 the next sheet of the Riemann surface in complex analysis and the next sheet of
-paper here. `assignLayers` colours the overlap graph (greedy, most-constrained
+paper here. `assignLayers` colors the overlap graph (greedy, most-constrained
 first), so **every layer is flat by construction**. Almost everything stays on
 layer 0; only the branch points climb.
 
@@ -948,7 +948,7 @@ triacontahedron's volume exactly. Their volumes stand in the ratio φ, and each
 solid has a single dihedral angle throughout — unusual, and what makes them so
 easy to build.
 
-Both are on `polyhedra.html`, turnable, in the same colours and contours as the
+Both are on `polyhedra.html`, turnable, in the same colors and contours as the
 roof.
 
 ## Known and deliberate
@@ -956,7 +956,7 @@ roof.
 - **Gen 5 is on the 3D page but not Net.** The unfolding methods take 1.2–2.5 s at
   5,719 rhombi against 48–76 ms at gen 4.
 - **`Pe5` closes the loop exactly; `Pe3` and `Pe1` do not — and the reason is the
-  substitution's symmetry.** Each pentagon expands to a blue centre with five
+  substitution's symmetry.** Each pentagon expands to a blue center with five
   petals, but only Pe5's petals are all alike: blue + 5 yellow, against Pe3's
   3 yellow + 2 orange and Pe1's 1 yellow + 4 orange. The rules say the same thing —
   `Pe5` has `twist [0,0,0,0,0]` and no diamonds, so its substitution is unchanged
@@ -1102,7 +1102,7 @@ where their order was obvious:
 ### What chapter 3 measured
 
 `src/packing.ts`, checked by `tools/packing.mjs` — six checks over all 27 patches,
-including that the bucketed neighbour search agrees with a plain O(n²) sweep exactly.
+including that the bucketed neighbor search agrees with a plain O(n²) sweep exactly.
 
 - **One radius, not fitted.** ρ = √(1 + 2/√5), the triacontahedron's insphere, tangent
   to the roof at the exact center of every rhomb its solid carries.

@@ -1,4 +1,4 @@
-// Open question 2a: two RT centres one axis apart (separation exactly 1 edge length,
+// Open question 2a: two RT centers one axis apart (separation exactly 1 edge length,
 // not 2rho). Is the one-face partner just an edge effect?
 import { seedTypes, generatePatch, allRhombs, edgeMap } from "../../dist/geometry.js";
 import { triacontahedra, A6, centerOf } from "../../dist/centers.js";
@@ -8,7 +8,7 @@ for (const [seed, gen] of [["Sun", 3], ["Sun", 4], ["Star", 4]]) {
     generatePatch(seedTypes.findIndex((s) => s.label === seed), true, gen);
     const c = triacontahedra(); console.log = q;
     const byM = new Map(); for (const s of c.solids) byM.set(K(s.m), s);
-    // a shift by one axis a_i is m -> m + 2*e_i  (centres are half-lattice, all odd)
+    // a shift by one axis a_i is m -> m + 2*e_i  (centers are half-lattice, all odd)
     const pairs = [];
     for (const s of c.solids) {
         for (let i = 0; i < 6; i++) {
@@ -33,7 +33,7 @@ for (const [seed, gen] of [["Sun", 3], ["Sun", 4], ["Star", 4]]) {
             if (one.homeCount > 0) homeOnes++;
         }
     }
-    console.log(`${seed} gen ${gen}: ${pairs.length} centre pairs one axis apart, separation ${[...lens].join("/")}`);
+    console.log(`${seed} gen ${gen}: ${pairs.length} center pairs one axis apart, separation ${[...lens].join("/")}`);
     console.log(`   face counts: ${Object.entries(sizes).sort().map(([k,v])=>`${k}:${v}`).join("  ")}`);
     console.log(`   pairs where BOTH hold 2 or more: ${bothTwo}`);
     console.log(`   of the ${oneIsOne} single-face partners: ${settledOnes} are settled (interior), ${homeOnes} are some rhomb's home`);

@@ -369,8 +369,8 @@ and class-2 homes, and the class-1 count is the constant ten.
 ### Nail heads — half the population is the far end of something else
 
 Spotted by Jeff, looking at Sun gen 2: a complete cap's normals converge on one side,
-and on the other side each of those faces has its own separate class-1 centre. Those
-are not classes. Every face names **two** centres by construction, so a solid holding
+and on the other side each of those faces has its own separate class-1 center. Those
+are not classes. Every face names **two** centers by construction, so a solid holding
 one face is usually just the far end of a normal whose point is somewhere else — a
 **nail head**.
 
@@ -471,7 +471,7 @@ generations 2 to 5), so they look like boundary residue rather than classes. Wha
 survives is three: **4 at ≈18%, 5 at ≈58%, complete at ≈23%**, agreeing across three
 seeds.
 
-This supersedes the share table below, which counted every centre. That one is a
+This supersedes the share table below, which counted every center. That one is a
 statement about the construction; this one is about the roof.
 
 ### The asymptote, and what the substitution matrix pins exactly
@@ -852,7 +852,7 @@ tilt about an axis. Checked at ρφ³ (2,087 groups), ρ√5 (245) and 3ρ (101)
 each, no exceptions.
 
 So the larger scales give pentagonal **caps**, not solids. A triacontahedron needs both
-tilts — 31.7175° and 58.2825° — tangent to one sphere at their own face centres, and
+tilts — 31.7175° and 58.2825° — tangent to one sphere at their own face centers, and
 that is precisely the isohedrality of §1. **Only ρ does it. The second scale has cap
 directions without the ring that would close them.**
 
@@ -868,7 +868,7 @@ Testing `R = ρ·φ^k` directly is stark:
 ρφ⁴ = 9.433862   max group  1     nothing
 ```
 
-φ and φ² and φ⁴ are blank — every candidate centre claimed by a single face. Only the
+φ and φ² and φ⁴ are blank — every candidate center claimed by a single face. Only the
 cube carries anything, and φ³ is also the minimum separation between complete solids
 (§5.4). Whether those are the same fact is not established.
 
@@ -900,8 +900,8 @@ Growing the seed further gives arbitrarily large patches of **the actual three
 symmetric figures**, which is both simpler and the thing that was wanted.
 
 **One honest caveat on the negative result.** This test asks whether a roof rhomb sits
-tangent *at its own centre*, which is a strong requirement. An inflated triacontahedron
-could be present without a roof rhomb happening to be centred on each of its ring
+tangent *at its own center*, which is a strong requirement. An inflated triacontahedron
+could be present without a roof rhomb happening to be centered on each of its ring
 faces. So "no second solid" is established for this test, not for the tiling — and
 constructing the inflated tiling directly, rather than probing for it, is the way to
 settle that.
@@ -1014,7 +1014,7 @@ zero gaps on Deca. Cluster with a tolerance before quoting these numbers again.*
 
    *What that proves.* A one-axis shift is `m → m ± 2e_i`, which moves `M` by ±2 for a
    horizontal axis and flips the side for the vertical — either way **`t` changes by
-   exactly one**. So a one-axis neighbour is always in an adjacent band, and therefore:
+   exactly one**. So a one-axis neighbor is always in an adjacent band, and therefore:
 
    > **both → thickOnly or thinOnly, never both → both;
    > thickOnly → both or empty, never thickOnly → thickOnly.**
@@ -1099,7 +1099,7 @@ labeled. A second mode colors by group *size* (1…10) on a single ramp.
   vertical slider. Decided with Jeff: scaling the vertical is an affine map, so the
   roof stays honest at any setting, but a squashed triacontahedron is not a
   triacontahedron — its normals stop meeting at a point, which is the page's entire
-  claim. Rather than grey the solids out between stops, the intermediate settings
+  claim. Rather than gray the solids out between stops, the intermediate settings
   simply do not exist here. Vertical scale is ±1 and nothing else.
 
   Implementation: compute the lift and the centers **unflipped**, then negate z on

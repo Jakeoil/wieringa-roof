@@ -35,7 +35,7 @@ export interface Face {
     id: number;
     thick: boolean;
     cluster: string; // gen-1 P1 cluster: Pe5 star / Pe3 boat / Pe1 diamond
-    pair: [number, number]; // the two lifting axes, for the five-colouring
+    pair: [number, number]; // the two lifting axes, for the five-coloring
     v: number[]; // tiling vertex ids, cyclic
 }
 

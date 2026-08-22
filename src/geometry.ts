@@ -542,15 +542,15 @@ function indexColor(idx: number): string {
 
 // ── the Kowalewski five ───────────────────────────────────────────
 //
-// A proper edge colouring of K₆ on the six icosahedral axes: pairs sharing an axis get
-// different colours, which is what makes every rosette of a rhombic triacontahedron
+// A proper edge coloring of K₆ on the six icosahedral axes: pairs sharing an axis get
+// different colors, which is what makes every rosette of a rhombic triacontahedron
 // show all five. It lives here, at the bottom of the import graph, because the roof
 // wants it too and `dissect.ts` is three modules downstream — geometry importing from
 // there would close a cycle. `dissect.ts` re-exports it.
 //
 // The roof lifts on five of the six axes, so a rhomb's pair is a pair of K₆ with the
-// vertical dropped and already carries a colour. Measured on the roof it comes out a
-// **proper** colouring of the surface as well — no two rhombi sharing an edge agree,
+// vertical dropped and already carries a color. Measured on the roof it comes out a
+// **proper** coloring of the surface as well — no two rhombi sharing an edge agree,
 // 0 of 32,305 adjacent pairs on Sun generation 4 — with the five exactly
 // equidistributed and every Pe5 rosette showing all five.
 const PAIR_COLOR: Record<string, number> = (() => {
@@ -566,7 +566,7 @@ const PAIR_COLOR: Record<string, number> = (() => {
     return out;
 })();
 
-/** Colour 0–4 of the face spanned by axes `i` and `j`. */
+/** Color 0–4 of the face spanned by axes `i` and `j`. */
 function pairColor(i: number, j: number): number {
     return PAIR_COLOR[`${Math.min(i, j)},${Math.max(i, j)}`];
 }
@@ -596,7 +596,7 @@ function tileFill(
             return null;
         case "five":
             // No pair means the caller has not been taught this mode; fall back rather
-            // than paint everything one colour and look deliberate.
+            // than paint everything one color and look deliberate.
             return pair ? FIVE_COLORS[pairColor(pair[0], pair[1])] : "#888888";
         case "mosaic":
             return MOSAIC_COLORS[cluster] ?? "#888888";

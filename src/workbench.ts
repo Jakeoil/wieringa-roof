@@ -332,9 +332,9 @@ function drawTiling() {
             // quietly go missing in the other. Flat modes stay flat: thick/thin and
             // height already *are* the information, and ramping them muddles it.
             const base = tileFill(tileColor, r.cluster, r.thick, vi[cLo], r.pair) ?? r.fill;
-            // These modes carry their own meaning in the flat colour and must not be
-            // shaded away — the five-colouring least of all, since two rhombi differing
-            // only by shade would read as the same colour.
+            // These modes carry their own meaning in the flat color and must not be
+            // shaded away — the five-coloring least of all, since two rhombi differing
+            // only by shade would read as the same color.
             if (tileColor === "type" || tileColor === "index" || tileColor === "five") return base;
             return makeGradient(ctx, base, sv[cLo], sv[cHi], vi[cLo], vi[cHi]);
         };

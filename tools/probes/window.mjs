@@ -1,6 +1,6 @@
 // Closing 2a: does a one-axis shift always leave the band a home has to occupy?
 //
-// From §5E: a centre is m (six odd integers), M = sum of the first five, and a face of
+// From §5E: a center is m (six odd integers), M = sum of the first five, and a face of
 // orientation {j,k} has low-corner index (M - 2 - T)/2 with T a constant of the rhomb
 // type and side — ±3 thick, ±1 thin. The roof has four index levels, so a rhombus's low
 // corner must be 1 or 2. That admits thick or thin or both, and only the "both" band

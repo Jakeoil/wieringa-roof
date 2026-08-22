@@ -18,8 +18,8 @@ golden rhombi for physical models.
 | `packing.html` | chapter 3 — the balls as a packing: contacts, coordination, kiss points | done |
 | `rhombohedra.html` | chapter 4 part 1 — the cage: twenty hexahedra, explode, Kowalewski five | done |
 | `intersect.html` | chapter 4 part 2 — what two triacontahedra share | done |
-| `nets.html` | chapter 4 part 3 — solid nets and their colouring schemes | done |
-| `hexroof.html` | chapter 4 part 4 — the roof from hexahedra | started |
+| `nets.html` | chapter 4 part 3 — solid nets and their coloring schemes | done |
+| `hexroof.html` | chapter 4 part 4 — the roof from hexahedra | built |
 | `unfold.html` | **Workbench** and **Sheets**, two views of one page | done |
 | `tools.html` | true-size templates, fold gauges, forming jigs, kit list | done |
 | `utilities.html` | odds and ends; currently the favicon designer | done |
@@ -67,7 +67,7 @@ overlap count, and `result.flat`, a fully flat variant costing one extra piece p
 added cut.
 
 **Widened ribbons** (`ribbonGrowPatch`). Takes the longest de Bruijn ribbon as a
-backbone, places it, then accretes neighbours across any edge — longest backbone
+backbone, places it, then accretes neighbors across any edge — longest backbone
 first, so it gets first claim on contested rhombi. Gathers 80–90% of a patch into
 one piece.
 
@@ -122,7 +122,7 @@ the master: configure the patch and method, get one net, split it when it looks
 right.
 
 Splits run **along hinges**, never through a rhombus, so every face lands whole on
-one sheet. A severed hinge stops being a fold and becomes a taped join, labelled with
+one sheet. A severed hinge stops being a fold and becomes a taped join, labeled with
 a capital letter and the page number of its other half — `A▸3` tapes to `A▸1` on
 sheet 3. Verified: every letter appears on exactly two sheets and each points back at
 the other.
@@ -166,7 +166,7 @@ nobody wanted. The `#sheets` hash deep-links to the view and splits the current 
 arrival.
 
 **The tiling canvas shows the partition.** Once a net is split, each region is drawn
-in its sheet's colour on the very canvas the net was built on — before and after in
+in its sheet's color on the very canvas the net was built on — before and after in
 one picture, keyed to the sheet list, the minis and the Map.
 
 Splitting always uses the **finished** net: a fresh Automatic load parks the scrubber
@@ -176,13 +176,13 @@ whatever prefix happens to be on screen.
 Every sheet carries a **locator mini of the patch** — the Penrose tiling, not the
 development. The tiling is the picture that can be recognized; the unfolded net is a
 shape nobody has seen before, so a mini of it locates nothing. The sheet's rhombi are
-filled in that sheet's colour and outlined along its cuts, with folds left out
+filled in that sheet's color and outlined along its cuts, with folds left out
 because at that size the outline is the information.
 
-The **Map** is the same drawing at full size with every sheet in its own colour and
+The **Map** is the same drawing at full size with every sheet in its own color and
 numbered: before cutting it says how the patch divides, after cutting it says which
 piece is which. It prints first in *Print all sheets*, and has its own row and print
-button. The same colour keys the list, the mini and the map.
+button. The same color keys the list, the mini and the map.
 
 **Back side** swaps hills for dales for printing the underside. Reflection is not a
 concern: every patch here has a mirror axis.

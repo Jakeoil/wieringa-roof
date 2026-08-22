@@ -1,12 +1,12 @@
 // Chapter 4, part 3 — nets for the triacontahedron and its twenty hexahedra.
 //
 // The unfolding is `solidnet.ts`; this is the workbench over it: pick a solid, pick a
-// colouring, set the side length, print at true size. Everything is drawn as SVG in
+// coloring, set the side length, print at true size. Everything is drawn as SVG in
 // physical units so what comes off the printer is the size it says.
 //
-// The colourings are the ones that mean something about the solid rather than the ones
+// The colorings are the ones that mean something about the solid rather than the ones
 // that look nice. **Kowalewski five** is the reason this page exists: it is a proper
-// edge colouring of K₆ on the six axes, so every rosette of the triacontahedron shows
+// edge coloring of K₆ on the six axes, so every rosette of the triacontahedron shows
 // all five, every hexahedron's opposite faces agree, and each hexahedron wears three of
 // the five — the ten 3-subsets, borne once by an acute cell and once by an obtuse one.
 // Cut the twenty out and you have the pieces of the classical Kowalewski puzzle, not
@@ -54,7 +54,7 @@ const AXIS_COLORS = ["#d94f3d", "#e8a33d", "#4f9d4a", "#3d7fc4", "#9b59b6", "#8a
 interface Job {
     name: string;
     faces: SolidFace[];
-    /** an extra caption under the net — the colour triple, for a puzzle piece */
+    /** an extra caption under the net — the color triple, for a puzzle piece */
     note?: string;
 }
 
@@ -86,7 +86,7 @@ function jobs(): Job[] {
             return [{
                 name: `${want ? "Acute" : "Obtuse"} golden hexahedron`,
                 faces: c.faces.map((f, i) => ({ id: i, corners: f, tag: tagCell(c, i) })),
-                note: scheme === "five" ? `colours ${cellColors(c).join(", ")}` : undefined,
+                note: scheme === "five" ? `colors ${cellColors(c).join(", ")}` : undefined,
             }];
         }
         default:

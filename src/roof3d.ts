@@ -30,10 +30,10 @@ import {
 
 // The Kowalewski five, brought over from the triacontahedron. A roof rhomb is spanned
 // by two of the five lifting axes, and those are five of the six axes of the solid —
-// so every rhomb already carries one of the five colours, with nothing to seed and
-// nothing to choose. It comes out a **proper** colouring of the roof: no two rhombi
-// sharing an edge take the same colour, 0 of 32,305 adjacent pairs on Sun generation 4,
-// with the five colours exactly equidistributed and every Pe5 rosette showing all five.
+// so every rhomb already carries one of the five colors, with nothing to seed and
+// nothing to choose. It comes out a **proper** coloring of the roof: no two rhombi
+// sharing an edge take the same color, 0 of 32,305 adjacent pairs on Sun generation 4,
+// with the five colors exactly equidistributed and every Pe5 rosette showing all five.
 const FIVE_3D = [0xd94f3d, 0xe8a33d, 0x4f9d4a, 0x3d7fc4, 0x9b59b6].map(
     (h) => new THREE.Color(h),
 );

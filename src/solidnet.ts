@@ -17,7 +17,7 @@ export type P2 = [number, number];
 export interface SolidFace {
     id: number;
     corners: V3[];
-    /** carried through untouched, so a net can be coloured by whatever the caller knows */
+    /** carried through untouched, so a net can be colored by whatever the caller knows */
     tag?: number;
 }
 

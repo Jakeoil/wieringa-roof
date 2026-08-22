@@ -3,9 +3,9 @@
 // Section 5A found equal-radius concurrences at radii other than rho and dismissed them
 // because their tangency sets were small. But the tiling is self-similar under
 // inflation by phi, so an inflated triacontahedron would have inradius rho*phi^k — and
-// its face planes would be tangent to a sphere of that radius, touching at the centres
+// its face planes would be tangent to a sphere of that radius, touching at the centers
 // of ITS faces, which are golden rhombi of edge phi^k. A roof rhomb sitting exactly at
-// one of those points would put its normal through the inflated centre.
+// one of those points would put its normal through the inflated center.
 //
 // So: run the same grouping as chapter 2, at radius rho*phi^k.
 import { seedTypes, generatePatch, allRhombs, vertexMap, roundKey, computeLift, pos3D, E5 } from "../../dist/geometry.js";

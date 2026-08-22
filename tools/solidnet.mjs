@@ -96,11 +96,11 @@ for (const which of [true, false]) {
     const c = cells.find((x) => x.acute === which);
     const faces = c.faces.map((f, i) => ({ id: i, corners: f, tag: faceColor(c, i) }));
     check(`${which ? "acute" : "obtuse"} hexahedron`, faces, bestUnfold(faces));
-    // 6 · opposite faces share a colour, and the cell wears three
+    // 6 · opposite faces share a color, and the cell wears three
     for (let q = 0; q < 3; q++)
         if (faceColor(c, 2 * q) !== faceColor(c, 2 * q + 1))
-            fail(`${which ? "acute" : "obtuse"}: an opposite pair differs in colour`);
-    if (new Set(cellColors(c)).size !== 3) fail("a cell does not wear three colours");
+            fail(`${which ? "acute" : "obtuse"}: an opposite pair differs in color`);
+    if (new Set(cellColors(c)).size !== 3) fail("a cell does not wear three colors");
 }
 
 const sh = shellFaces();
@@ -117,6 +117,6 @@ for (const c of cells) {
     if (n.pieces !== 1) fail(`cell ${c.id} needs ${n.pieces} pieces`);
 }
 console.log(`\nall twenty cells unfold whole (worst ${worstPieces} piece), ` +
-    `${sigs.size} distinct colour triples — C(5,3) = 10, each borne twice`);
+    `${sigs.size} distinct color triples — C(5,3) = 10, each borne twice`);
 console.log(bad === 0 ? "all checks passed" : `${bad} FAILURES`);
 process.exit(bad === 0 ? 0 : 1);

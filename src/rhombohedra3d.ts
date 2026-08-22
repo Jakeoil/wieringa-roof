@@ -74,9 +74,9 @@ const ACUTE = new THREE.Color(0xd98d3a);
 const OBTUSE = new THREE.Color(0x4a7fb5);
 // twenty hues, so a cell can be followed as it moves out
 const WHEEL = Array.from({ length: 20 }, (_, i) => new THREE.Color().setHSL(i / 20, 0.52, 0.55));
-// one colour per axis-pair the cell's faces use
+// one color per axis-pair the cell's faces use
 const AXIS = Array.from({ length: 6 }, (_, i) => new THREE.Color().setHSL(i / 6, 0.5, 0.55));
-// The Kowalewski five. A proper edge colouring of K6, so every rosette of the solid
+// The Kowalewski five. A proper edge coloring of K6, so every rosette of the solid
 // shows all five, every hexahedron's opposite faces agree, and each hexahedron wears
 // three of the five — the ten 3-subsets borne once by an acute cell and once by an
 // obtuse one. Chosen well apart in hue since the whole point is telling them apart.
@@ -130,7 +130,7 @@ function clear(): void {
     edgeMats = [];
 }
 
-/** Per face, since the five-colouring is a property of faces and not of cells. */
+/** Per face, since the five-coloring is a property of faces and not of cells. */
 const colorOf = (c: Cell, face: number): THREE.Color => {
     if (colorSel.value === "five") return FIVE[faceColor(c, face)];
     if (colorSel.value === "cell") return WHEEL[c.id];
@@ -143,7 +143,7 @@ const visible = (c: Cell): boolean =>
 function build(): void {
     clear();
     // Far enough that every cell actually leaves the cage, which needs more travel than
-    // it looks: a cell moves along its own centre, and centre magnitudes run 0.2814 to
+    // it looks: a cell moves along its own center, and center magnitudes run 0.2814 to
     // 1.1920, so the innermost goes only a quarter as far as the outermost. Clearing a
     // cage of radius 1.6180 with cells of radius up to 1.1920 therefore takes t ≈ 10 for
     // the worst of them, where the old limit of 2.6 stranded it inside. Squared travel
@@ -160,7 +160,7 @@ function build(): void {
     const cells = CELLS[kind];
     const cage = CAGES[kind];
     // Corners and edges of each cell, for the ball-and-stick frame. Taken per cell
-    // rather than deduplicated: assembled, neighbouring cells share corners and the
+    // rather than deduplicated: assembled, neighboring cells share corners and the
     // beads coincide exactly, which looks like one bead — and once exploded they must
     // travel with their own cell anyway.
     const beads: V3[] = [];

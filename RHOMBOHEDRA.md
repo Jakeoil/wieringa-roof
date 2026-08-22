@@ -88,7 +88,7 @@ Jeff's organization.
 ### Part 1 — the cage · **built**
 
 `rhombohedra.html`, nav label **Cage**. The twenty cells as a wireframe you can turn and
-pull apart: explode slider, colour by acute/obtuse or one hue per cell or by axis, show
+pull apart: explode slider, color by acute/obtuse or one hue per cell or by axis, show
 either family alone, faces on or off, auto-turn.
 
 `src/dissect.ts` holds the dissection and `tools/dissect.mjs` checks it — twenty cells
@@ -97,7 +97,7 @@ inside the solid, **no two cells overlapping**, and 93,809 sampled interior poin
 in exactly one cell. The dissection is found by backtracking and the module says so
 rather than pretending it is canonical: many dissections exist, this is one.
 
-Exploding moves each cell along the direction of its own centre, so zero reassembles
+Exploding moves each cell along the direction of its own center, so zero reassembles
 exactly and full travel is the same arrangement magnified. Faces go translucent while
 the cells are close, since assembled they share every internal face.
 
@@ -113,7 +113,7 @@ page's dissection:
 |---|---|
 | the shell, 30 outer faces | **60 of 60** — everything |
 | the inner cage, 45 internal faces | **1 of 60** — the identity alone |
-| the 20 cell centres | **1 of 60** |
+| the 20 cell centers | **1 of 60** |
 
 **The exterior is forced and the interior is chosen**, and this choice keeps none of the
 solid's symmetry whatever. The rosette Jeff can see is local — five cells meeting round
@@ -205,7 +205,7 @@ combinatorics; they are offset from one another by a half-lattice step.
 ### Part 3 — construction · **built**
 
 `nets.html`. Pick a solid — the triacontahedron, either hexahedron, or all twenty —
-pick a colouring, set the side length, print at true size.
+pick a coloring, set the side length, print at true size.
 
 `src/solidnet.ts` is a general edge-unfolder for closed polyhedra, which `unfold.ts`
 could not be pressed into: that one is built round the roof's own data, rhombi indexed
@@ -221,47 +221,63 @@ without showing on screen: edge lengths preserved to 1e-9, every corner angle wi
 1e-7 of 63.4349° or 116.5651°, hinges exactly `faces − pieces`, and no overlapping pair
 within a piece.
 
-The Kowalewski colouring makes the twenty a **puzzle** rather than a set of models: the
-ten 3-subsets of five colours, each borne once by an acute cell and once by an obtuse
+The Kowalewski coloring makes the twenty a **puzzle** rather than a set of models: the
+ten 3-subsets of five colors, each borne once by an acute cell and once by an obtuse
 one, which is the classical labelling Hart counts 320 assemblies for.
 
-### Part 4 — the roof from hexahedra · **started**
+### Part 4 — the roof from hexahedra · **built, and it closes exactly**
 
-`hexroof.html`. The roof in the cluster colours or the Kowalewski five, and the acute
+`hexroof.html`. The roof in the cluster colors or the Kowalewski five, and the acute
 and obtuse hexahedra hung beneath it.
 
-**The local fit is exact and was never in doubt.** The five lifting generators meet only
-at 63.4349° or 116.5651°, so any three of them span a parallelepiped with six congruent
-golden-rhomb faces — one of the two golden rhombohedra — and every roof rhomb is a face
-of one.
+**One hexahedron per rhomb, and nothing to choose.** The third edge of a cell is not
+another of the roof's five lifting generators. It is the **vertical** — `e_z`, the sixth
+icosahedral axis, the one the roof surface itself never uses. Chapter 2 already had it:
+`A6 = [E_0..E_4, e_z]` is exactly the six-axis set whose C(6,3) = 20 triples dissect the
+triacontahedron, and every one of the fifteen pairwise dots is ±1/√5. So
+`{E_j, E_k, e_z}` is a golden rhombohedron on the same footing as any other triple.
 
-**The global fit does not close.** A rhomb spans two axes; hanging a cell beneath it
-means choosing a third from the remaining three, and the cells must not overlap.
-Greedily, most-constrained first:
+Each cell is therefore a vertical prism: the rhomb on top, the same rhomb translated by
+`−e_z` beneath, and four vertical side faces whose edges run plumb — which is precisely
+the "faces perpendicular to the plane of the roof, also the edges, straight down" of
+Jeff's description.
 
-| patch | rhombi | cells placed | covered |
-|---|---|---|---|
-| Pe3 gen 2 | 23 | 14 | 60.9% |
-| Pe3 gen 3 | 139 | 80 | 57.6% |
-| Sun gen 3 | 2,440 | 1,404 | 57.5% |
-| Sun gen 4 | 16,475 | 9,438 | 57.3% |
+**Thick gives acute, thin gives obtuse — the determination is that simple.** For a thick
+rhomb `E_j · E_k = +1/√5`, so all three pairwise dots of `{E_j, E_k, e_z}` are positive
+and the cell is prolate, volume 0.760845. For a thin rhomb that one dot is negative and
+the cell is oblate, 0.470228. There is no search and no choice:
 
-The fraction is flat from generation 2 to generation 4, so it is structural rather than
-a boundary effect. The source discussion offered three possibilities — the opposite
-faces mesh exactly, they almost mesh, or they do not — and guessed the middle. The
-numbers say the middle.
+| patch | rhombi | cells | acute | obtuse | thick | thin |
+|---|---|---|---|---|---|---|
+| Pe5 gen 2 | 25 | 25 | 20 | 5 | 20 | 5 |
+| Pe3 gen 3 | 139 | 139 | 93 | 46 | 93 | 46 |
 
-**Stated as measured, not settled.** A greedy assignment is not a proof of
-impossibility, and two escapes remain open: a cleverer global choice of third axes, or
-the roof being a slab boundary in a sense that does not reduce to one cell per rhomb.
+The acute-to-obtuse ratio *is* the thick-to-thin ratio, so it tends to φ — the same
+statement as chapter 1's, one dimension up.
 
-*Two wrong turns worth recording, since both gave clean false answers.* Asking whether a
-cell's eight corners are all roof vertices returns zero everywhere — of course it does,
-since the roof is one surface and a cell's lower corners belong to the second surface
-whose existence is the question. And the local three-upper-faces test returned zero for
-every rhomb until a stray gate came out: it required the cell's bottom corner to be a
-roof vertex, which for a cell hanging below the roof it is not. With the gate removed
-the same test gives 16%, not 0%.
+**They cannot overlap, by construction rather than by search.** Distinct cells are
+vertical prisms under distinct rhombi, and the rhombi project onto a tiling of the
+plane. Disjoint shadows, disjoint prisms, whatever the heights.
+
+`tools/hexlayer.mjs` asserts all of it over five patches — one cell per rhomb, unit
+edges, golden angles, both volumes against the Gram determinant, the side walls plumb,
+the shadows distinct, and the floor exactly one unit below. Writing it turned up two
+real bugs in the module: the edge vectors were being stored at half length, and the two
+volumes were pasted constants rather than determinants of the actual edges.
+
+**And the lower surface is the roof again.** Every cell's bottom face is its top face
+moved down by exactly one unit, so the second Penrose surface is congruent to the first
+and exactly parallel — the quasiperiodic sandwich panel of the source discussion, and
+exact rather than approximate. The `floor` checkbox draws it.
+
+*The wrong turn, recorded because it burned most of the work.* The written source
+available here asks "which third edge vector is chosen for each cell", which reads as a
+choice among the roof's own five generators. Taken that way it is a packing problem, and
+greedy assignment settles at ~57% coverage, flat from generation 2 to 4 — a clean,
+stable, entirely false answer. The passage that would have settled it, on stacking the
+hexahedra, was in Jeff's original conversation but had not been carried into the file.
+Either way the sixth axis had been sitting in `centers.ts` since chapter 2, and I should
+have looked there before searching.
 
 ## 3. Open questions
 
@@ -274,11 +290,11 @@ record shows what was asked.*
    non-parallelogram quadrilaterals. Which is why neither volume has a closed form.
 2. ~~Which reading is "5 × 2"?~~ **Ten and ten**, settled by Jeff — the acute 5 + 5
    seating split is a secondary observation with nothing named after it.
-3. **Is a complete layer of hexahedra possible at all?** Part 4 gets 57% by greedy
-   assignment, flat across generations. A greedy result is not a proof of
-   impossibility, and the two escapes are open: a cleverer global choice of third axes,
-   or the roof being a slab boundary in some sense that does not reduce to one cell per
-   rhomb. This is the live question of the chapter.
+3. ~~Is a complete layer of hexahedra possible at all?~~ **Yes, and it is forced** —
+   part 4. The third axis is the vertical, not a fourth roof generator; every rhomb
+   hangs one cell straight down, thick→acute and thin→obtuse, the cells cannot overlap,
+   and the floor is a congruent parallel copy of the roof. The question was only ever
+   hard because it was posed as a choice.
 4. **What is the material between the triacontahedra?** Chapter 2 found every rhomb
    belongs to two solids, one above and one below. Part 2 showed their intersections are
    not unions of cells — offset by a half-lattice step — so whatever fills the space
