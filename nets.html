@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Solid nets — Wieringa Roof</title>
+<link rel="stylesheet" href="./site.css">
+<link rel="icon" href="./favicon.svg">
+<style>
+    .bar { display: flex; gap: 16px; align-items: flex-end; flex-wrap: wrap;
+        background: var(--panel); border: 1px solid var(--rule);
+        border-radius: 8px; padding: 12px 14px; margin: 18px 0 10px; }
+    .bar label { display: flex; flex-direction: column; gap: 3px; font-size: 12px; color: var(--ink-soft); }
+    .bar select, .bar input[type=text] { font: inherit; font-size: 13px; padding: 5px 8px;
+        border: 1px solid #ccc; border-radius: 4px; background: #fff; color: var(--ink); }
+    .bar input[type=text] { width: 5.5em; }
+    .bar .checks { display: flex; gap: 12px; align-items: center; }
+    .bar .checks label { flex-direction: row; align-items: center; gap: 5px; font-size: 13px; color: var(--ink); }
+    #out { display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-start; margin: 16px 0; }
+    .net { background: #fff; border: 1px solid var(--rule); border-radius: 4px; padding: 4px; }
+    .net svg { display: block; }
+    #status { display: block; margin: 6px 0 0; line-height: 1.5; }
+    @media print {
+        nav, .bar, #status, details, h1, .lede { display: none !important; }
+        .wrap { max-width: none; margin: 0; padding: 0; }
+        #out { gap: 0; }
+        .net { border: none; padding: 0; break-inside: avoid; }
+    }
+</style>
+</head>
+<body>
+
+<nav>
+    <span class="brand">Wieringa Roof</span>
+    <a href="./index.html" draggable="false">Home</a>
+    <a href="./roof3d.html" draggable="false">3D</a>
+    <a href="./info.html" draggable="false">Mathematics</a>
+    <a href="./polyhedra.html" draggable="false">Polyhedra</a>
+    <a href="./centers.html" draggable="false">Centers</a>
+    <a href="./packing.html" draggable="false">Packing</a>
+    <a href="./rhombohedra.html" draggable="false">Cage</a>
+    <a href="./intersect.html" draggable="false">Intersection</a>
+    <a href="./nets.html" draggable="false" aria-current="page">Solid nets</a>
+    <a href="./unfold.html" draggable="false">Workbench</a>
+    <a href="./tools.html" draggable="false">Tools</a>
+    <a href="./utilities.html" draggable="false">Utilities</a>
+    <a href="./unfold.html#sheets" draggable="false">Sheets</a>
+</nav>
+
+<div class="wrap">
+
+<h1>Solid nets</h1>
+<p class="lede">
+    The triacontahedron and its twenty golden hexahedra, flattened for paper. Cut the
+    twenty out in the Kowalewski colouring and you have the pieces of the puzzle
+    itself — not a picture of it.
+</p>
+
+<div class="bar">
+    <label>Solid <select id="solid">
+        <option value="rt">Rhombic triacontahedron</option>
+        <option value="acute">Acute hexahedron</option>
+        <option value="obtuse">Obtuse hexahedron</option>
+        <option value="all">All twenty hexahedra</option>
+    </select></label>
+    <label>Colouring <select id="scheme">
+        <option value="five">Kowalewski five</option>
+        <option value="type">Acute / obtuse</option>
+        <option value="axis">By axis</option>
+        <option value="plain">Plain</option>
+    </select></label>
+    <label title="Any of 20mm, 2cm, 1in">Side <input type="text" id="side" value="1in"></label>
+    <span class="checks">
+        <label><input type="checkbox" id="folds" checked> fold lines</label>
+        <label><input type="checkbox" id="labels" checked> labels</label>
+        <button id="print">Print</button>
+        <button id="reset" title="Forget saved settings and start again from the defaults">Reset</button>
+    </span>
+</div>
+
+<span class="info" id="status"></span>
+<div id="out"></div>
+
+<details id="help">
+    <summary>How it works <span class="mono" id="buildtag" style="font-weight:400;color:#888"></span></summary>
+    <div class="helpbody">
+
+<p>
+    <strong>Every solid here unfolds whole.</strong> The triacontahedron's thirty faces
+    come apart into a single connected net with no overlap, and so does each of the
+    twenty hexahedra — checked, along with the things that would ruin a model without
+    being visible on screen: every edge keeps its length and every corner its angle, to
+    within 1e-9. The angles are 63.43° and 116.57° throughout, because every face of
+    every solid on this page is the same golden rhombus.
+</p>
+<p>
+    <strong>Solid lines cut, dashed lines fold.</strong> An edge shared by two faces of
+    the net is a fold; every other edge is where the scissors go. There are no glue
+    tabs — this is a cut-and-tape net, the same convention the roof
+    <a href="./unfold.html#sheets" draggable="false">Sheets</a> use.
+</p>
+<p>
+    <strong>Kowalewski five.</strong> The colouring is a proper edge colouring of
+    K<sub>6</sub> on the six icosahedral axes: a face is spanned by two of them, and
+    faces sharing an axis must differ. Three things follow rather than being imposed —
+    every rosette of the triacontahedron shows all five colours; every hexahedron's
+    <em>opposite faces agree</em>, since its six faces are three opposite pairs, one per
+    axis pair of its triple; and each hexahedron therefore wears exactly
+    <strong>three</strong> of the five. There are <span class="mono">C(5,3) = 10</span>
+    such triples, and each is borne once by an acute cell and once by an obtuse one —
+    which is precisely the twenty labelled pieces of the classical
+    <strong>Kowalewski</strong> puzzle. George Hart counts 320 colour-matching ways to
+    put them back into the shell.
+</p>
+<p>
+    See the <a href="./rhombohedra.html" draggable="false">Cage</a> for the dissection
+    these come from, and the <a href="./unfold.html" draggable="false">Workbench</a> for
+    the same five colours on the roof itself — where, unexpectedly, they also come out a
+    proper colouring of the surface.
+</p>
+<p>
+    <strong>Size.</strong> The side is the rhombus edge, never a diagonal. At a 1 inch
+    side the diagonals are 1.7013 in and 1.0515 in, and the whole triacontahedron net is
+    about 7.8 by 8.9 side lengths — too big for one Letter sheet at that size, so drop to
+    around 12 mm if it must fit on one page. The twenty hexahedra are small enough to
+    print together at any sensible size.
+</p>
+
+    </div>
+</details>
+
+</div>
+
+<script type="module" src="./dist/nets.js"></script>
+<script src="./site.js"></script>
+</body>
+</html>

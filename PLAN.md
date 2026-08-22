@@ -18,6 +18,7 @@ golden rhombi for physical models.
 | `packing.html` | chapter 3 — the balls as a packing: contacts, coordination, kiss points | done |
 | `rhombohedra.html` | chapter 4 part 1 — the cage: twenty hexahedra, explode, Kowalewski five | done |
 | `intersect.html` | chapter 4 part 2 — what two triacontahedra share | done |
+| `nets.html` | chapter 4 part 3 — solid nets and their colouring schemes | done |
 | `unfold.html` | **Workbench** and **Sheets**, two views of one page | done |
 | `tools.html` | true-size templates, fold gauges, forming jigs, kit list | done |
 | `utilities.html` | odds and ends; currently the favicon designer | done |

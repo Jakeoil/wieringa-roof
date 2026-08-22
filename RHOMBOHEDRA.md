@@ -202,12 +202,28 @@ sits half a cell out of step with the dissection and cuts ten of the twenty. The
 packing and the dissection are built on the same six axes and are not the same
 combinatorics; they are offset from one another by a half-lattice step.
 
-### Part 3 — construction
+### Part 3 — construction · **built**
 
-The colouring workbench and the nets. Schemes for the triacontahedron and for the two
-hexahedra — by cell type, by seating signature, by axis, by shell — printed at true size
-through the existing `sheet.ts` machinery, which already knows how to put golden rhombi
-on paper.
+`nets.html`. Pick a solid — the triacontahedron, either hexahedron, or all twenty —
+pick a colouring, set the side length, print at true size.
+
+`src/solidnet.ts` is a general edge-unfolder for closed polyhedra, which `unfold.ts`
+could not be pressed into: that one is built round the roof's own data, rhombi indexed
+by tiling vertex with hinges from a cut tree, and a solid has no tiling behind it. Faces
+go in as lists of 3D corners, adjacency comes from shared edges, a BFS spanning tree
+places each face across the edge it arrived by, and a placement that would overlap
+starts a new piece instead — so the output is always valid paper.
+
+**Everything unfolds whole.** The triacontahedron's thirty faces come apart into one
+connected net with no overlap, at 7.847 × 8.944 side lengths, and so does every one of
+the twenty hexahedra. `tools/solidnet.mjs` checks the things that would ruin a model
+without showing on screen: edge lengths preserved to 1e-9, every corner angle within
+1e-7 of 63.4349° or 116.5651°, hinges exactly `faces − pieces`, and no overlapping pair
+within a piece.
+
+The Kowalewski colouring makes the twenty a **puzzle** rather than a set of models: the
+ten 3-subsets of five colours, each borne once by an acute cell and once by an obtuse
+one, which is the classical labelling Hart counts 320 assemblies for.
 
 ### Part 4 — the roof from hexahedra
 

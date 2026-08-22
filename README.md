@@ -20,6 +20,7 @@ supplies nothing but the pattern of which rhombus joins which, and at what angle
 | `packing.html` | the ping-pong packing — one radius, where the balls kiss |
 | `rhombohedra.html` | the cage — the triacontahedron's twenty golden hexahedra |
 | `intersect.html` | what two triacontahedra share |
+| `nets.html` | nets for the triacontahedron and its twenty hexahedra |
 | `unfold.html` | unfold a net by hand, or replay an algorithm step by step |
 
 ## Running
