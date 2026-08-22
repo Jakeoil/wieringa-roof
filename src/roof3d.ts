@@ -15,6 +15,7 @@ import { loadPrefs, savePrefs, resetPrefs } from "./prefs.js";
 import { BUILD_ID } from "./build-id.js";
 import { seedTypes, generatePatch, allRhombs, vertexList } from "./geometry.js";
 import { buildRoof } from "./roofgeom.js";
+import { pairColor } from "./dissect.js";
 import {
     createRoofView,
     INDEX_COLORS,
@@ -26,6 +27,16 @@ import {
     CLUSTER_3D,
     CLUSTER_FALLBACK,
 } from "./roofview.js";
+
+// The Kowalewski five, brought over from the triacontahedron. A roof rhomb is spanned
+// by two of the five lifting axes, and those are five of the six axes of the solid —
+// so every rhomb already carries one of the five colours, with nothing to seed and
+// nothing to choose. It comes out a **proper** colouring of the roof: no two rhombi
+// sharing an edge take the same colour, 0 of 32,305 adjacent pairs on Sun generation 4,
+// with the five colours exactly equidistributed and every Pe5 rosette showing all five.
+const FIVE_3D = [0xd94f3d, 0xe8a33d, 0x4f9d4a, 0x3d7fc4, 0x9b59b6].map(
+    (h) => new THREE.Color(h),
+);
 
 // Naming the missing id turns a silent null-dereference three frames later into
 // an immediate, readable failure.
@@ -106,6 +117,7 @@ function build(reframe: boolean): void {
             if (mode === "mosaic") return MOSAIC_3D[f.cluster] ?? CLUSTER_FALLBACK;
             if (mode === "classic") return CLASSIC_3D[f.cluster] ?? CLUSTER_FALLBACK;
             if (mode === "cluster") return CLUSTER_3D[f.cluster] ?? CLUSTER_FALLBACK;
+            if (mode === "five") return FIVE_3D[pairColor(f.pair[0], f.pair[1])];
             if (mode === "type") return f.thick ? THICK_COLOR : THIN_COLOR;
             if (mode === "index") {
                 // color by actual height, so flipping recolors too

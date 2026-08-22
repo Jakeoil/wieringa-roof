@@ -26,6 +26,11 @@ export interface RoofFaceInfo {
     vids: number[];
     thick: boolean;
     cluster: string;
+    /** the two generators the rhombus is spanned by, ascending. The roof lifts on five
+     *  of the six icosahedral axes, so this is a pair of K₆ with the sixth — the
+     *  vertical — never used, which is what lets the triacontahedron's five-colouring
+     *  be read straight off it. */
+    pair: [number, number];
 }
 
 export interface RoofData {
@@ -129,12 +134,21 @@ export function buildRoof(vscale: number, flip: boolean): RoofData | null {
     const lift = computeLift();
     const P: (V3 | null)[] = lift.n.map((nv) => (nv ? pos3D(nv, flip) : null));
 
-    const faces: RoofFaceInfo[] = allRhombs.map((r) => ({
-        id: r.id,
-        vids: r.verts.map((pt) => vertexMap.get(roundKey(pt))!.id),
-        thick: r.thick,
-        cluster: r.cluster,
-    }));
+    const faces: RoofFaceInfo[] = allRhombs.map((r) => {
+        const vids = r.verts.map((pt) => vertexMap.get(roundKey(pt))!.id);
+        const n0 = lift.n[vids[0]]!;
+        const d1 = lift.n[vids[1]]!.map((x, i) => x - n0[i]);
+        const d3 = lift.n[vids[3]]!.map((x, i) => x - n0[i]);
+        const a = d1.findIndex((x) => x !== 0);
+        const b = d3.findIndex((x) => x !== 0);
+        return {
+            id: r.id,
+            vids,
+            thick: r.thick,
+            cluster: r.cluster,
+            pair: [Math.min(a, b), Math.max(a, b)] as [number, number],
+        };
+    });
 
     let idxLo = Infinity;
     let idxHi = -Infinity;

@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Intersection — Wieringa Roof</title>
+<link rel="stylesheet" href="./site.css">
+<link rel="icon" href="./favicon.svg">
+<style>
+    .bar { display: flex; gap: 16px; align-items: flex-end; flex-wrap: wrap;
+        background: var(--panel); border: 1px solid var(--rule);
+        border-radius: 8px; padding: 12px 14px; margin: 18px 0 10px; }
+    .bar label { display: flex; flex-direction: column; gap: 3px; font-size: 12px; color: var(--ink-soft); }
+    .bar select { font: inherit; font-size: 13px; padding: 5px 8px; border: 1px solid #ccc; border-radius: 4px; background: #fff; color: var(--ink); }
+    .bar input[type=range] { width: 190px; }
+    .bar .checks { display: flex; gap: 12px; align-items: center; }
+    .bar .checks label { flex-direction: row; align-items: center; gap: 5px; font-size: 13px; color: var(--ink); }
+    #view { width: 100%; height: min(72vh, 640px); border: 1px solid var(--rule);
+        border-radius: 8px; overflow: hidden; background: #f4f1e8; }
+    #view canvas { display: block; width: 100%; height: 100%; cursor: grab; }
+    #view canvas:active { cursor: grabbing; }
+    #status { display: block; margin: 10px 0 0; line-height: 1.5; }
+</style>
+</head>
+<body>
+
+<nav>
+    <span class="brand">Wieringa Roof</span>
+    <a href="./index.html" draggable="false">Home</a>
+    <a href="./roof3d.html" draggable="false">3D</a>
+    <a href="./info.html" draggable="false">Mathematics</a>
+    <a href="./polyhedra.html" draggable="false">Polyhedra</a>
+    <a href="./centers.html" draggable="false">Centers</a>
+    <a href="./packing.html" draggable="false">Packing</a>
+    <a href="./rhombohedra.html" draggable="false">Cage</a>
+    <a href="./intersect.html" draggable="false" aria-current="page">Intersection</a>
+    <a href="./unfold.html" draggable="false">Workbench</a>
+    <a href="./tools.html" draggable="false">Tools</a>
+    <a href="./utilities.html" draggable="false">Utilities</a>
+    <a href="./unfold.html#sheets" draggable="false">Sheets</a>
+</nav>
+
+<div class="wrap">
+
+<h1>Intersection</h1>
+<p class="lede">
+    In the packing, triacontahedra overlap. This asks what they actually share. Slide
+    the second one out from coincident to the offset and watch the shared body appear
+    between them — only one of the four offsets leaves anything with a name.
+</p>
+
+<div class="bar">
+    <label>Offset <select id="offset">
+        <option value="axis">One axis</option>
+        <option value="short">Short diagonal</option>
+        <option value="long">Long diagonal</option>
+        <option value="contact">Face contact</option>
+    </select></label>
+    <label title="Scroll over the slider to work it; hold shift for fine steps">Separation <span id="sepOut" class="mono"></span>
+        <input type="range" id="sep" min="0" max="1" step="0.005" value="1">
+    </label>
+    <label>Shared body <select id="body">
+        <option value="solid">Solid</option>
+        <option value="transparent">Transparent</option>
+        <option value="invisible">Invisible</option>
+    </select></label>
+    <span class="checks">
+        <label><input type="checkbox" id="edges" checked> edges</label>
+        <label><input type="checkbox" id="parents" checked> parents</label>
+        <label><input type="checkbox" id="spin" checked> turn</label>
+        <button id="reset" title="Forget saved settings and start again from the defaults">Reset</button>
+    </span>
+</div>
+
+<div id="view"></div>
+<span class="info" id="status"></span>
+
+<details id="help">
+    <summary>How it works <span class="mono" id="buildtag" style="font-weight:400;color:#888"></span></summary>
+    <div class="helpbody">
+
+<p>
+    <strong>Where the offsets come from.</strong> On the
+    <a href="./centers.html" draggable="false">Centers</a> page every rhomb of the roof
+    lies on two triacontahedra, and those solids sit at a small number of separations
+    from one another. Four of them are worth looking at, and they are the four here.
+    Everything below was computed by exact vertex enumeration over the thirty bounding
+    planes rather than by sampling, so the volumes are good to the last digit shown.
+</p>
+<p>
+    <strong>One axis</strong> — separation 1.0000. The shared body is the
+    <strong>rhombic icosahedron</strong>: 6.155367, which is <em>exactly half</em> the
+    triacontahedron's volume, on 22 vertices and 20 faces every one of them a
+    parallelogram. This one has a reason behind it. A triacontahedron is the zonohedron
+    on six axes, and <strong>translating a zonohedron by one of its own generators and
+    intersecting deletes that generator</strong> — what is left is the zonohedron on the
+    other five, which is the rhombic icosahedron by definition.
+</p>
+<p>
+    <strong>Short diagonal</strong> — 1.0515, the golden rhombus's short diagonal.
+    Shares 5.836483, on 30 vertices and 28 faces. All four-sided, but only 20 of them
+    are parallelograms, so it is not a zonohedron.
+</p>
+<p>
+    <strong>Long diagonal</strong> — 1.7013. Shares 2.655892 on 16 vertices, and eight
+    of its eighteen faces are <em>triangles</em>. A zonohedron has no triangular face at
+    all.
+</p>
+<p>
+    <strong>Face contact</strong> — 2ρ = 2.7528. Nothing. The two solids meet on a
+    single face and share no volume, which is the kissing distance of the
+    <a href="./packing.html" draggable="false">Packing</a> page.
+</p>
+<p>
+    <strong>Why only the first has a tidy answer.</strong> A three-dimensional polytope
+    is a zonotope exactly when every face is centrally symmetric, and only the one-axis
+    body manages it. That is also why only its volume has a closed form: neither
+    diagonal volume can be written as <span class="mono">(a + b√5)/c</span> for small
+    integers, where every zonohedral volume in this chapter can. A diagonal is not a
+    generator, so the deletion argument has nothing to say about it.
+</p>
+<p>
+    <strong>Colour says which parent cuts.</strong> Each face of the shared body lies on
+    a bounding plane of one solid or the other — blue for the first, amber for the
+    second, green where the two coincide. The split is always even, as it must be: the
+    shared region is centrally symmetric about the midpoint of the two centres.
+</p>
+<p>
+    <strong>And none of them is a union of whole cells.</strong> That was the hope — if
+    the overlaps were unions of the twenty golden hexahedra of the
+    <a href="./rhombohedra.html" draggable="false">Cage</a>, then the packing and the
+    dissection would be the same combinatorics twice. They are not, for any offset and
+    for either dissection. Even the good case fails: the one-axis body <em>is</em> the
+    rhombic icosahedron, but translated by <em>half</em> an axis, so it sits half a cell
+    out of step and cuts ten of the twenty. The packing and the dissection stand on the
+    same six axes and are offset from one another by a half-lattice step.
+</p>
+
+    </div>
+</details>
+
+</div>
+
+<script type="importmap">
+{
+    "imports": {
+        "three": "./vendor/three.module.js",
+        "three/addons/controls/OrbitControls.js": "./vendor/OrbitControls.js",
+        "three/addons/lines/LineSegments2.js": "./vendor/LineSegments2.js",
+        "three/addons/lines/LineSegmentsGeometry.js": "./vendor/LineSegmentsGeometry.js",
+        "three/addons/lines/LineMaterial.js": "./vendor/LineMaterial.js"
+    }
+}
+</script>
+<script type="module" src="./dist/intersect3d.js"></script>
+<script src="./site.js"></script>
+</body>
+</html>

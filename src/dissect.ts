@@ -40,6 +40,10 @@ const cross = (a: V3, b: V3): V3 => [
     a[0] * b[1] - a[1] * b[0],
 ];
 const sub = (a: V3, b: V3): V3 => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
+const norm = (a: V3): V3 => {
+    const L = Math.hypot(a[0], a[1], a[2]);
+    return [a[0] / L, a[1] / L, a[2] / L];
+};
 
 /** Separating-axis test. Interiors only — cells of a dissection touch along faces. */
 function disjoint(P: Cell, Q: Cell): boolean {
@@ -450,6 +454,138 @@ function onSurface(p: V3): boolean {
 }
 
 const RT_INRADIUS = Math.sqrt(1 + 2 / Math.sqrt(5));
+
+// ── what two triacontahedra share ─────────────────────────────────
+
+export interface Region {
+    /** each face, corners in order round it, and which parent's plane it came from */
+    faces: Array<{ corners: V3[]; from: "a" | "b" | "both" }>;
+    volume: number;
+    vertices: number;
+    /** true when every face is a parallelogram — that is, when the region is a
+     *  zonohedron. Only the one-axis offset manages it. */
+    zonohedron: boolean;
+}
+
+const FACE_NORMALS: V3[] = (() => {
+    const out: V3[] = [];
+    for (let i = 0; i < 6; i++) {
+        for (let j = i + 1; j < 6; j++) {
+            const n = cross(A6[i], A6[j]);
+            const L = Math.hypot(n[0], n[1], n[2]);
+            out.push([n[0] / L, n[1] / L, n[2] / L]);
+        }
+    }
+    return out;
+})();
+
+const RHO_ = Math.sqrt(1 + 2 / Math.sqrt(5));
+
+/**
+ * The region shared by the triacontahedron and a copy of it translated by `t`.
+ *
+ * Both are intersections of the same fifteen slabs, so the shared region is an
+ * intersection of fifteen slabs too — a convex polytope, centrally symmetric about
+ * `t/2`. Found by solving every triple of bounding planes and keeping the feasible
+ * points, which is exact where sampling would not be.
+ */
+export function intersection(t: V3): Region {
+    const lo = FACE_NORMALS.map((u) => Math.max(-RHO_, dot(u, t) - RHO_));
+    const hi = FACE_NORMALS.map((u) => Math.min(RHO_, dot(u, t) + RHO_));
+    if (FACE_NORMALS.some((_, k) => lo[k] > hi[k] + 1e-12)) {
+        return { faces: [], volume: 0, vertices: 0, zonohedron: false };
+    }
+    // Each bounding plane belongs to the parent it came from — or to both, where the
+    // two agree, which is what a shared face looks like.
+    const planes: Array<{ n: V3; d: number; from: "a" | "b" | "both" }> = [];
+    FACE_NORMALS.forEach((u, k) => {
+        const aHi = RHO_;
+        const bHi = dot(u, t) + RHO_;
+        planes.push({
+            n: u,
+            d: hi[k],
+            from: Math.abs(aHi - bHi) < 1e-9 ? "both" : hi[k] === aHi ? "a" : "b",
+        });
+        const aLo = -RHO_;
+        const bLo = dot(u, t) - RHO_;
+        planes.push({
+            n: [-u[0], -u[1], -u[2]],
+            d: -lo[k],
+            from: Math.abs(aLo - bLo) < 1e-9 ? "both" : lo[k] === aLo ? "a" : "b",
+        });
+    });
+
+    const feasible = (p: V3) =>
+        FACE_NORMALS.every((u, k) => {
+            const v = dot(u, p);
+            return v >= lo[k] - 1e-9 && v <= hi[k] + 1e-9;
+        });
+
+    const verts: V3[] = [];
+    const seen = new Set<string>();
+    for (let a = 0; a < planes.length; a++) {
+        for (let b = a + 1; b < planes.length; b++) {
+            for (let c = b + 1; c < planes.length; c++) {
+                const A = planes[a], B = planes[b], C = planes[c];
+                const det = dot(A.n, cross(B.n, C.n));
+                if (Math.abs(det) < 1e-9) continue;
+                const bc = cross(B.n, C.n), ca = cross(C.n, A.n), ab = cross(A.n, B.n);
+                const p: V3 = [0, 1, 2].map(
+                    (i) => (A.d * bc[i] + B.d * ca[i] + C.d * ab[i]) / det,
+                ) as V3;
+                if (!feasible(p)) continue;
+                const k = p.map((x) => Math.round(x * 1e7)).join(",");
+                if (seen.has(k)) continue;
+                seen.add(k);
+                verts.push(p);
+            }
+        }
+    }
+    if (verts.length < 4) return { faces: [], volume: 0, vertices: verts.length, zonohedron: false };
+
+    const faces: Region["faces"] = [];
+    let volume = 0;
+    let allParallelogram = true;
+    for (const pl of planes) {
+        const on = verts.filter((v) => Math.abs(dot(pl.n, v) - pl.d) < 1e-7);
+        if (on.length < 3) continue;
+        const ctr: V3 = [0, 1, 2].map((i) => on.reduce((s2, v) => s2 + v[i], 0) / on.length) as V3;
+        const e1 = norm(sub(on[0], ctr));
+        const e2 = cross(pl.n, e1);
+        const ang = (p: V3) => Math.atan2(dot(sub(p, ctr), e2), dot(sub(p, ctr), e1));
+        const ord = [...on].sort((p, q) => ang(p) - ang(q));
+        let area = 0;
+        for (let i = 0; i < ord.length; i++) {
+            const p1 = sub(ord[i], ctr);
+            const p2 = sub(ord[(i + 1) % ord.length], ctr);
+            area += Math.abs(dot(pl.n, cross(p1, p2))) / 2;
+        }
+        volume += (pl.d * area) / 3;
+        if (ord.length !== 4) allParallelogram = false;
+        else {
+            const d1 = sub(ord[1], ord[0]);
+            const d2 = sub(ord[2], ord[3]);
+            if (Math.hypot(...sub(d1, d2)) > 1e-7) allParallelogram = false;
+        }
+        faces.push({ corners: ord, from: pl.from });
+    }
+    return { faces, volume, vertices: verts.length, zonohedron: allParallelogram };
+}
+
+/** The offsets worth looking at, being the ones the packing actually produces. */
+export const OFFSETS: Array<{ key: string; label: string; t: V3 }> = [
+    { key: "axis", label: "One axis", t: A6[0] },
+    { key: "short", label: "Short diagonal", t: sub(A6[0], A6[1]) },
+    { key: "long", label: "Long diagonal", t: [A6[0][0] + A6[1][0], A6[0][1] + A6[1][1], A6[0][2] + A6[1][2]] },
+    {
+        key: "contact",
+        label: "Face contact",
+        t: (() => {
+            const n = norm(cross(A6[0], A6[1]));
+            return [n[0] * 2 * RHO_, n[1] * 2 * RHO_, n[2] * 2 * RHO_] as V3;
+        })(),
+    },
+];
 
 /** Total cell volume, which must be the triacontahedron's own. */
 export const RT_VOLUME = 4 * Math.sqrt(5 + 2 * Math.sqrt(5));
