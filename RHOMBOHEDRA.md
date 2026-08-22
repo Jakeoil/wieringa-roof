@@ -259,6 +259,32 @@ statement as chapter 1's, one dimension up.
 vertical prisms under distinct rhombi, and the rhombi project onto a tiling of the
 plane. Disjoint shadows, disjoint prisms, whatever the heights.
 
+**The Kowalewski five carries down, and it is the same five.** Jeff's question was
+whether the roof's five-coloring can be extended to the hexahedra under the rule the
+triacontahedron uses — like touches like — and whether it needs new colors. Both answers
+are as good as they could be: it is not an analogue of the RT's coloring but literally
+the same one, because the layer's six axes *are* `A6`. A zonohedron face takes
+`pairColor` of the two axes spanning it, so:
+
+* top and bottom of a cell span `{j, k}` — the rhomb's own roof color, already on screen
+* a side wall spans `{m, vertical}` and `pairColor(m, 5) = m`, so a wall wears the color
+  of the edge direction it stands on
+
+Like touches like *necessarily*, not by arrangement: two rhombs share an edge along one
+axis `m`, so both of their walls over that edge are spanned by `{m, vertical}` and both
+take color `m`. Measured, no clashes anywhere:
+
+| patch | cells | shared walls | clashes |
+|---|---|---|---|
+| Pe5 gen 2 | 25 | 40 | 0 |
+| Pe3 gen 3 | 139 | 249 | 0 |
+| Sun gen 3 | 2,440 | 4,715 | 0 |
+
+And each cell wears exactly three colors, as on the triacontahedron — `pairColor(j,k)`,
+`j`, `k` — distinct because a proper edge coloring of K₆ cannot give a pair the color of
+an axis inside it. The `shrink` slider pulls each cell toward its own center so the walls
+can be seen without disturbing the arrangement.
+
 `tools/hexlayer.mjs` asserts all of it over five patches — one cell per rhomb, unit
 edges, golden angles, both volumes against the Gram determinant, the side walls plumb,
 the shadows distinct, and the floor exactly one unit below. Writing it turned up two

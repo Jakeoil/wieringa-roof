@@ -24,8 +24,18 @@
 // generators and got 57% coverage by greedy assignment. That was the wrong question:
 // the third axis is the vertical one, and the answer is complete and forced.
 
-import { allRhombs, vertexMap, roundKey, computeLift, pos3D, E5 } from "./geometry.js";
+import { allRhombs, vertexMap, roundKey, computeLift, pos3D, E5, pairColor } from "./geometry.js";
 import type { V3 } from "./geometry.js";
+
+/** Which of a rhomb's two axes does this edge run along? An edge is ±E_j or ±E_k. */
+function axisOf(d: V3, j: number, k: number): number {
+    for (const a of [j, k]) {
+        const E = E5[a];
+        const s = d[0] * E[0] + d[1] * E[1] + d[2] * E[2] > 0 ? 1 : -1;
+        if (Math.hypot(d[0] - s * E[0], d[1] - s * E[1], d[2] - s * E[2]) < 1e-9) return a;
+    }
+    throw new Error("a rhomb edge lies along neither of its own axes");
+}
 
 /** Volume of the parallelepiped on three edge vectors. */
 const det3 = (e: [V3, V3, V3]): number =>
@@ -36,11 +46,22 @@ const det3 = (e: [V3, V3, V3]): number =>
 /** The vertical — the sixth icosahedral axis, and the one the roof surface never uses. */
 export const EZ: V3 = [0, 0, 1];
 
+/** Its index in `A6`, so `pairColor` can be asked about it like any other axis. */
+export const VERTICAL_AXIS = 5;
+
 export interface HexCell {
     /** the roof rhomb it hangs from, one to one */
     rhomb: number;
     /** the two lifting axes of that rhomb; the third edge is always `EZ` */
     pair: [number, number];
+    /**
+     * Kowalewski five, one per face, in the order of `faces`. The layer's axes are
+     * exactly `A6`, so this is the *same* coloring the triacontahedron wears — the same
+     * `pairColor` on the same six axes, not an analogue of it.
+     */
+    colors: number[];
+    /** the axis each of the four side walls stands on, in the order of `faces[2..5]` */
+    wallAxis: number[];
     center: V3;
     e: [V3, V3, V3];
     corners: V3[];
@@ -89,11 +110,25 @@ export function hexLayer(): HexLayer {
         // sides. The sides stand perpendicular to the horizontal plane, with their edges
         // running straight down — which is what makes the cell a prism and the shadows
         // disjoint.
+        //
+        // The coloring rides along. A face of a zonohedron is spanned by two of the six
+        // axes and takes `pairColor` of them, so:
+        //   * top and bottom span {j, k}      -> the rhomb's own roof color
+        //   * a wall spans {m, vertical}      -> color m, since `pairColor(m, 5) = m`
+        // which is why like touches like without being arranged: two rhombi share an
+        // edge along one axis m, so both of their walls over it span {m, vertical}.
         const faces: V3[][] = [top, bottom];
+        const topColor = pairColor(j, k);
+        const colors: number[] = [topColor, topColor];
+        const wallAxis: number[] = [];
         for (let i = 0; i < 4; i++) {
             const a = top[i];
             const b = top[(i + 1) % 4];
             faces.push([a, b, [b[0], b[1], b[2] - 1], [a[0], a[1], a[2] - 1]]);
+            const d: V3 = [b[0] - a[0], b[1] - a[1], b[2] - a[2]];
+            const m = axisOf(d, j, k);
+            wallAxis.push(m);
+            colors.push(pairColor(m, VERTICAL_AXIS));
         }
         const corners = [...top, ...bottom];
         if (r.thick) acute++;
@@ -104,6 +139,8 @@ export function hexLayer(): HexLayer {
             e,
             corners,
             faces,
+            colors,
+            wallAxis,
             acute: r.thick,
             volume: Math.abs(det3(e)),
         });

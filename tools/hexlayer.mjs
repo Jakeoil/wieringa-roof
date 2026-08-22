@@ -2,13 +2,13 @@
 //
 //   node tools/hexlayer.mjs
 //
-// Seven checks. The page claims four things that would be easy to get wrong and hard to
+// Nine checks. The page claims four things that would be easy to get wrong and hard to
 // see: one cell per rhomb with no choice, every cell a genuine golden rhombohedron,
 // thick→acute and thin→obtuse, and a floor congruent to the roof. All four are asserted
 // here rather than eyeballed.
 
-import { generatePatch, allRhombs, seedTypes } from "../dist/geometry.js";
-import { hexLayer, EZ } from "../dist/hexlayer.js";
+import { generatePatch, allRhombs, seedTypes, pairColor } from "../dist/geometry.js";
+import { hexLayer, EZ, VERTICAL_AXIS } from "../dist/hexlayer.js";
 
 // Volumes from the Gram determinant of three unit vectors with pairwise dots ±1/√5:
 // det(G) = 1 + 2abc − a² − b² − c². All-positive gives the prolate cell; one negative
@@ -19,14 +19,15 @@ const ACUTE_V = Math.sqrt(1 + 2 * t ** 3 - 3 * t ** 2);
 const OBTUSE_V = Math.sqrt(1 - 2 * t ** 3 - 3 * t ** 2);
 const GOLDEN = (Math.acos(1 / Math.sqrt(5)) * 180) / Math.PI; // 63.4349
 
+const shared = {};
 let bad = 0;
 const fail = (m) => { bad++; console.log(`  x ${m}`); };
 const sub = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
 const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
 const len = (a) => Math.hypot(a[0], a[1], a[2]);
 
-console.log("patch  gen  rhombi  cells  acute  obtuse   volume    ratio");
-console.log("-".repeat(62));
+console.log("patch  gen  rhombi  cells  acute  obtuse   volume    ratio   shared walls");
+console.log("-".repeat(75));
 
 for (const [label, gen] of [["Pe5", 2], ["Pe3", 2], ["Pe3", 3], ["St1", 2], ["Sun", 3]]) {
     const quiet = console.log;
@@ -107,10 +108,45 @@ for (const [label, gen] of [["Pe5", 2], ["Pe3", 2], ["Pe3", 3], ["St1", 2], ["Su
     // 7 · the floor is the roof, face for face
     if (L.floor.length !== rh.length) fail(`${label} g${gen}: floor has ${L.floor.length} faces for ${rh.length} rhombi`);
 
+    // 8 · the Kowalewski five, exactly as the triacontahedron wears it. Top and bottom
+    // take the rhomb's own roof color; a wall takes the color of the axis it stands on.
+    // Each cell must wear three, and opposite faces must agree, as on the RT.
+    for (const c of L.cells) {
+        const roofColor = pairColor(...rh[c.rhomb].pair);
+        if (c.colors[0] !== roofColor || c.colors[1] !== roofColor)
+            fail(`${label} g${gen}: cell ${c.rhomb} top/bottom is not the rhomb's roof color`);
+        for (let i = 0; i < 4; i++)
+            if (c.colors[2 + i] !== pairColor(c.wallAxis[i], VERTICAL_AXIS))
+                fail(`${label} g${gen}: cell ${c.rhomb} wall ${i} miscolored`);
+        if (c.colors[2] !== c.colors[4] || c.colors[3] !== c.colors[5])
+            fail(`${label} g${gen}: cell ${c.rhomb} has opposite walls of different colors`);
+        if (new Set(c.colors).size !== 3)
+            fail(`${label} g${gen}: cell ${c.rhomb} wears ${new Set(c.colors).size} colors, not 3`);
+    }
+
+    // 9 · like touches like: every wall shared by two cells agrees, and no wall is
+    // claimed by three. This is the whole question, and it holds without arrangement —
+    // two rhombi share an edge along one axis, so both walls over it span {axis, vertical}.
+    const walls = new Map();
+    for (const c of L.cells)
+        for (let i = 2; i < 6; i++) {
+            const k = c.faces[i].map((p) => p.map((x) => Math.round(x * 1e6)).join(",")).sort().join("|");
+            if (!walls.has(k)) walls.set(k, []);
+            walls.get(k).push(c.colors[i]);
+        }
+    let sharedWalls = 0, clashes = 0;
+    for (const v of walls.values()) {
+        if (v.length > 2) fail(`${label} g${gen}: a wall is claimed by ${v.length} cells`);
+        if (v.length === 2) { sharedWalls++; if (v[0] !== v[1]) clashes++; }
+    }
+    if (clashes) fail(`${label} g${gen}: ${clashes} of ${sharedWalls} shared walls clash`);
+    shared[label + gen] = sharedWalls;
+
     const vol = L.cells.reduce((s, c) => s + c.volume, 0);
     console.log(`${label.padEnd(5)} ${String(gen).padStart(3)} ${String(rh.length).padStart(7)} ` +
         `${String(L.cells.length).padStart(6)} ${String(L.acute).padStart(6)} ${String(L.obtuse).padStart(7)} ` +
-        `${vol.toFixed(4).padStart(9)} ${(L.acute / Math.max(1, L.obtuse)).toFixed(5).padStart(8)}`);
+        `${vol.toFixed(4).padStart(9)} ${(L.acute / Math.max(1, L.obtuse)).toFixed(5).padStart(8)}` +
+        `${String(shared[label + gen]).padStart(9)}, all agreeing`);
 }
 
 console.log(`\nacute/obtuse tends to phi = ${((1 + Math.sqrt(5)) / 2).toFixed(5)}, ` +

@@ -13,6 +13,9 @@
 // translated down by one unit — a second Penrose surface, congruent and parallel.
 
 import * as THREE from "three";
+import { LineSegments2 } from "three/addons/lines/LineSegments2.js";
+import { LineSegmentsGeometry } from "three/addons/lines/LineSegmentsGeometry.js";
+import { LineMaterial } from "three/addons/lines/LineMaterial.js";
 import { loadPrefs, savePrefs, resetPrefs } from "./prefs.js";
 import { BUILD_ID } from "./build-id.js";
 import { seedTypes, generatePatch, allRhombs, pairColor, FIVE_COLORS } from "./geometry.js";
@@ -35,12 +38,14 @@ const cellSel = el<HTMLSelectElement>("cellmode");
 const edgesChk = el<HTMLInputElement>("edges");
 const flipChk = el<HTMLInputElement>("flip");
 const floorChk = el<HTMLInputElement>("floor");
+const shrinkInput = el<HTMLInputElement>("shrink");
+const shrinkOut = el<HTMLElement>("shrinkOut");
 const statusEl = el<HTMLElement>("status");
 
 const PREFS_KEY = "wr-hexroof";
 const PREF_DEFAULTS = {
     patch: "Pe3", gen: 3, color: "cluster",
-    roofmode: "solid", cellmode: "type", edges: true, flip: false, floor: false,
+    roofmode: "solid", cellmode: "type", edges: true, flip: false, floor: false, shrink: 1,
 };
 const prefs = loadPrefs(PREFS_KEY, PREF_DEFAULTS);
 const rv = createRoofView(view, 0xf4f1e8);
@@ -49,6 +54,7 @@ const ACUTE = new THREE.Color(0xd98d3a);
 const OBTUSE = new THREE.Color(0x4a7fb5);
 const FIVE = FIVE_COLORS.map((h) => new THREE.Color(h));
 
+let edgeMats: LineMaterial[] = [];
 let patchKey = "";
 let layerCache: HexLayer | null = null;
 function ensurePatch(): void {
@@ -64,6 +70,8 @@ function ensurePatch(): void {
 
 function build(reframe: boolean): void {
     const t0 = performance.now();
+    edgeMats = [];
+    shrinkOut.textContent = `${(100 * Number(shrinkInput.value)).toFixed(0)}%`;
     ensurePatch();
     const flip = flipChk.checked;
     const d = buildRoof(1, flip);
@@ -118,22 +126,40 @@ function build(reframe: boolean): void {
         const tris: number[] = [];
         const cols: number[] = [];
         const seg: number[] = [];
+        // Shrinking happens about each cell's own center, so nothing moves out of place —
+        // the layer keeps its arrangement and only opens up enough to see the walls.
+        const k = Number(shrinkInput.value);
         for (const c of layer.cells) {
             const col = cellSel.value === "acute" && !c.acute ? null
                 : cellSel.value === "obtuse" && c.acute ? null
                 : c.acute ? ACUTE : OBTUSE;
-            if (!col) continue;
-            for (const f of c.faces) {
-                const q = f.map((p) => [p[0] - d.offset[0], p[1] - d.offset[1], p[2] * zsign - d.offset[2]]);
+            if (!col && cellSel.value !== "five") continue;
+            const ctr = c.center;
+            c.faces.forEach((f, fi) => {
+                // Face 0 is the roof rhomb itself, point for point. At full size the two
+                // are exactly coplanar, and no depth test can separate them — which is
+                // what mottled the surface in dales up, where the fixed polygon offset
+                // pushes the wrong way. Leave it to the roof unless the roof is hidden
+                // or shrink has already pulled the cell clear.
+                if (fi === 0 && k === 1 && roofSel.value !== "invisible") return;
+                const face = cellSel.value === "five" ? FIVE[c.colors[fi]] : col!;
+                const q = f.map((p0) => {
+                    const p = k === 1 ? p0 : [
+                        ctr[0] + (p0[0] - ctr[0]) * k,
+                        ctr[1] + (p0[1] - ctr[1]) * k,
+                        ctr[2] + (p0[2] - ctr[2]) * k,
+                    ];
+                    return [p[0] - d.offset[0], p[1] - d.offset[1], p[2] * zsign - d.offset[2]];
+                });
                 for (const v of [q[0], q[1], q[2], q[0], q[2], q[3]]) {
                     tris.push(v[0], v[1], v[2]);
-                    cols.push(col.r, col.g, col.b);
+                    cols.push(face.r, face.g, face.b);
                 }
                 for (let i = 0; i < 4; i++) {
                     const a = q[i], b = q[(i + 1) % 4];
                     seg.push(a[0], a[1], a[2], b[0], b[1], b[2]);
                 }
-            }
+            });
         }
         if (tris.length) {
             const g = new THREE.BufferGeometry();
@@ -148,12 +174,20 @@ function build(reframe: boolean): void {
                 depthWrite: cellSel.value !== "transparent",
                 polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1,
             })));
-            if (edgesChk.checked) {
-                const lg = new THREE.BufferGeometry();
-                lg.setAttribute("position", new THREE.Float32BufferAttribute(seg, 3));
-                rv.add(new THREE.LineSegments(lg, new THREE.LineBasicMaterial({
-                    color: 0x3a3f4a, transparent: true, opacity: 0.55,
-                })));
+            if (edgesChk.checked && seg.length) {
+                // Screen-space width, so the edges hold up at any zoom. `LineBasicMaterial`
+                // ignores `linewidth` on every desktop driver, which is why the outlines
+                // were hairlines however dark they were set.
+                const lg = new LineSegmentsGeometry();
+                lg.setPositions(seg);
+                const lm = new LineMaterial({
+                    color: 0x1b1e24, linewidth: 2.2, worldUnits: false, alphaToCoverage: true,
+                });
+                lm.resolution.set(view.clientWidth || 1, view.clientHeight || 1);
+                edgeMats.push(lm);
+                const lines = new LineSegments2(lg, lm);
+                lines.renderOrder = 2;
+                rv.add(lines);
             }
         }
     }
@@ -192,6 +226,7 @@ cellSel.value = prefs.cellmode || PREF_DEFAULTS.cellmode;
 edgesChk.checked = prefs.edges;
 flipChk.checked = prefs.flip;
 floorChk.checked = prefs.floor;
+shrinkInput.value = String(prefs.shrink);
 
 function rebuild(reframe: boolean): void {
     if (`${patchSel.value}|${genSel.value}` !== patchKey) {
@@ -205,6 +240,18 @@ function rebuild(reframe: boolean): void {
     build(reframe);
 }
 for (const c of [patchSel, genSel]) c.addEventListener("change", () => rebuild(true));
+// Through `rebuild`, not `build` — `build` only adds to the scene, and it is `rebuild`
+// that clears it first. Calling `build` directly stacked a fresh copy of the whole layer
+// on every tick of the slider, so the full-size copy stayed on top and nothing appeared
+// to shrink at all.
+shrinkInput.addEventListener("input", () => rebuild(false));
+// Scrolling over the slider works it, as on the Intersection page.
+shrinkInput.addEventListener("wheel", (e) => {
+    e.preventDefault();
+    const step = (e.shiftKey ? 0.002 : 0.02) * (e.deltaY > 0 ? -1 : 1);
+    shrinkInput.value = String(Math.min(1, Math.max(0.3, Number(shrinkInput.value) + step)));
+    rebuild(false);
+}, { passive: false });
 for (const c of [colorSel, roofSel, cellSel, edgesChk, flipChk, floorChk]) c.addEventListener("change", () => rebuild(false));
 
 function persist(): void {
@@ -212,6 +259,7 @@ function persist(): void {
         patch: patchSel.value, gen: Number(genSel.value), color: colorSel.value,
         roofmode: roofSel.value, cellmode: cellSel.value,
         edges: edgesChk.checked, flip: flipChk.checked, floor: floorChk.checked,
+        shrink: Number(shrinkInput.value),
     });
 }
 window.addEventListener("beforeunload", persist);
@@ -223,7 +271,10 @@ el<HTMLButtonElement>("reset").addEventListener("click", () => {
         resetPrefs(PREFS_KEY);
     }
 });
-window.addEventListener("resize", () => rv.resize());
+window.addEventListener("resize", () => {
+    rv.resize();
+    for (const m of edgeMats) m.resolution.set(view.clientWidth || 1, view.clientHeight || 1);
+});
 
 console.log(`hexroof build ${BUILD_ID}`);
 {

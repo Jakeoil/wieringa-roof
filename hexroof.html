@@ -11,6 +11,7 @@
         background: var(--panel); border: 1px solid var(--rule);
         border-radius: 8px; padding: 12px 14px; margin: 18px 0 10px; }
     .bar label { display: flex; flex-direction: column; gap: 3px; font-size: 12px; color: var(--ink-soft); }
+    .bar input[type=range] { width: 120px; }
     .bar select { font: inherit; font-size: 13px; padding: 5px 8px; border: 1px solid #ccc; border-radius: 4px; background: #fff; color: var(--ink); }
     .bar .checks { display: flex; gap: 12px; align-items: center; }
     .bar .checks label { flex-direction: row; align-items: center; gap: 5px; font-size: 13px; color: var(--ink); }
@@ -67,11 +68,14 @@
     </select></label>
     <label>Hexahedra <select id="cellmode">
         <option value="type">Acute and obtuse</option>
+        <option value="five">Kowalewski five</option>
         <option value="acute">Acute only</option>
         <option value="obtuse">Obtuse only</option>
         <option value="transparent">Transparent</option>
         <option value="invisible">Invisible</option>
     </select></label>
+    <label>Shrink <input type="range" id="shrink" min="0.3" max="1" step="0.01" value="1">
+        <span class="mono" id="shrinkOut" style="font-size:11px"></span></label>
     <span class="checks">
         <label><input type="checkbox" id="edges" checked> edges</label>
         <label><input type="checkbox" id="floor"> floor</label>
@@ -118,6 +122,31 @@
     plane. Disjoint shadows, therefore disjoint prisms, whatever their heights.
 </p>
 <p>
+    <strong>The five carries down, and it is the same five.</strong> The layer's six axes
+    are exactly the triacontahedron's — the roof's five generators plus the vertical — so
+    the Kowalewski coloring applies verbatim rather than by analogy: same function, same
+    six axes, same five colors. A zonohedron face takes the color of the two axes that
+    span it, which here means the top and bottom of a cell wear the rhomb's own roof
+    color, and a side wall wears the color of the edge it stands on, since
+    <span class="mono">pairColor(m, vertical) = m</span>.
+</p>
+<p>
+    <strong>Like touches like, without being arranged.</strong> Two neighboring rhombs
+    share an edge, that edge runs along one axis <span class="mono">m</span>, so both of
+    their walls over it are spanned by <span class="mono">{m, vertical}</span> and both
+    take color <span class="mono">m</span>. Every shared wall agrees, necessarily.
+    Measured on Sun generation 3: 4,715 shared walls, no clashes. And every cell wears
+    three colors, as on the triacontahedron — <span class="mono">pairColor(j,k)</span>,
+    <span class="mono">j</span> and <span class="mono">k</span>, distinct because a proper
+    edge coloring of K₆ cannot give a pair the color of an axis inside it.
+</p>
+<p>
+    Drag <em>shrink</em> to pull each cell in toward its own center, which opens the
+    walls to view without moving anything out of place. At full size a cell's top face is
+    the roof rhomb itself — the same four points — so it is left undrawn while the roof is
+    showing, since two coincident surfaces cannot be rendered one in front of the other.
+</p>
+<p>
     <strong>And the floor is the roof again.</strong> The cells' bottom faces are their
     top faces moved down by one unit, so the second Penrose surface underneath is
     congruent to the first and exactly parallel — the quasiperiodic sandwich panel of the
@@ -140,7 +169,10 @@
 {
     "imports": {
         "three": "./vendor/three.module.js",
-        "three/addons/controls/OrbitControls.js": "./vendor/OrbitControls.js"
+        "three/addons/controls/OrbitControls.js": "./vendor/OrbitControls.js",
+        "three/addons/lines/LineSegments2.js": "./vendor/LineSegments2.js",
+        "three/addons/lines/LineSegmentsGeometry.js": "./vendor/LineSegmentsGeometry.js",
+        "three/addons/lines/LineMaterial.js": "./vendor/LineMaterial.js"
     }
 }
 </script>
