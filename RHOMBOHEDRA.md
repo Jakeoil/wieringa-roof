@@ -225,30 +225,67 @@ The Kowalewski colouring makes the twenty a **puzzle** rather than a set of mode
 ten 3-subsets of five colours, each borne once by an acute cell and once by an obtuse
 one, which is the classical labelling Hart counts 320 assemblies for.
 
-### Part 4 — the roof from hexahedra
+### Part 4 — the roof from hexahedra · **started**
 
-A roof page built from the cells rather than from the surface. Jeff: *"well known.
-nothing to do with RT's, but here's hoping."* The classical construction is that the
-roof is the boundary of a layer of acute and obtuse rhombohedra, which is prior work;
-what would be new is any link back to the triacontahedra, and there is no reason yet to
-expect one.
+`hexroof.html`. The roof in the cluster colours or the Kowalewski five, and the acute
+and obtuse hexahedra hung beneath it.
+
+**The local fit is exact and was never in doubt.** The five lifting generators meet only
+at 63.4349° or 116.5651°, so any three of them span a parallelepiped with six congruent
+golden-rhomb faces — one of the two golden rhombohedra — and every roof rhomb is a face
+of one.
+
+**The global fit does not close.** A rhomb spans two axes; hanging a cell beneath it
+means choosing a third from the remaining three, and the cells must not overlap.
+Greedily, most-constrained first:
+
+| patch | rhombi | cells placed | covered |
+|---|---|---|---|
+| Pe3 gen 2 | 23 | 14 | 60.9% |
+| Pe3 gen 3 | 139 | 80 | 57.6% |
+| Sun gen 3 | 2,440 | 1,404 | 57.5% |
+| Sun gen 4 | 16,475 | 9,438 | 57.3% |
+
+The fraction is flat from generation 2 to generation 4, so it is structural rather than
+a boundary effect. The source discussion offered three possibilities — the opposite
+faces mesh exactly, they almost mesh, or they do not — and guessed the middle. The
+numbers say the middle.
+
+**Stated as measured, not settled.** A greedy assignment is not a proof of
+impossibility, and two escapes remain open: a cleverer global choice of third axes, or
+the roof being a slab boundary in a sense that does not reduce to one cell per rhomb.
+
+*Two wrong turns worth recording, since both gave clean false answers.* Asking whether a
+cell's eight corners are all roof vertices returns zero everywhere — of course it does,
+since the roof is one surface and a cell's lower corners belong to the second surface
+whose existence is the question. And the local three-upper-faces test returned zero for
+every rhomb until a stray gate came out: it required the cell's bottom corner to be a
+roof vertex, which for a cell hanging below the roof it is not. With the gate removed
+the same test gives 16%, not 0%.
 
 ## 3. Open questions
 
-1. **Are the short- and long-diagonal intersections named solids?** The one-axis case
-   is the rhombic icosahedron exactly. 47% and 22% do not match ½, ¼ or any obvious
-   member of the family, so they are probably not zonohedra on a sub-family — but the
-   test is cheap and has not been run.
-2. **Which reading is "5 × 2"?** The acute ten split 5 + 5 by signature; the total is
-   10 + 10. Settle before naming.
-3. **Does the roof's layer of rhombohedra have a canonical thickness?** Chapter 2 found
-   every rhomb belongs to two solids, one above and one below. The cells between them
-   are what chapter 4 F would build from.
-4. **Do the packing's overlaps decompose into cells?** Chapter 3 found 4,645
-   overlapping ball pairs. If the corresponding RT intersections are unions of whole
-   cells, the packing and the dissection are the same combinatorics twice.
+*Two that stood here have been answered and are struck out rather than deleted, so the
+record shows what was asked.*
 
----
+1. ~~Are the short- and long-diagonal intersections named solids?~~ **No** — part 2. A
+   3-polytope is a zonotope exactly when all its faces are centrally symmetric, and
+   neither manages it: the long diagonal has eight triangular faces, the short has eight
+   non-parallelogram quadrilaterals. Which is why neither volume has a closed form.
+2. ~~Which reading is "5 × 2"?~~ **Ten and ten**, settled by Jeff — the acute 5 + 5
+   seating split is a secondary observation with nothing named after it.
+3. **Is a complete layer of hexahedra possible at all?** Part 4 gets 57% by greedy
+   assignment, flat across generations. A greedy result is not a proof of
+   impossibility, and the two escapes are open: a cleverer global choice of third axes,
+   or the roof being a slab boundary in some sense that does not reduce to one cell per
+   rhomb. This is the live question of the chapter.
+4. **What is the material between the triacontahedra?** Chapter 2 found every rhomb
+   belongs to two solids, one above and one below. Part 2 showed their intersections are
+   not unions of cells — offset by a half-lattice step — so whatever fills the space
+   between them is not simply the dissection.
+5. **Do the packing's overlaps decompose into cells?** Chapter 3 found 4,645
+   overlapping ball pairs. Part 2 says no for the four named offsets; whether some other
+   decomposition works is untested.
 
 ## 4. Credit
 

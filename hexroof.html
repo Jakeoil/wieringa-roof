@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hexahedra — Wieringa Roof</title>
+<link rel="stylesheet" href="./site.css">
+<link rel="icon" href="./favicon.svg">
+<style>
+    .bar { display: flex; gap: 16px; align-items: flex-end; flex-wrap: wrap;
+        background: var(--panel); border: 1px solid var(--rule);
+        border-radius: 8px; padding: 12px 14px; margin: 18px 0 10px; }
+    .bar label { display: flex; flex-direction: column; gap: 3px; font-size: 12px; color: var(--ink-soft); }
+    .bar select { font: inherit; font-size: 13px; padding: 5px 8px; border: 1px solid #ccc; border-radius: 4px; background: #fff; color: var(--ink); }
+    .bar .checks { display: flex; gap: 12px; align-items: center; }
+    .bar .checks label { flex-direction: row; align-items: center; gap: 5px; font-size: 13px; color: var(--ink); }
+    #view { width: 100%; height: min(72vh, 640px); border: 1px solid var(--rule);
+        border-radius: 8px; overflow: hidden; background: #f4f1e8; }
+    #view canvas { display: block; width: 100%; height: 100%; cursor: grab; }
+    #view canvas:active { cursor: grabbing; }
+    #status { display: block; margin: 10px 0 0; line-height: 1.5; }
+</style>
+</head>
+<body>
+
+<nav>
+    <span class="brand">Wieringa Roof</span>
+    <a href="./index.html" draggable="false">Home</a>
+    <a href="./roof3d.html" draggable="false">3D</a>
+    <a href="./info.html" draggable="false">Mathematics</a>
+    <a href="./polyhedra.html" draggable="false">Polyhedra</a>
+    <a href="./centers.html" draggable="false">Centers</a>
+    <a href="./packing.html" draggable="false">Packing</a>
+    <a href="./rhombohedra.html" draggable="false">Cage</a>
+    <a href="./intersect.html" draggable="false">Intersection</a>
+    <a href="./nets.html" draggable="false">Solid nets</a>
+    <a href="./hexroof.html" draggable="false" aria-current="page">Hexahedra</a>
+    <a href="./unfold.html" draggable="false">Workbench</a>
+    <a href="./tools.html" draggable="false">Tools</a>
+    <a href="./utilities.html" draggable="false">Utilities</a>
+    <a href="./unfold.html#sheets" draggable="false">Sheets</a>
+</nav>
+
+<div class="wrap">
+
+<h1>Hexahedra</h1>
+<p class="lede">
+    The same roof, seen as solid rather than as surface. Every rhomb is a face of a
+    golden rhombohedron, and this hangs one beneath each rhomb it can. Start with the
+    roof in the cluster colours or the Kowalewski five, then bring the hexahedra up.
+</p>
+
+<div class="bar">
+    <label>Patch <select id="patch"></select></label>
+    <label>Generation <select id="gen"></select></label>
+    <label>Roof colour <select id="color">
+        <option value="cluster">Star / boat / diamond</option>
+        <option value="five">Kowalewski five</option>
+        <option value="type">Thick / thin</option>
+        <option value="covered">Carries a hexahedron</option>
+        <option value="plain">Plain</option>
+    </select></label>
+    <label>Roof <select id="roofmode">
+        <option value="solid">Solid</option>
+        <option value="transparent">Transparent</option>
+        <option value="invisible">Invisible</option>
+    </select></label>
+    <label>Hexahedra <select id="cellmode">
+        <option value="type">Acute and obtuse</option>
+        <option value="acute">Acute only</option>
+        <option value="obtuse">Obtuse only</option>
+        <option value="transparent">Transparent</option>
+        <option value="invisible">Invisible</option>
+    </select></label>
+    <span class="checks">
+        <label><input type="checkbox" id="edges" checked> edges</label>
+        <label><input type="checkbox" id="flip"> dales up</label>
+        <button id="reset" title="Forget saved settings and start again from the defaults">Reset</button>
+    </span>
+</div>
+
+<div id="view"></div>
+<span class="info" id="status"></span>
+
+<details id="help">
+    <summary>How it works <span class="mono" id="buildtag" style="font-weight:400;color:#888"></span></summary>
+    <div class="helpbody">
+
+<p>
+    <strong>The change of primitive.</strong> At the surface the roof is golden rhombs —
+    a Penrose P3 tiling lifted out of the plane. One level down the natural blocks are
+    not rhombs at all but the two <strong>golden rhombohedra</strong>, acute and obtuse,
+    which are the three-dimensional analogues of the thick and thin tiles and the cells
+    of icosahedral quasicrystal models. The same object, two equally natural
+    descriptions — much as P1 and P3 are.
+</p>
+<p>
+    <strong>The local fit is exact, with no fudging.</strong> The lift uses five
+    generators whose pairwise angles can only be
+    <span class="mono">63.4349°</span> or <span class="mono">116.5651°</span> — precisely
+    the angles of the golden rhombus. So <em>any three</em> of them span a parallelepiped
+    with six congruent golden-rhomb faces, which is to say one of the two golden
+    rhombohedra, prolate or oblate according to the signs. Every roof rhomb is therefore
+    a face of one, exactly.
+</p>
+<p>
+    <strong>The global fit is the open question, and it does not close.</strong> A rhomb
+    spans two axes; hanging a cell beneath it means choosing a third from the remaining
+    three, and the cells must not overlap. Greedily, most-constrained first, about
+    <strong>57%</strong> of rhombi can be given one — and that fraction holds from
+    generation 2 to generation 4, so it is structural and not an artifact of the patch
+    boundary. Colour the roof by <em>carries a hexahedron</em> to see which do and which
+    do not.
+</p>
+<p>
+    A greedy assignment is not a proof of impossibility, and this is stated as measured
+    rather than settled. But it does answer the guess in the source discussion, which
+    offered three possibilities — that the opposite faces mesh exactly, that they almost
+    mesh, or that they do not — and expected the middle one. The middle one is what the
+    numbers say.
+</p>
+<p>
+    <strong>What that leaves.</strong> If the layer were complete, the far faces of the
+    cells would form a second Penrose surface beneath the first, and the roof would be a
+    quasiperiodic sandwich panel. It is not complete under this construction, so either a
+    cleverer choice of third axes exists, or the roof is a slab boundary in a sense that
+    does not reduce to one cell per rhomb. Both remain open.
+</p>
+<p>
+    See <a href="./roof3d.html" draggable="false">3D</a> for the surface on its own,
+    <a href="./centers.html" draggable="false">Centers</a> for the triacontahedra above
+    and below it, and the <a href="./rhombohedra.html" draggable="false">Cage</a> for
+    where these two shapes come from.
+</p>
+
+    </div>
+</details>
+
+</div>
+
+<script type="importmap">
+{
+    "imports": {
+        "three": "./vendor/three.module.js",
+        "three/addons/controls/OrbitControls.js": "./vendor/OrbitControls.js"
+    }
+}
+</script>
+<script type="module" src="./dist/hexroof.js"></script>
+<script src="./site.js"></script>
+</body>
+</html>
