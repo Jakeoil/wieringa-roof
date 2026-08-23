@@ -31,15 +31,26 @@
         background: var(--panel); border: 1px solid var(--rule);
         border-radius: 8px; padding: 10px 14px; margin: 0 0 10px;
     }
-    .zgrp { display: flex; flex-direction: column; gap: 2px; }
-    .zrow { display: flex; gap: 12px; align-items: center; }
-    .zrow label { display: flex; align-items: center; gap: 4px; font-size: 13px; color: var(--ink); }
-    .zrow:last-child label { font-size: 12px; color: var(--ink-soft); }
+    /* The reset button belongs to the box, not to any control in it, so it sits out
+       at the right-hand edge of the first line. */
+    #globalbar #reset { margin-left: auto; }
+    /* A box is one subject. Anything given `flex-basis: 100%` starts a fresh line
+       inside its box, which is what makes Global and the RTs two-line boxes. */
+    .zgrp { display: flex; flex-direction: column; gap: 3px; flex-basis: 100%; }
+    /* Three columns, so `tails` stands over `tail solids` and `heads` over
+       `heads solids` — the pairing is the point, and it was invisible while the two
+       rows were independently packed flex lines. */
+    .zgrid { display: grid; grid-template-columns: max-content max-content max-content; gap: 3px 20px; align-items: center; }
+    .bar .zgrp .grp { align-self: flex-start; margin: 0 0 1px; }
+    .zgrid label { display: flex; flex-direction: row; align-items: center; gap: 5px; font-size: 13px; color: var(--ink); }
+    .zgrid label:nth-child(n+4) { font-size: 12px; color: var(--ink-soft); }
+    .rtchecks { flex-basis: 100%; }
+    /* Cups and class footprints only: see the note in centers3d.ts. */
+    .bar .checks label.off { color: var(--ink-faint); }
     .bar .grp, .classbar .grp {
         font-size: 11px; text-transform: uppercase; letter-spacing: .06em;
         color: var(--ink-faint); align-self: center; margin: 0 2px 3px 0;
     }
-    .classbar .grp { flex-basis: 100%; text-transform: none; letter-spacing: 0; font-size: 12px; color: var(--ink-soft); }
     .cls .row { display: flex; align-items: center; gap: 4px; font-size: 12px; }
     .cls { display: flex; flex-direction: column; gap: 3px; }
     .cls .top { display: flex; align-items: center; gap: 5px; font-size: 13px; }
@@ -87,10 +98,31 @@
     piece of that solid's surface. The roof stops being a surface and becomes a lid.
 </p>
 
-<div class="bar">
+<div class="bar" id="globalbar">
     <span class="grp">Global</span>
     <label>Patch <select id="patch"></select></label>
     <label>Generation <select id="gen"></select></label>
+    <button id="reset" title="Forget saved settings and start again from the defaults">Reset</button>
+    <span class="zgrp">
+        <span class="grp">Z-orientation</span>
+        <span class="zgrid">
+            <label title="The reflection: index runs downward"><input type="radio" name="parity" id="ptails"> tails</label>
+            <label title="Collapse the roof into its own shadow, the flat Penrose tiling"><input type="checkbox" id="flat"> flat</label>
+            <label title="The default: index runs upward"><input type="radio" name="parity" id="pheads" checked> heads</label>
+            <label title="Solids below the roof in the default orientation"><input type="checkbox" id="tailsolids" checked> tail solids</label>
+            <span></span>
+            <label title="Solids above the roof in the default orientation"><input type="checkbox" id="headsolids" checked> heads solids</label>
+        </span>
+    </span>
+</div>
+
+<div class="bar" id="rhombbar">
+    <span class="grp">Rhomb patch</span>
+    <label>Surface <select id="rhombmode">
+        <option value="solid">Solid</option>
+        <option value="transparent">Transparent</option>
+        <option value="invisible">Invisible</option>
+    </select></label>
     <label>Color <select id="color">
         <option value="class">Proper class</option>
         <option value="cluster">Star / boat / diamond</option>
@@ -98,37 +130,15 @@
         <option value="type">Thick / thin</option>
         <option value="plain">Plain</option>
     </select></label>
-    <span class="zgrp">
-        <span class="grp">Z-orientation</span>
-        <span class="zrow">
-            <label title="The reflection: index runs downward"><input type="radio" name="parity" id="ptails"> tails</label>
-            <label title="Collapse the roof into its own shadow, the flat Penrose tiling"><input type="checkbox" id="flat"> flat</label>
-            <label title="The default: index runs upward"><input type="radio" name="parity" id="pheads" checked> heads</label>
-        </span>
-        <span class="zrow">
-            <label title="Solids below the roof in the default orientation"><input type="checkbox" id="tailsolids" checked> tail solids</label>
-            <label title="Solids above the roof in the default orientation"><input type="checkbox" id="headsolids" checked> heads solids</label>
-        </span>
-    </span>
     <span class="checks">
-        <button id="reset" title="Forget saved settings and start again from the defaults">Reset</button>
+        <label><input type="checkbox" id="edges" checked> edges</label>
+        <label title="A light-to-dark ramp with height, so the surface reads as a relief rather than a flat map"><input type="checkbox" id="shade" checked> functional shading</label>
+        <label title="Level sets of height, running on unbroken from tile to tile"><input type="checkbox" id="isogloss"> isoglosses</label>
     </span>
 </div>
 
-<div class="bar">
-    <span class="grp">Rhombs</span>
-    <label>Surface <select id="rhombmode">
-        <option value="solid">Solid</option>
-        <option value="transparent">Transparent</option>
-        <option value="invisible">Invisible</option>
-    </select></label>
-    <span class="checks">
-        <label><input type="checkbox" id="edges" checked> edges</label>
-        <label><input type="checkbox" id="shade" checked> shading</label>
-        <label><input type="checkbox" id="isogloss"> isoglosses</label>
-    </span>
-
-    <span class="grp">RTs</span>
+<div class="bar" id="rtbar">
+    <span class="grp">Triacontahedra</span>
     <label>Solids <select id="rtmode">
         <option value="transparent">Transparent</option>
         <option value="solid">Solid</option>
@@ -144,15 +154,16 @@
         <option value="cups" title="The ten on the roof's side — a cup above the roof, a hat below it">Cup</option>
         <option value="class" title="Only the rhombs this solid actually owns: four, five or ten">By class</option>
     </select></label>
-    <span class="checks">
-        <label><input type="checkbox" id="rtedges" checked> edges</label>
+    <span class="checks rtchecks">
         <label title="The face normal of each rhomb, drawn from the tile to the center it names"><input type="checkbox" id="normals"> normals</label>
+        <label><input type="checkbox" id="rtedges" checked> edges</label>
+        <label id="rtshadelab" title="A light-to-dark ramp with height across the cup — the hint that says bowl from hat. Whole solids need no such hint, so it applies to Cup and By class only."><input type="checkbox" id="rtshade" checked> functional shading</label>
+        <label id="rtisolab" title="Level sets of height across the cup. Cup and By class only."><input type="checkbox" id="rtisogloss"> isoglosses</label>
     </span>
 </div>
 
 <div class="classbar" id="classbar">
-    <span class="grp">Proper classes — a rhomb with all its normals. Everything else is
-    demoted: shaded and contoured, but colorless.</span>
+    <span class="grp" title="A proper class is a rhomb with all its normals. Everything else is demoted: shaded and contoured, but colorless.">Proper classes</span>
 </div>
 
 <div id="view"></div>

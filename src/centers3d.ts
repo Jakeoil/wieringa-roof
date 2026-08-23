@@ -75,6 +75,8 @@ const rtSel = el<HTMLSelectElement>("rtmode");
 const rtExtentSel = el<HTMLSelectElement>("rtextent");
 const rtEdgesChk = el<HTMLInputElement>("rtedges");
 const rtFacesSel = el<HTMLSelectElement>("rtfaces");
+const rtShadeChk = el<HTMLInputElement>("rtshade");
+const rtIsoChk = el<HTMLInputElement>("rtisogloss");
 
 const classBar = el<HTMLElement>("classbar");
 const pickEl = el<HTMLElement>("pick");
@@ -82,8 +84,11 @@ const statusEl = el<HTMLElement>("status");
 
 const PREFS_KEY = "wr-centers";
 const PREF_DEFAULTS = {
-    patch: "Pe3",
-    gen: 3,
+    // The Sun at generation 2. The Sun is the patch with a genuine center — a Pe5
+    // rosette with the void under it — and at generation 2 it is small enough that
+    // every solid in it can be looked at one at a time.
+    patch: "Sun",
+    gen: 2,
     color: "class",
     parity: "heads",
     flat: false,
@@ -102,6 +107,8 @@ const PREF_DEFAULTS = {
     rtextent: "sphere",
     rtedges: true,
     rtfaces: "full",
+    rtshade: true,
+    rtisogloss: false,
     classOn: [true, true, true, true],
     classNorm: [true, true, true, true],
     classRT: [true, true, true, true],
@@ -321,6 +328,138 @@ function netFor(faces: number[]): Float32Array {
     if (netCache.size > 400) netCache.delete(netCache.keys().next().value as string);
     netCache.set(k, made);
     return made;
+}
+
+// ── the cup's own relief ──────────────────────────────────────────
+//
+// A whole ball needs no help reading as a solid: its silhouette closes and its lighting
+// runs all the way round. A *piece* of one does not. Ten spherical rhombs are the same
+// picture whether they are a bowl seen from inside or a dome seen from outside, and the
+// eye picks whichever it feels like — which on this page is exactly the question being
+// asked, since a cup above the roof and a hat below it are the two parities.
+//
+// So the cups borrow the roof's own two cues: a light-to-dark ramp with height, and
+// level sets of height. Both are functions of z alone, which is what makes them read as
+// relief rather than as pattern. They are offered for `cups` and `by class` and not for
+// `all 30`, where the surface closes and the cue would only fight the lighting.
+//
+// Everything here is computed once per face set on the unit solid and then scaled,
+// mirrored and translated per solid, exactly as `patchesFor` and `netFor` are.
+
+/** Seven contours, so the spacing is the eighths the roof's isoglosses already use. */
+const ISO_LEVELS = 7;
+
+/** Unit-space z range of a triangle soup. */
+function zRangeOf(tri: ArrayLike<number>): [number, number] {
+    let lo = Infinity;
+    let hi = -Infinity;
+    for (let i = 2; i < tri.length; i += 3) {
+        if (tri[i] < lo) lo = tri[i];
+        if (tri[i] > hi) hi = tri[i];
+    }
+    return [lo, hi];
+}
+
+/** The face set as flat triangles on the unit solid — the polyhedral counterpart of
+ *  `sphericalPatches`, used only to slice contours out of. */
+function flatTris(faces: number[]): Float32Array {
+    const out: number[] = [];
+    for (const fi of faces) {
+        const f = RT_FACES[fi];
+        for (const v of [f[0], f[1], f[2], f[0], f[2], f[3]]) out.push(v[0], v[1], v[2]);
+    }
+    return new Float32Array(out);
+}
+
+/** Level sets of z, marched over the triangles. A plane through a vertex can cut one
+ *  edge or three; those are dropped rather than guessed at, since the neighboring
+ *  levels cover the same ground. */
+function contourSegments(tri: ArrayLike<number>, lo: number, hi: number): Float32Array {
+    const out: number[] = [];
+    if (!(hi > lo)) return new Float32Array(0);
+    for (let k = 1; k <= ISO_LEVELS; k++) {
+        const z = lo + ((hi - lo) * k) / (ISO_LEVELS + 1);
+        for (let t = 0; t < tri.length; t += 9) {
+            const hits: number[] = [];
+            for (let e = 0; e < 3; e++) {
+                const a = t + e * 3;
+                const b = t + ((e + 1) % 3) * 3;
+                const da = tri[a + 2] - z;
+                const db = tri[b + 2] - z;
+                if ((da <= 0 && db > 0) || (db <= 0 && da > 0)) {
+                    const u = da / (da - db);
+                    hits.push(
+                        tri[a] + (tri[b] - tri[a]) * u,
+                        tri[a + 1] + (tri[b + 1] - tri[a + 1]) * u,
+                        z,
+                    );
+                }
+            }
+            if (hits.length === 6) out.push(...hits);
+        }
+    }
+    return new Float32Array(out);
+}
+
+interface CupRelief {
+    /** unit-space z of the lowest and highest point of the face set */
+    lo: number;
+    hi: number;
+    /** unit-space contour segments, ready to scale and place */
+    iso: Float32Array;
+}
+const reliefCache = new Map<string, CupRelief>();
+function reliefFor(faces: number[], spherical: boolean): CupRelief {
+    const k = (spherical ? "s:" : "f:") + faces.slice().sort((a, b) => a - b).join(",");
+    const had = reliefCache.get(k);
+    if (had) return had;
+    const tri = spherical ? patchesFor(faces).pos : flatTris(faces);
+    const [lo, hi] = zRangeOf(tri);
+    const made: CupRelief = { lo, hi, iso: contourSegments(tri, lo, hi) };
+    // Bounded like the other two, and for the same reason: "by class" opens the key
+    // space up to arbitrary subsets of the thirty.
+    if (reliefCache.size > 400) reliefCache.delete(reliefCache.keys().next().value as string);
+    reliefCache.set(k, made);
+    return made;
+}
+
+/**
+ * The ramp parameter for one vertex: −1 at the bottom of the cup, +1 at the top.
+ *
+ * `zUnit` is unit-space and `z` is the parity, so the product is the world-space
+ * height and the ramp follows the model over rather than travelling with it. Turning
+ * a hat into a bowl therefore turns the shading over too, which is the whole point of
+ * having it.
+ */
+function cupRampT(zUnit: number, r: CupRelief, z: number): number {
+    const span = r.hi - r.lo;
+    if (!(span > 0)) return 0;
+    const wLo = z > 0 ? r.lo : -r.hi;
+    return ((zUnit * z - wLo) / span) * 2 - 1;
+}
+
+/** `shadeColor` without the allocation — this runs per vertex over a whole patch. */
+function pushShaded(out: number[], c: THREE.Color, t: number): void {
+    const k = Math.abs(t) * 0.55;
+    const to = t >= 0 ? 1 : 0;
+    out.push(c.r + (to - c.r) * k, c.g + (to - c.g) * k, c.b + (to - c.b) * k);
+}
+
+/**
+ * Place unit-space contours on one solid, scaled by `r` and mirrored with the scene.
+ *
+ * Two shells, one just outside the surface and one just inside, exactly as the
+ * spherical net uses: drawn at radius `r` a contour is coplanar with the surface along
+ * its whole length and loses the depth test to it, and a single outer shell disappears
+ * again the moment you look into the cup from inside.
+ */
+function placeRelief(out: number[], iso: Float32Array, r: number, c: V3, z: number): void {
+    for (const shell of [1.004, 0.996]) {
+        const k = r * shell;
+        for (let i = 0; i < iso.length; i += 3) {
+            out.push(iso[i] * k + c[0], iso[i + 1] * k + c[1], iso[i + 2] * k * z + c[2]);
+        }
+    }
 }
 
 // The insphere, as a mesh. ρ is not a fitted radius — the triacontahedron is
@@ -683,7 +822,13 @@ function build(reframe: boolean): void {
     const spherical = rtExtent === "sphere" || rtExtent === "midsphere";
     const sphereR = rtExtent === "midsphere" ? MIDRADIUS : RHO;
     const surfaceShown = rhombSel.value !== "invisible";
+    // The relief cues, live only where a surface is open. See `reliefFor` above.
+    const cupShade = rtCup && rtShadeChk.checked;
+    const cupIso = rtCup && rtIsoChk.checked;
     if (rtMode !== "invisible") {
+        // Unit-space contours, scaled and placed per solid, gathered from whichever of
+        // the two surface paths runs and drawn once at the end.
+        const isoSeg: number[] = [];
         const tris: number[] = [];
         const cols: number[] = [];
         const lines: number[] = [];
@@ -705,10 +850,12 @@ function build(reframe: boolean): void {
                 const cols: number[] = [];
                 const z = flip ? -1 : 1;
                 for (const s of balls) {
-                    const { pos: up, nrm: un } = patchesFor(facesOf(s));
+                    const fs = facesOf(s);
+                    const { pos: up, nrm: un } = patchesFor(fs);
                     const r = sphereR * sizeOf(s);
                     const c = place(s.c);
                     const col = solidColor(s);
+                    const relief = cupShade || cupIso ? reliefFor(fs, true) : null;
                     for (let t = 0; t < up.length; t += 9) {
                         // Reflecting z reverses each triangle's winding, and these carry
                         // **supplied** normals rather than computed ones. Left alone,
@@ -721,9 +868,11 @@ function build(reframe: boolean): void {
                             const i = t + o;
                             pos.push(up[i] * r + c[0], up[i + 1] * r + c[1], up[i + 2] * r * z + c[2]);
                             nrm.push(un[i], un[i + 1], un[i + 2] * z);
-                            cols.push(col.r, col.g, col.b);
+                            if (cupShade && relief) pushShaded(cols, col, cupRampT(up[i + 2], relief, z));
+                            else cols.push(col.r, col.g, col.b);
                         }
                     }
+                    if (cupIso && relief) placeRelief(isoSeg, relief.iso, r, c, z);
                 }
                 const g = new THREE.BufferGeometry();
                 g.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
@@ -831,11 +980,18 @@ function build(reframe: boolean): void {
             const t = sizeOf(s);
             if (t <= 0) continue;
             const col = solidColor(s);
-            for (const i of facesOf(s)) {
+            const fs = facesOf(s);
+            const relief = cupShade || cupIso ? reliefFor(fs, false) : null;
+            for (const i of fs) {
                 const f = solidFace(s, i, flip, t, d.offset);
-                for (const v of [f[0], f[1], f[2], f[0], f[2], f[3]]) {
+                // The unit face alongside the placed one: the ramp is a function of
+                // unit-space height, so it does not have to undo the placement.
+                const u = RT_FACES[i];
+                for (const k of [0, 1, 2, 0, 2, 3]) {
+                    const v = f[k];
                     tris.push(v[0], v[1], v[2]);
-                    cols.push(col.r, col.g, col.b);
+                    if (cupShade && relief) pushShaded(cols, col, cupRampT(u[k][2], relief, zsign));
+                    else cols.push(col.r, col.g, col.b);
                 }
                 for (let k = 0; k < 4; k++) {
                     const a = f[k];
@@ -843,6 +999,7 @@ function build(reframe: boolean): void {
                     lines.push(a[0], a[1], a[2], b[0], b[1], b[2]);
                 }
             }
+            if (cupIso && relief) placeRelief(isoSeg, relief.iso, t, place(s.c), zsign);
         }
         if (tris.length) {
         const sg = new THREE.BufferGeometry();
@@ -885,6 +1042,23 @@ function build(reframe: boolean): void {
         ll.renderOrder = 2;
         rv.add(ll);
         }
+        }
+
+        // The contours, gathered from whichever surface path ran. Lighter and thinner
+        // than the edges they lie between: the creases say where one rhomb stops and
+        // the next begins, and these say only how high you are.
+        if (isoSeg.length) {
+            const ig = new LineSegmentsGeometry();
+            ig.setPositions(isoSeg);
+            const im = new LineMaterial({
+                color: 0x1d2026, linewidth: 1.2, worldUnits: false,
+                transparent: true, opacity: 0.6, alphaToCoverage: true,
+            });
+            im.resolution.set(view.clientWidth || 1, view.clientHeight || 1);
+            normalMats.push(im);
+            const il = new LineSegments2(ig, im);
+            il.renderOrder = 2;
+            rv.add(il);
         }
     }
 
@@ -1130,6 +1304,25 @@ rtEdgesChk.checked = prefs.rtedges;
 rtFacesSel.value = prefs.rtfaces
     || (prefs.rtextent === "cup" || (prefs as { rtcups?: boolean }).rtcups ? "cups" : PREF_DEFAULTS.rtfaces);
 if (!rtFacesSel.value) rtFacesSel.value = PREF_DEFAULTS.rtfaces;
+rtShadeChk.checked = prefs.rtshade ?? PREF_DEFAULTS.rtshade;
+rtIsoChk.checked = prefs.rtisogloss ?? PREF_DEFAULTS.rtisogloss;
+
+/**
+ * The two relief cues only have work to do where the surface is open.
+ *
+ * At `All 30` the solid closes and there is nothing ambiguous about it — the lighting
+ * and the silhouette already say ball, and a height ramp laid over all thirty faces
+ * only argues with them. So the pair goes dead at `All 30` and lives at `Cup` and
+ * `By class`. Disabled rather than hidden: a control that vanishes takes the fact that
+ * it exists with it.
+ */
+function syncCupControls(): void {
+    const live = rtFacesSel.value !== "full" && rtSel.value !== "invisible";
+    for (const c of [rtShadeChk, rtIsoChk]) {
+        c.disabled = !live;
+        c.parentElement?.classList.toggle("off", !live);
+    }
+}
 // After every select that feeds the limit has been restored, not before — the list that
 // gets built depends on the extent and on whether edges are on.
 fillGenerations(Number(prefs.gen) || PREF_DEFAULTS.gen);
@@ -1245,9 +1438,11 @@ for (const c of [rtSel, rtExtentSel, rtEdgesChk]) {
     c.addEventListener("change", () => { fillGenerations(); rebuild(false); });
 }
 for (const c of [colorSel, headSolidsChk, tailSolidsChk, rhombSel, edgesChk, shadeChk,
-                 isoChk, normalsChk, rtFacesSel]) {
+                 isoChk, normalsChk, rtFacesSel, rtShadeChk, rtIsoChk]) {
     c.addEventListener("change", () => rebuild(false));
 }
+for (const c of [rtFacesSel, rtSel]) c.addEventListener("change", syncCupControls);
+syncCupControls();
 
 // Switching parity runs the roof down to flat, turns it over while nothing is on
 // screen, and runs it back out. Already flat, there is nothing to animate — the parity
@@ -1292,6 +1487,8 @@ function persist(): void {
         rtextent: rtExtentSel.value,
         rtedges: rtEdgesChk.checked,
         rtfaces: rtFacesSel.value,
+        rtshade: rtShadeChk.checked,
+        rtisogloss: rtIsoChk.checked,
         classOn: classCtl.map((c) => c.on.checked),
         classNorm: classCtl.map((c) => c.norm.checked),
         classRT: classCtl.map((c) => c.rt.checked),
