@@ -291,6 +291,67 @@ the shadows distinct, and the floor exactly one unit below. Writing it turned up
 real bugs in the module: the edge vectors were being stored at half length, and the two
 volumes were pasted constants rather than determinants of the actual edges.
 
+**The two heights, since they are easy to confuse.** Everything is in units of the
+**rhomb edge**, and the rhomb edge is the object of length 1: all six icosahedral
+generators are unit vectors, the vertical included, so every one of a hexahedron's twelve
+edges is 1 and so is the drop from roof to floor. The slab is one rhomb edge thick. The
+lift's own step is the other height — a vertex of index `m` sits at `z = m/√5`, since
+each generator contributes `E_j · e_z = 1/√5`:
+
+| index | height `m/√5` | above index 1 |
+|---|---|---|
+| 1 | 0.447213595 | 0 |
+| 2 | 0.894427191 | 0.447213595 |
+| 3 | 1.341640786 | 0.894427191 |
+| 4 | 1.788854382 | 1.341640786 |
+
+So the roof's whole relief is `3/√5 = 1.3416` (the constant `roof3d.ts` already carries),
+one index step is `1/√5 = 0.4472`, and the slab is `√5 = 2.2360680` index steps deep.
+Irrational, with a consequence: the floor never lands on a height the roof uses — not
+rarely but never, since `m − m′ = √5` has no integer solution.
+
+**Isoglosses: tops and floors yes, side walls no.** A roof edge changes the index by
+exactly 1, so every rhomb spans exactly 2 levels and contours on eighths of a face's own
+span are quarter-index levels *globally*, running on continuously from rhomb to rhomb.
+On the cell tops that is the roof's contour map; on the floors it is the same map one
+unit lower. The walls get none, for a reason and not for taste: a wall is plumb, so
+height restricted to it depends on nothing but `z` and its level sets are horizontal
+lines on every wall alike — dense, uniform, and asserting only that the wall is vertical,
+which the construction guarantees. What the walls do encode is the √5 above, and that is
+better said in a sentence than drawn. (Jeff raised this; the reasoning is his instinct
+plus the arithmetic.)
+
+**Generations are ghosted rather than capped.** `src/patchsize.ts` holds the rhomb count
+of every patch at every generation, generated and verified by `tools/patchsize.mjs`, so
+the dropdown can say how big a choice is before making it. Each entry shows its count, is
+marked *(slow)* past 8,000 and disabled past 45,000; the star seeds show generation 1 as
+*none*, since a star, boat or diamond is not produced until the first deflation. One flat
+cap would have been the wrong instrument — Pe5 reaches generation 6 at 33,820 rhombs while
+Sun is at 16,475 by generation 4:
+
+| patch | 1 | 2 | 3 | 4 | 5 | 6 |
+|---|---|---|---|---|---|---|
+| Pe5 | 5 | 25 | 140 | 835 | 5,225 | 33,820 |
+| Pe3 | 4 | 23 | 139 | 878 | 5,719 | 38,003 |
+| Pe1 | 3 | 21 | 138 | 921 | 6,213 | 42,186 |
+| St5 | — | 15 | 165 | 1,380 | 10,455 | 75,645 |
+| St3 | — | 9 | 105 | 894 | 6,825 | 49,569 |
+| St1 | — | 3 | 45 | 408 | 3,195 | 23,493 |
+| Deca | 10 | 80 | 610 | 4,430 | 31,360 | 218,930 |
+| Sun | 55 | 365 | 2,440 | 16,475 | 111,925 | 763,160 |
+| Star | 35 | 280 | 2,075 | 14,845 | 104,240 | 724,435 |
+
+**Controls: the hexahedra are the subject, the roof is an accessory.** Color and surface
+are separated — how a cell is painted is independent of whether it is solid, transparent
+or hidden. `tops` and `floors` toggle the cells' own two Penrose surfaces, which belong
+to the cells and not to the roof. `shading` ramps tops and floors light-high to dark-low
+*as seen*, so it inverts under tails, and that inversion is the cue that the model has
+been turned over. Parity is tails/heads; there is deliberately no vertical-scale slider,
+because squashing the lift would leave the solids no longer golden and the solids are the
+point. The roof overlay may be collapsed instead, into its own shadow held above the
+model as a sheet, and is lifted a hair clear of the cell tops when not — the two are
+coplanar point for point, and coincident surfaces cannot be depth-sorted.
+
 **And the lower surface is the roof again.** Every cell's bottom face is its top face
 moved down by exactly one unit, so the second Penrose surface is congruent to the first
 and exactly parallel — the quasiperiodic sandwich panel of the source discussion, and

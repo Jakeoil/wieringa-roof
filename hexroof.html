@@ -7,14 +7,33 @@
 <link rel="stylesheet" href="./site.css">
 <link rel="icon" href="./favicon.svg">
 <style>
-    .bar { display: flex; gap: 16px; align-items: flex-end; flex-wrap: wrap;
+    .bar { display: flex; gap: 14px; align-items: flex-end; flex-wrap: wrap;
         background: var(--panel); border: 1px solid var(--rule);
         border-radius: 8px; padding: 12px 14px; margin: 18px 0 10px; }
+    .bar + .bar { margin-top: 0; }
     .bar label { display: flex; flex-direction: column; gap: 3px; font-size: 12px; color: var(--ink-soft); }
-    .bar input[type=range] { width: 120px; }
     .bar select { font: inherit; font-size: 13px; padding: 5px 8px; border: 1px solid #ccc; border-radius: 4px; background: #fff; color: var(--ink); }
+    .bar input[type=range] { width: 132px; }
     .bar .checks { display: flex; gap: 12px; align-items: center; }
     .bar .checks label { flex-direction: row; align-items: center; gap: 5px; font-size: 13px; color: var(--ink); }
+    .zgrp { display: flex; flex-direction: column; gap: 2px; }
+    .zrow { display: flex; gap: 12px; align-items: center; }
+    .zrow label { display: flex; align-items: center; gap: 4px; font-size: 13px; color: var(--ink); }
+    /* The roof group folds away, since the roof is an accessory and most of the time
+       its controls are just taking up room above the model. */
+    .fold { background: var(--panel); border: 1px solid var(--rule);
+        border-radius: 8px; margin: 0 0 10px; }
+    .fold > summary { list-style: none; cursor: pointer; padding: 9px 14px;
+        font-size: 11px; text-transform: uppercase; letter-spacing: .06em;
+        color: var(--ink-faint); display: flex; align-items: center; gap: 8px; }
+    .fold > summary::-webkit-details-marker { display: none; }
+    .fold > summary::before { content: "\25B8"; font-size: 10px; transition: transform .15s; }
+    .fold[open] > summary::before { transform: rotate(90deg); }
+    .fold > summary .state { text-transform: none; letter-spacing: 0; font-size: 12px;
+        color: var(--ink-soft); }
+    .fold .bar { border: none; background: none; margin: 0; padding: 0 14px 12px; }
+    .bar .grp { font-size: 11px; text-transform: uppercase; letter-spacing: .06em;
+        color: var(--ink-faint); align-self: center; margin: 0 2px 3px 0; }
     #view { width: 100%; height: min(72vh, 640px); border: 1px solid var(--rule);
         border-radius: 8px; overflow: hidden; background: #f4f1e8; }
     #view canvas { display: block; width: 100%; height: 100%; cursor: grab; }
@@ -46,43 +65,78 @@
 
 <h1>Hexahedra</h1>
 <p class="lede">
-    The same roof, seen as solid rather than as surface. Under every rhomb hangs exactly
-    one golden hexahedron — acute beneath the thick, obtuse beneath the thin, straight
-    down, with nothing to choose. Start with the roof in the cluster colors or the
-    Kowalewski five, then bring the hexahedra up.
+    The roof as a solid slab rather than a surface. Under every rhomb hangs exactly one
+    golden hexahedron — acute beneath the thick, obtuse beneath the thin, straight down,
+    with nothing to choose. The cells carry their own upper and lower surfaces, so the
+    roof itself is an accessory here: leave it off, or drop it over the model as a
+    transparent color filter.
 </p>
 
 <div class="bar">
+    <span class="grp">Global</span>
     <label>Patch <select id="patch"></select></label>
     <label>Generation <select id="gen"></select></label>
-    <label>Roof color <select id="color">
-        <option value="cluster">Star / boat / diamond</option>
+    <span class="zgrp">
+        <span class="grp">Z-orientation</span>
+        <span class="zrow">
+            <label title="The reflection: index runs downward"><input type="radio" name="parity" id="ptails"> tails</label>
+            <label title="The default: index runs upward"><input type="radio" name="parity" id="pheads" checked> heads</label>
+        </span>
+    </span>
+    <span class="checks">
+        <button id="reset" title="Forget saved settings and start again from the defaults">Reset</button>
+    </span>
+</div>
+
+<div class="bar">
+    <span class="grp">Hexahedra</span>
+    <label>Color <select id="cellcolor">
+        <option value="type">Acute / obtuse</option>
         <option value="five">Kowalewski five</option>
-        <option value="type">Thick / thin</option>
         <option value="plain">Plain</option>
     </select></label>
-    <label>Roof <select id="roofmode">
+    <label>Surface <select id="cellmode">
         <option value="solid">Solid</option>
         <option value="transparent">Transparent</option>
         <option value="invisible">Invisible</option>
     </select></label>
-    <label>Hexahedra <select id="cellmode">
-        <option value="type">Acute and obtuse</option>
-        <option value="five">Kowalewski five</option>
+    <label>Show <select id="cellshow">
+        <option value="both">Both</option>
         <option value="acute">Acute only</option>
         <option value="obtuse">Obtuse only</option>
-        <option value="transparent">Transparent</option>
-        <option value="invisible">Invisible</option>
     </select></label>
-    <label>Shrink <input type="range" id="shrink" min="0.3" max="1" step="0.01" value="1">
-        <span class="mono" id="shrinkOut" style="font-size:11px"></span></label>
+    <label>Shrink <span id="shrinkOut" class="mono"></span>
+        <input type="range" id="shrink" min="0.3" max="1" step="0.005" value="1"></label>
     <span class="checks">
+        <label title="The upper rhomb of each cell — the roof surface itself"><input type="checkbox" id="tops" checked> tops</label>
+        <label title="The lower rhomb of each cell — the second Penrose surface"><input type="checkbox" id="floors" checked> floors</label>
         <label><input type="checkbox" id="edges" checked> edges</label>
-        <label><input type="checkbox" id="floor"> floor</label>
-        <label><input type="checkbox" id="flip"> dales up</label>
-        <button id="reset" title="Forget saved settings and start again from the defaults">Reset</button>
+        <label title="Light where high, dark where low, in the orientation on screen"><input type="checkbox" id="shade"> shading</label>
+        <label title="Height contours on the tops and floors. Side walls are plumb, so their contours would be horizontal lines carrying no information."><input type="checkbox" id="isogloss"> isoglosses</label>
     </span>
 </div>
+
+<details class="fold" id="roofpanel">
+    <summary>Roof <span class="state" id="roofstate"></span></summary>
+    <div class="bar">
+        <label>Roof <select id="roofmode">
+            <option value="invisible">Off</option>
+            <option value="transparent">Transparent</option>
+            <option value="solid">Solid</option>
+        </select></label>
+        <label>Color <select id="roofcolor">
+            <option value="cluster">Star / boat / diamond</option>
+            <option value="five">Kowalewski five</option>
+            <option value="type">Thick / thin</option>
+            <option value="plain">Plain</option>
+        </select></label>
+        <span class="checks">
+            <label title="Flatten the roof into its own shadow, the plain Penrose tiling, and hold it above the model as a sheet"><input type="checkbox" id="flat"> flatten</label>
+            <label><input type="checkbox" id="roofedges" checked> edges</label>
+            <label><input type="checkbox" id="roofiso"> isoglosses</label>
+        </span>
+    </div>
+</details>
 
 <div id="view"></div>
 <span class="info" id="status"></span>
@@ -95,63 +149,120 @@
     <strong>The change of primitive.</strong> At the surface the roof is golden rhombs —
     a Penrose P3 tiling lifted out of the plane. One level down the natural blocks are
     not rhombs at all but the two <strong>golden hexahedra</strong>, acute and obtuse,
-    which are the three-dimensional analogues of the thick and thin tiles and the cells
-    of icosahedral quasicrystal models.
+    the three-dimensional analogues of the thick and thin tiles and the cells of
+    icosahedral quasicrystal models.
 </p>
 <p>
     <strong>One hexahedron per rhomb, and nothing to choose.</strong> A rhomb spans two
     of the five lifting axes. The third edge of its cell is the <strong>vertical</strong>
-    — which is the sixth icosahedral axis, the one the roof surface itself never uses.
-    Every generator satisfies <span class="mono">|E<sub>j</sub>| = 1</span> and
+    — the sixth icosahedral axis, the one the roof surface itself never uses. Every
+    generator satisfies <span class="mono">|E<sub>j</sub>| = 1</span> and
     <span class="mono">E<sub>j</sub> · e<sub>z</sub> = 1/√5</span> exactly, so
     <span class="mono">{E<sub>j</sub>, E<sub>k</sub>, e<sub>z</sub>}</span> is a golden
     rhombohedron like any other triple of the six. The cell hangs straight down: four
-    vertical side faces, edges running plumb, the rhomb on top and its own translate
-    beneath.
+    plumb side walls, the rhomb on top and its own translate beneath.
 </p>
 <p>
     <strong>Thick gives acute, thin gives obtuse.</strong> For a thick rhomb the two
     lifting axes meet at <span class="mono">+1/√5</span>, so all three pairwise dots are
-    positive and the cell is the prolate one, volume 0.760845. For a thin rhomb that dot
-    is negative and the cell is oblate, 0.470228. So the acute-to-obtuse ratio is just
-    the thick-to-thin ratio, tending to φ.
+    positive and the cell is prolate, volume 0.760845. For a thin rhomb that dot is
+    negative and the cell is oblate, 0.470228. The acute-to-obtuse ratio is therefore the
+    thick-to-thin ratio, tending to φ — and the two volumes are themselves in golden
+    ratio.
 </p>
 <p>
     <strong>They cannot overlap.</strong> Not by search but by construction: each cell is
-    a vertical prism under its own rhomb, and the rhombi project to a tiling of the
-    plane. Disjoint shadows, therefore disjoint prisms, whatever their heights.
+    a vertical prism under its own rhomb, and the rhombs project to a tiling of the plane.
+    Disjoint shadows, therefore disjoint prisms, whatever their heights.
+</p>
+
+<h3>The two heights</h3>
+<p>
+    Everything on this page is measured in units of the <strong>rhomb edge</strong>, and
+    that edge is the object of length 1. All six icosahedral generators are unit vectors,
+    the vertical included, so every edge of every hexahedron — all twelve — is 1, and so
+    is the drop from the roof to the floor. The slab is exactly one rhomb edge thick.
 </p>
 <p>
-    <strong>The five carries down, and it is the same five.</strong> The layer's six axes
-    are exactly the triacontahedron's — the roof's five generators plus the vertical — so
-    the Kowalewski coloring applies verbatim rather than by analogy: same function, same
-    six axes, same five colors. A zonohedron face takes the color of the two axes that
-    span it, which here means the top and bottom of a cell wear the rhomb's own roof
-    color, and a side wall wears the color of the edge it stands on, since
-    <span class="mono">pairColor(m, vertical) = m</span>.
+    The lift's own step is the other height. A vertex of index <span class="mono">m</span>
+    sits at <span class="mono">z = m/√5</span>, because each generator contributes
+    <span class="mono">E<sub>j</sub> · e<sub>z</sub> = 1/√5</span>, and the four indices
+    of a Penrose lift give four levels:
+</p>
+<table>
+    <thead><tr><th>index</th><th>height <span class="mono">m/√5</span></th><th>above index 1</th></tr></thead>
+    <tbody>
+        <tr><td>1</td><td class="mono">0.447213595</td><td class="mono">0</td></tr>
+        <tr><td>2</td><td class="mono">0.894427191</td><td class="mono">0.447213595</td></tr>
+        <tr><td>3</td><td class="mono">1.341640786</td><td class="mono">0.894427191</td></tr>
+        <tr><td>4</td><td class="mono">1.788854382</td><td class="mono">1.341640786</td></tr>
+    </tbody>
+</table>
+<p>
+    So the whole relief of the roof is <span class="mono">3/√5 = 1.3416</span>, one index
+    step is <span class="mono">1/√5 = 0.4472</span>, and the slab — being one edge thick —
+    is <span class="mono">√5 = 2.2360680</span> index steps deep. That is irrational, and
+    it has a consequence: the floor never lands on a height the roof uses. Not rarely —
+    never, since <span class="mono">m − m′ = √5</span> has no integer solution.
+</p>
+
+<h3>Isoglosses, and where they mean something</h3>
+<p>
+    A roof edge changes the index by exactly 1, so every rhomb spans exactly 2 levels and
+    contours drawn on eighths of a face's own span are quarter-index levels
+    <em>globally</em> — they run on continuously from one rhomb into the next. On the
+    cell tops that is the roof's own contour map, and on the floors it is the same map
+    exactly one unit lower.
 </p>
 <p>
-    <strong>Like touches like, without being arranged.</strong> Two neighboring rhombs
-    share an edge, that edge runs along one axis <span class="mono">m</span>, so both of
-    their walls over it are spanned by <span class="mono">{m, vertical}</span> and both
-    take color <span class="mono">m</span>. Every shared wall agrees, necessarily.
-    Measured on Sun generation 3: 4,715 shared walls, no clashes. And every cell wears
-    three colors, as on the triacontahedron — <span class="mono">pairColor(j,k)</span>,
-    <span class="mono">j</span> and <span class="mono">k</span>, distinct because a proper
-    edge coloring of K₆ cannot give a pair the color of an axis inside it.
+    <strong>The side walls get none, and for a reason rather than for taste.</strong> A
+    wall is plumb, so height restricted to it depends on nothing but
+    <span class="mono">z</span>: its level sets are horizontal lines, on every wall alike.
+    They would be dense, uniform, and would tell you only that the wall is vertical, which
+    the construction already guarantees. What the walls really encode is the √5 above —
+    band them by height and you would see bands registering with nothing, ever, in either
+    direction. Better said in a sentence than drawn.
+</p>
+
+<h3>The controls</h3>
+<p>
+    The hexahedra are the subject and come first. <em>Color</em> and <em>surface</em> are
+    separate: how a cell is painted has nothing to do with whether it is solid,
+    transparent or hidden. <em>Tops</em> and <em>floors</em> turn the cells' own two
+    Penrose surfaces on and off — they belong to the cells, not to the roof.
+    <em>Shading</em> ramps the tops and floors light-high to dark-low <em>as seen</em>,
+    so it inverts under tails, and that inversion is the cue that the model has been
+    turned over.
 </p>
 <p>
-    Drag <em>shrink</em> to pull each cell in toward its own center, which opens the
-    walls to view without moving anything out of place. At full size a cell's top face is
-    the roof rhomb itself — the same four points — so it is left undrawn while the roof is
-    showing, since two coincident surfaces cannot be rendered one in front of the other.
+    <strong>Every generation is offered, and the ones that will not hold up are
+    ghosted.</strong> A single cap would be the wrong instrument: Pe5 reaches generation 6
+    at 33,820 rhombs while Sun is already at 16,475 by generation 4, so one number that
+    suits the largest patch throws away most of what the small ones can do. Each entry
+    carries its rhomb count, is marked <em>(slow)</em> past 8,000, and is disabled past
+    45,000 — the page pays for each cell in six faces and twenty-four edge segments, and
+    the edges are the expensive half. The three star seeds show generation 1 as
+    <em>none</em>, since a star, boat or diamond is not produced until the first
+    deflation.
 </p>
 <p>
-    <strong>And the floor is the roof again.</strong> The cells' bottom faces are their
-    top faces moved down by one unit, so the second Penrose surface underneath is
-    congruent to the first and exactly parallel — the quasiperiodic sandwich panel of the
-    original discussion, and it is exact rather than approximate. Turn on
-    <em>floor</em> to see it.
+    <strong>Parity is tails and heads, and there is no flat roof here.</strong> The reflection is
+    exact — a mirrored golden rhombohedron is still golden — but the vertical-scale slider
+    of the <a href="./roof3d.html" draggable="false">3D</a> page is not available here,
+    because squashing the lift would leave the solids no longer golden, and the solids are
+    the point. The roof overlay may be collapsed instead: <em>collapse</em> flattens it
+    into its own shadow, the plain Penrose tiling, and holds it above the model as a
+    sheet — <em>flatten</em>, which collapses the surface, not the panel.
+</p>
+<p>
+    <strong>The roof is an accessory.</strong> Off by default, since the cells already
+    carry their own upper and lower surfaces — and its whole control group folds away,
+    with the current setting shown on the closed header so nothing is hidden by being
+    put out of sight. Its use is as a transparent film for reading
+    the tiling's coloring through the solid. Its rhombs are coplanar with the cell tops
+    point for point, so it is lifted a hair clear of them along the outward direction —
+    two exactly coincident surfaces cannot be depth-sorted, and left alone they mottle
+    together and neither reads.
 </p>
 <p>
     See <a href="./roof3d.html" draggable="false">3D</a> for the surface on its own,

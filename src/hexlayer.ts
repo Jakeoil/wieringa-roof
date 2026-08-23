@@ -62,6 +62,12 @@ export interface HexCell {
     colors: number[];
     /** the axis each of the four side walls stands on, in the order of `faces[2..5]` */
     wallAxis: number[];
+    /**
+     * Lift index of each top corner, in the order of `corners`. Always four consecutive
+     * values spanning exactly 2, since a roof edge changes the index by exactly 1 — which
+     * is what lets height contours be drawn at globally consistent levels.
+     */
+    index: number[];
     center: V3;
     e: [V3, V3, V3];
     corners: V3[];
@@ -91,7 +97,9 @@ export function hexLayer(): HexLayer {
     let acute = 0;
 
     for (const r of allRhombs) {
-        const vids = r.verts.map((pt) => vertexMap.get(roundKey(pt))!.id);
+        const vs = r.verts.map((pt) => vertexMap.get(roundKey(pt))!);
+        const vids = vs.map((v) => v.id);
+        const index = vs.map((v) => v.index);
         const top = vids.map((v) => pos3D(lift.n[v]!));
         const bottom = top.map((p) => [p[0], p[1], p[2] - 1] as V3);
         floor.push(bottom);
@@ -141,6 +149,7 @@ export function hexLayer(): HexLayer {
             faces,
             colors,
             wallAxis,
+            index,
             acute: r.thick,
             volume: Math.abs(det3(e)),
         });

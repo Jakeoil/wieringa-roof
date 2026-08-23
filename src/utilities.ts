@@ -47,12 +47,19 @@ for (let g = 1; g <= 4; g++) {
     genSel.appendChild(o);
 }
 
+// A select handed a stored value that no option carries reports "" rather than
+// rejecting it, and every later comparison against it quietly fails. `seedSel` was
+// already guarded; the rest were not.
 seedSel.value = prefs.seed;
-if (!seedSel.value) seedSel.value = ICON_DEFAULTS.seed;
 genSel.value = String(prefs.gen);
 subjectSel.value = prefs.subject;
 colorSel.value = prefs.color;
 bgSel.value = prefs.background;
+for (const [sel, def] of [
+    [seedSel, ICON_DEFAULTS.seed], [genSel, String(ICON_DEFAULTS.gen)],
+    [subjectSel, ICON_DEFAULTS.subject], [colorSel, ICON_DEFAULTS.color],
+    [bgSel, ICON_DEFAULTS.background],
+] as Array<[HTMLSelectElement, string]>) if (!sel.value) sel.value = def;
 strokeIn.value = String(prefs.stroke);
 strokeColSel.value = prefs.strokeColor;
 if (!strokeColSel.value) strokeColSel.value = ICON_DEFAULTS.strokeColor;
