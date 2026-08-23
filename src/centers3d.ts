@@ -39,12 +39,6 @@ import type { V3 } from "./solids.js";
 // Detents. Only a handful of settings on either slider mean anything, so those are
 // the ones the control lands on; the travel between them is free, which is how the
 // normals are watched converging rather than merely found already converged.
-const NLEN_STOPS = [0, Math.sqrt(1 + 2 / Math.sqrt(5))];
-const SSCALE_STOPS = [0, 1 / PHI ** 3, 1 / PHI ** 2, 1 / PHI, 1];
-const snapTo = (v: number, stops: number[], tol: number): number => {
-    for (const s of stops) if (Math.abs(v - s) < tol) return s;
-    return v;
-};
 
 const cross = (a: V3, b: V3): V3 => [
     a[1] * b[2] - a[2] * b[1],
@@ -76,17 +70,12 @@ const edgesChk = el<HTMLInputElement>("edges");
 const shadeChk = el<HTMLInputElement>("shade");
 const isoChk = el<HTMLInputElement>("isogloss");
 const normalsChk = el<HTMLInputElement>("normals");
-const nlenInput = el<HTMLInputElement>("nlen");
-const nlenOut = el<HTMLElement>("nlenOut");
+
 const rtSel = el<HTMLSelectElement>("rtmode");
 const rtExtentSel = el<HTMLSelectElement>("rtextent");
 const rtEdgesChk = el<HTMLInputElement>("rtedges");
 const rtFacesSel = el<HTMLSelectElement>("rtfaces");
-const markersChk = el<HTMLInputElement>("markers");
-const demotedChk = el<HTMLInputElement>("rtdemoted");
-const truncChk = el<HTMLInputElement>("rttrunc");
-const sscaleInput = el<HTMLInputElement>("sscale");
-const sscaleOut = el<HTMLElement>("sscaleOut");
+
 const classBar = el<HTMLElement>("classbar");
 const pickEl = el<HTMLElement>("pick");
 const statusEl = el<HTMLElement>("status");
@@ -105,7 +94,6 @@ const PREF_DEFAULTS = {
     shade: true,
     isogloss: false,
     normals: false,
-    nlen: Math.sqrt(1 + 2 / Math.sqrt(5)),
     rtmode: "transparent",
     // Spheres by default. The balls were the object of the exercise and the
     // triacontahedra the means of finding them — and the sphere is also the only
@@ -114,10 +102,6 @@ const PREF_DEFAULTS = {
     rtextent: "sphere",
     rtedges: true,
     rtfaces: "full",
-    markers: true,
-    rtdemoted: false,
-    rttrunc: false,
-    sscale: 1,
     classOn: [true, true, true, true],
     classNorm: [true, true, true, true],
     classRT: [true, true, true, true],
@@ -530,8 +514,10 @@ function build(reframe: boolean): void {
     }
 
     const complete = cen.solids.filter((s) => s.complete);
-    const nlen = Number(nlenInput.value);
-    const sscale = Number(sscaleInput.value);
+    // The normals ran on a length slider that detented at ρ. Everything interesting
+    // happens at ρ — it is where every normal lands on its center — so they are simply
+    // drawn at ρ now and the slider is gone.
+    const nlen = RHO;
     const wantHeadSolids = headSolidsChk.checked;
     const wantTailSolids = tailSolidsChk.checked;
     last = { faces: d.faces };
@@ -549,12 +535,12 @@ function build(reframe: boolean): void {
     //
     // Turn both on and coverage is total, necessarily: every rhomb has a home and a
     // home's cup contains it. Verified at 0 uncovered on every patch.
-    const wantDemoted = demotedChk.checked;
-    const wantTrunc = truncChk.checked;
+    // Demoted and truncated solids are never drawn now. The class rows carry everything
+    // worth steering, and both switches only ever added shapes that are not classes:
+    // demoted solids have no class at all, and truncated ones are cut by the patch edge
+    // so their count is a lower bound rather than a fact.
     const eligible = (s: Solid): boolean =>
-        s.homeCount > 0 &&
-        (s.settled || wantTrunc) &&
-        (properOf(s) >= 0 || wantDemoted);
+        s.homeCount > 0 && s.settled && properOf(s) >= 0;
     // A **heads solid** sits above the roof in the default orientation, a **tails
     // solid** below it. Intrinsic, and deliberately so: turning the roof over shows you
     // the same solids from underneath rather than swapping them for the other set,
@@ -573,7 +559,7 @@ function build(reframe: boolean): void {
     const passes = (s: Solid): boolean =>
         eligible(s) && sided(s) && (ctl(s)?.on.checked ?? true);
     /** how big to draw this class's solids, 0 for not at all */
-    const sizeOf = (s: Solid) => Number(ctl(s)?.size.value ?? 1) * sscale;
+    const sizeOf = (s: Solid) => Number(ctl(s)?.size.value ?? 1);
     const showNormalsFor = (s: Solid) =>
         passes(s) && (ctl(s)?.norm.checked ?? normalsChk.checked);
     const showRTFor = (s: Solid) => passes(s) && (ctl(s)?.rt.checked ?? true);
@@ -697,7 +683,7 @@ function build(reframe: boolean): void {
     const spherical = rtExtent === "sphere" || rtExtent === "midsphere";
     const sphereR = rtExtent === "midsphere" ? MIDRADIUS : RHO;
     const surfaceShown = rhombSel.value !== "invisible";
-    if (rtMode !== "invisible" && sscale > 0) {
+    if (rtMode !== "invisible") {
         const tris: number[] = [];
         const cols: number[] = [];
         const lines: number[] = [];
@@ -723,10 +709,20 @@ function build(reframe: boolean): void {
                     const r = sphereR * sizeOf(s);
                     const c = place(s.c);
                     const col = solidColor(s);
-                    for (let i = 0; i < up.length; i += 3) {
-                        pos.push(up[i] * r + c[0], up[i + 1] * r + c[1], up[i + 2] * r * z + c[2]);
-                        nrm.push(un[i], un[i + 1], un[i + 2] * z);
-                        cols.push(col.r, col.g, col.b);
+                    for (let t = 0; t < up.length; t += 9) {
+                        // Reflecting z reverses each triangle's winding, and these carry
+                        // **supplied** normals rather than computed ones. Left alone,
+                        // `DoubleSide` sees a back face and negates the normal I gave it,
+                        // so a mirrored cap ends up lit from the inside — the light
+                        // apparently moving underneath the model when parity is switched.
+                        // Reversing the winding puts the two back in step.
+                        const order = z > 0 ? [0, 3, 6] : [6, 3, 0];
+                        for (const o of order) {
+                            const i = t + o;
+                            pos.push(up[i] * r + c[0], up[i + 1] * r + c[1], up[i + 2] * r * z + c[2]);
+                            nrm.push(un[i], un[i + 1], un[i + 2] * z);
+                            cols.push(col.r, col.g, col.b);
+                        }
                     }
                 }
                 const g = new THREE.BufferGeometry();
@@ -777,23 +773,30 @@ function build(reframe: boolean): void {
         // Budgeted like the solids are — the net is 60 arcs of 7 segments, and past a few
         // hundred solids that is more line than anyone can read.
         if (spherical && rtEdgesChk.checked && balls.length) {
-            const perSolid = (rtCup ? 20 : 60) * 7 * 6;
+            const perSolid = (rtCup ? 20 : 60) * 7 * 6 * 2; // two shells, see below
             if (balls.length * perSolid > 4_000_000) {
                 rtNote += ` · ${balls.length.toLocaleString()} spherical nets is too much ` +
                     `line to draw — turn edges off or show fewer classes.`;
             } else {
                 const seg: number[] = [];
                 const z = flip ? -1 : 1;
-                for (const s of balls) {
-                    const net = netFor(facesOf(s));
-                    // A hair proud of the surface. Drawn at exactly `r` the arcs are
-                    // coplanar with the ball everywhere along their length and lose the
-                    // depth test to it — the net is in the buffer and nothing shows.
-                    const r = sphereR * sizeOf(s) * 1.004;
-                    const c = place(s.c);
-                    // Mirrored with the scene, exactly as the solids are.
-                    for (let i = 0; i < net.length; i += 3) {
-                        seg.push(net[i] * r + c[0], net[i + 1] * r + c[1], net[i + 2] * r * z + c[2]);
+                // Two shells, one just outside the surface and one just inside.
+                //
+                // Drawn at exactly `r` the arcs are coplanar with the ball along their
+                // whole length and lose the depth test to it, so nothing shows at all. A
+                // single shell outside fixes that from the outside and reintroduces it
+                // from within — and with a solid surface you are often looking into the
+                // cap, where the outer copy is behind the very surface it is drawn on. A
+                // pair costs one more line buffer and is visible from either side.
+                for (const shell of [1.004, 0.996]) {
+                    for (const s of balls) {
+                        const net = netFor(facesOf(s));
+                        const r = sphereR * sizeOf(s) * shell;
+                        const c = place(s.c);
+                        // Mirrored with the scene, exactly as the solids are.
+                        for (let i = 0; i < net.length; i += 3) {
+                            seg.push(net[i] * r + c[0], net[i + 1] * r + c[1], net[i + 2] * r * z + c[2]);
+                        }
                     }
                 }
                 const g = new LineSegmentsGeometry();
@@ -885,45 +888,6 @@ function build(reframe: boolean): void {
         }
     }
 
-    // A marker at every center that holds two faces or more. A center claimed by a
-    // single face is not evidence of anything — every face has two of those by
-    // construction — so showing them would bury the signal in its own scaffolding.
-    if (markersChk.checked) {
-        const pts: number[] = [];
-        const cols: number[] = [];
-        let drawnMarkers = 0;
-        for (const s of shown) {
-            drawnMarkers++;
-            const p = place(s.c);
-            const r = (0.05 + 0.022 * s.faces.length) * Math.max(0.35, sizeOf(s));
-            const col = solidColor(s);
-            for (let i = 0; i < BALL_POS.length; i += 3) {
-                pts.push(
-                    BALL_POS[i] * r + p[0],
-                    BALL_POS[i + 1] * r + p[1],
-                    BALL_POS[i + 2] * r + p[2],
-                );
-                cols.push(col.r, col.g, col.b);
-            }
-        }
-        if (drawnMarkers) {
-            const mg = new THREE.BufferGeometry();
-            mg.setAttribute("position", new THREE.Float32BufferAttribute(pts, 3));
-            mg.setAttribute("color", new THREE.Float32BufferAttribute(cols, 3));
-            mg.computeVertexNormals();
-            rv.add(
-                new THREE.Mesh(
-                    mg,
-                    new THREE.MeshStandardMaterial({
-                        vertexColors: true,
-                        roughness: 0.45,
-                        metalness: 0.1,
-                        flatShading: true,
-                    }),
-                ),
-            );
-        }
-    }
 
     // The clicked face, and the two solids it names — drawn whatever the filters say,
     // since the point of asking about one face is to see the answer even when the
@@ -951,7 +915,7 @@ function build(reframe: boolean): void {
             // Through solidFace like everything else. Drawn from the raw mesh table
             // this had its own copy of the parity bug — a highlight a tenth of a turn
             // off the solid it is highlighting.
-            const t = Math.max(sscale, 0.14);
+            const t = 1;
             for (let i = 0; i < RT_FACES.length; i++) {
                 const face = solidFace(cen.solids[sid], i, flip, t, d.offset);
                 for (let k = 0; k < 4; k++) {
@@ -1045,7 +1009,6 @@ function build(reframe: boolean): void {
         `${shown.length} of ${perClass.reduce((a, b) => a + b, 0)} proper solids shown · ` +
         `rhombi by class ${clsText}, ${demoted} demoted · ` +
         `${bare} rhombi with no cup over them${bare ? " (turn on demoted and truncated)" : ""} · ` +
-        `normals ${(nlen / RHO).toFixed(2)}ρ · ` +
         // What the RT controls are actually doing, spelled out. A toggle that has not
         // taken effect is then visible here instead of being a matter of opinion about
         // what the picture looks like.
@@ -1140,8 +1103,6 @@ function fillGenerations(prefer?: number): void {
 colorSel.value = prefs.color;
 if (!colorSel.value) colorSel.value = PREF_DEFAULTS.color;
 normalsChk.checked = prefs.normals;
-nlenInput.value = String(prefs.nlen);
-sscaleInput.value = String(prefs.sscale);
 flip = prefs.parity === "tails";
 headsRadio.checked = !flip;
 tailsRadio.checked = flip;
@@ -1155,7 +1116,6 @@ edgesChk.checked = prefs.edges;
 shadeChk.checked = prefs.shade;
 isoChk.checked = prefs.isogloss;
 normalsChk.checked = prefs.normals;
-nlenInput.value = String(prefs.nlen);
 rtSel.value = prefs.rtmode || PREF_DEFAULTS.rtmode;
 if (!rtSel.value) rtSel.value = PREF_DEFAULTS.rtmode;
 // "Cup only" used to be a third extent and is now a checkbox, so a saved setting from
@@ -1173,10 +1133,6 @@ if (!rtFacesSel.value) rtFacesSel.value = PREF_DEFAULTS.rtfaces;
 // After every select that feeds the limit has been restored, not before — the list that
 // gets built depends on the extent and on whether edges are on.
 fillGenerations(Number(prefs.gen) || PREF_DEFAULTS.gen);
-markersChk.checked = prefs.markers;
-demotedChk.checked = prefs.rtdemoted;
-truncChk.checked = prefs.rttrunc;
-sscaleInput.value = String(prefs.sscale);
 
 // One row per proper class: show, its own normals and solids overrides, a size slider
 // and a live population. The three globals above are master switches — flipping one
@@ -1266,9 +1222,6 @@ rtSel.addEventListener("change", () => {
 });
 
 function rebuild(reframe: boolean): void {
-    const nl = Number(nlenInput.value);
-    nlenOut.textContent = `${(nl / RHO).toFixed(2)}ρ`;
-    sscaleOut.textContent = `${Number(sscaleInput.value).toFixed(2)}×`;
     // Generating a patch and finding its triacontahedra takes about two seconds at
     // generation 5 — the Sun is 112,000 rhombi — and it blocks the thread. Announce it
     // and yield a frame so the message actually paints first, which is the same
@@ -1292,7 +1245,7 @@ for (const c of [rtSel, rtExtentSel, rtEdgesChk]) {
     c.addEventListener("change", () => { fillGenerations(); rebuild(false); });
 }
 for (const c of [colorSel, headSolidsChk, tailSolidsChk, rhombSel, edgesChk, shadeChk,
-                 isoChk, normalsChk, markersChk, demotedChk, truncChk, rtFacesSel]) {
+                 isoChk, normalsChk, rtFacesSel]) {
     c.addEventListener("change", () => rebuild(false));
 }
 
@@ -1321,22 +1274,6 @@ for (const r of [headsRadio, tailsRadio]) {
     });
 }
 flatChk.addEventListener("change", () => animateTo(flatChk.checked ? 0 : 1));
-for (const c of [nlenInput, sscaleInput]) {
-    c.addEventListener("input", () => rebuild(false));
-}
-// Only the landing snaps, as on the 3D page's vertical slider. Dragging is free —
-// watching the segments converge is the whole point of the control — but letting go
-// near ρ lands on ρ exactly, so the picture that makes the argument is not something
-// you have to hit by hand.
-nlenInput.addEventListener("change", () => {
-    nlenInput.value = String(snapTo(Number(nlenInput.value), NLEN_STOPS, 0.1));
-    rebuild(false);
-});
-sscaleInput.addEventListener("change", () => {
-    sscaleInput.value = String(snapTo(Number(sscaleInput.value), SSCALE_STOPS, 0.035));
-    rebuild(false);
-});
-
 function persist(): void {
     savePrefs(PREFS_KEY, {
         patch: patchSel.value,
@@ -1351,15 +1288,10 @@ function persist(): void {
         shade: shadeChk.checked,
         isogloss: isoChk.checked,
         normals: normalsChk.checked,
-        nlen: Number(nlenInput.value),
         rtmode: rtSel.value,
         rtextent: rtExtentSel.value,
         rtedges: rtEdgesChk.checked,
         rtfaces: rtFacesSel.value,
-        markers: markersChk.checked,
-        rtdemoted: demotedChk.checked,
-        rttrunc: truncChk.checked,
-        sscale: Number(sscaleInput.value),
         classOn: classCtl.map((c) => c.on.checked),
         classNorm: classCtl.map((c) => c.norm.checked),
         classRT: classCtl.map((c) => c.rt.checked),

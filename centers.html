@@ -128,14 +128,6 @@
         <label><input type="checkbox" id="isogloss"> isoglosses</label>
     </span>
 
-    <span class="grp">Normals</span>
-    <span class="checks">
-        <label><input type="checkbox" id="normals"> show</label>
-    </span>
-    <label>Length <span id="nlenOut" class="mono"></span>
-        <input type="range" id="nlen" min="0" max="3" step="0.005" value="1.376">
-    </label>
-
     <span class="grp">RTs</span>
     <label>Solids <select id="rtmode">
         <option value="transparent">Transparent</option>
@@ -144,23 +136,18 @@
     </select></label>
     <label>Extent <select id="rtextent">
         <option value="full">RT</option>
-        <option value="sphere">Insphere ρ = 1.3764</option>
-        <option value="midsphere">Midsphere = 1.4644</option>
+        <option value="sphere" title="ρ = 1.3764, tangent to every face at its centroid">Insphere</option>
+        <option value="midsphere" title="√(ρ²+¼) = 1.4644, tangent to all sixty edges at their midpoints">Midsphere</option>
     </select></label>
     <label title="Which faces of each RT to draw">Faces <select id="rtfaces">
-        <option value="full">All thirty</option>
-        <option value="cups">Cup — the ten on the roof's side</option>
-        <option value="class">By class — only the rhombs it owns</option>
+        <option value="full">All 30</option>
+        <option value="cups" title="The ten on the roof's side — a cup above the roof, a hat below it">Cup</option>
+        <option value="class" title="Only the rhombs this solid actually owns: four, five or ten">By class</option>
     </select></label>
     <span class="checks">
         <label><input type="checkbox" id="rtedges" checked> edges</label>
-        <label><input type="checkbox" id="markers" checked> centers</label>
-        <label title="Solids whose home class is 1, 2 or 3 — not proper, drawn colorless"><input type="checkbox" id="rtdemoted"> demoted</label>
-        <label title="Solids whose ten-face footprint runs off the edge of the patch, so the count is a lower bound"><input type="checkbox" id="rttrunc"> truncated</label>
+        <label title="The face normal of each rhomb, drawn from the tile to the center it names"><input type="checkbox" id="normals"> normals</label>
     </span>
-    <label>Size <span id="sscaleOut" class="mono"></span>
-        <input type="range" id="sscale" min="0" max="1" step="0.005" value="1">
-    </label>
 </div>
 
 <div class="classbar" id="classbar">
@@ -365,18 +352,18 @@
     orientation rather than decoration.
 </p>
 <p>
-    <strong>Normals and triacontahedra</strong> have global settings, and each class
-    overrides them: the globals are master switches that write through to all four, and
-    the per-class boxes are the state from then on. <em>Length</em> detents at ρ, where
-    every normal lands on its center, and runs past it on purpose — normals do meet at
-    ρ/φ³, ρ√5, 3ρ and ρφ³, and none of those gathers more than a handful of faces.
-    Only ρ builds anything, and watching the rest fail is worth more than being told.
-    <em>Cups</em> — now a checkbox, since it applies to any extent — draws ten faces
-    instead of all thirty: the ten on the roof's side, which are the ones that actually
-    carry the solid's rhombs and all of a solid the roof ever sees. Measured on Sun
-    generation 1, every owned rhomb falls inside that ten for every solid, hat and bowl
-    alike.
-    <em>Insphere</em> draws the ball instead of the polyhedron — the ping-pong ball. Its radius is not fitted:
+    <strong>Normals and RTs</strong> have global switches here, and each class row
+    overrides them: the globals write through to all four, and the per-class boxes are the
+    state from then on. Normals are drawn at ρ and only at ρ — that is where every one of
+    them lands on its center, and the length slider that used to run past it has gone.
+    Only the four proper classes are drawn: demoted solids have no class, and truncated
+    ones are cut by the patch edge so their count is a lower bound rather than a fact.
+    <em>Faces</em> chooses how much of each solid to show — all thirty, the ten-rhomb
+    <em>cup</em> on the roof's side, or <em>by class</em>, only the rhombs it owns.
+    Measured on Sun generation 1, every owned rhomb falls inside the cup for every solid,
+    hat and bowl alike.
+    <em>Insphere</em> draws the ball instead of the polyhedron — the ping-pong ball. Its
+    radius is not fitted:
     the triacontahedron is isohedral, so all thirty face planes are tangent to one
     sphere of radius ρ, each touching at its own face's centroid. So the ball touches
     the roof at the exact middle of every rhomb that solid carries, and nowhere else —
