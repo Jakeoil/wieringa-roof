@@ -17,7 +17,9 @@ import { BUILD_ID } from "./build-id.js";
 import { seedTypes, generatePatch, allRhombs } from "./geometry.js";
 import { buildRoof } from "./roofgeom.js";
 import { createRoofView, PLAIN_COLOR } from "./roofview.js";
-import { triacontahedra, RHO } from "./centers.js";
+import { triacontahedra, RHO, MIDRADIUS } from "./centers.js";
+import { cutaway } from "./cutaway.js";
+import { patchSize, patchBalls, MAX_GENERATION } from "./patchsize.js";
 import { packing, properBalls } from "./packing.js";
 import type { Solid } from "./centers.js";
 
@@ -38,7 +40,19 @@ const roofOnlyChk = el<HTMLInputElement>("roofonly");
 const roofChk = el<HTMLInputElement>("roof");
 const kissChk = el<HTMLInputElement>("kiss");
 const biggestChk = el<HTMLInputElement>("biggest");
+const cutModeSel = el<HTMLSelectElement>("cutmode");
+const cutRadiusSel = el<HTMLSelectElement>("cutradius");
+const cutFacesSel = el<HTMLSelectElement>("cutfaces");
+const cutDetailSel = el<HTMLSelectElement>("cutdetail");
 const statusEl = el<HTMLElement>("status");
+
+// What the cutaway costs is clipping, not drawing: every triangle of every ball is tested
+// against every neighbor plane. Measured at detail 3, a thousand balls is about half a
+// second per rebuild, and it grows linearly in balls and fourfold per detail step. So the
+// generations are ghosted on the **ball** count and the limits are tighter in cutaway
+// mode than for plain spheres.
+const CUT_BUSY = 150;
+const CUT_LIMIT = 1000;
 
 const PREFS_KEY = "wr-packing";
 const PREF_DEFAULTS = {
@@ -51,6 +65,10 @@ const PREF_DEFAULTS = {
     roof: false,
     kiss: true,
     biggest: false,
+    cutmode: "balls",
+    cutradius: "rho",
+    cutfaces: "all",
+    cutdetail: "3",
 };
 const prefs = loadPrefs(PREFS_KEY, PREF_DEFAULTS);
 const rv = createRoofView(view, 0xf7f6f2);
@@ -140,7 +158,56 @@ function build(reframe: boolean): void {
     };
 
     const shown = balls.map((_, i) => i).filter((i) => keep[i]);
-    if (shown.length && scale > 0) {
+    const cutting = cutModeSel.value === "cut";
+    let cutInfo = "";
+
+    if (cutting && shown.length) {
+        // Only the balls actually on screen are cut, but every ball is offered as a
+        // cutter — a hidden neighbor still buries part of a visible sphere, and pretending
+        // otherwise would show surface that is not really exposed.
+        const radius = cutRadiusSel.value === "mid" ? MIDRADIUS
+            : cutRadiusSel.value === "custom" ? RHO * scale
+            : RHO;
+        const res = cutaway(balls, {
+            radius,
+            ownFacesOnly: cutFacesSel.value === "own",
+            detail: Number(cutDetailSel.value),
+        });
+        const pos: number[] = [];
+        const col: number[] = [];
+        let exposedShown = 0;
+        let bareShown = 0;
+        for (const sp of res.spheres) {
+            if (!keep[sp.ball]) continue;
+            exposedShown += sp.area;
+            bareShown += 4 * Math.PI * radius * radius;
+            const c = colorOf(sp.ball);
+            for (let i = 0; i < sp.positions.length; i += 3) {
+                const p3 = place([sp.positions[i], sp.positions[i + 1], sp.positions[i + 2]]);
+                pos.push(p3[0], p3[1], p3[2]);
+                col.push(c.r, c.g, c.b);
+            }
+        }
+        if (pos.length) {
+            const g = new THREE.BufferGeometry();
+            g.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
+            g.setAttribute("color", new THREE.Float32BufferAttribute(col, 3));
+            g.computeVertexNormals();
+            rv.add(new THREE.Mesh(g, new THREE.MeshStandardMaterial({
+                vertexColors: true, roughness: 0.36, metalness: 0.04,
+                side: THREE.DoubleSide, flatShading: false,
+            })));
+        }
+        const label = cutRadiusSel.value === "mid" ? "midsphere"
+            : cutRadiusSel.value === "custom" ? `${scale.toFixed(2)}ρ` : "insphere ρ";
+        cutInfo = `cutaway at ${label} = ${radius.toFixed(4)} · ` +
+            `${(pos.length / 9).toFixed(0)} triangles · ` +
+            `exposed ${(100 * exposedShown / Math.max(1e-9, bareShown)).toFixed(1)}% of bare sphere` +
+            `${cutFacesSel.value === "own" ? ", under owned rhombs only" : ""} · ` +
+            `${res.cutPairs} cutting pairs · `;
+    }
+
+    if (!cutting && shown.length && scale > 0) {
         const mesh = new THREE.InstancedMesh(
             BALL_GEO,
             new THREE.MeshStandardMaterial({
@@ -228,7 +295,8 @@ function build(reframe: boolean): void {
     for (let i = 0; i < balls.length; i++) if (keep[i]) h[pk.degree[i]] = (h[pk.degree[i]] ?? 0) + 1;
     const onRoof = pk.contacts.filter((c) => c.onRoof !== null).length;
     statusEl.textContent =
-        `${shown.length} balls of radius ρ=${RHO.toFixed(4)} · ` +
+        `${shown.length} balls${cutting ? "" : ` of radius ρ=${RHO.toFixed(4)}`} · ` +
+        cutInfo +
         `${pk.contacts.length} contacts, ${onRoof} of them on the roof · ` +
         `${pk.overlapPairs} overlapping pairs · ` +
         `coordination ${JSON.stringify(h)} · ` +
@@ -245,12 +313,61 @@ for (const [code, nick] of [
     o.value = code; o.textContent = nick; patchSel.appendChild(o);
 }
 patchSel.value = prefs.patch || PREF_DEFAULTS.patch;
-for (const g of [2, 3, 4, 5]) {
-    const o = document.createElement("option");
-    o.value = String(g); o.textContent = `Generation ${g}`; genSel.appendChild(o);
+if (!patchSel.value) patchSel.value = PREF_DEFAULTS.patch;
+
+/**
+ * Fill the generation list for the current patch and mode, ghosting what will not run.
+ *
+ * The limit depends on the mode. Drawing spheres is cheap and scales with the ball count;
+ * cutting them is not, so in cutaway mode the ceiling drops by more than an order of
+ * magnitude. Ghosting the choice is better than letting it be made and then quietly
+ * doing something cheaper instead.
+ */
+function fillGenerations(prefer?: number): void {
+    const code = patchSel.value || PREF_DEFAULTS.patch;
+    const cutting = cutModeSel.value === "cut";
+    const keep = prefer ?? Number(genSel.value);
+    genSel.textContent = "";
+    const usable = (g: number): boolean => {
+        if (patchSize(code, g) <= 0) return false;
+        if (!cutting) return patchSize(code, g) <= 45000;
+        const b = patchBalls(code, g);
+        return b > 0 && b <= CUT_LIMIT;
+    };
+    for (let g = 1; g <= MAX_GENERATION; g++) {
+        const n = patchSize(code, g);
+        const b = patchBalls(code, g);
+        const o = document.createElement("option");
+        o.value = String(g);
+        if (n <= 0) {
+            o.textContent = `Generation ${g} — none`;
+            o.disabled = true;
+            o.title = `${code} does not exist at generation ${g}`;
+        } else if (!usable(g)) {
+            o.textContent = `Generation ${g} — ${cutting && b > 0 ? `${b.toLocaleString()} balls` : `${n.toLocaleString()} rhombs`}`;
+            o.disabled = true;
+            o.title = cutting
+                ? "too many balls to cut away — every triangle is clipped against every neighbor"
+                : `${n.toLocaleString()} rhombs is past what this page can draw`;
+        } else {
+            const busy = cutting && b > CUT_BUSY;
+            o.textContent = `Generation ${g} — ${b > 0 ? `${b.toLocaleString()} balls` : `${n.toLocaleString()} rhombs`}${busy ? " (slow)" : ""}`;
+            o.title = `${n.toLocaleString()} rhombs, ${b > 0 ? b.toLocaleString() : "?"} proper solids`;
+        }
+        genSel.appendChild(o);
+    }
+    let g = keep || PREF_DEFAULTS.gen;
+    if (!usable(g)) {
+        let best = 0;
+        for (let i = 1; i <= MAX_GENERATION; i++) if (usable(i) && (i <= g || best === 0)) best = i;
+        g = best || 2;
+    }
+    genSel.value = String(g);
+    if (!genSel.value) {
+        const first = Array.from(genSel.options).find((o) => !o.disabled);
+        if (first) genSel.value = first.value;
+    }
 }
-genSel.value = String(prefs.gen);
-if (!genSel.value) genSel.value = String(PREF_DEFAULTS.gen);
 colorSel.value = prefs.color || PREF_DEFAULTS.color;
 sizeInput.value = String(prefs.size);
 contactsChk.checked = prefs.contacts;
@@ -258,6 +375,16 @@ roofOnlyChk.checked = prefs.roofonly;
 roofChk.checked = prefs.roof;
 kissChk.checked = prefs.kiss;
 biggestChk.checked = prefs.biggest;
+
+cutModeSel.value = prefs.cutmode || PREF_DEFAULTS.cutmode;
+cutRadiusSel.value = prefs.cutradius || PREF_DEFAULTS.cutradius;
+cutFacesSel.value = prefs.cutfaces || PREF_DEFAULTS.cutfaces;
+cutDetailSel.value = String(prefs.cutdetail ?? PREF_DEFAULTS.cutdetail);
+for (const [sel, def] of [
+    [cutModeSel, PREF_DEFAULTS.cutmode], [cutRadiusSel, PREF_DEFAULTS.cutradius],
+    [cutFacesSel, PREF_DEFAULTS.cutfaces], [cutDetailSel, PREF_DEFAULTS.cutdetail],
+] as Array<[HTMLSelectElement, string]>) if (!sel.value) sel.value = def;
+fillGenerations(Number(prefs.gen) || PREF_DEFAULTS.gen);
 
 function rebuild(reframe: boolean): void {
     sizeOut.textContent = `${Number(sizeInput.value).toFixed(2)}ρ`;
@@ -271,7 +398,12 @@ function rebuild(reframe: boolean): void {
     rv.clear();
     build(reframe);
 }
-for (const c of [patchSel, genSel]) c.addEventListener("change", () => rebuild(true));
+patchSel.addEventListener("change", () => { fillGenerations(); rebuild(true); });
+genSel.addEventListener("change", () => rebuild(true));
+cutModeSel.addEventListener("change", () => { fillGenerations(); rebuild(false); });
+for (const c of [cutRadiusSel, cutFacesSel, cutDetailSel]) {
+    c.addEventListener("change", () => rebuild(false));
+}
 for (const c of [colorSel, contactsChk, roofOnlyChk, roofChk, kissChk, biggestChk]) {
     c.addEventListener("change", () => rebuild(false));
 }
@@ -283,6 +415,8 @@ function persist(): void {
         size: Number(sizeInput.value), contacts: contactsChk.checked,
         roofonly: roofOnlyChk.checked, roof: roofChk.checked,
         kiss: kissChk.checked, biggest: biggestChk.checked,
+        cutmode: cutModeSel.value, cutradius: cutRadiusSel.value,
+        cutfaces: cutFacesSel.value, cutdetail: cutDetailSel.value,
     });
 }
 window.addEventListener("beforeunload", persist);

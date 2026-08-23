@@ -13,3 +13,6 @@ vendor/
 
 # generated each build so the page can report which build it is running
 src/build-id.ts
+
+# Jeff's own source material — chat exports, scratch scripts. Local only.
+jake/

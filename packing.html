@@ -72,6 +72,26 @@
         <input type="range" id="size" min="0" max="1" step="0.01" value="1">
     </label>
 
+    <span class="grp">Cutaway</span>
+    <label title="Balls draws whole spheres. Cutaway removes the part of each sphere buried inside its neighbors, leaving the exposed surface bounded by circular arcs.">Surface <select id="cutmode">
+        <option value="balls">Balls</option>
+        <option value="cut">Cutaway</option>
+    </select></label>
+    <label title="The radius every ball is drawn at">Sphere <select id="cutradius">
+        <option value="rho">Insphere ρ = 1.3764</option>
+        <option value="mid">Midsphere = 1.4644</option>
+        <option value="custom">Custom</option>
+    </select></label>
+    <label title="Whole sphere, or only the part under the rhombs this solid actually owns">Extent <select id="cutfaces">
+        <option value="all">Whole sphere</option>
+        <option value="own">Under its own rhombs</option>
+    </select></label>
+    <label title="Tessellation. Every extra step quadruples the triangles and the clipping work.">Detail <select id="cutdetail">
+        <option value="2">Coarse</option>
+        <option value="3">Medium</option>
+        <option value="4">Fine</option>
+    </select></label>
+
     <span class="grp">Show</span>
     <span class="checks">
         <label><input type="checkbox" id="contacts" checked> contacts</label>
@@ -133,6 +153,73 @@
     the other way round: slice the packing with a plane and tangent spheres become tangent
     circles of varying radius. That has not been tried.
 </p>
+<h3>The cutaway</h3>
+<p>
+    The balls overlap, so most of each sphere's surface is buried inside its neighbors.
+    <em>Cutaway</em> takes that away and leaves what is actually exposed. Every neighbor
+    at distance <span class="mono">d &lt; 2r</span> slices off a cap bounded by the circle
+    where the two spheres meet, and because all the balls share one radius that cutting
+    plane is simply the perpendicular bisector of the two centers — at
+    <span class="mono">d/2</span>, always. What survives is a spherical patch with
+    circular-arc edges.
+</p>
+<p>
+    Where a triangle edge crosses a cutting plane the crossing point is put on the sphere
+    exactly, by solving for where the great-circle arc between its endpoints meets the
+    plane, so the boundary vertices sit on the true intersection circle. Checked against
+    the two-ball case, where the exposed area is <span class="mono">4πr² − 2πrh</span> with
+    <span class="mono">h = r − d/2</span> and nothing is approximated at all: the
+    tessellation converges from below, to 0.1% at <em>fine</em>.
+</p>
+<p>
+    <strong>Extent</strong> chooses between the whole sphere and only the part under the
+    rhombs the solid actually owns — so a class-10 solid shows the spherical image of its
+    ten-face cap, a class-4 solid four rhombs' worth.
+</p>
+
+<h3>Which radius?</h3>
+<p>
+    The insphere <span class="mono">ρ = 1.376382</span> is the natural first guess, the
+    <a href="./polyhedra.html" draggable="false">midsphere</a>
+    <span class="mono">√(ρ² + ¼) = 1.464386</span> the obvious alternative. Measured on
+    Pe3 generation 4 — 106 balls — the insphere is not merely a reasonable choice but a
+    <strong>local maximum of total exposed area</strong>, and the midsphere is well past
+    the cliff:
+</p>
+<table>
+    <thead><tr><th>radius</th><th>exposed area</th><th>of bare sphere</th><th>cutting pairs</th></tr></thead>
+    <tbody>
+        <tr><td class="mono">1.20</td><td class="mono">1687.5</td><td class="mono">87.98%</td><td class="mono">155</td></tr>
+        <tr><td class="mono">1.30</td><td class="mono">1752.1</td><td class="mono">77.83%</td><td class="mono">155</td></tr>
+        <tr><td><strong>ρ = 1.376382</strong></td><td class="mono">1816.8</td><td class="mono">72.00%</td><td class="mono">155</td></tr>
+        <tr><td class="mono">1.464386 (mid)</td><td class="mono">1716.3</td><td class="mono">60.08%</td><td class="mono">305</td></tr>
+        <tr><td class="mono">1.60</td><td class="mono">1667.9</td><td class="mono">48.91%</td><td class="mono">305</td></tr>
+    </tbody>
+</table>
+<p>
+    <strong>And the reason is exact.</strong> The centers do not sit at arbitrary
+    distances — they fall in discrete shells, and the third shell is
+    <span class="mono">2ρ = 2.752764</span>, holding 150 pairs. Those are the kissing
+    contacts. At <span class="mono">r = ρ</span> they are tangent and cost nothing; a hair
+    past it, all 150 caps open at once. That is the kink, and it lands on ρ by
+    construction rather than by luck.
+</p>
+<table>
+    <thead><tr><th>shell</th><th>distance</th><th>pairs</th><th>starts cutting past</th><th>what it is</th></tr></thead>
+    <tbody>
+        <tr><td>1</td><td class="mono">1.701302</td><td class="mono">40</td><td class="mono">0.850651</td><td>the golden rhomb's long diagonal</td></tr>
+        <tr><td>2</td><td class="mono">2.383963</td><td class="mono">115</td><td class="mono">1.191982</td><td></td></tr>
+        <tr><td>3</td><td class="mono">2.752764</td><td class="mono">150</td><td class="mono">1.376382</td><td><strong>2ρ — the kiss</strong></td></tr>
+        <tr><td>4</td><td class="mono">3.641564</td><td class="mono">66</td><td class="mono">1.820782</td><td></td></tr>
+    </tbody>
+</table>
+<p>
+    Past ρ the exposed fraction keeps falling but the bare area grows as
+    <span class="mono">r²</span>, so the total turns up again and climbs indefinitely. The
+    peak at ρ is a genuine local maximum, not a global one — the global answer is simply
+    "as large as you like", which is why the local one is the interesting number.
+</p>
+
 <p>
     See <a href="./polyhedra.html" draggable="false">Polyhedra</a> for the solid these
     are inscribed in, and <a href="./info.html" draggable="false">Mathematics</a> for the

@@ -50,6 +50,21 @@ export const A6: V3[] = [...E5.map((v) => [...v] as V3), [0, 0, 1]];
  *  this far from the center, and touches the insphere at its own centroid. */
 export const RHO = Math.sqrt(1 + 2 / SQRT5);
 
+/**
+ * The **midradius** — the sphere tangent to all sixty edges at their midpoints.
+ *
+ * `√(ρ² + ¼)`, and the quarter has a reason: in any rhombus of edge 1 the diagonals
+ * satisfy `p² + q² = 4`, so the distance from its center to an edge midpoint is
+ * `√(p²+q²)/4 = ½` whatever the rhombus. Drop a perpendicular to a face, travel ½ within
+ * it, and you are at an edge midpoint.
+ *
+ * It is a genuine midsphere because the triacontahedron is edge-transitive — it and the
+ * rhombic dodecahedron are the only two Catalan solids that are, being the duals of the
+ * two quasiregular Archimedeans. There is no matching circumsphere: the solid is not
+ * vertex-transitive, and its 32 vertices sit in two shells, 12 at φ and 20 at 1.4733704.
+ */
+export const MIDRADIUS = Math.sqrt(1 + 2 / SQRT5 + 0.25);
+
 const add = (a: V3, b: V3): V3 => [a[0] + b[0], a[1] + b[1], a[2] + b[2]];
 const sub = (a: V3, b: V3): V3 => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
 const mul = (a: V3, s: number): V3 => [a[0] * s, a[1] * s, a[2] * s];

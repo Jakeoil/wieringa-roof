@@ -22,7 +22,30 @@ export const PATCH_SIZE: Record<string, number[]> = {
     Star: [35, 280, 2075, 14845, 104240, 724435],
 };
 
+/**
+ * Proper triacontahedra in the same patch — the balls of the packing.
+ *
+ * `-1` means not measured: the patch is past 15,000 rhombs, which is far past
+ * what the cutaway can draw anyway, so the exact number would not change any decision.
+ */
+export const PATCH_BALLS: Record<string, number[]> = {
+    Pe5: [0, 1, 11, 91, 701, -1],
+    Pe3: [0, 1, 12, 106, 822, -1],
+    Pe1: [0, 1, 13, 121, 943, -1],
+    St5: [-1, 1, 21, 211, 1731, -1],
+    St3: [-1, 0, 12, 134, 1122, -1],
+    St1: [-1, 0, 4, 58, 514, -1],
+    Deca: [0, 9, 96, 756, -1, -1],
+    Sun: [6, 46, 366, -1, -1, -1],
+    Star: [1, 41, 346, 2576, -1, -1],
+};
+
 /** Rhombs in a patch, or 0 if it does not exist. */
 export function patchSize(code: string, gen: number): number {
     return PATCH_SIZE[code]?.[gen - 1] ?? 0;
+}
+
+/** Balls in the same patch, or -1 where it was too large to measure. */
+export function patchBalls(code: string, gen: number): number {
+    return PATCH_BALLS[code]?.[gen - 1] ?? 0;
 }
