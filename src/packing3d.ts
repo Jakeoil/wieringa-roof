@@ -17,7 +17,7 @@ import { BUILD_ID } from "./build-id.js";
 import { seedTypes, generatePatch, allRhombs } from "./geometry.js";
 import { buildRoof } from "./roofgeom.js";
 import { createRoofView, PLAIN_COLOR } from "./roofview.js";
-import { triacontahedra, RHO, MIDRADIUS } from "./centers.js";
+import { triacontahedra, ownedFaceIndices, RHO, MIDRADIUS } from "./centers.js";
 import { cutaway } from "./cutaway.js";
 import { patchSize, patchBalls, MAX_GENERATION } from "./patchsize.js";
 import { packing, properBalls } from "./packing.js";
@@ -51,6 +51,11 @@ const statusEl = el<HTMLElement>("status");
 // second per rebuild, and it grows linearly in balls and fourfold per detail step. So the
 // generations are ghosted on the **ball** count and the limits are tighter in cutaway
 // mode than for plain spheres.
+// The two vertex shells. There is no circumsphere — the solid is face-transitive and
+// edge-transitive but not vertex-transitive, so its 32 vertices sit at two radii.
+const VERT_OUTER = (1 + Math.sqrt(5)) / 2;                       // 12 fivefold vertices
+const VERT_INNER = Math.sqrt(RHO * RHO + 1 / (VERT_OUTER * Math.sqrt(5))); // the other 20
+
 const CUT_BUSY = 150;
 const CUT_LIMIT = 1000;
 
@@ -103,7 +108,12 @@ function ensurePatch(): void {
     patchKey = key;
     cache = null;
 }
-let cache: { balls: Solid[]; pk: ReturnType<typeof packing>; offset: [number, number, number] } | null = null;
+let cache: {
+    balls: Solid[];
+    pk: ReturnType<typeof packing>;
+    offset: [number, number, number];
+    owned: number[][];
+} | null = null;
 
 function build(reframe: boolean): void {
     const t0 = performance.now();
@@ -117,9 +127,16 @@ function build(reframe: boolean): void {
         const cen = triacontahedra();
         const balls = properBalls(cen);
         const d = buildRoof(1, false);
-        cache = { balls, pk: packing(cen, balls), offset: d ? d.offset : [0, 0, 0] };
+        cache = {
+            balls,
+            pk: packing(cen, balls),
+            offset: d ? d.offset : [0, 0, 0],
+            // Worked out once with the patch rather than on every rebuild: it needs the
+            // whole Centers structure and does not change while the patch stands.
+            owned: balls.map((b) => ownedFaceIndices(cen, b)),
+        };
     }
-    const { balls, pk, offset } = cache;
+    const { balls, pk, offset, owned } = cache;
     const place = (c: readonly number[]): [number, number, number] => [
         c[0] - offset[0], c[1] - offset[1], c[2] - offset[2],
     ];
@@ -165,13 +182,19 @@ function build(reframe: boolean): void {
         // Only the balls actually on screen are cut, but every ball is offered as a
         // cutter — a hidden neighbor still buries part of a visible sphere, and pretending
         // otherwise would show surface that is not really exposed.
+        // The vertex shells are two, not one: the triacontahedron is not vertex-transitive
+        // and has no circumsphere. 12 of its 32 vertices sit at φ and the other 20 at
+        // 1.4733704, so both are offered rather than a made-up single figure.
         const radius = cutRadiusSel.value === "mid" ? MIDRADIUS
+            : cutRadiusSel.value === "inner" ? VERT_INNER
+            : cutRadiusSel.value === "outer" ? VERT_OUTER
             : cutRadiusSel.value === "custom" ? RHO * scale
             : RHO;
         const res = cutaway(balls, {
             radius,
             ownFacesOnly: cutFacesSel.value === "own",
             detail: Number(cutDetailSel.value),
+            facesOf: (_b, i) => owned[i] ?? [],
         });
         const pos: number[] = [];
         const col: number[] = [];
@@ -199,7 +222,9 @@ function build(reframe: boolean): void {
             })));
         }
         const label = cutRadiusSel.value === "mid" ? "midsphere"
-            : cutRadiusSel.value === "custom" ? `${scale.toFixed(2)}ρ` : "insphere ρ";
+            : cutRadiusSel.value === "inner" ? "inner vertex shell"
+            : cutRadiusSel.value === "outer" ? "outer vertex shell φ"
+            : cutRadiusSel.value === "custom" ? `${scale.toFixed(3)}ρ` : "insphere ρ";
         cutInfo = `cutaway at ${label} = ${radius.toFixed(4)} · ` +
             `${(pos.length / 9).toFixed(0)} triangles · ` +
             `exposed ${(100 * exposedShown / Math.max(1e-9, bareShown)).toFixed(1)}% of bare sphere` +
@@ -387,7 +412,8 @@ for (const [sel, def] of [
 fillGenerations(Number(prefs.gen) || PREF_DEFAULTS.gen);
 
 function rebuild(reframe: boolean): void {
-    sizeOut.textContent = `${Number(sizeInput.value).toFixed(2)}ρ`;
+    sizeOut.textContent =
+        `${Number(sizeInput.value).toFixed(2)}ρ = ${(RHO * Number(sizeInput.value)).toFixed(4)}`;
     if (`${patchSel.value}|${genSel.value}` !== patchKey) {
         rv.clear();
         statusEl.textContent = `building ${patchSel.value} generation ${genSel.value}…`;

@@ -34,6 +34,13 @@ export interface CutawayOpts {
     ownFacesOnly: boolean;
     /** subdivision per rhomb edge, or icosahedron subdivisions when showing all of it */
     detail: number;
+    /**
+     * Which `RT_FACES` indices a ball owns, when `ownFacesOnly`. Supplied by the caller
+     * because it needs the whole `Centers` structure to work out, which this module has
+     * no other use for. Without it the ten-face cup is used, which is what the solid
+     * *could* show rather than what it does.
+     */
+    facesOf?: (ball: Solid, index: number) => number[];
 }
 
 export interface CutSphere {
@@ -239,8 +246,7 @@ export function cutaway(balls: Solid[], opts: CutawayOpts): CutawayResult {
         cutPairs += planes.length;
 
         const source = opts.ownFacesOnly
-            ? cupIndices(balls[i])
-                .filter((fi) => balls[i].faces.length > 0)
+            ? (opts.facesOf ? opts.facesOf(balls[i], i) : cupIndices(balls[i]))
                 .flatMap((fi) => facePatch(RT_FACES[fi], r, Math.max(1, opts.detail)))
             : icosphere(r, Math.max(0, Math.min(4, opts.detail)));
 

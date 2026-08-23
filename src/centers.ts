@@ -112,6 +112,39 @@ export function cupIndices(s: Solid): number[] {
     return out;
 }
 
+/**
+ * Which of the thirty `RT_FACES` a solid actually **owns** — that is, which of its faces
+ * are rhombs present in this patch.
+ *
+ * `cupIndices` gives the ten a solid could ever show; this gives the four, five or ten it
+ * really does. A face is matched by direction: a rhomb lying on the solid has its centroid
+ * at `ρ` from the center along one of the thirty face normals, so normalising
+ * `face.c − s.c` picks the index out with no ambiguity.
+ */
+export function ownedFaceIndices(cen: Centers, s: Solid): number[] {
+    const dirs = RT_FACES.map((f) => {
+        const c: V3 = [0, 0, 0];
+        for (const q of f) for (let d = 0; d < 3; d++) c[d] += q[d] / 4;
+        const L = Math.hypot(c[0], c[1], c[2]) || 1;
+        return [c[0] / L, c[1] / L, c[2] / L] as V3;
+    });
+    const out: number[] = [];
+    for (const rid of s.faces) {
+        const f = cen.byRhomb[rid];
+        if (!f) continue;
+        const v: V3 = [f.c[0] - s.c[0], f.c[1] - s.c[1], f.c[2] - s.c[2]];
+        const L = Math.hypot(v[0], v[1], v[2]) || 1;
+        let best = -1;
+        let bestDot = 0.999;
+        for (let i = 0; i < dirs.length; i++) {
+            const d = (v[0] * dirs[i][0] + v[1] * dirs[i][1] + v[2] * dirs[i][2]) / L;
+            if (d > bestDot) { bestDot = d; best = i; }
+        }
+        if (best >= 0 && !out.includes(best)) out.push(best);
+    }
+    return out;
+}
+
 /** Face `i` of solid `s` as it belongs in the scene: scaled about its own center,
  *  mirrored with the scene when `flip`, and recentered by the roof's own offset. */
 export function solidFace(
