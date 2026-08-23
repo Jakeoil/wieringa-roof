@@ -236,7 +236,12 @@ function build(): void {
 
 offsetSel.value = prefs.offset || PREF_DEFAULTS.offset;
 sepInput.value = String(prefs.sep);
+
+// A select handed a stored value that no option carries reports "" rather than rejecting
+// it, so each falls back explicitly.
 bodySel.value = prefs.body || PREF_DEFAULTS.body;
+if (!bodySel.value) bodySel.value = PREF_DEFAULTS.body;
+if (!offsetSel.value) offsetSel.value = PREF_DEFAULTS.offset;
 edgesChk.checked = prefs.edges;
 parentsChk.checked = prefs.parents;
 spinChk.checked = prefs.spin;

@@ -377,6 +377,13 @@ showSel.value = prefs.show || PREF_DEFAULTS.show;
 faceSel.value = prefs.facemode || PREF_DEFAULTS.facemode;
 edgeSel.value = prefs.edgemode || PREF_DEFAULTS.edgemode;
 cageSel.value = prefs.cagemode || PREF_DEFAULTS.cagemode;
+// A select handed a stored value that no option carries reports "" rather than rejecting
+// it, so each falls back explicitly.
+for (const [sel, def] of [
+    [colorSel, PREF_DEFAULTS.color], [showSel, PREF_DEFAULTS.show],
+    [faceSel, PREF_DEFAULTS.facemode], [edgeSel, PREF_DEFAULTS.edgemode],
+    [cageSel, PREF_DEFAULTS.cagemode],
+] as Array<[HTMLSelectElement, string]>) if (!sel.value) sel.value = def;
 flipChk.checked = prefs.flip;
 spinChk.checked = prefs.spin;
 controls.autoRotate = spinChk.checked;

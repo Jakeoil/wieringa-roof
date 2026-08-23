@@ -94,6 +94,7 @@
     <label>Color <select id="color">
         <option value="class">Proper class</option>
         <option value="cluster">Star / boat / diamond</option>
+        <option value="five">Kowalewski five</option>
         <option value="type">Thick / thin</option>
         <option value="plain">Plain</option>
     </select></label>
@@ -135,18 +136,19 @@
         <input type="range" id="nlen" min="0" max="3" step="0.005" value="1.376">
     </label>
 
-    <span class="grp">Triacontahedra</span>
+    <span class="grp">RTs</span>
     <label>Solids <select id="rtmode">
         <option value="transparent">Transparent</option>
         <option value="solid">Solid</option>
         <option value="invisible">Invisible</option>
     </select></label>
     <label>Extent <select id="rtextent">
-        <option value="full">Whole solid</option>
-        <option value="cup">Cup only</option>
-        <option value="sphere">Inscribed sphere</option>
+        <option value="full">RT</option>
+        <option value="sphere">Insphere ρ = 1.3764</option>
+        <option value="midsphere">Midsphere = 1.4644</option>
     </select></label>
     <span class="checks">
+        <label title="The ten-rhomb cap on the roof's side — a cup above the roof, a hat below it — instead of all thirty faces"><input type="checkbox" id="rtcups"> cups</label>
         <label><input type="checkbox" id="rtedges" checked> edges</label>
         <label><input type="checkbox" id="markers" checked> centers</label>
         <label title="Solids whose home class is 1, 2 or 3 — not proper, drawn colorless"><input type="checkbox" id="rtdemoted"> demoted</label>
@@ -365,9 +367,12 @@
     every normal lands on its center, and runs past it on purpose — normals do meet at
     ρ/φ³, ρ√5, 3ρ and ρφ³, and none of those gathers more than a handful of faces.
     Only ρ builds anything, and watching the rest fail is worth more than being told.
-    <em>Cup only</em> draws the ten faces the roof can touch instead of all thirty,
-    which is all of a solid the roof ever sees. <em>Inscribed sphere</em> draws the
-    insphere instead of the polyhedron — the ping-pong ball. Its radius is not fitted:
+    <em>Cups</em> — now a checkbox, since it applies to any extent — draws ten faces
+    instead of all thirty: the ten on the roof's side, which are the ones that actually
+    carry the solid's rhombs and all of a solid the roof ever sees. Measured on Sun
+    generation 1, every owned rhomb falls inside that ten for every solid, hat and bowl
+    alike.
+    <em>Insphere</em> draws the ball instead of the polyhedron — the ping-pong ball. Its radius is not fitted:
     the triacontahedron is isohedral, so all thirty face planes are tangent to one
     sphere of radius ρ, each touching at its own face's centroid. So the ball touches
     the roof at the exact middle of every rhomb that solid carries, and nowhere else —
@@ -375,6 +380,46 @@
     surface. It is the tangency the whole page rests on, made literal. Being its own
     mirror image, the sphere also needs no parity handling, so it is drawn from the
     center alone.
+</p>
+
+<h3>The spherical triacontahedron</h3>
+<p>
+    With a sphere extent showing and <em>edges</em> on, the solid's own edge net is drawn
+    on the ball: thirty spherical rhombs meeting five and three at a time, the sixty edges
+    as great-circle arcs. It is the same graph at any radius — projecting from the center
+    does not care how far out the sphere is — but the two radii offered mean different
+    things.
+</p>
+<p>
+    <strong>With <em>cups</em> on, the surface follows the net.</strong> Only the ten
+    spherical rhombs are drawn — an open cap rather than a whole ball with lines on it.
+    With all thirty there is nothing to cut: thirty spherical rhombs tile the sphere
+    exactly, so the plain ball is the same picture and one instanced mesh draws it however
+    many solids there are.
+</p>
+<p>
+    On the <strong>insphere</strong> <span class="mono">ρ = 1.3763819</span> the net floats
+    inside the solid, since a triacontahedron's edges stand further from the center than
+    its faces do. On the <strong>midsphere</strong>
+    <span class="mono">√(ρ² + ¼) = 1.4643863</span> the arcs pass exactly through the
+    sixty points where the edges are tangent, so the net is pinned to the solid rather
+    than hovering under it.
+</p>
+<p>
+    <strong>The quarter in that radius has a reason.</strong> In <em>any</em> rhombus of
+    edge 1 the diagonals satisfy <span class="mono">p² + q² = 4</span>, so the distance
+    from its center to an edge midpoint is <span class="mono">√(p²+q²)/4 = ½</span>,
+    however squashed the rhombus. Drop a perpendicular from the center to a face — that is
+    ρ — then travel ½ within the face and you are at an edge midpoint. Pythagoras does the
+    rest.
+</p>
+<p>
+    It is a genuine midsphere, tangent to all sixty edges, because the triacontahedron is
+    <strong>edge-transitive</strong>: it and the rhombic dodecahedron are the only two
+    Catalan solids that are, being the duals of the two quasiregular Archimedeans. There
+    is no third sphere to offer. The solid is face-transitive and edge-transitive but
+    <em>not</em> vertex-transitive, so it has no circumsphere at all — its 32 vertices sit
+    in two shells, 12 at φ = 1.6180340 and 20 at 1.4733704.
 </p>
 <p>
     The balls show the two populations apart at a glance. <strong>Complete solids never

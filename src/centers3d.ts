@@ -20,14 +20,17 @@
 import * as THREE from "three";
 import { loadPrefs, savePrefs, resetPrefs } from "./prefs.js";
 import { BUILD_ID } from "./build-id.js";
-import { seedTypes, generatePatch, allRhombs, vertexList } from "./geometry.js";
+import { seedTypes, generatePatch, allRhombs, vertexList, pairColor, FIVE_COLORS } from "./geometry.js";
 import { buildRoof, rescale } from "./roofgeom.js";
 import type { RoofData } from "./roofgeom.js";
 import { LineSegments2 } from "three/addons/lines/LineSegments2.js";
 import { LineSegmentsGeometry } from "three/addons/lines/LineSegmentsGeometry.js";
 import { LineMaterial } from "three/addons/lines/LineMaterial.js";
 import { createRoofView, CLUSTER_3D, CLUSTER_FALLBACK, PLAIN_COLOR } from "./roofview.js";
-import { triacontahedra, pe5Rosettes, cupIndices, solidFace, RT_FACES, A6, RHO } from "./centers.js";
+import {
+    triacontahedra, pe5Rosettes, cupIndices, solidFace, RT_FACES, A6, RHO, MIDRADIUS,
+} from "./centers.js";
+import { patchSize, MAX_GENERATION } from "./patchsize.js";
 import type { Solid } from "./centers.js";
 import { zonohedron, faceOutward, PHI } from "./solids.js";
 import type { V3 } from "./solids.js";
@@ -77,6 +80,7 @@ const nlenOut = el<HTMLElement>("nlenOut");
 const rtSel = el<HTMLSelectElement>("rtmode");
 const rtExtentSel = el<HTMLSelectElement>("rtextent");
 const rtEdgesChk = el<HTMLInputElement>("rtedges");
+const rtCupsChk = el<HTMLInputElement>("rtcups");
 const markersChk = el<HTMLInputElement>("markers");
 const demotedChk = el<HTMLInputElement>("rtdemoted");
 const truncChk = el<HTMLInputElement>("rttrunc");
@@ -108,6 +112,7 @@ const PREF_DEFAULTS = {
     // are. One dropdown away from the polyhedra when the faces are what you want.
     rtextent: "sphere",
     rtedges: true,
+    rtcups: false,
     markers: true,
     rtdemoted: false,
     rttrunc: false,
@@ -210,6 +215,119 @@ const isShared = (f: { solids: [number, number] }, solids: Solid[]): boolean =>
 // The mesh and its placement live in centers.ts, so that the page and
 // tools/centers.mjs are running the same code. Everything below is drawing.
 const ALL_FACES = RT_FACES.map((_, i) => i);
+
+/**
+ * The triacontahedron's edge net projected radially onto a unit sphere — the **spherical
+ * rhombic triacontahedron**, thirty spherical rhombs meeting five and three at a time.
+ *
+ * The graph is the same at any radius, since projection from the center does not care how
+ * far out the sphere is; only the arcs' curvature changes. Two radii are worth drawing it
+ * at. On the **insphere** the arcs pass outside the solid's edges, which are further from
+ * the center than the faces. On the **midsphere** they pass exactly through the sixty
+ * points where the edges are tangent, so the net is pinned to the solid rather than
+ * floating over it — which is the whole point of a midsphere existing.
+ *
+ * Built once at unit radius and then scaled and translated per solid, because at several
+ * hundred solids rebuilding sixty arcs apiece on every control change is the difference
+ * between a page and a pause.
+ */
+function sphericalNet(faces: number[], steps = 7): Float32Array {
+    const seen = new Set<string>();
+    const out: number[] = [];
+    const unit = (p: readonly number[]): [number, number, number] => {
+        const L = Math.hypot(p[0], p[1], p[2]) || 1;
+        return [p[0] / L, p[1] / L, p[2] / L];
+    };
+    const key = (p: readonly number[]) => p.map((x) => Math.round(x * 1e6)).join(",");
+    for (const fi of faces) {
+        const f = RT_FACES[fi];
+        for (let k = 0; k < 4; k++) {
+            const a = f[k];
+            const b = f[(k + 1) % 4];
+            const ek = [key(a), key(b)].sort().join("|");
+            if (seen.has(ek)) continue; // every edge is shared by two faces
+            seen.add(ek);
+            const A = unit(a);
+            const B = unit(b);
+            let prev = A;
+            for (let i = 1; i <= steps; i++) {
+                // slerp, so the segment really follows the great circle rather than the
+                // chord — at these arc lengths the difference is plainly visible
+                const t = i / steps;
+                const q = unit([
+                    A[0] + (B[0] - A[0]) * t, A[1] + (B[1] - A[1]) * t, A[2] + (B[2] - A[2]) * t,
+                ]);
+                out.push(prev[0], prev[1], prev[2], q[0], q[1], q[2]);
+                prev = q;
+            }
+        }
+    }
+    return new Float32Array(out);
+}
+
+const FIVE = FIVE_COLORS.map((h) => new THREE.Color(h));
+/**
+ * The **surfaces** the net outlines: each rhomb face projected radially onto the unit
+ * sphere and tessellated, so a partial set of faces gives a partial spherical shell
+ * rather than a whole ball with lines drawn on it.
+ *
+ * With all thirty this is pointless — thirty spherical rhombs tile the sphere exactly, so
+ * the plain instanced ball is the same picture for a fraction of the cost. It earns its
+ * keep under `cups`, where ten of the thirty leave an open cap.
+ *
+ * Normals are the positions themselves: every point of a sphere has its own outward
+ * direction, so there is nothing to average and no faceting to hide.
+ */
+function sphericalPatches(faces: number[], steps = 5): { pos: Float32Array; nrm: Float32Array } {
+    const pos: number[] = [];
+    const unit = (p: readonly number[]): [number, number, number] => {
+        const L = Math.hypot(p[0], p[1], p[2]) || 1;
+        return [p[0] / L, p[1] / L, p[2] / L];
+    };
+    for (const fi of faces) {
+        const f = RT_FACES[fi];
+        const at = (i: number, j: number): [number, number, number] => {
+            const u = i / steps;
+            const v = j / steps;
+            const q: [number, number, number] = [0, 0, 0];
+            for (let d = 0; d < 3; d++) {
+                q[d] = f[0][d] * (1 - u) * (1 - v) + f[1][d] * u * (1 - v)
+                    + f[2][d] * u * v + f[3][d] * (1 - u) * v;
+            }
+            return unit(q);
+        };
+        for (let i = 0; i < steps; i++) {
+            for (let j = 0; j < steps; j++) {
+                const a = at(i, j), b = at(i + 1, j), c = at(i + 1, j + 1), e = at(i, j + 1);
+                for (const q of [a, b, c, a, c, e]) pos.push(q[0], q[1], q[2]);
+            }
+        }
+    }
+    const arr = new Float32Array(pos);
+    return { pos: arr, nrm: arr.slice() };
+}
+
+const ALL_INDICES = RT_FACES.map((_, i) => i);
+const NET_FULL = sphericalNet(ALL_INDICES);
+const patchCache = new Map<string, { pos: Float32Array; nrm: Float32Array }>();
+function patchesFor(faces: number[]): { pos: Float32Array; nrm: Float32Array } {
+    const k = faces.slice().sort((a, b) => a - b).join(",");
+    const had = patchCache.get(k);
+    if (had) return had;
+    const made = sphericalPatches(faces);
+    patchCache.set(k, made);
+    return made;
+}
+const netCache = new Map<string, Float32Array>();
+function netFor(faces: number[]): Float32Array {
+    if (faces.length === RT_FACES.length) return NET_FULL;
+    const k = faces.slice().sort((a, b) => a - b).join(",");
+    const had = netCache.get(k);
+    if (had) return had;
+    const made = sphericalNet(faces);
+    netCache.set(k, made);
+    return made;
+}
 
 // The insphere, as a mesh. ρ is not a fitted radius — the triacontahedron is
 // isohedral, so all thirty face planes are tangent to one sphere and each touches at
@@ -360,6 +478,10 @@ function build(reframe: boolean): void {
         colorOf: (f) => {
             const s = cen.solids[assign[f.id]];
             if (mode === "cluster") return CLUSTER_3D[f.cluster] ?? CLUSTER_FALLBACK;
+            // The Kowalewski five: a proper edge coloring of K₆ on the six axes, so it is
+            // the triacontahedron's own coloring seen on the roof rather than a scheme
+            // invented for the tiling.
+            if (mode === "five") return FIVE[pairColor(f.pair[0], f.pair[1])];
             if (mode === "complete")
                 return s.complete ? solidColor(s) : WASH.clone();
             if (mode === "class") {
@@ -544,7 +666,11 @@ function build(reframe: boolean): void {
     let rtNote = "";
     const rtMode = rtSel.value;
     const rtExtent = rtExtentSel.value;
-    const rtCup = rtExtent === "cup";
+    // Cups is now its own checkbox rather than a third extent, so it applies to whichever
+    // extent is showing: ten faces of the solid, or ten spherical rhombs of the net.
+    const rtCup = rtCupsChk.checked;
+    const spherical = rtExtent === "sphere" || rtExtent === "midsphere";
+    const sphereR = rtExtent === "midsphere" ? MIDRADIUS : RHO;
     const surfaceShown = rhombSel.value !== "invisible";
     if (rtMode !== "invisible" && sscale > 0) {
         const tris: number[] = [];
@@ -554,7 +680,45 @@ function build(reframe: boolean): void {
         // complete solids on Sun gen 4 a merged ball of this tessellation would be
         // over a million vertices, and they are all the same ball.
         const balls = shown.filter((s) => showRTFor(s) && sizeOf(s) > 0);
-        if (rtExtent === "sphere" && balls.length) {
+        if (spherical && rtCup && balls.length) {
+            // Cups on a sphere: only the ten spherical rhombs, not the whole ball. The
+            // patches are built once at unit radius and copied per solid, exactly as the
+            // net is, so the two always agree about where the boundary is.
+            const per = patchesFor(cupIndices(balls[0])).pos.length;
+            if ((balls.length * per) / 3 > 1_500_000) {
+                rtNote += ` · ${balls.length.toLocaleString()} spherical cups is too much ` +
+                    `surface to draw — show fewer classes, or turn cups off.`;
+            } else {
+                const pos: number[] = [];
+                const nrm: number[] = [];
+                const cols: number[] = [];
+                const z = flip ? -1 : 1;
+                for (const s of balls) {
+                    const { pos: up, nrm: un } = patchesFor(cupIndices(s));
+                    const r = sphereR * sizeOf(s);
+                    const c = place(s.c);
+                    const col = solidColor(s);
+                    for (let i = 0; i < up.length; i += 3) {
+                        pos.push(up[i] * r + c[0], up[i + 1] * r + c[1], up[i + 2] * r * z + c[2]);
+                        nrm.push(un[i], un[i + 1], un[i + 2] * z);
+                        cols.push(col.r, col.g, col.b);
+                    }
+                }
+                const g = new THREE.BufferGeometry();
+                g.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
+                g.setAttribute("normal", new THREE.Float32BufferAttribute(nrm, 3));
+                g.setAttribute("color", new THREE.Float32BufferAttribute(cols, 3));
+                rv.add(new THREE.Mesh(g, new THREE.MeshStandardMaterial({
+                    vertexColors: true, roughness: 0.42, metalness: 0.03,
+                    side: THREE.DoubleSide,
+                    transparent: rtMode === "transparent",
+                    opacity: rtMode === "transparent" ? (surfaceShown ? 0.42 : 0.66) : 1,
+                    depthWrite: rtMode !== "transparent",
+                })));
+            }
+        } else if (spherical && balls.length) {
+            // All thirty spherical rhombs tile the sphere, so the whole ball is the same
+            // picture and one instanced mesh draws it however many there are.
             const mesh = new THREE.InstancedMesh(
                 BALL_GEO,
                 new THREE.MeshStandardMaterial({
@@ -568,7 +732,7 @@ function build(reframe: boolean): void {
             );
             const m = new THREE.Matrix4();
             balls.forEach((s, i) => {
-                const r = RHO * sizeOf(s);
+                const r = sphereR * sizeOf(s);
                 const c = place(s.c);
                 m.makeScale(r, r, r).setPosition(c[0], c[1], c[2]);
                 mesh.setMatrixAt(i, m);
@@ -579,6 +743,47 @@ function build(reframe: boolean): void {
             rv.add(mesh);
         }
 
+        // The spherical triacontahedron, when the extent is a sphere and edges are on.
+        // Each solid gets a copy of a precomputed unit net, scaled to its own radius.
+        // Two nets are in play under `cups`, not one: `cupIndices` returns the top ten
+        // faces for a hat and the bottom ten for a bowl, so hats and bowls carry
+        // different halves of the solid. The cache keys on the face set and so holds both.
+        //
+        // Budgeted like the solids are — the net is 60 arcs of 7 segments, and past a few
+        // hundred solids that is more line than anyone can read.
+        if (spherical && rtEdgesChk.checked && balls.length) {
+            const perSolid = (rtCup ? 20 : 60) * 7 * 6;
+            if (balls.length * perSolid > 4_000_000) {
+                rtNote += ` · ${balls.length.toLocaleString()} spherical nets is too much ` +
+                    `line to draw — turn edges off or show fewer classes.`;
+            } else {
+                const seg: number[] = [];
+                const z = flip ? -1 : 1;
+                for (const s of balls) {
+                    const net = netFor(rtCup ? cupIndices(s) : ALL_INDICES);
+                    // A hair proud of the surface. Drawn at exactly `r` the arcs are
+                    // coplanar with the ball everywhere along their length and lose the
+                    // depth test to it — the net is in the buffer and nothing shows.
+                    const r = sphereR * sizeOf(s) * 1.004;
+                    const c = place(s.c);
+                    // Mirrored with the scene, exactly as the solids are.
+                    for (let i = 0; i < net.length; i += 3) {
+                        seg.push(net[i] * r + c[0], net[i + 1] * r + c[1], net[i + 2] * r * z + c[2]);
+                    }
+                }
+                const g = new LineSegmentsGeometry();
+                g.setPositions(seg);
+                const m = new LineMaterial({
+                    color: 0x1b1e24, linewidth: 2.0, worldUnits: false, alphaToCoverage: true,
+                });
+                m.resolution.set(view.clientWidth || 1, view.clientHeight || 1);
+                normalMats.push(m);
+                const ls = new LineSegments2(g, m);
+                ls.renderOrder = 2;
+                rv.add(ls);
+            }
+        }
+
         // A budget, because generation 5 can ask for more than is reasonable: 19,056
         // proper solids on the Sun, which at the full thirty faces is 3.4 million
         // vertices rebuilt on every control change. Refuse and say so rather than
@@ -586,14 +791,14 @@ function build(reframe: boolean): void {
         // are, which is what makes them the answer at this size.
         const drawCount = shown.filter((s) => showRTFor(s) && sizeOf(s) > 0).length;
         const vertsWanted = drawCount * (rtCup ? 10 : 30) * 6;
-        const overBudget = rtExtent !== "sphere" && vertsWanted > 1_500_000;
+        const overBudget = !spherical && vertsWanted > 1_500_000;
         if (overBudget) {
             rtNote =
-                ` · ${drawCount.toLocaleString()} solids at ${rtCup ? "cup" : "full"} extent ` +
+                ` · ${drawCount.toLocaleString()} ${rtCup ? "cups" : "RTs"} ` +
                 `is ${(vertsWanted / 1e6).toFixed(1)}M vertices — too many to draw. ` +
-                `Switch Extent to inscribed sphere, or show fewer classes.`;
+                `Switch Extent to a sphere, or show fewer classes.`;
         }
-        for (const s of rtExtent === "sphere" || overBudget ? [] : shown) {
+        for (const s of spherical || overBudget ? [] : shown) {
             if (!showRTFor(s)) continue;
             const t = sizeOf(s);
             if (t <= 0) continue;
@@ -638,18 +843,19 @@ function build(reframe: boolean): void {
             ),
         );
         if (rtEdgesChk.checked) {
-        const lg = new THREE.BufferGeometry();
-        lg.setAttribute("position", new THREE.Float32BufferAttribute(lines, 3));
-        rv.add(
-            new THREE.LineSegments(
-                lg,
-                new THREE.LineBasicMaterial({
-                    color: 0x3a3f4a,
-                    transparent: true,
-                    opacity: 0.5,
-                }),
-            ),
-        );
+        // Screen-space width, like the normals above. `LineBasicMaterial` ignores
+        // `linewidth` on every desktop driver, so these were one-pixel hairlines at half
+        // opacity — present in the buffer and all but invisible on the glass.
+        const lg = new LineSegmentsGeometry();
+        lg.setPositions(lines);
+        const lm = new LineMaterial({
+            color: 0x1b1e24, linewidth: 2.0, worldUnits: false, alphaToCoverage: true,
+        });
+        lm.resolution.set(view.clientWidth || 1, view.clientHeight || 1);
+        normalMats.push(lm);
+        const ll = new LineSegments2(lg, lm);
+        ll.renderOrder = 2;
+        rv.add(ll);
         }
         }
     }
@@ -814,7 +1020,16 @@ function build(reframe: boolean): void {
         `${shown.length} of ${perClass.reduce((a, b) => a + b, 0)} proper solids shown · ` +
         `rhombi by class ${clsText}, ${demoted} demoted · ` +
         `${bare} rhombi with no cup over them${bare ? " (turn on demoted and truncated)" : ""} · ` +
-        `normals ${(nlen / RHO).toFixed(2)}ρ · ${ms} ms${rtNote}`;
+        `normals ${(nlen / RHO).toFixed(2)}ρ · ` +
+        // What the RT controls are actually doing, spelled out. A toggle that has not
+        // taken effect is then visible here instead of being a matter of opinion about
+        // what the picture looks like.
+        `RTs ${rtSel.value}, ${
+            rtExtent === "full" ? (rtCup ? "cups — 10 faces each" : "whole RT — 30 faces each")
+            : `${rtExtent === "midsphere" ? "midsphere" : "insphere"} r=${sphereR.toFixed(4)}, ` +
+              `${rtCup ? "10 spherical rhombs" : "whole ball (30 rhombs, tiling it)"}` +
+              `${rtEdgesChk.checked ? " + net" : ""}`
+        } · ${ms} ms${rtNote}`;
 }
 
 // ── controls ──────────────────────────────────────────────────────
@@ -836,15 +1051,63 @@ for (const [code, nick] of [
     patchSel.appendChild(o);
 }
 patchSel.value = prefs.patch;
-for (const g of [1, 2, 3, 4, 5]) {
-    const o = document.createElement("option");
-    o.value = String(g);
-    o.textContent = `Generation ${g}`;
-    genSel.appendChild(o);
-}
-genSel.value = String(prefs.gen);
 if (!patchSel.value) patchSel.value = PREF_DEFAULTS.patch;
-if (!genSel.value) genSel.value = String(PREF_DEFAULTS.gen);
+/**
+ * Fill the generation list for the current patch, ghosting what will not draw.
+ *
+ * The ceiling depends on the settings, because what this page costs depends on them. A
+ * sphere is one instanced mesh however many there are, so the spherical extents reach much
+ * further than the full solid does; edges on the spherical net cost per solid again. So the
+ * list is refilled whenever those change rather than being fixed once at startup.
+ */
+function fillGenerations(prefer?: number): void {
+    const code = patchSel.value || PREF_DEFAULTS.patch;
+    const keep = prefer ?? Number(genSel.value);
+    const cheap = rtSel.value === "invisible"
+        || ((rtExtentSel.value === "sphere" || rtExtentSel.value === "midsphere")
+            && !rtEdgesChk.checked);
+    // Worked from the two budgets further down rather than picked. The full solid costs
+    // 180 vertices per solid against a 1.5M ceiling, so ~8,300 solids; the spherical net
+    // costs 60 arcs x 7 segments x 6 floats = 2,520 against 4M, so ~1,590. Solids run
+    // about 0.13 of the rhomb count, which puts the two at ~64,000 and ~12,000 rhombs.
+    // A sphere with no edges is one instanced mesh and barely cares.
+    const limit = cheap ? 120000 : rtExtentSel.value === "full" ? 45000 : 12000;
+    genSel.textContent = "";
+    const usable = (g: number) => {
+        const n = patchSize(code, g);
+        return n > 0 && n <= limit;
+    };
+    for (let g = 1; g <= MAX_GENERATION; g++) {
+        const n = patchSize(code, g);
+        const o = document.createElement("option");
+        o.value = String(g);
+        if (n <= 0) {
+            o.textContent = `Generation ${g} — none`;
+            o.disabled = true;
+            o.title = `${code} does not exist at generation ${g}`;
+        } else if (!usable(g)) {
+            o.textContent = `Generation ${g} — ${n.toLocaleString()} rhombs`;
+            o.disabled = true;
+            o.title = `${n.toLocaleString()} rhombs is past what the current settings can draw` +
+                `${cheap ? "" : " — turn the solids off, or use a sphere extent without edges"}`;
+        } else {
+            o.textContent = `Generation ${g} — ${n.toLocaleString()}${n > limit / 4 ? " (slow)" : ""}`;
+            o.title = `${n.toLocaleString()} rhombs`;
+        }
+        genSel.appendChild(o);
+    }
+    let g = keep || PREF_DEFAULTS.gen;
+    if (!usable(g)) {
+        let best = 0;
+        for (let i = 1; i <= MAX_GENERATION; i++) if (usable(i) && (i <= g || best === 0)) best = i;
+        g = best || 2;
+    }
+    genSel.value = String(g);
+    if (!genSel.value) {
+        const first = Array.from(genSel.options).find((o) => !o.disabled);
+        if (first) genSel.value = first.value;
+    }
+}
 colorSel.value = prefs.color;
 if (!colorSel.value) colorSel.value = PREF_DEFAULTS.color;
 normalsChk.checked = prefs.normals;
@@ -858,14 +1121,25 @@ vmag = flatChk.checked ? 0 : 1;
 headSolidsChk.checked = prefs.headsolids;
 tailSolidsChk.checked = prefs.tailsolids;
 rhombSel.value = prefs.rhombmode || PREF_DEFAULTS.rhombmode;
+if (!rhombSel.value) rhombSel.value = PREF_DEFAULTS.rhombmode;
 edgesChk.checked = prefs.edges;
 shadeChk.checked = prefs.shade;
 isoChk.checked = prefs.isogloss;
 normalsChk.checked = prefs.normals;
 nlenInput.value = String(prefs.nlen);
 rtSel.value = prefs.rtmode || PREF_DEFAULTS.rtmode;
-rtExtentSel.value = prefs.rtextent || PREF_DEFAULTS.rtextent;
+if (!rtSel.value) rtSel.value = PREF_DEFAULTS.rtmode;
+// "Cup only" used to be a third extent and is now a checkbox, so a saved setting from
+// before the change is migrated rather than dropped on the floor — a select handed a
+// value no option carries reports "" and every comparison against it fails quietly.
+const savedExtent = prefs.rtextent === "cup" ? "full" : prefs.rtextent;
+rtExtentSel.value = savedExtent || PREF_DEFAULTS.rtextent;
+if (!rtExtentSel.value) rtExtentSel.value = PREF_DEFAULTS.rtextent;
 rtEdgesChk.checked = prefs.rtedges;
+rtCupsChk.checked = prefs.rtextent === "cup" ? true : !!prefs.rtcups;
+// After every select that feeds the limit has been restored, not before — the list that
+// gets built depends on the extent and on whether edges are on.
+fillGenerations(Number(prefs.gen) || PREF_DEFAULTS.gen);
 markersChk.checked = prefs.markers;
 demotedChk.checked = prefs.rtdemoted;
 truncChk.checked = prefs.rttrunc;
@@ -976,9 +1250,16 @@ function rebuild(reframe: boolean): void {
     rv.clear();
     build(reframe);
 }
-for (const c of [patchSel, genSel]) c.addEventListener("change", () => rebuild(true));
+patchSel.addEventListener("change", () => { fillGenerations(); rebuild(true); });
+genSel.addEventListener("change", () => rebuild(true));
+// These three set the ceiling, so the list is rebuilt when they move. A generation that
+// was reachable on spheres may not be on the full solid, and it is better for the option
+// to go grey than for the page to try it.
+for (const c of [rtSel, rtExtentSel, rtEdgesChk]) {
+    c.addEventListener("change", () => { fillGenerations(); rebuild(false); });
+}
 for (const c of [colorSel, headSolidsChk, tailSolidsChk, rhombSel, edgesChk, shadeChk,
-                 isoChk, normalsChk, rtSel, rtExtentSel, rtEdgesChk, markersChk, demotedChk, truncChk]) {
+                 isoChk, normalsChk, markersChk, demotedChk, truncChk, rtCupsChk]) {
     c.addEventListener("change", () => rebuild(false));
 }
 
@@ -1041,6 +1322,7 @@ function persist(): void {
         rtmode: rtSel.value,
         rtextent: rtExtentSel.value,
         rtedges: rtEdgesChk.checked,
+        rtcups: rtCupsChk.checked,
         markers: markersChk.checked,
         rtdemoted: demotedChk.checked,
         rttrunc: truncChk.checked,

@@ -47,8 +47,11 @@ for (const page of html) {
         if (!name) continue;
         const v = name[1];
         const assigns = src.includes(`${v}.value =`);
-        const guarded = src.includes(`!${v}.value`) || new RegExp(`\\[${v},`).test(src) ||
-            new RegExp(`${v}\\.value\\s*=\\s*prefs\\.\\w+\\s*\\|\\|`).test(src);
+        // `x.value = prefs.y || DEFAULT` is not a guard. It covers a missing key, but not
+        // the case that actually bites: a stored value whose <option> has since been
+        // renamed or removed, which a select accepts and then reports as "". Only an
+        // explicit `if (!x.value)` or a fallback loop counts.
+        const guarded = src.includes(`!${v}.value`) || new RegExp(`\\[${v},`).test(src);
         if (assigns && !guarded) fail(`${modPath}: select ${v} restores a stored value with no fallback`);
     }
 }

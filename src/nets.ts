@@ -177,7 +177,13 @@ function build(): void {
 }
 
 solidSel.value = prefs.solid || PREF_DEFAULTS.solid;
+
+// A select handed a stored value that no option carries reports "" rather than rejecting
+// it, so each falls back explicitly.
 schemeSel.value = prefs.scheme || PREF_DEFAULTS.scheme;
+for (const [sel, def] of [
+    [solidSel, PREF_DEFAULTS.solid], [schemeSel, PREF_DEFAULTS.scheme],
+] as Array<[HTMLSelectElement, string]>) if (!sel.value) sel.value = def;
 sideInput.value = prefs.side || PREF_DEFAULTS.side;
 foldsChk.checked = prefs.folds;
 labelsChk.checked = prefs.labels;
