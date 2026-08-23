@@ -1329,3 +1329,33 @@ so `npm run build` first.
 | `weak.mjs` | uniqueness, the vertex triples, overlap, the plane arrangement |
 | `diag.mjs` | the shortest center separations and their lattice vectors |
 | `why.mjs`, `why2.mjs` | the index window (§5E) and the face counts at each separation |
+
+## 9. Shared ownership: amber and purple, and nothing else
+
+A rhomb names two solids, one on each side. When both are proper the rhomb is *shared*.
+Which class pairs actually occur? Measured over Sun gen 2 and 3, Star gen 3, Queen gen 3,
+Pe5 gen 4 and St5 gen 4:
+
+**The only pair that ever occurs is 4 + 5b — amber with purple.**
+
+Not 4+4, not 4+5a, not 4+10, not 5b+5b, not 5b+10, not 10+10. **Class 10 and class 5a
+never share at all**, at any patch or generation: every complete cap and every all-thick
+rosette faces a demoted solid across every one of its rhombs.
+
+The amber side is rigid. On Sun gen 3 the eighty class-4 solids split exactly on
+settledness:
+
+| class 4 | faces shared | count |
+|---|---|---|
+| settled | 2 of 4 | 55 |
+| unsettled (cut by the patch edge) | 0 of 4 | 25 |
+
+Never one, three or four. And a class-4 solid is four of a rosette's five faces with one
+missing — of all 55 settled ones, **every one shares exactly the two faces flanking that
+gap**, 55 of 55. The purple side is looser: a 5b shares 0, 1 or 2 of its five, never more.
+
+This is Jeff's conjecture, stated before any of it was measured, and it holds in the
+strong form: not "amber usually pairs with purple" but "amber pairs with purple and
+nothing else ever pairs with anything." The `Faces → by class` mode on `centers.html`
+draws each solid wearing only its own footprint, which is what makes the shared rhomb
+visible as one spherical rhomb worn by two balls in two colors.

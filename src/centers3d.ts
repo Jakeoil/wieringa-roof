@@ -28,7 +28,8 @@ import { LineSegmentsGeometry } from "three/addons/lines/LineSegmentsGeometry.js
 import { LineMaterial } from "three/addons/lines/LineMaterial.js";
 import { createRoofView, CLUSTER_3D, CLUSTER_FALLBACK, PLAIN_COLOR } from "./roofview.js";
 import {
-    triacontahedra, pe5Rosettes, cupIndices, solidFace, RT_FACES, A6, RHO, MIDRADIUS,
+    triacontahedra, pe5Rosettes, cupIndices, ownedFaceIndices, solidFace,
+    RT_FACES, A6, RHO, MIDRADIUS,
 } from "./centers.js";
 import { patchSize, MAX_GENERATION } from "./patchsize.js";
 import type { Solid } from "./centers.js";
@@ -80,7 +81,7 @@ const nlenOut = el<HTMLElement>("nlenOut");
 const rtSel = el<HTMLSelectElement>("rtmode");
 const rtExtentSel = el<HTMLSelectElement>("rtextent");
 const rtEdgesChk = el<HTMLInputElement>("rtedges");
-const rtCupsChk = el<HTMLInputElement>("rtcups");
+const rtFacesSel = el<HTMLSelectElement>("rtfaces");
 const markersChk = el<HTMLInputElement>("markers");
 const demotedChk = el<HTMLInputElement>("rtdemoted");
 const truncChk = el<HTMLInputElement>("rttrunc");
@@ -112,7 +113,7 @@ const PREF_DEFAULTS = {
     // are. One dropdown away from the polyhedra when the faces are what you want.
     rtextent: "sphere",
     rtedges: true,
-    rtcups: false,
+    rtfaces: "full",
     markers: true,
     rtdemoted: false,
     rttrunc: false,
@@ -195,6 +196,10 @@ const DEMOTED = new THREE.Color(0xc9cad2);
 // About 5.6% of rhombi.
 const SHARED = new THREE.Color(0xd1477a);
 const properOf = (s: Solid): number => PROPER.findIndex((p) => p.makeup === s.makeup);
+
+/** Which of the thirty faces each solid actually owns, filled in with the patch. */
+let ownedCache: number[][] | null = null;
+const ownedOf = (s: Solid): number[] => ownedCache?.[s.id] ?? [];
 
 function solidColor(s: Solid): THREE.Color {
     const i = properOf(s);
@@ -315,6 +320,10 @@ function patchesFor(faces: number[]): { pos: Float32Array; nrm: Float32Array } {
     const had = patchCache.get(k);
     if (had) return had;
     const made = sphericalPatches(faces);
+    // "By class" asks for arbitrary subsets of the thirty rather than the two cup sets, so
+    // the key space is no longer small. Bounded, oldest out, rather than left to grow a
+    // Float32Array per distinct footprint in the patch.
+    if (patchCache.size > 400) patchCache.delete(patchCache.keys().next().value as string);
     patchCache.set(k, made);
     return made;
 }
@@ -325,6 +334,7 @@ function netFor(faces: number[]): Float32Array {
     const had = netCache.get(k);
     if (had) return had;
     const made = sphericalNet(faces);
+    if (netCache.size > 400) netCache.delete(netCache.keys().next().value as string);
     netCache.set(k, made);
     return made;
 }
@@ -458,6 +468,11 @@ function build(reframe: boolean): void {
 
     if (!cenCache) cenCache = triacontahedra();
     const cen = cenCache;
+    if (!ownedCache || ownedCache.length !== cen.solids.length) {
+        // Once per patch, not per rebuild: it needs the whole Centers structure and does
+        // not change while the patch stands.
+        ownedCache = cen.solids.map((s) => ownedFaceIndices(cen, s));
+    }
     const assign = cen.home;
     const mode = colorSel.value;
 
@@ -666,9 +681,19 @@ function build(reframe: boolean): void {
     let rtNote = "";
     const rtMode = rtSel.value;
     const rtExtent = rtExtentSel.value;
-    // Cups is now its own checkbox rather than a third extent, so it applies to whichever
-    // extent is showing: ten faces of the solid, or ten spherical rhombs of the net.
-    const rtCup = rtCupsChk.checked;
+    // Which faces of each RT to draw, independent of the extent it is drawn at:
+    //
+    //   full   all thirty
+    //   cups   the ten on the roof's side — a cup above the roof, a hat below it
+    //   class  only the rhombs the solid actually owns in this patch, so four, five or
+    //          ten. This is the class made visible: a solid wears exactly its own
+    //          footprint and nothing it merely could have had.
+    const rtFaces = rtFacesSel.value;
+    const rtCup = rtFaces !== "full";
+    const facesOf = (s: Solid): number[] =>
+        rtFaces === "cups" ? cupIndices(s)
+        : rtFaces === "class" ? ownedOf(s)
+        : ALL_FACES;
     const spherical = rtExtent === "sphere" || rtExtent === "midsphere";
     const sphereR = rtExtent === "midsphere" ? MIDRADIUS : RHO;
     const surfaceShown = rhombSel.value !== "invisible";
@@ -684,9 +709,9 @@ function build(reframe: boolean): void {
             // Cups on a sphere: only the ten spherical rhombs, not the whole ball. The
             // patches are built once at unit radius and copied per solid, exactly as the
             // net is, so the two always agree about where the boundary is.
-            const per = patchesFor(cupIndices(balls[0])).pos.length;
+            const per = patchesFor(facesOf(balls[0])).pos.length;
             if ((balls.length * per) / 3 > 1_500_000) {
-                rtNote += ` · ${balls.length.toLocaleString()} spherical cups is too much ` +
+                rtNote += ` · ${balls.length.toLocaleString()} spherical caps is too much ` +
                     `surface to draw — show fewer classes, or turn cups off.`;
             } else {
                 const pos: number[] = [];
@@ -694,7 +719,7 @@ function build(reframe: boolean): void {
                 const cols: number[] = [];
                 const z = flip ? -1 : 1;
                 for (const s of balls) {
-                    const { pos: up, nrm: un } = patchesFor(cupIndices(s));
+                    const { pos: up, nrm: un } = patchesFor(facesOf(s));
                     const r = sphereR * sizeOf(s);
                     const c = place(s.c);
                     const col = solidColor(s);
@@ -760,7 +785,7 @@ function build(reframe: boolean): void {
                 const seg: number[] = [];
                 const z = flip ? -1 : 1;
                 for (const s of balls) {
-                    const net = netFor(rtCup ? cupIndices(s) : ALL_INDICES);
+                    const net = netFor(facesOf(s));
                     // A hair proud of the surface. Drawn at exactly `r` the arcs are
                     // coplanar with the ball everywhere along their length and lose the
                     // depth test to it — the net is in the buffer and nothing shows.
@@ -790,11 +815,11 @@ function build(reframe: boolean): void {
         // hanging. Spheres are exempt — they are one instanced mesh however many there
         // are, which is what makes them the answer at this size.
         const drawCount = shown.filter((s) => showRTFor(s) && sizeOf(s) > 0).length;
-        const vertsWanted = drawCount * (rtCup ? 10 : 30) * 6;
+        const vertsWanted = drawCount * (rtCup ? 10 : 30) * 6;  // ten is the worst case for cups and class alike
         const overBudget = !spherical && vertsWanted > 1_500_000;
         if (overBudget) {
             rtNote =
-                ` · ${drawCount.toLocaleString()} ${rtCup ? "cups" : "RTs"} ` +
+                ` · ${drawCount.toLocaleString()} ${rtFaces === "class" ? "class footprints" : rtCup ? "cups" : "RTs"} ` +
                 `is ${(vertsWanted / 1e6).toFixed(1)}M vertices — too many to draw. ` +
                 `Switch Extent to a sphere, or show fewer classes.`;
         }
@@ -803,7 +828,7 @@ function build(reframe: boolean): void {
             const t = sizeOf(s);
             if (t <= 0) continue;
             const col = solidColor(s);
-            for (const i of rtCup ? cupIndices(s) : ALL_FACES) {
+            for (const i of facesOf(s)) {
                 const f = solidFace(s, i, flip, t, d.offset);
                 for (const v of [f[0], f[1], f[2], f[0], f[2], f[3]]) {
                     tris.push(v[0], v[1], v[2]);
@@ -1025,9 +1050,13 @@ function build(reframe: boolean): void {
         // taken effect is then visible here instead of being a matter of opinion about
         // what the picture looks like.
         `RTs ${rtSel.value}, ${
-            rtExtent === "full" ? (rtCup ? "cups — 10 faces each" : "whole RT — 30 faces each")
+            rtExtent === "full"
+                ? (rtFaces === "class" ? "by class — each RT wears its own footprint"
+                    : rtFaces === "cups" ? "cups — 10 faces each" : "whole RT — 30 faces each")
             : `${rtExtent === "midsphere" ? "midsphere" : "insphere"} r=${sphereR.toFixed(4)}, ` +
-              `${rtCup ? "10 spherical rhombs" : "whole ball (30 rhombs, tiling it)"}` +
+              `${rtFaces === "class" ? "spherical rhombs by class"
+                  : rtFaces === "cups" ? "10 spherical rhombs"
+                  : "whole ball (30 rhombs, tiling it)"}` +
               `${rtEdgesChk.checked ? " + net" : ""}`
         } · ${ms} ms${rtNote}`;
 }
@@ -1136,7 +1165,11 @@ const savedExtent = prefs.rtextent === "cup" ? "full" : prefs.rtextent;
 rtExtentSel.value = savedExtent || PREF_DEFAULTS.rtextent;
 if (!rtExtentSel.value) rtExtentSel.value = PREF_DEFAULTS.rtextent;
 rtEdgesChk.checked = prefs.rtedges;
-rtCupsChk.checked = prefs.rtextent === "cup" ? true : !!prefs.rtcups;
+// Migrated twice over now: "cup" was once an extent, then a checkbox, and is now one
+// value of this dropdown. Both older shapes are honoured rather than silently dropped.
+rtFacesSel.value = prefs.rtfaces
+    || (prefs.rtextent === "cup" || (prefs as { rtcups?: boolean }).rtcups ? "cups" : PREF_DEFAULTS.rtfaces);
+if (!rtFacesSel.value) rtFacesSel.value = PREF_DEFAULTS.rtfaces;
 // After every select that feeds the limit has been restored, not before — the list that
 // gets built depends on the extent and on whether edges are on.
 fillGenerations(Number(prefs.gen) || PREF_DEFAULTS.gen);
@@ -1259,7 +1292,7 @@ for (const c of [rtSel, rtExtentSel, rtEdgesChk]) {
     c.addEventListener("change", () => { fillGenerations(); rebuild(false); });
 }
 for (const c of [colorSel, headSolidsChk, tailSolidsChk, rhombSel, edgesChk, shadeChk,
-                 isoChk, normalsChk, markersChk, demotedChk, truncChk, rtCupsChk]) {
+                 isoChk, normalsChk, markersChk, demotedChk, truncChk, rtFacesSel]) {
     c.addEventListener("change", () => rebuild(false));
 }
 
@@ -1322,7 +1355,7 @@ function persist(): void {
         rtmode: rtSel.value,
         rtextent: rtExtentSel.value,
         rtedges: rtEdgesChk.checked,
-        rtcups: rtCupsChk.checked,
+        rtfaces: rtFacesSel.value,
         markers: markersChk.checked,
         rtdemoted: demotedChk.checked,
         rttrunc: truncChk.checked,

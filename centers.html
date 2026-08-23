@@ -147,8 +147,12 @@
         <option value="sphere">Insphere ρ = 1.3764</option>
         <option value="midsphere">Midsphere = 1.4644</option>
     </select></label>
+    <label title="Which faces of each RT to draw">Faces <select id="rtfaces">
+        <option value="full">All thirty</option>
+        <option value="cups">Cup — the ten on the roof's side</option>
+        <option value="class">By class — only the rhombs it owns</option>
+    </select></label>
     <span class="checks">
-        <label title="The ten-rhomb cap on the roof's side — a cup above the roof, a hat below it — instead of all thirty faces"><input type="checkbox" id="rtcups"> cups</label>
         <label><input type="checkbox" id="rtedges" checked> edges</label>
         <label><input type="checkbox" id="markers" checked> centers</label>
         <label title="Solids whose home class is 1, 2 or 3 — not proper, drawn colorless"><input type="checkbox" id="rtdemoted"> demoted</label>
@@ -389,6 +393,45 @@
     as great-circle arcs. It is the same graph at any radius — projecting from the center
     does not care how far out the sphere is — but the two radii offered mean different
     things.
+</p>
+<p>
+    <strong>By class</strong> draws each solid wearing only the rhombs it actually owns —
+    four, five or ten — instead of a shape it merely could have had. It is the class made
+    visible, and it is what makes the sharing below legible: a rhomb held by two proper
+    solids shows up as the same spherical rhomb on two different balls, in two different
+    colors.
+</p>
+
+<h3>Who shares with whom</h3>
+<p>
+    A rhomb always names two solids, one on each side. When <em>both</em> are proper the
+    rhomb is shared, and the question is which classes ever find themselves on opposite
+    sides of the same tile. Measured across six patches and generations — Sun 2 and 3,
+    Star 3, Queen 3, Pe5 4, St5 4 — the answer never varies:
+</p>
+<p style="text-align:center"><strong>the only pair that ever occurs is 4 + 5b — amber with
+purple.</strong></p>
+<p>
+    Not 4+4, not 4+5a, not 4+10, not 5b+5b, not 5b+10. <strong>Class 10 and class 5a never
+    share at all</strong>, at any size: every complete cap and every all-thick rosette
+    faces demoted solids on the far side of all of its rhombs, without exception.
+</p>
+<p>
+    And the amber side is rigid. On Sun generation 3 the eighty class-4 solids split
+    exactly along settledness:
+</p>
+<table>
+    <thead><tr><th>class 4 solids</th><th>faces shared</th><th>count</th></tr></thead>
+    <tbody>
+        <tr><td>settled — whole footprint inside the patch</td><td class="mono">2 of 4</td><td class="mono">55</td></tr>
+        <tr><td>unsettled — cut by the patch edge</td><td class="mono">0 of 4</td><td class="mono">25</td></tr>
+    </tbody>
+</table>
+<p>
+    Never one, never three, never four. A class-4 solid is four of the five faces of a
+    rosette with one missing, and of all 55 settled ones, <strong>every single one shares
+    exactly the two faces flanking that gap</strong> — 55 of 55, no exceptions. The purple
+    side is looser: a 5b shares nought, one or two of its five, never more.
 </p>
 <p>
     <strong>With <em>cups</em> on, the surface follows the net.</strong> Only the ten
