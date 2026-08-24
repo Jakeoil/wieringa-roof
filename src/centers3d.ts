@@ -362,24 +362,6 @@ const VORONOI_STEPS = 5;
 const VORONOI_MESH = sphericalPatches(ALL_INDICES, VORONOI_STEPS).pos;
 const TRIS_PER_FACE = VORONOI_STEPS * VORONOI_STEPS * 2;
 
-/** Unit centroid direction of each of the thirty faces; the spherical rhomb of face i
- *  is the set of directions for which `v·n̂ᵢ` is the largest. */
-const FACE_DIRS: V3[] = RT_FACES.map((f) => {
-    const c: V3 = [0, 0, 0];
-    for (const q of f) for (let d = 0; d < 3; d++) c[d] += q[d] / 4;
-    return nrm(c);
-});
-const NO_FACES: Set<number> = new Set();
-function faceOfDir(v: V3): number {
-    let best = 0;
-    let bd = -2;
-    for (let i = 0; i < FACE_DIRS.length; i++) {
-        const d = v[0] * FACE_DIRS[i][0] + v[1] * FACE_DIRS[i][1] + v[2] * FACE_DIRS[i][2];
-        if (d > bd) { bd = d; best = i; }
-    }
-    return best;
-}
-
 /**
  * Where the great-circle arc a→b crosses the plane `v·u = k`.
  *
@@ -468,14 +450,21 @@ function clipPoly(poly: V3[], u: V3, k: number): V3[] {
  * same construction with the radii put back — so that is what is computed, and it
  * collapses to the bisector the moment the two agree.
  *
+ * The first clip is the **drop-dead**: the ball's own equator, keeping the side its
+ * faces are on. It is not a bound in the same sense as the others — it is what happens
+ * when no neighbor is found at all. Two balls meeting settle their boundary between
+ * them; growth in a direction with no ball in it has nothing to settle against, so it
+ * runs until the surface turns away from the roof and is cut off there.
+ *
  * `z` is the parity. The cell is built in unmirrored coordinates and mirrored on the
  * way out, exactly as the cups are, so the neighbor direction has to be unmirrored on
- * the way in.
+ * the way in — while the equator is stated in unmirrored terms already and travels with
+ * the mirror on its own.
  */
 function voronoiPlanes(
-    c: V3, r: number, others: Array<{ c: V3; r: number }>, z: number,
+    c: V3, r: number, hat: boolean, others: Array<{ c: V3; r: number }>, z: number,
 ): Clip[] {
-    const out: Clip[] = [];
+    const out: Clip[] = [{ u: [0, 0, hat ? -1 : 1], k: 0 }];
     for (const o of others) {
         const dx = o.c[0] - c[0];
         const dy = o.c[1] - c[1];
@@ -487,6 +476,127 @@ function voronoiPlanes(
         out.push({ u: [dx / d, dy / d, (dz / d) * z], k });
     }
     return out;
+}
+
+/**
+ * Topology of the unit mesh, built once: unique vertices, which face each triangle came
+ * from, and every interior edge with the two triangles that share it.
+ *
+ * Needed because the clip alone does not say what is *attached*. See `reachable`.
+ */
+interface MeshTopo {
+    vert: V3[];
+    tri: number[][];
+    face: number[];
+    edges: Array<{ a: number; b: number; t1: number; t2: number }>;
+}
+const VORONOI_TOPO: MeshTopo = (() => {
+    const m = VORONOI_MESH;
+    const key = (i: number) =>
+        `${m[i].toFixed(6)},${m[i + 1].toFixed(6)},${m[i + 2].toFixed(6)}`;
+    const index = new Map<string, number>();
+    const vert: V3[] = [];
+    const tri: number[][] = [];
+    const face: number[] = [];
+    for (let t = 0, n = 0; t < m.length; t += 9, n++) {
+        const ids: number[] = [];
+        for (const o of [0, 3, 6]) {
+            const k = key(t + o);
+            let id = index.get(k);
+            if (id === undefined) {
+                id = vert.length;
+                index.set(k, id);
+                vert.push([m[t + o], m[t + o + 1], m[t + o + 2]]);
+            }
+            ids.push(id);
+        }
+        tri.push(ids);
+        face.push(Math.floor(n / TRIS_PER_FACE));
+    }
+    const seen = new Map<string, number>();
+    const edges: MeshTopo["edges"] = [];
+    tri.forEach((ids, t) => {
+        for (let e = 0; e < 3; e++) {
+            const a = ids[e];
+            const b = ids[(e + 1) % 3];
+            const k = a < b ? `${a}_${b}` : `${b}_${a}`;
+            const had = seen.get(k);
+            if (had === undefined) seen.set(k, t);
+            else edges.push({ a, b, t1: had, t2: t });
+        }
+    });
+    return { vert, tri, face, edges };
+})();
+
+/**
+ * Which triangles are actually **attached to the footprint**.
+ *
+ * The clip on its own leaves stranded surface — territory that survives every plane but
+ * touches nothing the solid owns. It is not a rare corner: on Sun gen 2 every single
+ * proper solid has some, and for the complete class it is the *entire* skirt. A class-10
+ * ball keeps its dome, and then a separate ring of surface floats near its equator with
+ * a band of daylight between the two, because the band is inside a neighbour's ball and
+ * the ring beyond it is not. Drawn, that reads as exactly what it is: a discontinuity.
+ *
+ * So the territory is the connected component of the clipped region that contains the
+ * footprint. Two triangles count as attached when the edge they share keeps some of its
+ * length — both are clipped by the same planes, so the kept part of a shared edge is the
+ * same seen from either side, and a clipped triangle is convex and therefore in one
+ * piece. Sampling the edge can only ever *miss* a thin attachment, never invent one, so
+ * the error runs towards pruning.
+ *
+ * With this, a complete solid comes out at exactly its footprint — 33.3%, what
+ * `by class` draws — and the other classes gain the short enlargement that reaches
+ * their neighbours and nothing beyond it.
+ */
+function reachable(clips: Clip[], owned: Set<number>): Uint8Array {
+    const { vert, tri, face, edges } = VORONOI_TOPO;
+    const inside = (v: V3): boolean => {
+        for (const c of clips) {
+            if (v[0] * c.u[0] + v[1] * c.u[1] + v[2] * c.u[2] >= c.k) return false;
+        }
+        return true;
+    };
+    const vin = new Uint8Array(vert.length);
+    for (let i = 0; i < vert.length; i++) vin[i] = inside(vert[i]) ? 1 : 0;
+    // a triangle is live if it keeps anything at all: any corner in, or any clipped
+    // sliver, which its own corners being out does not rule out
+    const live = new Uint8Array(tri.length);
+    for (let t = 0; t < tri.length; t++) {
+        if (owned.has(face[t])) { live[t] = 1; continue; }
+        live[t] = tri[t].some((i) => vin[i]) ? 1 : 0;
+    }
+    const adj: number[][] = tri.map(() => []);
+    const SAMPLES = 9;
+    for (const e of edges) {
+        if (!live[e.t1] || !live[e.t2]) continue;
+        // Owned triangles are never cut, so an edge one of them owns is kept whole.
+        let open = owned.has(face[e.t1]) && owned.has(face[e.t2]);
+        if (!open) open = vin[e.a] === 1 || vin[e.b] === 1;
+        if (!open) {
+            const a = vert[e.a];
+            const b = vert[e.b];
+            for (let k = 1; k < SAMPLES && !open; k++) {
+                const s = k / SAMPLES;
+                const x = a[0] + (b[0] - a[0]) * s;
+                const y = a[1] + (b[1] - a[1]) * s;
+                const z = a[2] + (b[2] - a[2]) * s;
+                const L = Math.hypot(x, y, z) || 1;
+                if (inside([x / L, y / L, z / L])) open = true;
+            }
+        }
+        if (open) { adj[e.t1].push(e.t2); adj[e.t2].push(e.t1); }
+    }
+    const seen = new Uint8Array(tri.length);
+    const stack: number[] = [];
+    for (let t = 0; t < tri.length; t++) {
+        if (owned.has(face[t])) { seen[t] = 1; stack.push(t); }
+    }
+    while (stack.length) {
+        const t = stack.pop() as number;
+        for (const u of adj[t]) if (!seen[u] && live[u]) { seen[u] = 1; stack.push(u); }
+    }
+    return seen;
 }
 
 /**
@@ -502,30 +612,35 @@ function voronoiPlanes(
  *
  * So the footprint is laid down whole and the clips apply only outside it.
  *
- * **Growth stops at the cup rim**, not at the ball's equator. The cup is the ten faces
- * on the roof's side, and it is where the solid's roof-facing surface finishes; past it
- * the ball has nothing to do with the roof. Run to the equator instead and a cell grows
- * into directions with no neighbour anywhere near, which is the part that reads as
- * unnecessary: green ends in a point and then keeps going. The two are far apart —
- * green 21.0% against 24.6%, amber 23.9% against 30.8% — and the case that settles it is
- * the complete class, which owns its whole cup and so does not move at all: blue stays
- * at 33.3%, exactly what `by class` draws. No cell can ever exceed 10/30.
+ * Only what is **attached to the footprint** survives — see `reachable`, which is what
+ * removes the stranded ring the clip leaves on its own.
  *
- * The bound also makes the hemisphere clip redundant: a cup's spherical rhombs span
- * z 0.1876 to 1, well inside their own half.
+ * **Where nothing bounds the growth, it runs to the equator and is cut off there.**
+ * That leaves a spur, and the spur is real rather than an artifact: a class-5 cell can
+ * come to a point against blue and purple — a triple point of the packing, where the
+ * gap genuinely closes — and then carry on past it, because two circles crossing bound
+ * a lune on one side and nothing on the other. Closing it would take a third neighbour,
+ * and in those directions there is no ball at all. Bounding the growth at the cup rim
+ * instead was tried and only made the spur shorter, so the honest drop-dead is the
+ * equator: it says "no bound found" rather than pretending to one. Class 4 is the worst
+ * of it and cannot be helped — it owns four rhombs of a ten-rhomb cup and has the least
+ * to fence it in.
  */
-function voronoiCell(clips: Clip[], owned: Set<number>, cup: Set<number>): V3[][] {
+function voronoiCell(
+    clips: Clip[], owned: Set<number>,
+): { tri: V3[][]; bnd: Array<[V3, V3]> } {
     const out: V3[][] = [];
+    const bnd: Array<[V3, V3]> = [];
     const m = VORONOI_MESH;
+    const keep = reachable(clips, owned);
     for (let t = 0, tri = 0; t < m.length; t += 9, tri++) {
+        if (!keep[tri]) continue;
         let poly: V3[] = [
             [m[t], m[t + 1], m[t + 2]],
             [m[t + 3], m[t + 4], m[t + 5]],
             [m[t + 6], m[t + 7], m[t + 8]],
         ];
-        const face = Math.floor(tri / TRIS_PER_FACE);
-        if (!cup.has(face)) continue;              // outside the roof-facing cup
-        for (const c of owned.has(face) ? [] : clips) {
+        for (const c of owned.has(Math.floor(tri / TRIS_PER_FACE)) ? [] : clips) {
             let anyIn = false;
             let anyOut = false;
             for (const v of poly) {
@@ -538,56 +653,23 @@ function voronoiCell(clips: Clip[], owned: Set<number>, cup: Set<number>): V3[][
             if (poly.length < 3) { poly = []; break; }
         }
         for (let i = 1; i + 1 < poly.length; i++) out.push([poly[0], poly[i], poly[i + 1]]);
-    }
-    return out;
-}
-
-/**
- * One small circle on the unit sphere, `v·u = k`, kept only where the cell keeps it and
- * placed on the solid.
- *
- * Serves both jobs the cell needs a curve for: the meeting curves themselves (one per
- * clip, with `skip` naming the clip that made it so it does not cut its own circle
- * away), and the height contours (`skip` = −1, since a contour is subject to all of
- * them).
- */
-function circleOnCell(
-    out: number[], u: V3, k: number, clips: Clip[], skip: number,
-    r: number, c: V3, z: number, bound: Set<number>, exclude: Set<number>, seg = 120,
-): void {
-    if (k <= -1 || k >= 1) return;
-    const rad = Math.sqrt(Math.max(0, 1 - k * k));
-    const seed: V3 = Math.abs(u[2]) < 0.9 ? [0, 0, 1] : [1, 0, 0];
-    const e1 = nrm(cross(u, seed));
-    const e2 = cross(u, e1);
-    let prev: V3 | null = null;
-    for (let t = 0; t <= seg; t++) {
-        const a = (t / seg) * Math.PI * 2;
-        const ca = Math.cos(a);
-        const sa = Math.sin(a);
-        const v: V3 = [
-            u[0] * k + (e1[0] * ca + e2[0] * sa) * rad,
-            u[1] * k + (e1[1] * ca + e2[1] * sa) * rad,
-            u[2] * k + (e1[2] * ca + e2[2] * sa) * rad,
-        ];
-        // Held to the same bound the cell is, and suppressed inside the footprint:
-        // the clips do not cut the footprint, so a curve drawn there would be a line
-        // across a rhomb that `by class` draws unbroken.
-        const f = faceOfDir(v);
-        let inside = bound.has(f) && !exclude.has(f);
-        for (let j = 0; j < clips.length && inside; j++) {
-            if (j === skip) continue;
-            const cj = clips[j];
-            if (v[0] * cj.u[0] + v[1] * cj.u[1] + v[2] * cj.u[2] > cj.k) inside = false;
+        // The meeting curves are read off the drawn region rather than sampled from the
+        // circles: a polygon edge whose two ends both sit on one neighbour's plane IS an
+        // arc of that meeting circle, and taking it this way it can only ever appear
+        // where there is surface under it. Clip 0 is the drop-dead, which is a rim and
+        // not a meeting, so it is passed over.
+        for (let i = 0; i < poly.length && poly.length > 2; i++) {
+            const a = poly[i];
+            const b = poly[(i + 1) % poly.length];
+            for (let j = 1; j < clips.length; j++) {
+                const c = clips[j];
+                const da = a[0] * c.u[0] + a[1] * c.u[1] + a[2] * c.u[2] - c.k;
+                const db = b[0] * c.u[0] + b[1] * c.u[1] + b[2] * c.u[2] - c.k;
+                if (Math.abs(da) < 1e-9 && Math.abs(db) < 1e-9) { bnd.push([a, b]); break; }
+            }
         }
-        if (inside && prev) {
-            out.push(
-                prev[0] * r + c[0], prev[1] * r + c[1], prev[2] * r * z + c[2],
-                v[0] * r + c[0], v[1] * r + c[1], v[2] * r * z + c[2],
-            );
-        }
-        prev = inside ? v : null;
     }
+    return { tri: out, bnd };
 }
 
 // ── the cup's own relief ──────────────────────────────────────────
@@ -1135,14 +1217,18 @@ function build(reframe: boolean): void {
                 const meet: number[] = [];
                 for (const b of cells) {
                     const clips = voronoiPlanes(
-                        b.c, b.r, partners.filter((o) => o.id !== b.s.id), z);
+                        b.c, b.r, b.s.hat, partners.filter((o) => o.id !== b.s.id), z);
                     const col = solidColor(b.s);
                     // Reflecting z reverses the winding, and these carry supplied
                     // normals: see the note in the cup path below.
                     const order = z > 0 ? [0, 1, 2] : [2, 1, 0];
                     const own = new Set(ownedOf(b.s));
-                    const cup = new Set(cupIndices(b.s));
-                    for (const t of voronoiCell(clips, own, cup)) {
+                    const cellGeo = voronoiCell(clips, own);
+                    // Unit-space copy of what was actually drawn, so the contours are
+                    // sliced out of the territory itself and cannot stray outside it.
+                    const flat: number[] = [];
+                    for (const t of cellGeo.tri) for (const v of t) flat.push(v[0], v[1], v[2]);
+                    for (const t of cellGeo.tri) {
                         for (const oi of order) {
                             const v = t[oi];
                             pos.push(v[0] * b.r + b.c[0], v[1] * b.r + b.c[1], v[2] * b.r * z + b.c[2]);
@@ -1153,18 +1239,24 @@ function build(reframe: boolean): void {
                             else cell.push(col.r, col.g, col.b);
                         }
                     }
+                    // Contours are a relief cue, not a boundary, so they run over the
+                    // footprint as they do in every other mode. Sliced from the drawn
+                    // triangles, over the whole sphere's span since a cell can reach
+                    // anywhere on the ball.
+                    const iso = cupIso ? contourSegments(flat, -1, 1) : null;
                     // Two shells for every line, for the reason the spherical net gives.
                     for (const shell of [1.004, 0.996]) {
                         const r = b.r * shell;
-                        for (let i = 0; i < clips.length; i++) {
-                            circleOnCell(meet, clips[i].u, clips[i].k, clips, i, r, b.c, z, cup, own);
+                        for (const [p0, p1] of cellGeo.bnd) {
+                            meet.push(
+                                p0[0] * r + b.c[0], p0[1] * r + b.c[1], p0[2] * r * z + b.c[2],
+                                p1[0] * r + b.c[0], p1[1] * r + b.c[1], p1[2] * r * z + b.c[2],
+                            );
                         }
-                        // Contours are a relief cue, not a boundary, so they run over
-                        // the footprint as they do in every other mode.
-                        if (cupIso) {
-                            for (let k = 1; k <= ISO_LEVELS; k++) {
-                                circleOnCell(isoSeg, [0, 0, 1], -1 + (2 * k) / (ISO_LEVELS + 1),
-                                             clips, -1, r, b.c, z, cup, NO_FACES);
+                        if (iso) {
+                            for (let i = 0; i < iso.length; i += 3) {
+                                isoSeg.push(iso[i] * r + b.c[0], iso[i + 1] * r + b.c[1],
+                                            iso[i + 2] * r * z + b.c[2]);
                             }
                         }
                     }

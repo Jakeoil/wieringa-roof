@@ -423,19 +423,25 @@
     they meet on is that plane cut by either sphere; giving each ball the surface nearest
     its own center therefore closes every seam by construction. Two things keep it a
     broadened footprint rather than a different object: the footprint itself is never
-    cut, and growth stops at the <em>cup</em> rim — the ten faces on the roof's side,
-    where the solid's roof-facing surface finishes. What grows is the skirt between the
-    footprint and that rim, so no cell can ever exceed 10/30. The rhomb net does not
-    move: the arcs drawn are the footprint's own, exactly the ones <em>by class</em>
-    draws, and the skirt carries none. Every eligible solid clips whether or not it is
-    currently drawn, so the curves are a fact about the packing and not about the
-    checkboxes. Offered at the <em>midsphere</em> only.
+    cut; only surface <em>attached</em> to the footprint is drawn; and growth is held to
+    the ball's own hemisphere, dropping dead at the equator where nothing else stops it.
+    The rhomb net does not move: the arcs drawn are the footprint's own, exactly the ones
+    <em>by class</em> draws, and the skirt carries none. Every eligible solid clips
+    whether or not it is currently drawn, so the curves are a fact about the packing and
+    not about the checkboxes. Offered at the <em>midsphere</em> only.
 </p>
 <p>
-    The move is short. On Sun generation 2 a class-4 ball goes from 4/30 = 13.3% of its
-    surface to 23.9%, a class-5 from 16.7% to 21.0%, and a complete one from 33.3% to
-    33.3% — it owns its whole cup, so it does not move at all. Every pair of proper
-    solids that is actually adjacent stands at
+    The attachment test is what keeps the move short. The clip on its own leaves stranded
+    surface — territory that survives every plane but touches nothing the solid owns —
+    and every proper solid has some: a complete ball keeps its dome and then floats a
+    separate ring near its equator, with a band of daylight between them. Pruned to the
+    piece that touches the footprint, Sun generation 2 reads: class 4 from 4/30 = 13.3%
+    of the ball to 17.5%, class 5a to 18.1%, class 5b to 17.0%, and the complete class
+    not moving at all, since its whole skirt was stranded. What is left over is a spur —
+    a cell can come to a point against two neighbors, a real triple point where the gap
+    closes, and still carry on past it, because two circles crossing bound a lune on one
+    side and nothing on the other. Closing that would take a third neighbor where there
+    is no ball at all. Every pair of proper solids that is actually adjacent stands at
     1.7013, 2.3840 or 2.7528 — all inside 2·midradius = 2.9288 — so every visible seam
     does close, in zero exceptions out of 2,615 adjacent pairs. The pairs that can never
     reach each other are blue–blue at φ³, green–green, and amber–green at 3.6416, and

@@ -54,8 +54,8 @@ function clipPoly(poly,u,k,acc){
   }
   return out;
 }
-function voronoiPlanes(c,r,others,reach){
-  const out=[];
+function voronoiPlanes(c,r,hat,others,reach){
+  const out=[{u:[0,0,hat?-1:1],k:0}]; if(reach) reach.push(null);
   for(const o of others){
     const dx=o.c[0]-c[0],dy=o.c[1]-c[1],dz=o.c[2]-c[2],d=Math.hypot(dx,dy,dz);
     if(d<1e-9||d>=r+o.r) continue;
@@ -73,13 +73,11 @@ function sphTri(a,b,c){
   return 4*Math.atan(Math.sqrt(Math.max(0,t)));
 }
 const TRIS_PER_FACE = 5*5*2;
-function cellArea(clips,accMiss,owned,cup){
+function cellArea(clips,accMiss,owned){
   let area=0;
   for(let t=0,tri=0;t<MESH.length;t+=9,tri++){
     let poly=[[MESH[t],MESH[t+1],MESH[t+2]],[MESH[t+3],MESH[t+4],MESH[t+5]],[MESH[t+6],MESH[t+7],MESH[t+8]]];
-    const face=Math.floor(tri/TRIS_PER_FACE);
-    if(!cup.has(face)) continue;
-    for(const c of (owned.has(face)?[]:clips)){
+    for(const c of (owned.has(Math.floor(tri/TRIS_PER_FACE))?[]:clips)){
       let anyIn=false,anyOut=false;
       for(const v of poly){ if(v[0]*c.u[0]+v[1]*c.u[1]+v[2]*c.u[2]-c.k<0) anyIn=true; else anyOut=true; }
       if(!anyOut) continue;
@@ -99,6 +97,36 @@ for(let k=0;k<M;k++){const z=1-(2*k+1)/M,r=Math.sqrt(Math.max(0,1-z*z)),t=GA*k;
 const N30 = RT_FACES.map((f)=>{const c=[0,0,0];for(const q of f)for(let d=0;d<3;d++)c[d]+=q[d]/4;
   const L=Math.hypot(...c);return [c[0]/L,c[1]/L,c[2]/L];});
 
+
+// ── the attachment filter ─────────────────────────────────────────
+// The clip leaves stranded surface: territory that survives every plane but touches
+// nothing the solid owns. Flood-fill the kept region from the footprint and report what
+// is left attached — which is what centers3d.ts actually draws.
+const AM=20000,AGA=Math.PI*(3-Math.sqrt(5)),AD=[];
+for(let k=0;k<AM;k++){const z=1-(2*k+1)/AM,r=Math.sqrt(Math.max(0,1-z*z)),t=AGA*k;
+  AD.push([r*Math.cos(t),r*Math.sin(t),z]);}
+const ACOS=Math.cos(Math.sqrt(4*Math.PI/AM)*1.6), AADJ=AD.map(()=>[]);
+for(let i=0;i<AM;i++)for(let j=i+1;j<Math.min(AM,i+60);j++){
+  const d=AD[i][0]*AD[j][0]+AD[i][1]*AD[j][1]+AD[i][2]*AD[j][2];
+  if(d>ACOS){AADJ[i].push(j);AADJ[j].push(i);} }
+function attached(cen, A, others, R) {
+  const own=new Set(ownedFaceIndices(cen,A.s)), up=A.s.hat;
+  const keep=new Uint8Array(AM), isOwn=new Uint8Array(AM);
+  for(let i=0;i<AM;i++){ const v=AD[i], f=faceOf(v);
+    if(own.has(f)){keep[i]=1;isOwn[i]=1;continue;}
+    let free=(up?v[2]>0:v[2]<0);
+    if(free) for(const o of others){
+      const dx=A.s.c[0]+R*v[0]-o.s.c[0],dy=A.s.c[1]+R*v[1]-o.s.c[1],dz=A.s.c[2]+R*v[2]-o.s.c[2];
+      if(dx*dx+dy*dy+dz*dz<R*R-1e-12){free=false;break;} }
+    if(free) keep[i]=1; }
+  const seen=new Uint8Array(AM), st=[];
+  for(let i=0;i<AM;i++) if(isOwn[i]){seen[i]=1;st.push(i);}
+  while(st.length){const i=st.pop();for(const j of AADJ[i]) if(!seen[j]&&keep[j]){seen[j]=1;st.push(j);}}
+  let own0=0,all=0,att=0;
+  for(let i=0;i<AM;i++){ if(isOwn[i])own0++; if(keep[i]){all++; if(seen[i])att++;} }
+  return { own: own0/AM, all: all/AM, att: att/AM };
+}
+
 for (const seed of ["Sun","Star"]) {
   const idx=seedTypes.findIndex((s)=>s.label===seed);
   const q=console.log; console.log=()=>{}; generatePatch(idx,true,2); console.log=q;
@@ -108,19 +136,17 @@ for (const seed of ["Sun","Star"]) {
   const st={}; const miss=[]; let onOther=0,onOtherBad=0, ownLost=0, ownTot=0;
   for(const b of cells){
     const others=cells.filter((o)=>o!==b);
-    const reach=[]; const clips=voronoiPlanes(b.c,b.r,others,reach);
+    const reach=[]; const clips=voronoiPlanes(b.c,b.r,b.s.hat,others,reach);
     const acc=[];
     const ownedSet=new Set(ownedFaceIndices(cen,b.s));
-    const cupSet=new Set(cupIndices(b.s));
-    const area=cellArea(clips,acc,ownedSet,cupSet);
+    const area=cellArea(clips,acc,ownedSet);
     miss.push(...acc);
     // Monte Carlo: outside every neighbour ball
     let mc=0, own=0, lost=0;
     const owned=ownedSet;
     for(const v of DIRS){
-      const fv = faceOf(v);
-      const inOwn = owned.has(fv);
-      let out = inOwn || cupSet.has(fv);
+      const inOwn = owned.has(faceOf(v));
+      let out = inOwn || (v[2]*(b.s.hat?1:-1) > 0);
       if(out && !inOwn) for(const o of others){
         const dx=b.c[0]+R*v[0]-o.c[0],dy=b.c[1]+R*v[1]-o.c[1],dz=b.c[2]+R*v[2]-o.c[2];
         if(dx*dx+dy*dy+dz*dz<R*R-1e-12){out=false;break;}
@@ -160,5 +186,13 @@ for (const seed of ["Sun","Star"]) {
   console.log(`  worst plane-crossing error: ${Math.max(...miss).toExponential(2)}  (${miss.length} crossings)`);
   console.log(`  meeting-circle points that also lie on the other ball: ${onOther-onOtherBad}/${onOther}`);
   console.log(`  footprint kept by the cell: ${(100*(1-ownLost/ownTot)).toFixed(2)}%  (must be 100)`);
+  const at={};
+  for(const A of cells){ const r=attached(cen,A,cells.filter((o)=>o!==A),R);
+    (at[A.k]??={n:0,o:0,a:0,t:0}); at[A.k].n++; at[A.k].o+=r.own; at[A.k].a+=r.att; at[A.k].t+=r.all; }
+  console.log("  attached to the footprint — what is actually drawn:");
+  console.log("    class        by class   drawn    growth   stranded, pruned");
+  for(const k of ["4","5a","5b","10"]){const v=at[k];if(!v)continue;
+    const o=100*v.o/v.n,a=100*v.a/v.n,t=100*v.t/v.n;
+    console.log(`    ${(k+" ("+COLOR[k]+")").padEnd(12)} ${o.toFixed(1).padStart(5)}%   ${a.toFixed(1).padStart(5)}%   ${(a-o>=0?"+":"")}${(a-o).toFixed(1).padStart(4)} pts   ${(t-a).toFixed(1).padStart(5)} pts`);}
   console.log();
 }

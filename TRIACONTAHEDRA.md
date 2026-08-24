@@ -1388,16 +1388,41 @@ stops on the meeting circles, which is what closes the seam. A complete solid ke
 dome and adds a skirt; a class-5 grows the little it takes to reach its neighbour, and
 its new rim lands exactly on the neighbour's surface.
 
-**Growth stops at the cup rim.** The cup is the ten faces on the roof's side, and it is
-where the solid's roof-facing surface finishes; past it the ball has nothing to do with
-the roof. Two looser bounds were tried and rejected. Unbounded, a cell wraps round the
-back of the ball and a class-4 solid goes from 4/30 of its surface to 69%. Bounded by
-the ball's own hemisphere it still grows into directions with no neighbour anywhere
-near — green ends in a point and then runs on to the equator. The cup settles it, and
-the case that proves it is the complete class: a class-10 solid owns its whole cup, so
-it does not move at all, and blue draws exactly what `by class` draws. **No cell can
-ever exceed 10/30.** The cup bound also makes a hemisphere clip redundant — a cup's
-spherical rhombs span z 0.1876 to 1, well inside their own half.
+**Where nothing bounds the growth, it runs to the ball's equator and is cut off there.**
+That drop-dead is not a bound in the same sense as the others: two balls meeting settle
+their boundary between them, and growth in a direction with no ball in it has nothing to
+settle against, so it runs until the surface turns away from the roof. Some bound is
+needed — unbounded, a cell wraps round the back of the ball and a class-4 solid goes
+from 4/30 of its surface to 69%.
+
+**Only what is attached to the footprint is drawn.** The clip on its own leaves
+*stranded* surface — territory that survives every plane but touches nothing the solid
+owns. It is not a rare corner: on Sun gen 2 **every single proper solid** has some, and
+for the complete class it is the entire skirt. A class-10 ball keeps its dome, and then
+a separate ring floats near its equator with a band of daylight between the two, because
+the band lies inside a neighbour's ball and the ring beyond it does not. Drawn, that
+reads as what it is — a discontinuity. Stranded share of the cell, Sun gen 2: amber 13.3
+of 30.8 points, green 6.5 of 24.6, purple 5.3 of 22.3, blue 8.5 of 41.9.
+
+So the territory is the connected component of the clipped region containing the
+footprint. Two triangles count as attached when the edge they share keeps some of its
+length — both are clipped by the same planes, so the kept part of a shared edge is the
+same seen from either side, and a clipped triangle is convex and therefore in one piece.
+Sampling that edge can only ever *miss* a thin attachment, never invent one, so the
+error runs towards pruning. The meeting curves are then read off the drawn region rather
+than sampled from the circles — a polygon edge with both ends on one neighbour's plane
+*is* an arc of that meeting circle — so a curve can only appear where there is surface
+under it, and the contours are sliced out of the same triangles.
+
+**The spur is real and cannot be closed.** A class-5 cell can come to a point against
+blue and purple — a genuine triple point of the packing, where the gap does close — and
+then carry on past it, leaving surface that looks unnecessary because it is. Two circles
+crossing bound a lune on one side and nothing on the other; closing it would take a
+third neighbour, and in those directions there is no ball at all. Tightening the
+drop-dead to the cup rim was tried and only made the spur shorter (green 21.0% against
+24.6%, amber 23.9% against 30.8%), so the equator stands as the honest answer: it says
+*no bound found* rather than pretending to one. Class 4 is the worst of it and cannot be
+helped — four rhombs of a ten-rhomb cup, and the least to fence it in.
 
 **Every eligible solid clips, drawn or not.** The partition is a property of the
 packing, not of the view: class unchecked, RT unchecked, size at zero, its side of the
@@ -1445,16 +1470,18 @@ border on the roof.
 **What the cells cost and pay.** Cell area as a share of the ball, against the 4/30,
 5/30, 10/30 the footprint wears:
 
-| class | footprint | Sun gen 2 | Star gen 2 | if it ran to the equator instead |
-|---|---|---|---|---|
-| 4 amber | 13.3% | 23.9% | 23.7% | 30.8% |
-| 5a green | 16.7% | 21.0% | 23.0% | 24.6% |
-| 5b purple | 16.7% | 18.8% | 20.5% | 22.3% |
-| 10 blue | 33.3% | **33.3%** | **33.3%** | 41.9% |
+| class | footprint | Sun gen 2 | Star gen 2 | growth | before pruning |
+|---|---|---|---|---|---|
+| 4 amber | 13.3% | 17.5% | 16.6% | +4.2 pts | 30.8% |
+| 5a green | 16.7% | 18.1% | 18.4% | +1.5 | 24.6% |
+| 5b purple | 16.7% | 17.0% | 17.3% | +0.3 | 22.3% |
+| 10 blue | 33.3% | 33.3% | 33.3% | +0.0 | 41.9% |
 
-Every class only ever grows, and the cell is always a superset of the footprint. Amber
-moves most because it owns the least — four rhombs of a ten-rhomb cup — and has the
-most room before it meets anything. Blue does not move.
+This is the size the move was always supposed to be: a short enlargement that reaches a
+neighbour and stops. The complete class does not move at all — every part of its skirt
+was stranded. Amber moves most because it owns the least and has the most room before it
+meets anything. Every class only grows, and the cell is always a superset of the
+footprint.
 
 **The map does not close, and no plausible radius closes it.** Measured on Sun gen 3
 over interior solids only, as the share of a ball's rim with no neighbour to stop it:
@@ -1490,8 +1517,7 @@ is at most the last 11°.
 
 **Verification.** `tools/probes/voronoi.mjs` — the clipped cell area agrees with a
 40,000-point Monte Carlo to 0.03% on all 51 Sun and 41 Star proper solids; the footprint
-is kept at 100.00% on every one of them, and the complete class lands on 33.33% = 10/30
-exactly; every one of 6,000 sampled
+is kept at 100.00% on every one of them; every one of 6,000 sampled
 meeting-circle points lies on the neighbouring ball to 1e-9; worst arc/plane crossing
 residual 9.75e-10 over 52,502 crossings. The crossing is solved as a quadratic on the
 projected chord with a bisection fallback, because an interpolated boundary is off by
