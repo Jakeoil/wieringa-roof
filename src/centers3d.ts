@@ -468,25 +468,14 @@ function clipPoly(poly: V3[], u: V3, k: number): V3[] {
  * same construction with the radii put back — so that is what is computed, and it
  * collapses to the bisector the moment the two agree.
  *
- * Growth is confined to the ball's **own hemisphere** — the side its faces are on,
- * above the center for a hat and below it for a bowl. Without that the cell wraps
- * around the back of the ball and stops being a broadened footprint at all: a class-4
- * ball goes from 4/30 of its surface to 69% of it, when the whole point is that a cell
- * should differ from its footprint only by the seam it closes. Held to its hemisphere
- * the same ball reaches 27.9%, a complete one 32.8% against a footprint of 33.3%, which
- * is the short enlargement this is for. The rim of that hemisphere is the equator,
- * where the surface stands perpendicular to the plane of the roof.
- *
  * `z` is the parity. The cell is built in unmirrored coordinates and mirrored on the
  * way out, exactly as the cups are, so the neighbor direction has to be unmirrored on
- * the way in — while the hemisphere is stated in unmirrored terms already and travels
- * with the mirror on its own.
+ * the way in.
  */
 function voronoiPlanes(
-    c: V3, r: number, hat: boolean, others: Array<{ c: V3; r: number }>, z: number,
+    c: V3, r: number, others: Array<{ c: V3; r: number }>, z: number,
 ): Clip[] {
-    // First, so a caller drawing the boundary can tell the rim from a meeting curve.
-    const out: Clip[] = [{ u: [0, 0, hat ? -1 : 1], k: 0 }];
+    const out: Clip[] = [];
     for (const o of others) {
         const dx = o.c[0] - c[0];
         const dy = o.c[1] - c[1];
@@ -511,14 +500,21 @@ function voronoiPlanes(
  * its dome so thoroughly that a pure nearest-center rule keeps **3.8%** of it. The
  * dome would simply disappear.
  *
- * So the footprint is laid down whole and the clips apply only outside it. What grows
- * is the skirt between the footprint's rim and the equator — the cup reaches 79.0° from
- * the pole whatever it owns, so that skirt is at most the last 11° — and that growth
- * stops on the meeting circles, which is what closes the seam. A complete solid needs
- * none of it and keeps its dome; a class-5 grows the little it takes to reach its
- * neighbor, and its new rim lands exactly on the neighbor's surface.
+ * So the footprint is laid down whole and the clips apply only outside it.
+ *
+ * **Growth stops at the cup rim**, not at the ball's equator. The cup is the ten faces
+ * on the roof's side, and it is where the solid's roof-facing surface finishes; past it
+ * the ball has nothing to do with the roof. Run to the equator instead and a cell grows
+ * into directions with no neighbour anywhere near, which is the part that reads as
+ * unnecessary: green ends in a point and then keeps going. The two are far apart —
+ * green 21.0% against 24.6%, amber 23.9% against 30.8% — and the case that settles it is
+ * the complete class, which owns its whole cup and so does not move at all: blue stays
+ * at 33.3%, exactly what `by class` draws. No cell can ever exceed 10/30.
+ *
+ * The bound also makes the hemisphere clip redundant: a cup's spherical rhombs span
+ * z 0.1876 to 1, well inside their own half.
  */
-function voronoiCell(clips: Clip[], owned: Set<number>): V3[][] {
+function voronoiCell(clips: Clip[], owned: Set<number>, cup: Set<number>): V3[][] {
     const out: V3[][] = [];
     const m = VORONOI_MESH;
     for (let t = 0, tri = 0; t < m.length; t += 9, tri++) {
@@ -527,7 +523,9 @@ function voronoiCell(clips: Clip[], owned: Set<number>): V3[][] {
             [m[t + 3], m[t + 4], m[t + 5]],
             [m[t + 6], m[t + 7], m[t + 8]],
         ];
-        for (const c of owned.has(Math.floor(tri / TRIS_PER_FACE)) ? [] : clips) {
+        const face = Math.floor(tri / TRIS_PER_FACE);
+        if (!cup.has(face)) continue;              // outside the roof-facing cup
+        for (const c of owned.has(face) ? [] : clips) {
             let anyIn = false;
             let anyOut = false;
             for (const v of poly) {
@@ -555,7 +553,7 @@ function voronoiCell(clips: Clip[], owned: Set<number>): V3[][] {
  */
 function circleOnCell(
     out: number[], u: V3, k: number, clips: Clip[], skip: number,
-    r: number, c: V3, z: number, owned: Set<number>, seg = 120,
+    r: number, c: V3, z: number, bound: Set<number>, exclude: Set<number>, seg = 120,
 ): void {
     if (k <= -1 || k >= 1) return;
     const rad = Math.sqrt(Math.max(0, 1 - k * k));
@@ -572,9 +570,11 @@ function circleOnCell(
             u[1] * k + (e1[1] * ca + e2[1] * sa) * rad,
             u[2] * k + (e1[2] * ca + e2[2] * sa) * rad,
         ];
-        // Suppressed inside the footprint: the clips do not cut it, so a curve drawn
-        // there would be a line across a rhomb that `by class` draws unbroken.
-        let inside = !owned.has(faceOfDir(v));
+        // Held to the same bound the cell is, and suppressed inside the footprint:
+        // the clips do not cut the footprint, so a curve drawn there would be a line
+        // across a rhomb that `by class` draws unbroken.
+        const f = faceOfDir(v);
+        let inside = bound.has(f) && !exclude.has(f);
         for (let j = 0; j < clips.length && inside; j++) {
             if (j === skip) continue;
             const cj = clips[j];
@@ -1118,6 +1118,16 @@ function build(reframe: boolean): void {
                     `a generation.`;
             } else {
                 const z = zsign;
+                // The partition is a property of the PACKING, not of the view. Every
+                // eligible proper solid takes part in the clip whether or not it is
+                // currently drawn — class unchecked, RT unchecked, size at zero, its
+                // side of the roof hidden, it still clips. Otherwise unchecking blue and
+                // purple lets green swell to fill its whole hemisphere, and the curve a
+                // ball meets its neighbour on moves every time something is toggled,
+                // which makes it a fact about the checkboxes rather than about the
+                // solids. Neighbours are taken at full radius for the same reason.
+                const partners = cen.solids.filter(eligible)
+                    .map((s) => ({ c: place(s.c), r: sphereR, id: s.id }));
                 const cells = balls.map((s) => ({ c: place(s.c), r: sphereR * sizeOf(s), s }));
                 const pos: number[] = [];
                 const nrmls: number[] = [];
@@ -1125,13 +1135,14 @@ function build(reframe: boolean): void {
                 const meet: number[] = [];
                 for (const b of cells) {
                     const clips = voronoiPlanes(
-                        b.c, b.r, b.s.hat, cells.filter((o) => o !== b), z);
+                        b.c, b.r, partners.filter((o) => o.id !== b.s.id), z);
                     const col = solidColor(b.s);
                     // Reflecting z reverses the winding, and these carry supplied
                     // normals: see the note in the cup path below.
                     const order = z > 0 ? [0, 1, 2] : [2, 1, 0];
                     const own = new Set(ownedOf(b.s));
-                    for (const t of voronoiCell(clips, own)) {
+                    const cup = new Set(cupIndices(b.s));
+                    for (const t of voronoiCell(clips, own, cup)) {
                         for (const oi of order) {
                             const v = t[oi];
                             pos.push(v[0] * b.r + b.c[0], v[1] * b.r + b.c[1], v[2] * b.r * z + b.c[2]);
@@ -1146,14 +1157,14 @@ function build(reframe: boolean): void {
                     for (const shell of [1.004, 0.996]) {
                         const r = b.r * shell;
                         for (let i = 0; i < clips.length; i++) {
-                            circleOnCell(meet, clips[i].u, clips[i].k, clips, i, r, b.c, z, own);
+                            circleOnCell(meet, clips[i].u, clips[i].k, clips, i, r, b.c, z, cup, own);
                         }
                         // Contours are a relief cue, not a boundary, so they run over
                         // the footprint as they do in every other mode.
                         if (cupIso) {
                             for (let k = 1; k <= ISO_LEVELS; k++) {
                                 circleOnCell(isoSeg, [0, 0, 1], -1 + (2 * k) / (ISO_LEVELS + 1),
-                                             clips, -1, r, b.c, z, NO_FACES);
+                                             clips, -1, r, b.c, z, cup, NO_FACES);
                             }
                         }
                     }

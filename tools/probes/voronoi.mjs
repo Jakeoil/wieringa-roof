@@ -2,7 +2,7 @@
 // and measured against Monte Carlo.
 import { seedTypes, generatePatch } from
     "/Users/jakeoil/projects/claude-projects/math-legacy/wieringa-roof/dist/geometry.js";
-import { triacontahedra, ownedFaceIndices, RT_FACES, MIDRADIUS } from
+import { triacontahedra, ownedFaceIndices, cupIndices, RT_FACES, MIDRADIUS } from
     "/Users/jakeoil/projects/claude-projects/math-legacy/wieringa-roof/dist/centers.js";
 const R = MIDRADIUS;
 const MAKEUP = { "4=4T+0t":"4", "5=5T+0t":"5a", "5=3T+2t":"5b", "10=5T+5t":"10" };
@@ -54,8 +54,8 @@ function clipPoly(poly,u,k,acc){
   }
   return out;
 }
-function voronoiPlanes(c,r,hat,others,reach){
-  const out=[{u:[0,0,hat?-1:1],k:0}]; if(reach) reach.push(null);
+function voronoiPlanes(c,r,others,reach){
+  const out=[];
   for(const o of others){
     const dx=o.c[0]-c[0],dy=o.c[1]-c[1],dz=o.c[2]-c[2],d=Math.hypot(dx,dy,dz);
     if(d<1e-9||d>=r+o.r) continue;
@@ -73,11 +73,13 @@ function sphTri(a,b,c){
   return 4*Math.atan(Math.sqrt(Math.max(0,t)));
 }
 const TRIS_PER_FACE = 5*5*2;
-function cellArea(clips,accMiss,owned){
+function cellArea(clips,accMiss,owned,cup){
   let area=0;
   for(let t=0,tri=0;t<MESH.length;t+=9,tri++){
     let poly=[[MESH[t],MESH[t+1],MESH[t+2]],[MESH[t+3],MESH[t+4],MESH[t+5]],[MESH[t+6],MESH[t+7],MESH[t+8]]];
-    for(const c of (owned.has(Math.floor(tri/TRIS_PER_FACE))?[]:clips)){
+    const face=Math.floor(tri/TRIS_PER_FACE);
+    if(!cup.has(face)) continue;
+    for(const c of (owned.has(face)?[]:clips)){
       let anyIn=false,anyOut=false;
       for(const v of poly){ if(v[0]*c.u[0]+v[1]*c.u[1]+v[2]*c.u[2]-c.k<0) anyIn=true; else anyOut=true; }
       if(!anyOut) continue;
@@ -106,17 +108,19 @@ for (const seed of ["Sun","Star"]) {
   const st={}; const miss=[]; let onOther=0,onOtherBad=0, ownLost=0, ownTot=0;
   for(const b of cells){
     const others=cells.filter((o)=>o!==b);
-    const reach=[]; const clips=voronoiPlanes(b.c,b.r,b.s.hat,others,reach);
+    const reach=[]; const clips=voronoiPlanes(b.c,b.r,others,reach);
     const acc=[];
     const ownedSet=new Set(ownedFaceIndices(cen,b.s));
-    const area=cellArea(clips,acc,ownedSet);
+    const cupSet=new Set(cupIndices(b.s));
+    const area=cellArea(clips,acc,ownedSet,cupSet);
     miss.push(...acc);
     // Monte Carlo: outside every neighbour ball
     let mc=0, own=0, lost=0;
     const owned=ownedSet;
     for(const v of DIRS){
-      const inOwn = owned.has(faceOf(v));
-      let out = inOwn || (v[2]*(b.s.hat?1:-1) > 0);
+      const fv = faceOf(v);
+      const inOwn = owned.has(fv);
+      let out = inOwn || cupSet.has(fv);
       if(out && !inOwn) for(const o of others){
         const dx=b.c[0]+R*v[0]-o.c[0],dy=b.c[1]+R*v[1]-o.c[1],dz=b.c[2]+R*v[2]-o.c[2];
         if(dx*dx+dy*dy+dz*dz<R*R-1e-12){out=false;break;}

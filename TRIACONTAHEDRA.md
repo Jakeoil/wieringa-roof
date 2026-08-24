@@ -1388,13 +1388,22 @@ stops on the meeting circles, which is what closes the seam. A complete solid ke
 dome and adds a skirt; a class-5 grows the little it takes to reach its neighbour, and
 its new rim lands exactly on the neighbour's surface.
 
-**Growth is confined to the ball's own hemisphere** — the side its faces are on, above
-the centre for a hat and below it for a bowl, with the equator as the rim. This is not
-a refinement either. Unconfined, the cell wraps round the back of the ball and a
-class-4 solid goes from 4/30 of its surface to 69% of it. The rim is the equator, where
-the surface stands perpendicular to the plane of the roof, and since every cup reaches
-79.0° from its own pole whatever it owns, the skirt a complete solid can add is at most
-the last 11°.
+**Growth stops at the cup rim.** The cup is the ten faces on the roof's side, and it is
+where the solid's roof-facing surface finishes; past it the ball has nothing to do with
+the roof. Two looser bounds were tried and rejected. Unbounded, a cell wraps round the
+back of the ball and a class-4 solid goes from 4/30 of its surface to 69%. Bounded by
+the ball's own hemisphere it still grows into directions with no neighbour anywhere
+near — green ends in a point and then runs on to the equator. The cup settles it, and
+the case that proves it is the complete class: a class-10 solid owns its whole cup, so
+it does not move at all, and blue draws exactly what `by class` draws. **No cell can
+ever exceed 10/30.** The cup bound also makes a hemisphere clip redundant — a cup's
+spherical rhombs span z 0.1876 to 1, well inside their own half.
+
+**Every eligible solid clips, drawn or not.** The partition is a property of the
+packing, not of the view: class unchecked, RT unchecked, size at zero, its side of the
+roof hidden — a solid still clips, and neighbours are taken at full radius. Otherwise
+unchecking blue and purple lets green swell to fill everything, and the curve two balls
+meet on becomes a fact about the checkboxes rather than about the solids.
 
 **The distances are quantized, and 2R lands in a wide gap.** Centre distances between
 proper solids, over Sun g2/g3, Star g2/g3, Pe5 g3/g4 and Queen g3:
@@ -1436,16 +1445,36 @@ border on the roof.
 **What the cells cost and pay.** Cell area as a share of the ball, against the 4/30,
 5/30, 10/30 the footprint wears:
 
-| class | footprint | Sun gen 2 | Star gen 2 | growth (Sun) |
+| class | footprint | Sun gen 2 | Star gen 2 | if it ran to the equator instead |
 |---|---|---|---|---|
-| 4 amber | 13.3% | 30.8% | 27.7% | +17.5 pts |
-| 5a green | 16.7% | 24.6% | 28.8% | +7.9 |
-| 5b purple | 16.7% | 22.3% | 27.2% | +5.6 |
-| 10 blue | 33.3% | 41.9% | 42.8% | +8.6 |
+| 4 amber | 13.3% | 23.9% | 23.7% | 30.8% |
+| 5a green | 16.7% | 21.0% | 23.0% | 24.6% |
+| 5b purple | 16.7% | 18.8% | 20.5% | 22.3% |
+| 10 blue | 33.3% | **33.3%** | **33.3%** | 41.9% |
 
 Every class only ever grows, and the cell is always a superset of the footprint. Amber
 moves most because it owns the least — four rhombs of a ten-rhomb cup — and has the
-most room to grow into before it meets anything.
+most room before it meets anything. Blue does not move.
+
+**The map does not close, and no plausible radius closes it.** Measured on Sun gen 3
+over interior solids only, as the share of a ball's rim with no neighbour to stop it:
+
+| radius | | 2R | open rim |
+|---|---|---|---|
+| insphere ρ | 1.3763819 | 2.752764 | 52.7% |
+| midsphere | 1.4643863 | 2.928773 | 32.6% |
+| 20 threefold vertices | 1.4733704 | 2.946741 | 32.3% |
+| 12 fivefold vertices, φ | 1.6180340 | 3.236068 | 29.3% |
+| — | 2.0 | 4.0 | 21.7% |
+| — | 2.9 | 5.8 | 0.0% |
+
+The limit is the **contact graph**, not the depth of the overlap. 2φ = 3.236068 is still
+short of the next distance shell at 3.641564, so midsphere, 20V and φ all touch exactly
+the same pairs and differ only in how wide each overlap is. The first new neighbour
+needs R > 1.820782, and even that buys only 32.6% → 27.0%. Nothing closes until about
+R = 2.9, twice the insphere, where the balls have stopped meaning anything about the
+triacontahedron. 20V is 0.6% larger than the midsphere and worth 0.3 points — not a
+distinction worth offering.
 
 **The net does not move.** The arcs drawn are exactly the footprint's own, the same ones
 `by class` draws. Drawing the whole thirty-rhomb net cut to the cell was wrong twice
@@ -1460,8 +1489,9 @@ hemisphere rim is 90°): class 4 owned 63.2°, class 5a 63.2°, class 5b 78.9°,
 is at most the last 11°.
 
 **Verification.** `tools/probes/voronoi.mjs` — the clipped cell area agrees with a
-40,000-point Monte Carlo to 0.04% on all 51 Sun and 41 Star proper solids; the footprint
-is kept at 100.00% on every one of them; every one of 6,000 sampled
+40,000-point Monte Carlo to 0.03% on all 51 Sun and 41 Star proper solids; the footprint
+is kept at 100.00% on every one of them, and the complete class lands on 33.33% = 10/30
+exactly; every one of 6,000 sampled
 meeting-circle points lies on the neighbouring ball to 1e-9; worst arc/plane crossing
 residual 9.75e-10 over 52,502 crossings. The crossing is solved as a quadratic on the
 projected chord with a bisection fallback, because an interpolated boundary is off by
