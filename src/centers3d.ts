@@ -78,8 +78,7 @@ const rtFacesSel = el<HTMLSelectElement>("rtfaces");
 const rtShadeChk = el<HTMLInputElement>("rtshade");
 const rtIsoChk = el<HTMLInputElement>("rtisogloss");
 
-const classBar = el<HTMLElement>("classbar");
-const pickEl = el<HTMLElement>("pick");
+const classBar = el<HTMLElement>("classlines");
 const statusEl = el<HTMLElement>("status");
 
 const PREFS_KEY = "wr-centers";
@@ -133,12 +132,6 @@ const classCtl: ClassCtl[] = [];
 
 const rv = createRoofView(view);
 
-/** The rhomb the user last clicked, or null. Survives a rebuild, because changing a
- *  filter should not throw away what you were looking at. */
-let selected: number | null = null;
-/** What the last build drew, so the pick handler can map a raycast onto a face. */
-let last: { faces: { id: number }[] } | null = null;
-
 // ── palette ───────────────────────────────────────────────────────
 //
 // One hue per solid, cycled. The point is only that neighbors differ: a complete cap
@@ -148,7 +141,6 @@ let last: { faces: { id: number }[] } | null = null;
 
 const WASH = new THREE.Color(0xd8d9de);
 
-const HILITE = new THREE.Color(0xd6402f);
 // A **proper** rhomb is one with all of its normals — one whose home solid shows the
 // roof a whole configuration rather than a scrap. Four of the nine makeups qualify,
 // and they are told apart by makeup and not by size alone: class 5 comes in two quite
@@ -328,6 +320,274 @@ function netFor(faces: number[]): Float32Array {
     if (netCache.size > 400) netCache.delete(netCache.keys().next().value as string);
     netCache.set(k, made);
     return made;
+}
+
+// ── the spherical Voronoi clip ────────────────────────────────────
+//
+// Balls at the midsphere overlap, and "by class" leaves a seam between every pair of
+// them because each wears only the rhombs it owns. Give a ball instead the part of its
+// surface **nearer to its own center than to any other drawn center** and the seams
+// close by construction: all the balls carry the same radius, so the plane two of them
+// meet in is the perpendicular bisector of their centers, and the curve they meet on is
+// that plane cut by either sphere. Neighbors meet exactly, nothing is drawn twice, and
+// no pair needs a decision of its own.
+//
+// It is offered at the midsphere only. The rule itself would run at any radius, but the
+// measurement it rests on was made there, and at ρ the kissing shell sits exactly on the
+// contact so half the pairs meet at a point rather than on a curve.
+//
+// Measured before it was built, over Sun and Star gen 2 (and confirmed on Pe5 gen 3-4
+// and Queen gen 3): every *adjacent* pair of proper solids stands at 1.7013, 2.3840 or
+// 2.7528 — all inside 2·midradius = 2.9288 — so every seam that is actually visible
+// does close, in 0 exceptions out of 2,615 adjacent pairs. The pairs that can never
+// reach each other are 10+10 at φ³ = 4.2361, 5a+5a, and 4+5a at 3.6416, and none of
+// those three is ever a neighbor: the surface they would have shared is open space
+// either way. See TRIACONTAHEDRA.md §10.
+//
+// The clip cannot fill a ball, only close its seams. At the midsphere a class-4 ball
+// wears 4/30 of its surface and reaches 41%; a class-10 ball 10/30 and reaches 56%. The
+// rest faces open space — 52-87% of the hemisphere away from the roof.
+
+/** Keep the part of the unit sphere with `v · u < k`. `k` is in units of the ball's
+ *  own radius, so one clip serves the ball whatever the size slider says. */
+interface Clip {
+    u: V3;
+    k: number;
+}
+
+/** The whole unit sphere, tessellated exactly as the cups are so that a cell and a cup
+ *  drawn on the same ball agree about where their shared rhomb boundaries lie. The
+ *  patches come out face by face, so a triangle's index names the rhomb it belongs to. */
+const VORONOI_STEPS = 5;
+const VORONOI_MESH = sphericalPatches(ALL_INDICES, VORONOI_STEPS).pos;
+const TRIS_PER_FACE = VORONOI_STEPS * VORONOI_STEPS * 2;
+
+/** Unit centroid direction of each of the thirty faces; the spherical rhomb of face i
+ *  is the set of directions for which `v·n̂ᵢ` is the largest. */
+const FACE_DIRS: V3[] = RT_FACES.map((f) => {
+    const c: V3 = [0, 0, 0];
+    for (const q of f) for (let d = 0; d < 3; d++) c[d] += q[d] / 4;
+    return nrm(c);
+});
+const NO_FACES: Set<number> = new Set();
+function faceOfDir(v: V3): number {
+    let best = 0;
+    let bd = -2;
+    for (let i = 0; i < FACE_DIRS.length; i++) {
+        const d = v[0] * FACE_DIRS[i][0] + v[1] * FACE_DIRS[i][1] + v[2] * FACE_DIRS[i][2];
+        if (d > bd) { bd = d; best = i; }
+    }
+    return best;
+}
+
+/**
+ * Where the great-circle arc a→b crosses the plane `v·u = k`.
+ *
+ * The arc is the chord projected back out to the sphere, so a point on it is
+ * `normalize(a + s·(b−a))` and the crossing solves `(a + s d)·u = k·|a + s d|`.
+ * Squaring gives a quadratic, whose spurious root is thrown out by testing both
+ * against the equation that was not squared.
+ *
+ * Solved rather than interpolated because the two balls have to land on the *same*
+ * circle. An interpolated boundary is off by O(θ²) on each side independently, which
+ * is a hairline of daylight between two surfaces whose whole purpose is to meet.
+ */
+function arcCross(a: V3, b: V3, u: V3, k: number): V3 {
+    const A = a[0] * u[0] + a[1] * u[1] + a[2] * u[2];
+    const B = (b[0] - a[0]) * u[0] + (b[1] - a[1]) * u[1] + (b[2] - a[2]) * u[2];
+    const q = 2 * (1 - (a[0] * b[0] + a[1] * b[1] + a[2] * b[2]));
+    const c2 = B * B - k * k * q;
+    const c1 = 2 * A * B + k * k * q;
+    const c0 = A * A - k * k;
+    const at = (t: number): V3 => {
+        const x = a[0] + (b[0] - a[0]) * t;
+        const y = a[1] + (b[1] - a[1]) * t;
+        const z = a[2] + (b[2] - a[2]) * t;
+        const L = Math.hypot(x, y, z) || 1;
+        return [x / L, y / L, z / L];
+    };
+    const miss = (t: number): number => {
+        const v = at(t);
+        return Math.abs(v[0] * u[0] + v[1] * u[1] + v[2] * u[2] - k);
+    };
+    const cand: number[] = [];
+    if (Math.abs(c2) < 1e-12) {
+        if (Math.abs(c1) > 1e-12) cand.push(-c0 / c1);
+    } else {
+        const r = Math.sqrt(Math.max(0, c1 * c1 - 4 * c2 * c0));
+        cand.push((-c1 + r) / (2 * c2), (-c1 - r) / (2 * c2));
+    }
+    let best = -1;
+    let bestMiss = Infinity;
+    for (const t of cand) {
+        if (t < -1e-9 || t > 1 + 1e-9) continue;
+        const m = miss(t);
+        if (m < bestMiss) { bestMiss = m; best = t; }
+    }
+    if (bestMiss > 1e-9) {
+        // A near-degenerate quadratic — a vertex sitting on the plane, or an arc almost
+        // tangent to it — can put both roots outside the segment. This is only called
+        // on an edge whose ends straddle the plane, so the signed distance changes sign
+        // across it and bisection cannot fail. Twenty halvings take the residual below
+        // 1e-6 of the arc, which is far finer than the tessellation it lands in.
+        const g = (t: number): number => {
+            const v = at(t);
+            return v[0] * u[0] + v[1] * u[1] + v[2] * u[2] - k;
+        };
+        let lo = 0;
+        let hi = 1;
+        const gLo = g(0);
+        for (let i = 0; i < 40; i++) {
+            const mid = (lo + hi) / 2;
+            if ((g(mid) < 0) === (gLo < 0)) lo = mid; else hi = mid;
+        }
+        best = (lo + hi) / 2;
+    }
+    return at(Math.min(1, Math.max(0, best)));
+}
+
+/** Sutherland–Hodgman, with the crossings taken on the sphere rather than the chord. */
+function clipPoly(poly: V3[], u: V3, k: number): V3[] {
+    const out: V3[] = [];
+    for (let i = 0; i < poly.length; i++) {
+        const a = poly[i];
+        const b = poly[(i + 1) % poly.length];
+        const da = a[0] * u[0] + a[1] * u[1] + a[2] * u[2] - k;
+        const db = b[0] * u[0] + b[1] * u[1] + b[2] * u[2] - k;
+        if (da < 0) out.push(a);
+        if ((da < 0) !== (db < 0)) out.push(arcCross(a, b, u, k));
+    }
+    return out;
+}
+
+/**
+ * The clips one ball takes from every other drawn ball it reaches.
+ *
+ * With equal radii this is the perpendicular bisector. The size sliders can leave two
+ * balls unequal, and then the plane they actually meet in is the radical plane — the
+ * same construction with the radii put back — so that is what is computed, and it
+ * collapses to the bisector the moment the two agree.
+ *
+ * Growth is confined to the ball's **own hemisphere** — the side its faces are on,
+ * above the center for a hat and below it for a bowl. Without that the cell wraps
+ * around the back of the ball and stops being a broadened footprint at all: a class-4
+ * ball goes from 4/30 of its surface to 69% of it, when the whole point is that a cell
+ * should differ from its footprint only by the seam it closes. Held to its hemisphere
+ * the same ball reaches 27.9%, a complete one 32.8% against a footprint of 33.3%, which
+ * is the short enlargement this is for. The rim of that hemisphere is the equator,
+ * where the surface stands perpendicular to the plane of the roof.
+ *
+ * `z` is the parity. The cell is built in unmirrored coordinates and mirrored on the
+ * way out, exactly as the cups are, so the neighbor direction has to be unmirrored on
+ * the way in — while the hemisphere is stated in unmirrored terms already and travels
+ * with the mirror on its own.
+ */
+function voronoiPlanes(
+    c: V3, r: number, hat: boolean, others: Array<{ c: V3; r: number }>, z: number,
+): Clip[] {
+    // First, so a caller drawing the boundary can tell the rim from a meeting curve.
+    const out: Clip[] = [{ u: [0, 0, hat ? -1 : 1], k: 0 }];
+    for (const o of others) {
+        const dx = o.c[0] - c[0];
+        const dy = o.c[1] - c[1];
+        const dz = o.c[2] - c[2];
+        const d = Math.hypot(dx, dy, dz);
+        if (d < 1e-9 || d >= r + o.r) continue; // too far apart to meet at all
+        const k = (d * d + r * r - o.r * o.r) / (2 * d * r);
+        if (k >= 1) continue;                   // the plane clears this sphere entirely
+        out.push({ u: [dx / d, dy / d, (dz / d) * z], k });
+    }
+    return out;
+}
+
+/**
+ * The territory, as unit-sphere triangles: the footprint, plus whatever the clips let
+ * it grow into.
+ *
+ * **A rhomb the solid owns is never cut.** This mode is `by class` with its seams
+ * closed, not a different partition, and a clip that can remove the footprint is not
+ * that. It also fails on the case it most needs to get right: the central blue of Sun
+ * gen 2 is a complete hat with five purple bowls resting on it, and their balls cover
+ * its dome so thoroughly that a pure nearest-center rule keeps **3.8%** of it. The
+ * dome would simply disappear.
+ *
+ * So the footprint is laid down whole and the clips apply only outside it. What grows
+ * is the skirt between the footprint's rim and the equator — the cup reaches 79.0° from
+ * the pole whatever it owns, so that skirt is at most the last 11° — and that growth
+ * stops on the meeting circles, which is what closes the seam. A complete solid needs
+ * none of it and keeps its dome; a class-5 grows the little it takes to reach its
+ * neighbor, and its new rim lands exactly on the neighbor's surface.
+ */
+function voronoiCell(clips: Clip[], owned: Set<number>): V3[][] {
+    const out: V3[][] = [];
+    const m = VORONOI_MESH;
+    for (let t = 0, tri = 0; t < m.length; t += 9, tri++) {
+        let poly: V3[] = [
+            [m[t], m[t + 1], m[t + 2]],
+            [m[t + 3], m[t + 4], m[t + 5]],
+            [m[t + 6], m[t + 7], m[t + 8]],
+        ];
+        for (const c of owned.has(Math.floor(tri / TRIS_PER_FACE)) ? [] : clips) {
+            let anyIn = false;
+            let anyOut = false;
+            for (const v of poly) {
+                if (v[0] * c.u[0] + v[1] * c.u[1] + v[2] * c.u[2] - c.k < 0) anyIn = true;
+                else anyOut = true;
+            }
+            if (!anyOut) continue;              // wholly kept, nothing to do
+            if (!anyIn) { poly = []; break; }   // wholly cut away
+            poly = clipPoly(poly, c.u, c.k);
+            if (poly.length < 3) { poly = []; break; }
+        }
+        for (let i = 1; i + 1 < poly.length; i++) out.push([poly[0], poly[i], poly[i + 1]]);
+    }
+    return out;
+}
+
+/**
+ * One small circle on the unit sphere, `v·u = k`, kept only where the cell keeps it and
+ * placed on the solid.
+ *
+ * Serves both jobs the cell needs a curve for: the meeting curves themselves (one per
+ * clip, with `skip` naming the clip that made it so it does not cut its own circle
+ * away), and the height contours (`skip` = −1, since a contour is subject to all of
+ * them).
+ */
+function circleOnCell(
+    out: number[], u: V3, k: number, clips: Clip[], skip: number,
+    r: number, c: V3, z: number, owned: Set<number>, seg = 120,
+): void {
+    if (k <= -1 || k >= 1) return;
+    const rad = Math.sqrt(Math.max(0, 1 - k * k));
+    const seed: V3 = Math.abs(u[2]) < 0.9 ? [0, 0, 1] : [1, 0, 0];
+    const e1 = nrm(cross(u, seed));
+    const e2 = cross(u, e1);
+    let prev: V3 | null = null;
+    for (let t = 0; t <= seg; t++) {
+        const a = (t / seg) * Math.PI * 2;
+        const ca = Math.cos(a);
+        const sa = Math.sin(a);
+        const v: V3 = [
+            u[0] * k + (e1[0] * ca + e2[0] * sa) * rad,
+            u[1] * k + (e1[1] * ca + e2[1] * sa) * rad,
+            u[2] * k + (e1[2] * ca + e2[2] * sa) * rad,
+        ];
+        // Suppressed inside the footprint: the clips do not cut it, so a curve drawn
+        // there would be a line across a rhomb that `by class` draws unbroken.
+        let inside = !owned.has(faceOfDir(v));
+        for (let j = 0; j < clips.length && inside; j++) {
+            if (j === skip) continue;
+            const cj = clips[j];
+            if (v[0] * cj.u[0] + v[1] * cj.u[1] + v[2] * cj.u[2] > cj.k) inside = false;
+        }
+        if (inside && prev) {
+            out.push(
+                prev[0] * r + c[0], prev[1] * r + c[1], prev[2] * r * z + c[2],
+                v[0] * r + c[0], v[1] * r + c[1], v[2] * r * z + c[2],
+            );
+        }
+        prev = inside ? v : null;
+    }
 }
 
 // ── the cup's own relief ──────────────────────────────────────────
@@ -659,7 +919,6 @@ function build(reframe: boolean): void {
     const nlen = RHO;
     const wantHeadSolids = headSolidsChk.checked;
     const wantTailSolids = tailSolidsChk.checked;
-    last = { faces: d.faces };
 
     // One filter, applied to everything: markers, shells and normals all mean "the
     // solids currently under consideration", and having them disagree would make the
@@ -813,18 +1072,27 @@ function build(reframe: boolean): void {
     //   class  only the rhombs the solid actually owns in this patch, so four, five or
     //          ten. This is the class made visible: a solid wears exactly its own
     //          footprint and nothing it merely could have had.
+//   voronoi  no face set at all: the part of the ball nearer to its own center than
+//            to any other drawn one, so neighbors meet on a curve instead of leaving
+//            a seam. Midsphere only — see the note above `voronoiPlanes`.
     const rtFaces = rtFacesSel.value;
-    const rtCup = rtFaces !== "full";
+    const voronoi = rtFaces === "voronoi" && rtExtent === "midsphere";
+    const rtCup = rtFaces === "cups" || rtFaces === "class";
     const facesOf = (s: Solid): number[] =>
         rtFaces === "cups" ? cupIndices(s)
-        : rtFaces === "class" ? ownedOf(s)
+        // Voronoi wears the footprint's net and nothing else — the skirt it grows has
+        // no rhombs in it — so it asks for the same faces `by class` does. Without this
+        // the shared net block below draws the whole thirty-rhomb cage.
+        : rtFaces === "class" || voronoi ? ownedOf(s)
         : ALL_FACES;
     const spherical = rtExtent === "sphere" || rtExtent === "midsphere";
     const sphereR = rtExtent === "midsphere" ? MIDRADIUS : RHO;
     const surfaceShown = rhombSel.value !== "invisible";
-    // The relief cues, live only where a surface is open. See `reliefFor` above.
-    const cupShade = rtCup && rtShadeChk.checked;
-    const cupIso = rtCup && rtIsoChk.checked;
+    // The relief cues, live wherever the surface is open — a cup, a class footprint or
+    // a Voronoi cell. See `reliefFor` above.
+    const partial = rtCup || voronoi;
+    const cupShade = partial && rtShadeChk.checked;
+    const cupIso = partial && rtIsoChk.checked;
     if (rtMode !== "invisible") {
         // Unit-space contours, scaled and placed per solid, gathered from whichever of
         // the two surface paths runs and drawn once at the end.
@@ -836,7 +1104,88 @@ function build(reframe: boolean): void {
         // complete solids on Sun gen 4 a merged ball of this tessellation would be
         // over a million vertices, and they are all the same ball.
         const balls = shown.filter((s) => showRTFor(s) && sizeOf(s) > 0);
-        if (spherical && rtCup && balls.length) {
+        if (voronoi && balls.length) {
+            // The territory each ball keeps, and the curves where it hands over. Cut in
+            // unmirrored unit coordinates and placed on the way out, exactly as the cups
+            // are, so a cell and a cup on the same ball are cut from one tessellation.
+            //
+            // Every ball is clipped against every other that reaches it, which is O(n²)
+            // in the distance test and O(n · mesh · clips) in the clipping. The distance
+            // test is the cheap half and the budget is set by the other.
+            if (balls.length > 400) {
+                rtNote += ` · ${balls.length.toLocaleString()} Voronoi cells is more ` +
+                    `clipping than this will do at once — show fewer classes, or drop ` +
+                    `a generation.`;
+            } else {
+                const z = zsign;
+                const cells = balls.map((s) => ({ c: place(s.c), r: sphereR * sizeOf(s), s }));
+                const pos: number[] = [];
+                const nrmls: number[] = [];
+                const cell: number[] = [];
+                const meet: number[] = [];
+                for (const b of cells) {
+                    const clips = voronoiPlanes(
+                        b.c, b.r, b.s.hat, cells.filter((o) => o !== b), z);
+                    const col = solidColor(b.s);
+                    // Reflecting z reverses the winding, and these carry supplied
+                    // normals: see the note in the cup path below.
+                    const order = z > 0 ? [0, 1, 2] : [2, 1, 0];
+                    const own = new Set(ownedOf(b.s));
+                    for (const t of voronoiCell(clips, own)) {
+                        for (const oi of order) {
+                            const v = t[oi];
+                            pos.push(v[0] * b.r + b.c[0], v[1] * b.r + b.c[1], v[2] * b.r * z + b.c[2]);
+                            nrmls.push(v[0], v[1], v[2] * z);
+                            // The cell can reach anywhere on the ball, so the ramp runs
+                            // over the whole sphere rather than over a face set's span.
+                            if (cupShade) pushShaded(cell, col, v[2] * z);
+                            else cell.push(col.r, col.g, col.b);
+                        }
+                    }
+                    // Two shells for every line, for the reason the spherical net gives.
+                    for (const shell of [1.004, 0.996]) {
+                        const r = b.r * shell;
+                        for (let i = 0; i < clips.length; i++) {
+                            circleOnCell(meet, clips[i].u, clips[i].k, clips, i, r, b.c, z, own);
+                        }
+                        // Contours are a relief cue, not a boundary, so they run over
+                        // the footprint as they do in every other mode.
+                        if (cupIso) {
+                            for (let k = 1; k <= ISO_LEVELS; k++) {
+                                circleOnCell(isoSeg, [0, 0, 1], -1 + (2 * k) / (ISO_LEVELS + 1),
+                                             clips, -1, r, b.c, z, NO_FACES);
+                            }
+                        }
+                    }
+                }
+                const g = new THREE.BufferGeometry();
+                g.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
+                g.setAttribute("normal", new THREE.Float32BufferAttribute(nrmls, 3));
+                g.setAttribute("color", new THREE.Float32BufferAttribute(cell, 3));
+                rv.add(new THREE.Mesh(g, new THREE.MeshStandardMaterial({
+                    vertexColors: true, roughness: 0.42, metalness: 0.03,
+                    side: THREE.DoubleSide,
+                    transparent: rtMode === "transparent",
+                    opacity: rtMode === "transparent" ? (surfaceShown ? 0.42 : 0.66) : 1,
+                    depthWrite: rtMode !== "transparent",
+                })));
+                // The meeting curves themselves, drawn whatever the edge checkbox says:
+                // they are the boundary of the territory rather than a feature of the
+                // solid, and without them two cells of one color run together.
+                if (meet.length) {
+                    const mg = new LineSegmentsGeometry();
+                    mg.setPositions(meet);
+                    const mm = new LineMaterial({
+                        color: 0x1b1e24, linewidth: 1.6, worldUnits: false, alphaToCoverage: true,
+                    });
+                    mm.resolution.set(view.clientWidth || 1, view.clientHeight || 1);
+                    normalMats.push(mm);
+                    const ml = new LineSegments2(mg, mm);
+                    ml.renderOrder = 2;
+                    rv.add(ml);
+                }
+            }
+        } else if (spherical && rtCup && balls.length) {
             // Cups on a sphere: only the ten spherical rhombs, not the whole ball. The
             // patches are built once at unit radius and copied per solid, exactly as the
             // net is, so the two always agree about where the boundary is.
@@ -922,7 +1271,7 @@ function build(reframe: boolean): void {
         // Budgeted like the solids are — the net is 60 arcs of 7 segments, and past a few
         // hundred solids that is more line than anyone can read.
         if (spherical && rtEdgesChk.checked && balls.length) {
-            const perSolid = (rtCup ? 20 : 60) * 7 * 6 * 2; // two shells, see below
+            const perSolid = (rtCup || voronoi ? 20 : 60) * 7 * 6 * 2; // two shells, see below
             if (balls.length * perSolid > 4_000_000) {
                 rtNote += ` · ${balls.length.toLocaleString()} spherical nets is too much ` +
                     `line to draw — turn edges off or show fewer classes.`;
@@ -1062,70 +1411,6 @@ function build(reframe: boolean): void {
         }
     }
 
-
-    // The clicked face, and the two solids it names — drawn whatever the filters say,
-    // since the point of asking about one face is to see the answer even when the
-    // filters have hidden it.
-    const sel = selected === null ? null : cen.byRhomb[selected];
-    if (sel) {
-        const hp: number[] = [];
-        const corners = sel.vids.map((v) => d.point(v));
-        for (let i = 0; i < 4; i++) {
-            const a = corners[i];
-            const b = corners[(i + 1) % 4];
-            hp.push(a[0], a[1], a[2], b[0], b[1], b[2]);
-        }
-        const p = place(sel.c);
-        const u: V3 = [sel.u[0], sel.u[1], sel.u[2] * zsign];
-        for (const dir of [1, -1]) {
-            hp.push(
-                p[0], p[1], p[2],
-                p[0] + u[0] * RHO * dir,
-                p[1] + u[1] * RHO * dir,
-                p[2] + u[2] * RHO * dir,
-            );
-        }
-        for (const sid of sel.solids) {
-            // Through solidFace like everything else. Drawn from the raw mesh table
-            // this had its own copy of the parity bug — a highlight a tenth of a turn
-            // off the solid it is highlighting.
-            const t = 1;
-            for (let i = 0; i < RT_FACES.length; i++) {
-                const face = solidFace(cen.solids[sid], i, flip, t, d.offset);
-                for (let k = 0; k < 4; k++) {
-                    const a = face[k];
-                    const b = face[(k + 1) % 4];
-                    hp.push(a[0], a[1], a[2], b[0], b[1], b[2]);
-                }
-            }
-        }
-        const hg = new THREE.BufferGeometry();
-        hg.setAttribute("position", new THREE.Float32BufferAttribute(hp, 3));
-        const hl = new THREE.LineSegments(
-            hg,
-            new THREE.LineBasicMaterial({ color: HILITE, depthTest: false }),
-        );
-        hl.renderOrder = 3;
-        rv.add(hl);
-
-        const say = (sid: number) => {
-            const s = cen.solids[sid];
-            return (
-                `#${s.id} holding ${s.faces.length} face${s.faces.length === 1 ? "" : "s"}` +
-                `${s.complete ? ", complete" : ""}, ${s.hat ? "below the roof" : "above it"}`
-            );
-        };
-        // `cluster` is a property of the tiling rather than of the solid, so it comes
-        // from the roof's own face list rather than from centers.ts.
-        const cluster = d.faces.find((f) => f.id === sel.id)?.cluster ?? "?";
-        pickEl.textContent =
-            `Rhomb ${sel.id}, ${sel.thick ? "thick" : "thin"}, from a ${cluster} tile · ` +
-            `lies on ${say(sel.solids[0])} · and on ${say(sel.solids[1])} · ` +
-            `two faces pin a solid uniquely, so a neighbor shares one exactly when the fold is 36°.`;
-    } else {
-        pickEl.textContent = "Click a face to see which triacontahedra it lies on.";
-    }
-
     // Framing is computed as though every solid were showing at full size, whatever
     // the checkboxes and sliders currently say. Any control that moved the camera
     // would lurch the view every time it was touched, and a solid reaches φ from its
@@ -1191,7 +1476,8 @@ function build(reframe: boolean): void {
                 ? (rtFaces === "class" ? "by class — each RT wears its own footprint"
                     : rtFaces === "cups" ? "cups — 10 faces each" : "whole RT — 30 faces each")
             : `${rtExtent === "midsphere" ? "midsphere" : "insphere"} r=${sphereR.toFixed(4)}, ` +
-              `${rtFaces === "class" ? "spherical rhombs by class"
+              `${voronoi ? "Voronoi cells — each ball nearer its own center than any other"
+                  : rtFaces === "class" ? "spherical rhombs by class"
                   : rtFaces === "cups" ? "10 spherical rhombs"
                   : "whole ball (30 rhombs, tiling it)"}` +
               `${rtEdgesChk.checked ? " + net" : ""}`
@@ -1200,20 +1486,23 @@ function build(reframe: boolean): void {
 
 // ── controls ──────────────────────────────────────────────────────
 
-for (const [code, nick] of [
-    ["Pe5", "Pe5 pentagon"],
-    ["Pe3", "Pe3 pentagon"],
-    ["Pe1", "Pe1 pentagon"],
-    ["St5", "St5 star"],
-    ["St3", "St3 boat"],
-    ["St1", "St1 diamond"],
-    ["Deca", "Queen (composite)"],
-    ["Sun", "Sun (composite)"],
-    ["Star", "Star (composite)"],
-] as Array<[string, string]>) {
+// Short in the list, long in the tooltip. The caption beside the select already says
+// Patch, and the dropdown has to fit a tile.
+for (const [code, nick, full] of [
+    ["Pe5", "Pe5", "Pe5 pentagon"],
+    ["Pe3", "Pe3", "Pe3 pentagon"],
+    ["Pe1", "Pe1", "Pe1 pentagon"],
+    ["St5", "St5 star", "St5 star"],
+    ["St3", "St3 boat", "St3 boat"],
+    ["St1", "St1 diamond", "St1 diamond"],
+    ["Deca", "Queen", "Queen — a composite of pentagons and stars"],
+    ["Sun", "Sun", "Sun — a composite of pentagons and stars"],
+    ["Star", "Star", "Star — a composite of pentagons and stars"],
+] as Array<[string, string, string]>) {
     const o = document.createElement("option");
     o.value = code;
     o.textContent = nick;
+    o.title = full;
     patchSel.appendChild(o);
 }
 patchSel.value = prefs.patch;
@@ -1229,15 +1518,20 @@ if (!patchSel.value) patchSel.value = PREF_DEFAULTS.patch;
 function fillGenerations(prefer?: number): void {
     const code = patchSel.value || PREF_DEFAULTS.patch;
     const keep = prefer ?? Number(genSel.value);
-    const cheap = rtSel.value === "invisible"
+    // Voronoi clips a whole-sphere mesh per ball against every neighbour that reaches
+    // it, and caps at 400 cells. Proper solids run about 0.14 of the rhomb count, so
+    // that ceiling is about 3,000 rhombi — far below anything else here.
+    const vor = rtFacesSel.value === "voronoi" && rtExtentSel.value === "midsphere"
+        && rtSel.value !== "invisible";
+    const cheap = !vor && (rtSel.value === "invisible"
         || ((rtExtentSel.value === "sphere" || rtExtentSel.value === "midsphere")
-            && !rtEdgesChk.checked);
+            && !rtEdgesChk.checked));
     // Worked from the two budgets further down rather than picked. The full solid costs
     // 180 vertices per solid against a 1.5M ceiling, so ~8,300 solids; the spherical net
     // costs 60 arcs x 7 segments x 6 floats = 2,520 against 4M, so ~1,590. Solids run
     // about 0.13 of the rhomb count, which puts the two at ~64,000 and ~12,000 rhombs.
     // A sphere with no edges is one instanced mesh and barely cares.
-    const limit = cheap ? 120000 : rtExtentSel.value === "full" ? 45000 : 12000;
+    const limit = vor ? 3000 : cheap ? 120000 : rtExtentSel.value === "full" ? 45000 : 12000;
     genSel.textContent = "";
     const usable = (g: number) => {
         const n = patchSize(code, g);
@@ -1248,16 +1542,16 @@ function fillGenerations(prefer?: number): void {
         const o = document.createElement("option");
         o.value = String(g);
         if (n <= 0) {
-            o.textContent = `Generation ${g} — none`;
+            o.textContent = `${g} — none`;
             o.disabled = true;
             o.title = `${code} does not exist at generation ${g}`;
         } else if (!usable(g)) {
-            o.textContent = `Generation ${g} — ${n.toLocaleString()} rhombs`;
+            o.textContent = `${g} — ${n.toLocaleString()}`;
             o.disabled = true;
             o.title = `${n.toLocaleString()} rhombs is past what the current settings can draw` +
                 `${cheap ? "" : " — turn the solids off, or use a sphere extent without edges"}`;
         } else {
-            o.textContent = `Generation ${g} — ${n.toLocaleString()}${n > limit / 4 ? " (slow)" : ""}`;
+            o.textContent = `${g} — ${n.toLocaleString()}${n > limit / 4 ? " (slow)" : ""}`;
             o.title = `${n.toLocaleString()} rhombs`;
         }
         genSel.appendChild(o);
@@ -1316,7 +1610,20 @@ rtIsoChk.checked = prefs.rtisogloss ?? PREF_DEFAULTS.rtisogloss;
  * `By class`. Disabled rather than hidden: a control that vanishes takes the fact that
  * it exists with it.
  */
+const voronoiOpt = Array.from(rtFacesSel.options).find((o) => o.value === "voronoi")!;
 function syncCupControls(): void {
+    // Voronoi is a midsphere construction. It would run at any radius, but the
+    // measurement it rests on was made at the midsphere, and at ρ the kissing shell
+    // lands exactly on the contact, so half the pairs would meet at a point rather
+    // than on a curve. Disabled elsewhere rather than hidden, and a selection that
+    // stops being legal falls back to the footprint it is closest to.
+    const mid = rtExtentSel.value === "midsphere";
+    voronoiOpt.disabled = !mid;
+    voronoiOpt.title = mid
+        ? "Each ball keeps the part of its surface nearer to its own center than to any "
+          + "other, so neighbors meet on a curve instead of leaving a seam"
+        : "Midsphere only";
+    if (!mid && rtFacesSel.value === "voronoi") rtFacesSel.value = "class";
     const live = rtFacesSel.value !== "full" && rtSel.value !== "invisible";
     for (const c of [rtShadeChk, rtIsoChk]) {
         c.disabled = !live;
@@ -1325,6 +1632,9 @@ function syncCupControls(): void {
 }
 // After every select that feeds the limit has been restored, not before — the list that
 // gets built depends on the extent and on whether edges are on.
+// Before the generation list, which now has a Voronoi ceiling of its own: a saved
+// Voronoi selection is illegal the moment the saved extent is not the midsphere.
+syncCupControls();
 fillGenerations(Number(prefs.gen) || PREF_DEFAULTS.gen);
 
 // One row per proper class: show, its own normals and solids overrides, a size slider
@@ -1375,8 +1685,11 @@ PROPER.forEach((p, i) => {
     size.step = "0.01";
     size.value = String(prefs.classSize[i] ?? 1);
     size.title = `How big to draw class ${p.label} solids`;
+    // Beside N and RT, not below them: a third line here would be a third line on
+    // every tile, since the bar is only as short as its tallest one.
+    row2.appendChild(size);
 
-    wrap.append(row1, row2, size);
+    wrap.append(row1, row2);
     classBar.appendChild(wrap);
     classCtl.push({ on, norm, rt, size, count });
     for (const c of [on, norm, rt]) c.addEventListener("change", () => rebuild(false));
@@ -1434,14 +1747,18 @@ genSel.addEventListener("change", () => rebuild(true));
 // These three set the ceiling, so the list is rebuilt when they move. A generation that
 // was reachable on spheres may not be on the full solid, and it is better for the option
 // to go grey than for the page to try it.
-for (const c of [rtSel, rtExtentSel, rtEdgesChk]) {
+// Registered first, so a selection that has just become illegal is corrected before
+// anything downstream reads it.
+for (const c of [rtFacesSel, rtSel, rtExtentSel]) {
+    c.addEventListener("change", syncCupControls);
+}
+for (const c of [rtSel, rtExtentSel, rtEdgesChk, rtFacesSel]) {
     c.addEventListener("change", () => { fillGenerations(); rebuild(false); });
 }
 for (const c of [colorSel, headSolidsChk, tailSolidsChk, rhombSel, edgesChk, shadeChk,
                  isoChk, normalsChk, rtFacesSel, rtShadeChk, rtIsoChk]) {
     c.addEventListener("change", () => rebuild(false));
 }
-for (const c of [rtFacesSel, rtSel]) c.addEventListener("change", syncCupControls);
 syncCupControls();
 
 // Switching parity runs the roof down to flat, turns it over while nothing is on
@@ -1510,41 +1827,6 @@ window.addEventListener("resize", () => {
     rv.resize();
     for (const m of normalMats) m.resolution.set(view.clientWidth, view.clientHeight);
 });
-
-// Picking. The surface is non-indexed with two triangles per rhombus, so a hit's
-// faceIndex >> 1 is the face's position in the build's own list — no separate index
-// to keep in step. A drag is an orbit and must not also be a click, so the pointer
-// has to come back up within a few pixels of where it went down.
-{
-    const ray = new THREE.Raycaster();
-    const ndc = new THREE.Vector2();
-    let downAt: { x: number; y: number } | null = null;
-
-    rv.renderer.domElement.addEventListener("pointerdown", (e) => {
-        downAt = { x: e.clientX, y: e.clientY };
-    });
-    rv.renderer.domElement.addEventListener("pointerup", (e) => {
-        if (!downAt) return;
-        const moved = Math.hypot(e.clientX - downAt.x, e.clientY - downAt.y);
-        downAt = null;
-        if (moved > 4) return;
-
-        const mesh = rv.surface();
-        if (!mesh || !last) return;
-        const r = rv.renderer.domElement.getBoundingClientRect();
-        ndc.x = ((e.clientX - r.left) / r.width) * 2 - 1;
-        ndc.y = -((e.clientY - r.top) / r.height) * 2 + 1;
-        ray.setFromCamera(ndc, rv.camera);
-        const hit = ray.intersectObject(mesh, false)[0];
-        const next =
-            hit && hit.faceIndex != null
-                ? (last.faces[hit.faceIndex >> 1]?.id ?? null)
-                : null;
-        // clicking the same face again lets go of it
-        selected = next !== null && next === selected ? null : next;
-        rebuild(false);
-    });
-}
 
 console.log(`centers build ${BUILD_ID}`);
 {

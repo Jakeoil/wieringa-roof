@@ -7,16 +7,45 @@
 <link rel="stylesheet" href="./site.css">
 <link rel="icon" href="./favicon.svg">
 <style>
+    /* One control surface, tiled. Five groups, each a heading over its own lines,
+       laid on a grid that packs five columns wide at full width and reflows narrower.
+       The dividing rules are the bar's own background showing through a one-pixel
+       gap, so they fall between tiles however the grid wraps — there is no border to
+       go stale when it does. */
     .bar {
-        display: flex; gap: 14px; align-items: flex-end; flex-wrap: wrap;
-        background: var(--panel); border: 1px solid var(--rule);
-        border-radius: 8px; padding: 12px 14px; margin: 18px 0 10px;
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 1px; background: var(--rule); border: 1px solid var(--rule);
+        border-radius: 8px; overflow: hidden; margin: 18px 0 12px;
     }
-    .bar label { display: flex; flex-direction: column; gap: 3px; font-size: 12px; color: var(--ink-soft); }
-    .bar select { font: inherit; font-size: 13px; padding: 5px 8px; border: 1px solid #ccc; border-radius: 4px; background: #fff; color: var(--ink); }
-    .bar input[type=range] { width: 132px; }
-    .bar .checks { display: flex; gap: 12px; align-items: center; }
-    .bar .checks label { flex-direction: row; align-items: center; gap: 5px; font-size: 13px; color: var(--ink); }
+    .tile { background: var(--panel); padding: 6px 10px 7px; display: flex; flex-direction: column; gap: 3px; }
+    .tile.w2 { grid-column: span 2; }
+    /* The two widest groups take a band each: the RTs carry three dropdowns and four
+       checkboxes, and the classes are five two-row chips, and neither fits beside
+       anything else without spilling onto a third line. */
+    .tile.full { grid-column: 1 / -1; }
+    .grp { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-faint); }
+    /* The heading line, which is also what carries Reset out to the right of Global. */
+    .head { display: flex; align-items: center; gap: 8px; }
+    .head button { font: inherit; font-size: 11px; padding: 1px 8px; }
+    .head #reset { margin-left: auto; }
+    /* A line is one row of a tile. The caption sits BESIDE its control rather than
+       above it: stacked, every dropdown was two lines tall on its own, which is the
+       height the tiles are here to give back. */
+    .line { display: flex; align-items: center; gap: 11px; flex-wrap: wrap; }
+    .line label { display: flex; flex-direction: row; align-items: center; gap: 5px; font-size: 12px; color: var(--ink); }
+    .line select {
+        font: inherit; font-size: 12px; padding: 1px 3px; max-width: 108px;
+        border: 1px solid #ccc; border-radius: 4px; background: #fff; color: var(--ink);
+    }
+    /* Cups and class footprints only: see the note in centers3d.ts. */
+    .line label.off { color: var(--ink-faint); }
+    /* Three columns, so `tails` stands over `tail solids` and `heads` over
+       `heads solids` — the pairing is the point, and it was invisible while the two
+       rows were independently packed flex lines. */
+    .zgrid { display: grid; grid-template-columns: max-content max-content max-content; gap: 3px 14px; align-items: center; }
+    .zgrid label { display: flex; flex-direction: row; align-items: center; gap: 5px; font-size: 12px; color: var(--ink); }
+    .zgrid label:nth-child(n+4) { color: var(--ink-soft); }
     #view {
         width: 100%; height: min(70vh, 620px);
         border: 1px solid var(--rule); border-radius: 8px; overflow: hidden;
@@ -25,38 +54,13 @@
     #view canvas { display: block; width: 100%; height: 100%; cursor: grab; }
     #view canvas:active { cursor: grabbing; }
     #status { display: block; margin: 10px 0 0; line-height: 1.5; }
-    #pick { display: block; margin: 6px 0 0; line-height: 1.5; }
-    .classbar {
-        display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end;
-        background: var(--panel); border: 1px solid var(--rule);
-        border-radius: 8px; padding: 10px 14px; margin: 0 0 10px;
-    }
-    /* The reset button belongs to the box, not to any control in it, so it sits out
-       at the right-hand edge of the first line. */
-    #globalbar #reset { margin-left: auto; }
-    /* A box is one subject. Anything given `flex-basis: 100%` starts a fresh line
-       inside its box, which is what makes Global and the RTs two-line boxes. */
-    .zgrp { display: flex; flex-direction: column; gap: 3px; flex-basis: 100%; }
-    /* Three columns, so `tails` stands over `tail solids` and `heads` over
-       `heads solids` — the pairing is the point, and it was invisible while the two
-       rows were independently packed flex lines. */
-    .zgrid { display: grid; grid-template-columns: max-content max-content max-content; gap: 3px 20px; align-items: center; }
-    .bar .zgrp .grp { align-self: flex-start; margin: 0 0 1px; }
-    .zgrid label { display: flex; flex-direction: row; align-items: center; gap: 5px; font-size: 13px; color: var(--ink); }
-    .zgrid label:nth-child(n+4) { font-size: 12px; color: var(--ink-soft); }
-    .rtchecks { flex-basis: 100%; }
-    /* Cups and class footprints only: see the note in centers3d.ts. */
-    .bar .checks label.off { color: var(--ink-faint); }
-    .bar .grp, .classbar .grp {
-        font-size: 11px; text-transform: uppercase; letter-spacing: .06em;
-        color: var(--ink-faint); align-self: center; margin: 0 2px 3px 0;
-    }
+    /* The four classes and the shared chip, each two rows like every other tile: the
+       size slider rides beside N and RT rather than taking a third line of its own. */
+    #classlines { display: flex; flex-wrap: wrap; gap: 3px 10px; }
+    .cls { display: flex; flex-direction: column; gap: 2px; border-left: 3px solid transparent; padding-left: 6px; }
     .cls .row { display: flex; align-items: center; gap: 4px; font-size: 12px; }
-    .cls { display: flex; flex-direction: column; gap: 3px; }
-    .cls .top { display: flex; align-items: center; gap: 5px; font-size: 13px; }
-    .cls .swatch { width: 11px; height: 11px; border-radius: 2px; border: 1px solid rgba(0,0,0,.25); }
-    .cls input[type=range] { width: 92px; }
-    .cls { border-left: 3px solid transparent; padding-left: 7px; }
+    .cls .swatch { width: 10px; height: 10px; border-radius: 2px; border: 1px solid rgba(0,0,0,.25); }
+    .cls input[type=range] { width: 40px; }
     .cls .count { font-size: 11px; color: var(--ink-faint); }
     .classgrid {
         display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
@@ -98,12 +102,18 @@
     piece of that solid's surface. The roof stops being a surface and becomes a lid.
 </p>
 
-<div class="bar" id="globalbar">
-    <span class="grp">Global</span>
-    <label>Patch <select id="patch"></select></label>
-    <label>Generation <select id="gen"></select></label>
-    <button id="reset" title="Forget saved settings and start again from the defaults">Reset</button>
-    <span class="zgrp">
+<div class="bar">
+
+    <div class="tile">
+        <span class="head">
+            <span class="grp">Global</span>
+            <button id="reset" title="Forget saved settings and start again from the defaults">Reset</button>
+        </span>
+        <span class="line"><label>Patch <select id="patch"></select></label></span>
+        <span class="line"><label>Gen <select id="gen"></select></label></span>
+    </div>
+
+    <div class="tile w2">
         <span class="grp">Z-orientation</span>
         <span class="zgrid">
             <label title="The reflection: index runs downward"><input type="radio" name="parity" id="ptails"> tails</label>
@@ -113,62 +123,68 @@
             <span></span>
             <label title="Solids above the roof in the default orientation"><input type="checkbox" id="headsolids" checked> heads solids</label>
         </span>
-    </span>
-</div>
+    </div>
 
-<div class="bar" id="rhombbar">
-    <span class="grp">Rhomb patch</span>
-    <label>Surface <select id="rhombmode">
-        <option value="solid">Solid</option>
-        <option value="transparent">Transparent</option>
-        <option value="invisible">Invisible</option>
-    </select></label>
-    <label>Color <select id="color">
-        <option value="class">Proper class</option>
-        <option value="cluster">Star / boat / diamond</option>
-        <option value="five">Kowalewski five</option>
-        <option value="type">Thick / thin</option>
-        <option value="plain">Plain</option>
-    </select></label>
-    <span class="checks">
-        <label><input type="checkbox" id="edges" checked> edges</label>
-        <label title="A light-to-dark ramp with height, so the surface reads as a relief rather than a flat map"><input type="checkbox" id="shade" checked> functional shading</label>
-        <label title="Level sets of height, running on unbroken from tile to tile"><input type="checkbox" id="isogloss"> isoglosses</label>
-    </span>
-</div>
+    <div class="tile w2">
+        <span class="grp">Rhomb patch</span>
+        <span class="line">
+            <label>Surface <select id="rhombmode">
+                <option value="solid">Solid</option>
+                <option value="transparent">Transparent</option>
+                <option value="invisible">Invisible</option>
+            </select></label>
+            <label>Color <select id="color">
+                <option value="class">Proper class</option>
+                <option value="cluster" title="Star / boat / diamond">Cluster</option>
+                <option value="five" title="Kowalewski's five, a proper edge coloring of K₆ on the six axes">Kowalewski</option>
+                <option value="type">Thick / thin</option>
+                <option value="plain">Plain</option>
+            </select></label>
+        </span>
+        <span class="line">
+            <label><input type="checkbox" id="edges" checked> edges</label>
+            <label title="A light-to-dark ramp with height, so the surface reads as a relief rather than a flat map"><input type="checkbox" id="shade" checked> shading</label>
+            <label title="Level sets of height, running on unbroken from tile to tile"><input type="checkbox" id="isogloss"> isoglosses</label>
+        </span>
+    </div>
 
-<div class="bar" id="rtbar">
-    <span class="grp">Triacontahedra</span>
-    <label>Solids <select id="rtmode">
-        <option value="transparent">Transparent</option>
-        <option value="solid">Solid</option>
-        <option value="invisible">Invisible</option>
-    </select></label>
-    <label>Extent <select id="rtextent">
-        <option value="full">RT</option>
-        <option value="sphere" title="ρ = 1.3764, tangent to every face at its centroid">Insphere</option>
-        <option value="midsphere" title="√(ρ²+¼) = 1.4644, tangent to all sixty edges at their midpoints">Midsphere</option>
-    </select></label>
-    <label title="Which faces of each RT to draw">Faces <select id="rtfaces">
-        <option value="full">All 30</option>
-        <option value="cups" title="The ten on the roof's side — a cup above the roof, a hat below it">Cup</option>
-        <option value="class" title="Only the rhombs this solid actually owns: four, five or ten">By class</option>
-    </select></label>
-    <span class="checks rtchecks">
-        <label title="The face normal of each rhomb, drawn from the tile to the center it names"><input type="checkbox" id="normals"> normals</label>
-        <label><input type="checkbox" id="rtedges" checked> edges</label>
-        <label id="rtshadelab" title="A light-to-dark ramp with height across the cup — the hint that says bowl from hat. Whole solids need no such hint, so it applies to Cup and By class only."><input type="checkbox" id="rtshade" checked> functional shading</label>
-        <label id="rtisolab" title="Level sets of height across the cup. Cup and By class only."><input type="checkbox" id="rtisogloss"> isoglosses</label>
-    </span>
-</div>
+    <div class="tile full">
+        <span class="grp">Triacontahedra</span>
+        <span class="line">
+            <label>Solids <select id="rtmode">
+                <option value="transparent">Transparent</option>
+                <option value="solid">Solid</option>
+                <option value="invisible">Invisible</option>
+            </select></label>
+            <label>Extent <select id="rtextent">
+                <option value="full">RT</option>
+                <option value="sphere" title="ρ = 1.3764, tangent to every face at its centroid">Insphere</option>
+                <option value="midsphere" title="√(ρ²+¼) = 1.4644, tangent to all sixty edges at their midpoints">Midsphere</option>
+            </select></label>
+            <label title="Which faces of each RT to draw">Faces <select id="rtfaces">
+                <option value="full">All 30</option>
+                <option value="cups" title="The ten on the roof's side — a cup above the roof, a hat below it">Cup</option>
+                <option value="class" title="Only the rhombs this solid actually owns: four, five or ten">By class</option>
+                <option value="voronoi">Voronoi</option>
+            </select></label>
+        </span>
+        <span class="line">
+            <label title="The face normal of each rhomb, drawn from the tile to the center it names"><input type="checkbox" id="normals"> normals</label>
+            <label><input type="checkbox" id="rtedges" checked> edges</label>
+            <label id="rtshadelab" title="A light-to-dark ramp with height across the cup — the hint that says bowl from hat. Whole solids need no such hint, so it applies to Cup and By class only."><input type="checkbox" id="rtshade" checked> shading</label>
+            <label id="rtisolab" title="Level sets of height across the cup. Cup and By class only."><input type="checkbox" id="rtisogloss"> isoglosses</label>
+        </span>
+    </div>
 
-<div class="classbar" id="classbar">
-    <span class="grp" title="A proper class is a rhomb with all its normals. Everything else is demoted: shaded and contoured, but colorless.">Proper classes</span>
+    <div class="tile full">
+        <span class="grp" title="A proper class is a rhomb with all its normals. Everything else is demoted: shaded and contoured, but colorless.">Proper classes</span>
+        <span class="lines" id="classlines"></span>
+    </div>
+
 </div>
 
 <div id="view"></div>
 <span class="info" id="status"></span>
-<span class="info" id="pick">Click a face to see which triacontahedra it lies on.</span>
 
 <details id="help">
     <summary>How it works <span class="mono" id="buildtag" style="font-weight:400;color:#888"></span></summary>
@@ -370,9 +386,10 @@
     Only the four proper classes are drawn: demoted solids have no class, and truncated
     ones are cut by the patch edge so their count is a lower bound rather than a fact.
     <em>Faces</em> chooses how much of each solid to show — all thirty, the ten-rhomb
-    <em>cup</em> on the roof's side, or <em>by class</em>, only the rhombs it owns.
-    Measured on Sun generation 1, every owned rhomb falls inside the cup for every solid,
-    hat and bowl alike.
+    <em>cup</em> on the roof's side, <em>by class</em>, only the rhombs it owns, or
+    <em>Voronoi</em>, which drops face sets altogether and gives each ball everything
+    nearer to its own center than to any other. Measured on Sun generation 1, every
+    owned rhomb falls inside the cup for every solid, hat and bowl alike.
     <em>Insphere</em> draws the ball instead of the polyhedron — the ping-pong ball. Its
     radius is not fitted:
     the triacontahedron is isohedral, so all thirty face planes are tangent to one
@@ -398,6 +415,31 @@
     visible, and it is what makes the sharing below legible: a rhomb held by two proper
     solids shows up as the same spherical rhomb on two different balls, in two different
     colors.
+</p>
+<p>
+    <strong>Voronoi</strong> answers the complaint that by class leaves a seam of bare
+    sphere between every pair of neighbors. All the balls carry one radius, so the plane
+    two of them meet in is the perpendicular bisector of their centers, and the curve
+    they meet on is that plane cut by either sphere; giving each ball the surface nearest
+    its own center therefore closes every seam by construction. Two things keep it a
+    broadened footprint rather than a different object: the footprint itself is never
+    cut, and growth is held to the ball's own hemisphere — the side its faces are on,
+    with the equator as the rim, where the surface stands perpendicular to the plane of
+    the roof. What grows is the skirt between the footprint and that rim. The rhomb net
+    does not move: the arcs drawn are the footprint's own, exactly the ones
+    <em>by class</em> draws, and the skirt carries none. Offered at the
+    <em>midsphere</em> only.
+</p>
+<p>
+    The move is short. On Sun generation 2 a class-4 ball goes from 4/30 = 13.3% of its
+    surface to 30.8%, a class-5 from 16.7% to 22.3%, and a complete one from 33.3% to
+    41.9% — every class grows, none is trimmed. Every cup reaches 79.0° from its own
+    pole whatever it owns, so the skirt is at most the last 11°. Every pair of proper
+    solids that is actually adjacent stands at
+    1.7013, 2.3840 or 2.7528 — all inside 2·midradius = 2.9288 — so every visible seam
+    does close, in zero exceptions out of 2,615 adjacent pairs. The pairs that can never
+    reach each other are blue–blue at φ³, green–green, and amber–green at 3.6416, and
+    none of those three is ever a neighbor.
 </p>
 
 <h3>Who shares with whom</h3>
@@ -503,10 +545,10 @@ purple.</strong></p>
     readout counts what is left bare.
 </p>
 <p>
-    <strong>Click any rhomb</strong> to see both of its solids, which is its home, and
-    whether either is complete — drawn whatever the filters are hiding. Two rhombi pin
-    a solid uniquely, so clicking a neighbor is the quick way to test the rule that two
-    faces share a solid exactly when the fold between them is 36°.
+    <strong>Two rhombi pin a solid uniquely</strong>, so a pair of neighbors shares one
+    exactly when the fold between them is 36°. That rule is what <em>Faces → By class</em>
+    draws: each solid wears the contiguous run of faces it actually owns and nothing it
+    merely could have had.
 </p>
 <p>
     See <a href="./polyhedra.html" draggable="false">Polyhedra</a> for the solid on its

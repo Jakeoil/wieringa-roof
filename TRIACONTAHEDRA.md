@@ -1359,3 +1359,111 @@ strong form: not "amber usually pairs with purple" but "amber pairs with purple 
 nothing else ever pairs with anything." The `Faces → by class` mode on `centers.html`
 draws each solid wearing only its own footprint, which is what makes the shared rhomb
 visible as one spherical rhomb worn by two balls in two colors.
+
+## 10. Closing the seams: the spherical Voronoi clip
+
+At the midsphere with `Faces → By class`, every ball wears only the rhombs it owns —
+4/30, 5/30 or 10/30 of its surface — so there is a seam of bare sphere between every
+pair of neighbours. The question was how much of that could be closed by broadening
+each ball's territory until it met its neighbour on a curve, and which pairs could
+never be made to meet at all.
+
+**The rule.** Every ball is drawn at the same radius, so the plane two of them meet in
+is the perpendicular bisector of their centres, and the curve they meet on is that
+plane cut by either sphere. Give each ball the part of its surface **nearer to its own
+centre than to any other drawn centre** and the seams close by construction: neighbours
+meet exactly, nothing is drawn twice, and no pair needs a decision of its own. (Under
+the size sliders two balls can differ in radius; the meeting plane is then the radical
+plane, the same construction with the radii put back, which collapses to the bisector
+the moment the two agree.)
+
+**The footprint is never cut.** This is `by class` with its seams closed, not a
+different partition, and a clip that can remove the footprint is not that. It fails
+worst on the case it most needs to get right: the central blue of Sun gen 2 is a
+complete hat with five purple bowls resting on it, and their balls cover its dome so
+thoroughly that a pure nearest-centre rule keeps **3.8%** of it — the dome simply
+disappears. So the footprint is laid down whole and the clips apply only outside it.
+What grows is the skirt between the footprint's rim and the equator, and that growth
+stops on the meeting circles, which is what closes the seam. A complete solid keeps its
+dome and adds a skirt; a class-5 grows the little it takes to reach its neighbour, and
+its new rim lands exactly on the neighbour's surface.
+
+**Growth is confined to the ball's own hemisphere** — the side its faces are on, above
+the centre for a hat and below it for a bowl, with the equator as the rim. This is not
+a refinement either. Unconfined, the cell wraps round the back of the ball and a
+class-4 solid goes from 4/30 of its surface to 69% of it. The rim is the equator, where
+the surface stands perpendicular to the plane of the roof, and since every cup reaches
+79.0° from its own pole whatever it owns, the skirt a complete solid can add is at most
+the last 11°.
+
+**The distances are quantized, and 2R lands in a wide gap.** Centre distances between
+proper solids, over Sun g2/g3, Star g2/g3, Pe5 g3/g4 and Queen g3:
+
+| distance | pairs | vs 2·midradius = 2.928773 |
+|---|---|---|
+| 1.701302 — the golden rhomb's long diagonal | 280 | meets, half-angle 54.49° |
+| 2.383963 | 1370 | meets, 35.51° |
+| 2.752764 — 2ρ, the kissing shell | 1290 | meets, 19.96°; clears by 0.176 |
+| 3.641564 | 935 | misses by 0.713 |
+| 3.892996 | 100 | misses |
+| 4.236068 — φ³ | 790 | misses |
+| 4.454065 | 2555 | misses |
+
+Nothing sits near the line, so no verdict here is a rounding question and none of it
+moves with generation. Only three overlap geometries exist, and each has a fixed
+half-angle.
+
+**Every adjacent pair reaches — 0 exceptions.** Six of the ten class pairs are ever
+adjacent (sharing a rhomb, or with footprints abutting across an edge), and every one
+of them stands at 1.7013, 2.3840 or 2.7528:
+
+| pair | distances |
+|---|---|
+| purple–purple 5b+5b | 1.701302 · 2.752764 |
+| amber–purple 4+5b | 2.383963 · 2.752764 — the sharing pair of §9 |
+| purple–blue 5b+10 | 2.383963 · 2.752764 |
+| amber–blue 4+10 | 2.383963 |
+| green–blue 5a+10 | 2.383963 |
+| green–purple 5a+5b | 2.383963 |
+
+**The four pairs that never share a border.** blue–blue never comes nearer than
+φ³ = 4.236068 (§5C), green–green sits at 6.7–7.2, and amber–green at 3.641564 — none
+of the three can reach even in principle. amber–amber is the odd one: on Star gen 2 two
+ambers stand at exactly 2ρ, so those spheres do overlap, but their footprints are still
+not neighbours, and the clip draws a meeting curve between two balls that share no
+border on the roof.
+
+**What the cells cost and pay.** Cell area as a share of the ball, against the 4/30,
+5/30, 10/30 the footprint wears:
+
+| class | footprint | Sun gen 2 | Star gen 2 | growth (Sun) |
+|---|---|---|---|---|
+| 4 amber | 13.3% | 30.8% | 27.7% | +17.5 pts |
+| 5a green | 16.7% | 24.6% | 28.8% | +7.9 |
+| 5b purple | 16.7% | 22.3% | 27.2% | +5.6 |
+| 10 blue | 33.3% | 41.9% | 42.8% | +8.6 |
+
+Every class only ever grows, and the cell is always a superset of the footprint. Amber
+moves most because it owns the least — four rhombs of a ten-rhomb cup — and has the
+most room to grow into before it meets anything.
+
+**The net does not move.** The arcs drawn are exactly the footprint's own, the same ones
+`by class` draws. Drawing the whole thirty-rhomb net cut to the cell was wrong twice
+over: it showed rhombs the solid does not own, and it moved the arcs of the ones it
+does. The grown skirt has no rhombs in it, so it carries no net; its outline is the
+meeting curve, and curves are suppressed inside the footprint so nothing is drawn across
+a rhomb that `by class` draws unbroken.
+
+**Reach of a footprint, from the ball's own pole** (Sun gen 2, unit sphere; the
+hemisphere rim is 90°): class 4 owned 63.2°, class 5a 63.2°, class 5b 78.9°, class 10
+79.0°. Every cup reaches 79.0° whatever it owns, so the enlargement a hemisphere allows
+is at most the last 11°.
+
+**Verification.** `tools/probes/voronoi.mjs` — the clipped cell area agrees with a
+40,000-point Monte Carlo to 0.04% on all 51 Sun and 41 Star proper solids; the footprint
+is kept at 100.00% on every one of them; every one of 6,000 sampled
+meeting-circle points lies on the neighbouring ball to 1e-9; worst arc/plane crossing
+residual 9.75e-10 over 52,502 crossings. The crossing is solved as a quadratic on the
+projected chord with a bisection fallback, because an interpolated boundary is off by
+O(θ²) on each side independently — a hairline of daylight between two surfaces whose
+whole purpose is to meet.
