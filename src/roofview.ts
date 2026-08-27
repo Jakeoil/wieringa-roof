@@ -16,37 +16,86 @@ import {
     isoglossSegments,
 } from "./roofgeom.js";
 import type { RoofData, RoofFaceInfo } from "./roofgeom.js";
-import { CLUSTER_COLORS, MOSAIC_COLORS, MOSAIC_CLASSIC } from "./geometry.js";
+import {
+    GROUP_COLORS,
+    TINTED_COLORS,
+    PLATE_COLORS,
+    CLASSIC_COLORS,
+    TYPE_COLORS,
+    INDEX_COLORS,
+    FIVE_COLORS,
+    PLAIN_FILL,
+    pairColor,
+} from "./geometry.js";
 
 // ── palettes ──────────────────────────────────────────────────────
+//
+// **Derived, never restated.** Every color here is the same string `geometry.ts`
+// hands the flat pages, turned into a `THREE.Color`. The two used to be kept
+// separately and had drifted — thick was `#9292e3` on paper and `0x8f8fdc` on screen,
+// and the height ramp was a four-color ramp in three dimensions against an
+// eight-color wrapping palette on the canvas. One table now, and a scheme added to it
+// reaches every page at once.
 
-export const INDEX_COLORS = [
-    new THREE.Color(0x2f6fb5),
-    new THREE.Color(0x54a598),
-    new THREE.Color(0xd9b463),
-    new THREE.Color(0xc4643f),
-];
-export const THICK_COLOR = new THREE.Color(0x8f8fdc);
-export const THIN_COLOR = new THREE.Color(0xe2b184);
-export const PLAIN_COLOR = 0xc9cbd4;
+const toColor = (hex: string): THREE.Color => new THREE.Color(hex);
+const toColors = (m: Record<string, string>): Record<string, THREE.Color> =>
+    Object.fromEntries(Object.entries(m).map(([k, v]) => [k, toColor(v)]));
 
-/** The penrose-mosaic plate palette, sampled from deca-shape-expansion.png. Darker
- *  and more saturated than the screen colors, and meant to be seen with the height
- *  shading on — the plate's depth comes from a wide ramp inside each tile. */
-export const MOSAIC_3D: Record<string, THREE.Color> = Object.fromEntries(
-    Object.entries(MOSAIC_COLORS).map(([k, v]) => [k, new THREE.Color(v)]),
-);
-/** penrose-mosaic's start-up colors. Very saturated next to everything else here,
- *  which is what makes them the classic look rather than a variant of it. */
-export const CLASSIC_3D: Record<string, THREE.Color> = Object.fromEntries(
-    Object.entries(MOSAIC_CLASSIC).map(([k, v]) => [k, new THREE.Color(v)]),
-);
-/** gen-1 P1 clusters, at the screen strengths: Pe5 blue star, Pe3 yellow boat,
- *  Pe1 orange diamond */
-export const CLUSTER_3D: Record<string, THREE.Color> = Object.fromEntries(
-    Object.entries(CLUSTER_COLORS).map(([k, v]) => [k, new THREE.Color(v)]),
-);
-export const CLUSTER_FALLBACK = new THREE.Color(0xbfc2ca);
+/** The screen strengths: Pe5 blue star, Pe3 yellow boat, Pe1 orange diamond. */
+export const GROUP_3D = toColors(GROUP_COLORS);
+/** The same three, with each group's thin rhomb carried away from it. */
+export const TINTED_3D = toColors(TINTED_COLORS);
+/** penrose-mosaic's start-up colors — the deep version of the same three. */
+export const CLASSIC_3D = toColors(CLASSIC_COLORS);
+/** Sampled from the plate. Wants the height shading and the isoglosses on. */
+export const PLATE_3D = toColors(PLATE_COLORS);
+export const FIVE_3D = FIVE_COLORS.map(toColor);
+export const INDEX_3D = INDEX_COLORS.map(toColor);
+export const THICK_COLOR = toColor(TYPE_COLORS.thick);
+export const THIN_COLOR = toColor(TYPE_COLORS.thin);
+export const PLAIN_COLOR = Number.parseInt(PLAIN_FILL.slice(1), 16);
+export const GROUP_FALLBACK = toColor(PLAIN_FILL);
+
+/**
+ * One rhomb's color under one scheme — the three-dimensional answer to the question
+ * `tileFill` answers on paper, and deliberately the same answer.
+ *
+ * `index` is the one mode that cannot come from the flat function: on the canvas a
+ * face takes the color of its low corner, while here it can take the color of the
+ * vertex being written, so a rhomb ramps across its own height. Pass `idx` to get
+ * that; leave it out and the face is colored by its low corner as the print is.
+ *
+ * A page with schemes of its own — Centers colors by solid and by class — handles
+ * those first and calls this for the rest, so the shared names cannot drift apart
+ * while the local ones stay local.
+ */
+export interface FillInfo {
+    /** which pentagon group the rhomb came from: Pe5 star, Pe3 boat, Pe1 diamond */
+    group: string;
+    thick: boolean;
+    pair: readonly [number, number];
+}
+
+export function roofFill(mode: string, f: FillInfo, idx?: number): THREE.Color {
+    switch (mode) {
+        case "tinted":
+            return (f.thick ? GROUP_3D : TINTED_3D)[f.group] ?? GROUP_FALLBACK;
+        case "classic":
+            return CLASSIC_3D[f.group] ?? GROUP_FALLBACK;
+        case "plate":
+            return PLATE_3D[f.group] ?? GROUP_FALLBACK;
+        case "five":
+            return FIVE_3D[pairColor(f.pair[0], f.pair[1])];
+        case "type":
+            return f.thick ? THICK_COLOR : THIN_COLOR;
+        case "index":
+            return INDEX_3D[Math.min(3, Math.max(0, (idx ?? 1) - 1))];
+        case "plain":
+            return GROUP_FALLBACK;
+        default:
+            return GROUP_3D[f.group] ?? GROUP_FALLBACK;
+    }
+}
 
 const WHITE = new THREE.Color(0xffffff);
 const BLACK = new THREE.Color(0x000000);

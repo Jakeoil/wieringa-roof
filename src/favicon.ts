@@ -5,7 +5,7 @@
 // disagrees with its preview is worse than no preview.
 //
 // At sixteen pixels almost nothing survives except silhouette and color, so the
-// defaults drop strokes and lean on the cluster palette. The unfolding of a small
+// defaults drop strokes and lean on the group palette. The unfolding of a small
 // patch is a good subject precisely because it is *sparse*: Queen generation 1 fills
 // only 47% of its own bounding box, and that spidery outline still reads when the
 // individual rhombs no longer do.
@@ -15,8 +15,9 @@ import {
     generatePatch,
     seedTypes,
     vertexList,
-    MOSAIC_COLORS,
-    MOSAIC_CLASSIC,
+    PLATE_COLORS,
+    CLASSIC_COLORS,
+    indexColor,
 } from "./geometry.js";
 import { cutTreeUnfold } from "./cuttree.js";
 
@@ -25,7 +26,7 @@ export interface IconOpts {
     gen: number;
     /** "net" unfolds the patch; "tiling" uses the flat Penrose patch */
     subject: "net" | "tiling";
-    color: "cluster" | "mosaic" | "classic" | "type" | "index" | "mono";
+    color: "groups" | "plate" | "classic" | "type" | "index" | "mono";
     /** stroke width as a fraction of a rhomb edge; 0 for none */
     stroke: number;
     strokeColor: string;
@@ -41,7 +42,7 @@ export const ICON_DEFAULTS: IconOpts = {
     seed: "Deca",
     gen: 1,
     subject: "net",
-    color: "cluster",
+    color: "groups",
     stroke: 0,
     strokeColor: "#111111",
     background: null,
@@ -50,12 +51,17 @@ export const ICON_DEFAULTS: IconOpts = {
     size: 64,
 };
 
-const CLUSTER: Record<string, string> = {
-    Pe5: "#6f6fd0",
-    Pe3: "#d8d15e",
-    Pe1: "#e39a5c",
+// **The one deliberate departure from the shared palettes.** Everything else on the
+// site now colors from `FILL_MODES` and `tileFill`, but a favicon is read at 16 px
+// against a browser chrome of unknown color, and the page strengths — chosen to be
+// shaded over and crossed by isoglosses — go to mush at that size. These are the same
+// three group colors carried a few steps deeper. The height ramp needs no such help
+// and comes from `geometry.ts` like everyone else's.
+const GROUPS: Record<string, string> = {
+    Pe5: "#6f6fd0", // star
+    Pe3: "#d8d15e", // boat
+    Pe1: "#e39a5c", // diamond
 };
-const INDEX_COLORS = ["#2f6fb5", "#54a598", "#d9b463", "#c4643f"];
 
 type P2 = [number, number];
 
@@ -68,15 +74,13 @@ function subjectPolys(o: IconOpts): Array<{ poly: P2[]; fill: string }> {
     console.log = quiet;
 
     const out: Array<{ poly: P2[]; fill: string }> = [];
-    const fillFor = (cluster: string, thick: boolean, lowIndex: number): string => {
+    const fillFor = (group: string, thick: boolean, lowIndex: number): string => {
         if (o.color === "mono") return "#333333";
-        if (o.color === "mosaic") return MOSAIC_COLORS[cluster] ?? "#888888";
-        if (o.color === "classic") return MOSAIC_CLASSIC[cluster] ?? "#888888";
+        if (o.color === "plate") return PLATE_COLORS[group] ?? "#888888";
+        if (o.color === "classic") return CLASSIC_COLORS[group] ?? "#888888";
         if (o.color === "type") return thick ? "#6f6fd0" : "#e39a5c";
-        if (o.color === "index") {
-            return INDEX_COLORS[Math.min(3, Math.max(0, lowIndex - 1))];
-        }
-        return CLUSTER[cluster] ?? "#bbbbbb";
+        if (o.color === "index") return indexColor(lowIndex);
+        return GROUPS[group] ?? "#bbbbbb";
     };
 
     if (o.subject === "tiling") {
@@ -84,7 +88,7 @@ function subjectPolys(o: IconOpts): Array<{ poly: P2[]; fill: string }> {
             const lo = Math.min(...r.vertIndices);
             out.push({
                 poly: r.verts.map((v) => [v.x, v.y] as P2),
-                fill: fillFor(r.cluster, r.thick, lo),
+                fill: fillFor(r.group, r.thick, lo),
             });
         }
         return out;
@@ -95,7 +99,7 @@ function subjectPolys(o: IconOpts): Array<{ poly: P2[]; fill: string }> {
         const lo = Math.min(...pl.verts.map((v) => vertexList[v]?.index ?? 1));
         out.push({
             poly: pl.poly.map((q) => [q[0], q[1]] as P2),
-            fill: fillFor(pl.cluster, pl.thick, lo),
+            fill: fillFor(pl.group, pl.thick, lo),
         });
     }
     return out;

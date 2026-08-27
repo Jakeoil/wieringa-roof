@@ -20,13 +20,14 @@
 import * as THREE from "three";
 import { loadPrefs, savePrefs, resetPrefs } from "./prefs.js";
 import { BUILD_ID } from "./build-id.js";
-import { seedTypes, generatePatch, allRhombs, vertexList, pairColor, FIVE_COLORS } from "./geometry.js";
+import { seedTypes, generatePatch, allRhombs, vertexList } from "./geometry.js";
 import { buildRoof, rescale } from "./roofgeom.js";
 import type { RoofData } from "./roofgeom.js";
 import { LineSegments2 } from "three/addons/lines/LineSegments2.js";
 import { LineSegmentsGeometry } from "three/addons/lines/LineSegmentsGeometry.js";
 import { LineMaterial } from "three/addons/lines/LineMaterial.js";
-import { createRoofView, CLUSTER_3D, CLUSTER_FALLBACK, PLAIN_COLOR } from "./roofview.js";
+import { createRoofView, roofFill, PLAIN_COLOR } from "./roofview.js";
+import { fillOptions } from "./schemes.js";
 import {
     triacontahedra, pe5Rosettes, cupIndices, ownedFaceIndices, solidFace,
     RT_FACES, A6, RHO, MIDRADIUS,
@@ -253,7 +254,6 @@ function sphericalNet(faces: number[], steps = 7): Float32Array {
     return new Float32Array(out);
 }
 
-const FIVE = FIVE_COLORS.map((h) => new THREE.Color(h));
 /**
  * The **surfaces** the net outlines: each rhomb face projected radially onto the unit
  * sphere and tessellated, so a partial set of faces gives a partial spherical shell
@@ -951,25 +951,23 @@ function build(reframe: boolean): void {
         c[2] * zsign - d.offset[2],
     ];
 
-    // The shadow keeps the roof's colors. A rhomb's class, its cluster, whether it is
+    // The shadow keeps the roof's colors. A rhomb's class, its group, whether it is
     // shared — none of that depends on how deep the roof is, or on which way up it is,
     // so flattening the surface is no reason to discard what it is colored by.
     rv.drawRoof(d, {
-        colorOf: (f) => {
+        // Two of these schemes belong to this page — a rhomb colored by the solid that
+        // owns it, and by whether that solid is complete — and the rest are the shared
+        // ones every roof surface offers. The local ones are answered here, the shared
+        // ones by `roofFill`, so "Rhomb groups" means the same thing on every page and
+        // "By class" stays where it makes sense.
+        colorOf: (f, vid) => {
             const s = cen.solids[assign[f.id]];
-            if (mode === "cluster") return CLUSTER_3D[f.cluster] ?? CLUSTER_FALLBACK;
-            // The Kowalewski five: a proper edge coloring of K₆ on the six axes, so it is
-            // the triacontahedron's own coloring seen on the roof rather than a scheme
-            // invented for the tiling.
-            if (mode === "five") return FIVE[pairColor(f.pair[0], f.pair[1])];
-            if (mode === "complete")
-                return s.complete ? solidColor(s) : WASH.clone();
+            if (mode === "complete") return s.complete ? solidColor(s) : WASH.clone();
             if (mode === "class") {
                 const rf = cen.byRhomb[f.id];
                 return rf && isShared(rf, cen.solids) ? SHARED : solidColor(s);
             }
-            if (mode === "type") return f.thick ? CLUSTER_3D.Pe5 ?? CLUSTER_FALLBACK : CLUSTER_FALLBACK;
-            return solidColor(s);
+            return roofFill(mode, f, d.indexAt(vid));
         },
         // Shading strength is the depth, so it goes out with it rather than lying
         // about a flat sheet.
@@ -1671,6 +1669,11 @@ function fillGenerations(prefer?: number): void {
         if (first) genSel.value = first.value;
     }
 }
+// The shared schemes, plus this page's own two. Built from `FILL_MODES` so the list
+// cannot drift from the 3D page's or the workbench's.
+fillOptions(colorSel, {
+    lead: [["class", "Proper class", "Color each rhomb by the triacontahedron that owns it"]],
+});
 colorSel.value = prefs.color;
 if (!colorSel.value) colorSel.value = PREF_DEFAULTS.color;
 normalsChk.checked = prefs.normals;

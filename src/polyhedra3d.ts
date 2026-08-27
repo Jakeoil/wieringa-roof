@@ -1,7 +1,7 @@
 // The three solids, live: rhombic triacontahedron and the two golden rhombohedra.
 //
 // Every face of all three is the same golden rhombus, so they get the same
-// treatment as the roof — cluster colors, isogloss contours, dark edges — and the
+// treatment as the roof — group colors, isogloss contours, dark edges — and the
 // family resemblance does the explaining.
 //
 // The triacontahedron is built as a zonohedron on the six icosahedral five-fold

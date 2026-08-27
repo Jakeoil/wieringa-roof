@@ -90,11 +90,7 @@
 
 <div class="bar">
     <span class="grp">Hexahedra</span>
-    <label>Color <select id="cellcolor">
-        <option value="type">Acute / obtuse</option>
-        <option value="five">Kowalewski five</option>
-        <option value="plain">Plain</option>
-    </select></label>
+    <label>Color <select id="cellcolor"></select></label>
     <label>Surface <select id="cellmode">
         <option value="solid">Solid</option>
         <option value="transparent">Transparent</option>
@@ -104,6 +100,11 @@
         <option value="both">Both</option>
         <option value="acute">Acute only</option>
         <option value="obtuse">Obtuse only</option>
+    </select></label>
+    <label title="The side walls. They are the only faces a matching rule has room to use: a wall stands on one lifting axis and the vertical, so its axis says how the tile is turned and its rise says which way up it is.">Rim <select id="rim">
+        <option value="cell">Same as cell</option>
+        <option value="axis">By axis</option>
+        <option value="rise">By axis + rise</option>
     </select></label>
     <label>Shrink <span id="shrinkOut" class="mono"></span>
         <input type="range" id="shrink" min="0.3" max="1" step="0.005" value="1"></label>
@@ -124,12 +125,7 @@
             <option value="transparent">Transparent</option>
             <option value="solid">Solid</option>
         </select></label>
-        <label>Color <select id="roofcolor">
-            <option value="cluster">Star / boat / diamond</option>
-            <option value="five">Kowalewski five</option>
-            <option value="type">Thick / thin</option>
-            <option value="plain">Plain</option>
-        </select></label>
+        <label>Color <select id="roofcolor"></select></label>
         <span class="checks">
             <label title="Flatten the roof into its own shadow, the plain Penrose tiling, and hold it above the model as a sheet"><input type="checkbox" id="flat"> flatten</label>
             <label><input type="checkbox" id="roofedges" checked> edges</label>

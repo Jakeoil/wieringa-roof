@@ -34,7 +34,7 @@ const cross3 = (a: V3, b: V3): V3 => [
 export interface Face {
     id: number;
     thick: boolean;
-    cluster: string; // gen-1 P1 cluster: Pe5 star / Pe3 boat / Pe1 diamond
+    group: string; // gen-1 P1 group: Pe5 star / Pe3 boat / Pe1 diamond
     pair: [number, number]; // the two lifting axes, for the five-coloring
     v: number[]; // tiling vertex ids, cyclic
 }
@@ -42,7 +42,7 @@ export interface Face {
 export interface Placed {
     faceId: number;
     thick: boolean;
-    cluster: string;
+    group: string;
     pair: [number, number];
     poly: P2[]; // net-space corners, matching `verts` order
     verts: number[]; // tiling vertex ids in the same order
@@ -86,7 +86,7 @@ export function buildFaces(): Face[] {
     return allRhombs.map((r) => ({
         id: r.id,
         thick: r.thick,
-        cluster: r.cluster,
+        group: r.group,
         pair: r.pair,
         v: r.verts.map((pt) => vertexMap.get(roundKey(pt))!.id),
     }));
@@ -361,7 +361,7 @@ function runBFS(
         placed.set(seedId!, {
             faceId: seedId!,
             thick: seed.thick,
-            cluster: seed.cluster,
+            group: seed.group,
             pair: seed.pair,
             poly: seedPoly,
             verts: seed.v.slice(),
@@ -436,7 +436,7 @@ function runBFS(
                 placed.set(link.other, {
                     faceId: link.other,
                     thick: byId.get(link.other)!.thick,
-                    cluster: byId.get(link.other)!.cluster,
+                    group: byId.get(link.other)!.group,
                     pair: byId.get(link.other)!.pair,
                     poly: cand.poly,
                     verts: cand.verts,
@@ -826,7 +826,7 @@ export function ribbonGrowPatch(opts: UnfoldOptions = {}): UnfoldResult {
                 placed.set(fid, {
                     faceId: fid,
                     thick: face.thick,
-                    cluster: face.cluster,
+                    group: face.group,
                     pair: face.pair,
                     poly: seedPoly,
                     verts: face.v.slice(),
@@ -847,7 +847,7 @@ export function ribbonGrowPatch(opts: UnfoldOptions = {}): UnfoldResult {
                 placed.set(fid, {
                     faceId: fid,
                     thick: face.thick,
-                    cluster: face.cluster,
+                    group: face.group,
                     pair: face.pair,
                     poly: cand.poly,
                     verts: cand.verts,
@@ -918,7 +918,7 @@ export function ribbonGrowPatch(opts: UnfoldOptions = {}): UnfoldResult {
                 placed.set(link.other, {
                     faceId: link.other,
                     thick: byId.get(link.other)!.thick,
-                    cluster: byId.get(link.other)!.cluster,
+                    group: byId.get(link.other)!.group,
                     pair: byId.get(link.other)!.pair,
                     poly: cand.poly,
                     verts: cand.verts,

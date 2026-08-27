@@ -737,7 +737,7 @@ export function renderPage(
         const vidx0 = p.verts.map(heightOf);
         const base = tileFill(
             o.fillMode,
-            p.cluster,
+            p.group,
             p.thick,
             Math.min(...vidx0),
             p.pair,

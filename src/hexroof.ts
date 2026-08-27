@@ -20,10 +20,9 @@ import { BUILD_ID } from "./build-id.js";
 import { seedTypes, generatePatch, allRhombs, pairColor, FIVE_COLORS } from "./geometry.js";
 import { buildRoof } from "./roofgeom.js";
 import type { RoofData } from "./roofgeom.js";
-import {
-    createRoofView, shadeColor, CLUSTER_3D, CLUSTER_FALLBACK,
-    THICK_COLOR, THIN_COLOR, PLAIN_COLOR,
-} from "./roofview.js";
+import { createRoofView, shadeColor, roofFill, PLAIN_COLOR } from "./roofview.js";
+import type { FillInfo } from "./roofview.js";
+import { fillOptions } from "./schemes.js";
 import { patchSize, MAX_GENERATION } from "./patchsize.js";
 import { hexLayer } from "./hexlayer.js";
 import type { HexLayer, HexCell } from "./hexlayer.js";
@@ -42,6 +41,7 @@ const headsRadio = el<HTMLInputElement>("pheads");
 const cellColorSel = el<HTMLSelectElement>("cellcolor");
 const cellSel = el<HTMLSelectElement>("cellmode");
 const cellShowSel = el<HTMLSelectElement>("cellshow");
+const rimSel = el<HTMLSelectElement>("rim");
 const shrinkInput = el<HTMLInputElement>("shrink");
 const shrinkOut = el<HTMLElement>("shrinkOut");
 const topsChk = el<HTMLInputElement>("tops");
@@ -61,17 +61,26 @@ const statusEl = el<HTMLElement>("status");
 const PREFS_KEY = "wr-hexroof";
 const PREF_DEFAULTS = {
     patch: "Pe3", gen: 3, tails: false,
-    cellcolor: "type", cellmode: "solid", cellshow: "both", shrink: 1,
+    cellcolor: "type", cellmode: "solid", cellshow: "both", rim: "cell", shrink: 1,
     tops: true, floors: true, edges: true, shade: false, isogloss: false,
-    roofmode: "invisible", roofcolor: "cluster", flat: false,
+    roofmode: "invisible", roofcolor: "groups", flat: false,
     roofedges: true, roofiso: false, roofopen: false,
 };
 const prefs = loadPrefs(PREFS_KEY, PREF_DEFAULTS);
 const rv = createRoofView(view, 0xf4f1e8);
 
+/**
+ * A cell, described the way the shared color resolver wants to be asked: a hexahedron
+ * takes the color of the rhomb it hangs from, since that is the one it *is*.
+ */
+const fillInfo = (c: HexCell): FillInfo => ({
+    group: allRhombs[c.rhomb].group,
+    thick: c.acute,
+    pair: c.pair,
+});
+
 const ACUTE = new THREE.Color(0xd98d3a);
 const OBTUSE = new THREE.Color(0x4a7fb5);
-const CELL_PLAIN = new THREE.Color(0xc9cbd4);
 const FIVE = FIVE_COLORS.map((h) => new THREE.Color(h));
 const FLOOR_TINT = 0.72; // floors sit a shade back, so up and down read apart
 
@@ -249,6 +258,7 @@ function build(reframe: boolean): void {
     const cellMode = cellSel.value;
     const showMode = cellShowSel.value;
     const colorMode = cellColorSel.value;
+    const rimMode = rimSel.value;
     let drawnCells = 0;
     let topZ = -Infinity;
     // The view used to be framed from `roofRadius()`, but that is only set when the roof
@@ -264,16 +274,32 @@ function build(reframe: boolean): void {
             if (showMode === "acute" && !c.acute) continue;
             if (showMode === "obtuse" && c.acute) continue;
             drawnCells++;
+            // `five` is the one scheme that differs face to face — a cell wears three
+            // of the five, opposite faces agreeing — so it is resolved inside the loop.
+            // Everything else colors the whole cell, and comes from the same resolver
+            // the roof and the flat pages use, so a rhomb and the cell hanging from it
+            // are never two different colors.
             const base = colorMode === "five" ? null
-                : colorMode === "plain" ? CELL_PLAIN
-                : c.acute ? ACUTE : OBTUSE;
+                : colorMode === "type" ? (c.acute ? ACUTE : OBTUSE)
+                : roofFill(colorMode, fillInfo(c), Math.min(...c.index));
             c.faces.forEach((f, fi) => {
                 if (fi === 0 && !topsChk.checked) return;
                 if (fi === 1 && !floorsChk.checked) return;
-                const face = colorMode === "five" ? FIVE[c.colors[fi]] : base!;
+                // A wall spans one lifting axis and the vertical, and `pairColor(m, 5)`
+                // is `m`, so a wall's Kowalewski color *is* its axis. That is the whole
+                // of the matching rule: the color says which of the five the edge runs
+                // along, and the rise says which end of it is high.
+                const wall = fi >= 2;
+                const face = wall && rimMode !== "cell"
+                    ? FIVE[c.colors[fi]]
+                    : colorMode === "five" ? FIVE[c.colors[fi]] : base!;
                 // A floor is the same rhomb as the top; darkening it a little is the only
                 // thing keeping the two surfaces apart when both are on.
                 const tinted = fi === 1 ? face.clone().multiplyScalar(FLOOR_TINT) : face;
+                // Corners 0 and 3 are one end of the wall's top edge, 1 and 2 the other.
+                // Which end is high is read after the mirror, so it follows what is on
+                // screen rather than what the unmirrored cell was built from.
+                const aHigh = wall && (f[0][2] - f[1][2]) * zsign > 0;
                 const q = f.map((p) => place(p as V3, c));
                 for (const i of [0, 1, 2, 0, 2, 3]) {
                     const v = q[i];
@@ -281,7 +307,12 @@ function build(reframe: boolean): void {
                     const r2 = v[0] * v[0] + v[1] * v[1] + v[2] * v[2];
                     if (r2 > frameR2) frameR2 = r2;
                     tris.push(v[0], v[1], v[2]);
-                    const col = shading && fi < 2
+                    // Shading a wall by its own height would only say "this end is
+                    // the top", which every wall says. Shading it by which *end of its
+                    // top edge* is high says something a neighbor can disagree with.
+                    const col = wall && rimMode === "rise"
+                        ? shadeColor(tinted, aHigh === (i === 0 || i === 3) ? 0.8 : -0.8, 1)
+                        : shading && fi < 2
                         ? shadeColor(tinted, tOf(f[i][2]), 1)
                         : tinted;
                     cols.push(col.r, col.g, col.b);
@@ -324,12 +355,8 @@ function build(reframe: boolean): void {
             : { ...d, offset: [d.offset[0], d.offset[1], d.offset[2] - lift] as V3 };
         const rmode = roofColorSel.value;
         rv.drawRoof(dRoof, {
-            colorOf: (f) => {
-                if (rmode === "five") return FIVE[pairColor(f.pair[0], f.pair[1])];
-                if (rmode === "cluster") return CLUSTER_3D[f.cluster] ?? CLUSTER_FALLBACK;
-                if (rmode === "type") return f.thick ? THICK_COLOR : THIN_COLOR;
-                return new THREE.Color(PLAIN_COLOR);
-            },
+            // The roof's own index range, so height coloring matches the 3D page.
+            colorOf: (f, vid) => roofFill(rmode, f, dRoof.indexAt(vid)),
             shade: 0,
             useVertexColors: rmode !== "plain",
             flatColor: PLAIN_COLOR,
@@ -369,12 +396,18 @@ headsRadio.checked = !prefs.tails;
 // `cellmode` meant something else in the previous layout — it carried the color scheme
 // as well as the surface. A stored value with no matching option leaves a select
 // reporting "", so each one falls back explicitly rather than silently reading empty.
+// Both color lists come from `FILL_MODES`, so the cells and the roof over them offer
+// the same schemes and call them the same thing. Only `type` differs: a cell is acute
+// or obtuse where a rhomb is thick or thin.
+fillOptions(cellColorSel, { cells: true });
+fillOptions(roofColorSel);
 cellColorSel.value = prefs.cellcolor || PREF_DEFAULTS.cellcolor;
 cellSel.value = prefs.cellmode || PREF_DEFAULTS.cellmode;
 cellShowSel.value = prefs.cellshow || PREF_DEFAULTS.cellshow;
+rimSel.value = prefs.rim || PREF_DEFAULTS.rim;
 for (const [sel, def] of [
     [cellColorSel, PREF_DEFAULTS.cellcolor], [cellSel, PREF_DEFAULTS.cellmode],
-    [cellShowSel, PREF_DEFAULTS.cellshow],
+    [cellShowSel, PREF_DEFAULTS.cellshow], [rimSel, PREF_DEFAULTS.rim],
 ] as Array<[HTMLSelectElement, string]>) if (!sel.value) sel.value = def;
 shrinkInput.value = String(prefs.shrink ?? 1);
 topsChk.checked = prefs.tops;
@@ -411,7 +444,7 @@ patchSel.addEventListener("change", () => {
 });
 genSel.addEventListener("change", () => rebuild(true));
 for (const c of [
-    tailsRadio, headsRadio, cellColorSel, cellSel, cellShowSel, topsChk, floorsChk,
+    tailsRadio, headsRadio, cellColorSel, cellSel, cellShowSel, rimSel, topsChk, floorsChk,
     edgesChk, shadeChk, isoChk, roofSel, roofColorSel, flatChk, roofEdgesChk, roofIsoChk,
 ]) c.addEventListener("change", () => rebuild(false));
 
@@ -428,7 +461,7 @@ shrinkInput.addEventListener("wheel", (e) => {
 function persist(): void {
     savePrefs(PREFS_KEY, {
         patch: patchSel.value, gen: Number(genSel.value), tails: tailsRadio.checked,
-        cellcolor: cellColorSel.value, cellmode: cellSel.value, cellshow: cellShowSel.value,
+        cellcolor: cellColorSel.value, cellmode: cellSel.value, cellshow: cellShowSel.value, rim: rimSel.value,
         shrink: Number(shrinkInput.value),
         tops: topsChk.checked, floors: floorsChk.checked, edges: edgesChk.checked,
         shade: shadeChk.checked, isogloss: isoChk.checked,

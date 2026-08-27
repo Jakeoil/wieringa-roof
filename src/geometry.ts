@@ -282,7 +282,7 @@ function makeRhombShapes(
 // ── P1 outline shapes ─────────────────────────────────────────────
 //
 // The rhombs are P3. P1 is the layer above them: pentagons, stars, boats and
-// diamonds. Every rhomb belongs to exactly one P1 tile — `Rhomb.cluster` already
+// diamonds. Every rhomb belongs to exactly one P1 tile — `Rhomb.group` already
 // says which type — but the P1 tiles that emit *no* rhombs are invisible in the
 // rhomb view, and those are precisely the gaps in a figure. To reason about filling
 // a patch you have to be able to see them, so the outlines are built here.
@@ -478,66 +478,115 @@ interface Rhomb {
     thick: boolean;
     isHeads: boolean;
     fill: string;
-    // Which gen-1 P1 cluster this rhomb came from: Pe5 star, Pe3 boat,
+    // Which gen-1 P1 group this rhomb came from: Pe5 star, Pe3 boat,
     // Pe1 diamond. Expansion always bottoms out at gen 1, so every rhomb
     // belongs to exactly one.
-    cluster: string;
+    group: string;
     // The two generators the rhombus is spanned by, ascending. Filled in by
     // assignIndices, since it comes from the lift and not from the emission.
     pair: [number, number];
 }
 
-// The penrose-mosaic plate palette, sampled from deca-shape-expansion.png (the
-// median of each color family in the generation-2 Queen). Darker and far more
-// saturated than the screen palette, and meant to be used *with* height shading and
-// isoglosses — the plate's character comes from a wide light-to-dark ramp inside
-// every tile, crossed by contour stripes, over heavy black edges. The color alone
-// is only a third of it.
-// Sampled from the penrose-mosaic plate (deca-shape-expansion.png, Queen gen 2).
-// These are *mid-tone* values, not medians of the whole tile: each tile on the plate
-// is a wide light-to-dark ramp, so a median is dragged toward the dark stripes and
-// comes out duller than the color the eye reads. Taking the median hue and
-// saturation at a mid lightness gives the color the gradient should center on.
-const MOSAIC_COLORS: Record<string, string> = {
-    Pe5: "#5b5b8a", // slate
-    Pe3: "#9f9f46", // olive
-    Pe1: "#ac6d38", // rust
+// ── the rhomb-group palettes ──────────────────────────────────────
+//
+// There are three **rhomb groups** — star, boat and diamond — and three palettes that
+// color them. They are the same scheme three times over, not three schemes, so they
+// live together and are named together.
+//
+// A word on the names, because two things here were both called "groups". The P1
+// tiles `Pe5`, `Pe3`, `Pe1` are **pentagons** (NOTES, "Settled: `Pe*` are pentagons").
+// The rhombs each one emits form a **group** shaped like a star, a boat or a diamond,
+// and it is the group that gets colored. The keys stay `Pe5`/`Pe3`/`Pe1` because that
+// is which pentagon a rhomb came from; the scheme is called rhomb groups.
+
+/** The screen strengths — pale enough to be shaded over and read under isoglosses. */
+const GROUP_COLORS: Record<string, string> = {
+    Pe5: "#9292e3", // star, blue-purple
+    Pe3: "#e6e68e", // boat, yellow
+    Pe1: "#eec09b", // diamond, orange
 };
 
 // penrose-mosaic's own defaults, verbatim from penrose.js:11-13 — the strong blue,
-// orange and yellow it starts up with. The cluster names there say the mapping
-// outright: Pe5 is BLUE_PENTA, Pe3 YELLOW_PENTA, Pe1 ORANGE_PENTA. Pure #0000ff and
-// #ffff00 are far more saturated than anything else on this site, which is the point:
-// this is the classic look, not a toned-down version of it.
-const MOSAIC_CLASSIC: Record<string, string> = {
-    Pe5: "#0000ff", // BLUE
-    Pe3: "#ffff00", // YELLOW
-    Pe1: "#e46c0a", // ORANGE
+// yellow and orange it starts up with, and the deep version of exactly the palette
+// above: `Pe5` is BLUE_PENTA, `Pe3` YELLOW_PENTA, `Pe1` ORANGE_PENTA. Pure #0000ff
+// and #ffff00 are far more saturated than anything else on this site, which is the
+// point — this is the classic look, not a toned-down version of it.
+const CLASSIC_COLORS: Record<string, string> = {
+    Pe5: "#0000ff", // star, BLUE
+    Pe3: "#ffff00", // boat, YELLOW
+    Pe1: "#e46c0a", // diamond, ORANGE
 };
 
-// Cluster colors (matches penrose-mosaic custom palette)
-const CLUSTER_COLORS: Record<string, string> = {
-    Pe5: "#9292e3", // [146,146,227]
-    Pe3: "#e6e68e", // [230,230,142]
-    Pe1: "#eec09b", // [238,192,155]
+// Sampled from the penrose-mosaic plate (deca-shape-expansion.png, Queen gen 2).
+// These are *mid-tone* values, not medians of the whole tile: each tile on the plate
+// is a wide light-to-dark ramp, so a median is dragged toward the dark stripes and
+// comes out duller than the color the eye reads. Taking the median hue and saturation
+// at a mid lightness gives the color the gradient should center on. Meant to be used
+// *with* the height ramp and the isoglosses — the plate's character is a wide ramp
+// inside every tile crossed by contour stripes over heavy black edges, and the color
+// alone is only a third of it.
+const PLATE_COLORS: Record<string, string> = {
+    Pe5: "#5b5b8a", // star, slate
+    Pe3: "#9f9f46", // boat, olive
+    Pe1: "#ac6d38", // diamond, rust
 };
+
+/**
+ * A thin rhomb's shade of its group color.
+ *
+ * The three groups are not three kinds of rhomb — a boat is three thick and one thin,
+ * a diamond one thick and two thin — so a group color alone hides which rhombus you
+ * are looking at. Carrying the thin one a few steps away separates them without
+ * spending a new hue, and the hierarchy still reads across the patch.
+ *
+ * Away from *what* has to depend on the color: lightening pure yellow does nothing and
+ * darkening a dark slate does nothing either. So it moves toward white when the color
+ * is dark and toward black when it is light, by the same amount either way.
+ */
+const TINT = 0.76;
+function tintThin(hex: string): string {
+    const n = Number.parseInt(hex.slice(1), 16);
+    const r = ((n >> 16) & 255) / 255, g = ((n >> 8) & 255) / 255, b = (n & 255) / 255;
+    const hi = Math.max(r, g, b), lo = Math.min(r, g, b), l = (hi + lo) / 2;
+    const d = hi - lo;
+    const sat = d === 0 ? 0 : d / (1 - Math.abs(2 * l - 1));
+    let h = 0;
+    if (d !== 0) {
+        h = hi === r ? ((g - b) / d + (g < b ? 6 : 0)) : hi === g ? (b - r) / d + 2 : (r - g) / d + 4;
+        h /= 6;
+    }
+    // Deeper, not muddier: the same hue and the same saturation at a lower lightness.
+    // Mixing toward black instead would drag the saturation down with it and the two
+    // rhombi would read as two colors rather than two weights of one.
+    const L = l > 0.42 ? l * TINT : 1 - (1 - l) * TINT;
+    const c = (1 - Math.abs(2 * L - 1)) * sat;
+    const x = c * (1 - Math.abs(((h * 6) % 2) - 1));
+    const m = L - c / 2;
+    const seg = Math.floor(h * 6) % 6;
+    const rgb = [
+        [c, x, 0], [x, c, 0], [0, c, x], [0, x, c], [x, 0, c], [c, 0, x],
+    ][seg].map((v) => Math.round((v + m) * 255));
+    return `#${rgb.map((v) => v.toString(16).padStart(2, "0")).join("")}`;
+}
+
+/** The thin rhomb of each group. The star group never needs one: `Pe5` emits five
+ *  thick rhombi and no thin, so no rhomb in that group is ever thin. */
+const TINTED_COLORS: Record<string, string> = Object.fromEntries(
+    Object.entries(GROUP_COLORS).map(([k, v]) => [k, tintThin(v)]),
+);
 
 const TYPE_COLORS = { thick: "#9292e3", thin: "#eec09b" };
 
-const INDEX_PALETTE = [
-    "#888",
-    "#4a9eda",
-    "#2ecc71",
-    "#f39c12",
-    "#e74c3c",
-    "#9b59b6",
-    "#1abc9c",
-    "#e67e22",
-];
+// The height ramp. A vertex index is only ever 1, 2, 3 or 4 (PLAN, "Four tent
+// poles"), so four colors is the whole range and an eight-color wrapping palette was
+// answering a question the geometry never asks. These are the values the 3D pages
+// already used; the flat pages now use them too, so a face takes the color its low
+// corner has in three dimensions.
+const INDEX_COLORS = ["#2f6fb5", "#54a598", "#d9b463", "#c4643f"];
 
+/** Color of height index `idx`, clamped to the 1–4 the surface actually reaches. */
 function indexColor(idx: number): string {
-    if (idx < 0) return "#333";
-    return INDEX_PALETTE[idx % INDEX_PALETTE.length] || "#333";
+    return INDEX_COLORS[Math.min(3, Math.max(0, Math.round(idx) - 1))];
 }
 
 // ── the Kowalewski five ───────────────────────────────────────────
@@ -574,19 +623,85 @@ function pairColor(i: number, j: number): number {
 /** The five, at the strengths the 3D pages use, so a printed net matches the screen. */
 const FIVE_COLORS = ["#d94f3d", "#e8a33d", "#4f9d4a", "#3d7fc4", "#9b59b6"];
 
-type FillMode = "none" | "cluster" | "mosaic" | "classic" | "type" | "index" | "five";
+/** The color every scheme falls back to, and what "Plain" paints. */
+const PLAIN_FILL = "#c9cbd4";
+
+type FillMode =
+    | "none"
+    | "groups"
+    | "tinted"
+    | "classic"
+    | "plate"
+    | "five"
+    | "index"
+    | "type"
+    | "plain";
+
+/**
+ * Every color scheme the roof surface has, in the order the controls should offer
+ * them, with the one label each is called by.
+ *
+ * The point of the table is that no page invents a name. "Cluster", "Star / boat /
+ * diamond", "Mosaic classic" and "Mosaic plate" were four labels for two schemes,
+ * spread over five pages, and a reader had no way to know which of them agreed.
+ * `type` reads differently on a solid than on the surface, so it carries the one
+ * alternative label; nothing else needs one.
+ */
+const FILL_MODES: ReadonlyArray<{
+    value: FillMode;
+    label: string;
+    /** what `type` is called when the thing being colored is a cell, not a rhomb */
+    cellLabel?: string;
+    title: string;
+}> = [
+    {
+        value: "groups",
+        label: "Rhomb groups",
+        title: "Star, boat and diamond — the rhombs each pentagon Pe5 / Pe3 / Pe1 emits",
+    },
+    {
+        value: "tinted",
+        label: "Tinted rhomb groups",
+        title: "The three groups, with the thin rhomb of each carried away from its group color",
+    },
+    {
+        value: "classic",
+        label: "Classic rhomb groups",
+        title: "The same three groups in penrose-mosaic's own start-up colors: blue, yellow, orange",
+    },
+    {
+        value: "plate",
+        label: "Plate rhomb groups",
+        title: "The same three groups sampled from the penrose-mosaic plate. Wants the shading and isoglosses on",
+    },
+    {
+        value: "five",
+        label: "Kowalewski five",
+        title: "A proper edge coloring of K\u2086 on the six axes, so every rosette shows all five",
+    },
+    { value: "index", label: "Height", title: "The height index of the rhomb's low corner, 1 to 4" },
+    {
+        value: "type",
+        label: "Thick / thin",
+        cellLabel: "Acute / obtuse",
+        title: "Which of the two rhombi it is",
+    },
+    { value: "plain", label: "Plain", title: "One color, so the shading and the edges carry everything" },
+];
 
 /**
  * The base color of one rhomb under a given color mode — the single answer the
- * workbench, the sheets and the printable map all ask for.
+ * workbench, the sheets, the printable map and the three-dimensional pages all ask
+ * for.
  *
  * It lives here because the sheets used to keep their own washed-out copy of the
- * cluster palette, so the same net came out one color on screen and another on
- * paper. One function, one answer: what you build is what prints.
+ * group palette, so the same net came out one color on screen and another on paper.
+ * One function, one answer: what you build is what prints, and what you turned over
+ * in three dimensions.
  */
 function tileFill(
     mode: FillMode,
-    cluster: string,
+    group: string,
     thick: boolean,
     lowIndex: number,
     pair?: readonly [number, number],
@@ -597,17 +712,21 @@ function tileFill(
         case "five":
             // No pair means the caller has not been taught this mode; fall back rather
             // than paint everything one color and look deliberate.
-            return pair ? FIVE_COLORS[pairColor(pair[0], pair[1])] : "#888888";
-        case "mosaic":
-            return MOSAIC_COLORS[cluster] ?? "#888888";
+            return pair ? FIVE_COLORS[pairColor(pair[0], pair[1])] : PLAIN_FILL;
+        case "tinted":
+            return (thick ? GROUP_COLORS : TINTED_COLORS)[group] ?? PLAIN_FILL;
         case "classic":
-            return MOSAIC_CLASSIC[cluster] ?? "#888888";
+            return CLASSIC_COLORS[group] ?? PLAIN_FILL;
+        case "plate":
+            return PLATE_COLORS[group] ?? PLAIN_FILL;
         case "type":
             return thick ? TYPE_COLORS.thick : TYPE_COLORS.thin;
         case "index":
             return indexColor(lowIndex);
+        case "plain":
+            return PLAIN_FILL;
         default:
-            return CLUSTER_COLORS[cluster] ?? "#f4f4f4";
+            return GROUP_COLORS[group] ?? PLAIN_FILL;
     }
 }
 
@@ -639,7 +758,7 @@ function emitRhomb(
     thick: boolean,
     isHeads: boolean,
     fill: string,
-    cluster: string,
+    group: string,
     ci: number,
 ) {
     const verts = shape.map((v) => loc.tr(v)) as [Pt, Pt, Pt, Pt];
@@ -662,7 +781,7 @@ function emitRhomb(
         thick,
         isHeads,
         fill,
-        cluster,
+        group,
         pair: [0, 0],
     });
 }
@@ -687,7 +806,7 @@ function emitRhombs(
     const thicks = shapes.thick;
     const thins = shapes.thin;
 
-    const fill = CLUSTER_COLORS[type.name];
+    const fill = GROUP_COLORS[type.name];
     const firstRhomb = rhombId;
 
     for (let i = 0; i < 5; i++) {
@@ -765,7 +884,7 @@ function expandPenta(
 
     // Index delta: moving from center to child crosses one grid line
     // Moving from penta center to pWheel child: index increases when center is a peak
-    // (isHeads=true), because the child's center is the LOW point of its own cluster
+    // (isHeads=true), because the child's center is the LOW point of its own group
     // (isHeads flips), and its ring vertices reach back up to match the parent's tips.
     const childDelta = isHeads ? +1 : -1;
 
@@ -1453,11 +1572,14 @@ function generatePatch(seedIdx: number, isHeads: boolean, gen: number): void {
 
 export type { FillMode };
 export {
-    CLUSTER_COLORS,
-    MOSAIC_COLORS,
-    MOSAIC_CLASSIC,
+    GROUP_COLORS,
+    TINTED_COLORS,
+    PLAIN_FILL,
+    FILL_MODES,
+    PLATE_COLORS,
+    CLASSIC_COLORS,
     TYPE_COLORS,
-    INDEX_PALETTE,
+    INDEX_COLORS,
     indexColor,
     tileFill,
     pairColor,

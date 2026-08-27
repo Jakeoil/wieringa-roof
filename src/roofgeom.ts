@@ -25,7 +25,7 @@ export interface RoofFaceInfo {
     /** the four corner vertex ids */
     vids: number[];
     thick: boolean;
-    cluster: string;
+    group: string;
     /** the two generators the rhombus is spanned by, ascending. The roof lifts on five
      *  of the six icosahedral axes, so this is a pair of K₆ with the sixth — the
      *  vertical — never used, which is what lets the triacontahedron's five-coloring
@@ -145,7 +145,7 @@ export function buildRoof(vscale: number, flip: boolean): RoofData | null {
             id: r.id,
             vids,
             thick: r.thick,
-            cluster: r.cluster,
+            group: r.group,
             pair: [Math.min(a, b), Math.max(a, b)] as [number, number],
         };
     });

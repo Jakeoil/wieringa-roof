@@ -16,7 +16,10 @@ import {
     generatePatch,
     indexColor,
 } from "./geometry.js";
-import type { Rhomb, Vertex } from "./geometry.js";
+// `FillMode` must be imported by name: the DOM lib declares one too (the Web
+// Animations fill mode), and the global would win silently.
+import type { Rhomb, Vertex, FillMode } from "./geometry.js";
+import { fillOptions } from "./schemes.js";
 import {
     analyzePatch,
     placeSeed,
@@ -46,7 +49,7 @@ const PREF_DEFAULTS = {
     seed: 1,
     gen: 2,
     method: "cuttree",
-    color: "cluster",
+    color: "groups",
     sideIn: 1,
     heightU: 1,
     isogloss: false,
@@ -78,7 +81,8 @@ function biasedHeight(u: number): number {
 
 // Face coloring in the tiling view. "Colored by type or by vertex index" was in
 // the original spec and never got built.
-type TileColor = "cluster" | "mosaic" | "classic" | "type" | "index" | "five";
+// The schemes are `FILL_MODES` in `geometry.ts`, shared with every other page.
+type TileColor = FillMode;
 let tileColor: TileColor = prefs.color as TileColor;
 
 function faceIndexLow(r: Rhomb): number {
@@ -331,7 +335,7 @@ function drawTiling() {
             // Same tileFill the sheets ask, so a mode added in one place cannot
             // quietly go missing in the other. Flat modes stay flat: thick/thin and
             // height already *are* the information, and ramping them muddles it.
-            const base = tileFill(tileColor, r.cluster, r.thick, vi[cLo], r.pair) ?? r.fill;
+            const base = tileFill(tileColor, r.group, r.thick, vi[cLo], r.pair) ?? r.fill;
             // These modes carry their own meaning in the flat color and must not be
             // shaded away — the five-coloring least of all, since two rhombi differing
             // only by shade would read as the same color.
@@ -394,7 +398,7 @@ function drawTiling() {
             ctx.strokeStyle = hint === "clean" ? "#2ea043" : "#c0392b";
             ctx.lineWidth = r.id === hoveredRhomb ? 2.5 : 1.5;
             ctx.stroke();
-        } else if (tileColor === "mosaic" || tileColor === "classic") {
+        } else if (tileColor === "plate" || tileColor === "classic") {
             // Heavy black outlines are half of what the plate looks like — the ramp
             // and the isoglosses do nothing without them. Scale with the rhomb so a
             // gen-4 patch does not turn solid black: the plate is gen 2, where a
@@ -694,7 +698,7 @@ function netAsPlaced(): Map<number, Placed> {
             faceId: nr.sourceId,
             thick: src.thick,
             pair: src.pair,
-            cluster: src.cluster,
+            group: src.group,
             poly: nr.poly,
             verts: nr.verts,
             piece: 0,
@@ -1173,7 +1177,7 @@ function asPlaced(nr: NetRhomb): Placed {
         faceId: nr.sourceId,
         thick: src.thick,
         pair: src.pair,
-        cluster: src.cluster,
+        group: src.group,
         poly: nr.poly,
         verts: nr.verts,
         piece: 0,
@@ -1410,7 +1414,7 @@ function drawNet() {
         const [nLo, nHi] = extremeCorners(nvi);
         ctx.fillStyle = makeGradient(
             ctx,
-            tileFill(tileColor, src.cluster, src.thick, nvi[nLo], src.pair) ?? src.fill,
+            tileFill(tileColor, src.group, src.thick, nvi[nLo], src.pair) ?? src.fill,
             { x: sv[nLo].x, y: sv[nLo].y },
             { x: sv[nHi].x, y: sv[nHi].y },
             nvi[nLo],
@@ -3020,26 +3024,16 @@ function buildControls() {
 
     const colorSel = document.createElement("select");
     colorSel.style.cssText = "padding:4px;font-size:13px;";
-    for (const [v, t] of [
-        ["cluster", "Cluster"],
-        ["mosaic", "Mosaic plate"],
-        ["classic", "Mosaic classic"],
-        ["type", "Thick / thin"],
-        ["index", "Height index"],
-        ["five", "Kowalewski five"],
-    ] as Array<[TileColor, string]>) {
-        const opt = document.createElement("option");
-        opt.value = v;
-        opt.textContent = t;
-        colorSel.appendChild(opt);
-    }
+    // Options first: a value set on an empty select does not stick.
+    fillOptions(colorSel);
     colorSel.value = tileColor;
+    if (!colorSel.value) colorSel.selectedIndex = 0;
     colorSel.addEventListener("change", () => {
         tileColor = colorSel.value as TileColor;
-        if (tileColor === "mosaic" && !showIsogloss) {
+        if (tileColor === "plate" && !showIsogloss) {
             showIsogloss = true;
             say(
-                "Mosaic plate: darker palette, height ramp and isoglosses — the " +
+                "Plate rhomb groups: darker palette, height ramp and isoglosses — the " +
                     "contour stripes are half of what makes the plate look like it does.",
             );
         }

@@ -15,28 +15,8 @@ import { loadPrefs, savePrefs, resetPrefs } from "./prefs.js";
 import { BUILD_ID } from "./build-id.js";
 import { seedTypes, generatePatch, allRhombs, vertexList } from "./geometry.js";
 import { buildRoof } from "./roofgeom.js";
-import { pairColor } from "./dissect.js";
-import {
-    createRoofView,
-    INDEX_COLORS,
-    THICK_COLOR,
-    THIN_COLOR,
-    PLAIN_COLOR,
-    MOSAIC_3D,
-    CLASSIC_3D,
-    CLUSTER_3D,
-    CLUSTER_FALLBACK,
-} from "./roofview.js";
-
-// The Kowalewski five, brought over from the triacontahedron. A roof rhomb is spanned
-// by two of the five lifting axes, and those are five of the six axes of the solid —
-// so every rhomb already carries one of the five colors, with nothing to seed and
-// nothing to choose. It comes out a **proper** coloring of the roof: no two rhombi
-// sharing an edge take the same color, 0 of 32,305 adjacent pairs on Sun generation 4,
-// with the five colors exactly equidistributed and every Pe5 rosette showing all five.
-const FIVE_3D = [0xd94f3d, 0xe8a33d, 0x4f9d4a, 0x3d7fc4, 0x9b59b6].map(
-    (h) => new THREE.Color(h),
-);
+import { fillOptions } from "./schemes.js";
+import { createRoofView, roofFill, PLAIN_COLOR } from "./roofview.js";
 
 // Naming the missing id turns a silent null-dereference three frames later into
 // an immediate, readable failure.
@@ -61,7 +41,7 @@ const PREFS_KEY = "wr-roof3d";
 const PREF_DEFAULTS = {
     patch: "Pe3",
     gen: 3,
-    color: "cluster",
+    color: "groups",
     vscale: 1,
     edges: true,
     isogloss: false,
@@ -113,19 +93,10 @@ function build(reframe: boolean): void {
     const shade = shadeChk.checked ? Math.abs(vscale) : 0;
 
     rv.drawRoof(d, {
-        colorOf: (f, vid) => {
-            if (mode === "mosaic") return MOSAIC_3D[f.cluster] ?? CLUSTER_FALLBACK;
-            if (mode === "classic") return CLASSIC_3D[f.cluster] ?? CLUSTER_FALLBACK;
-            if (mode === "cluster") return CLUSTER_3D[f.cluster] ?? CLUSTER_FALLBACK;
-            if (mode === "five") return FIVE_3D[pairColor(f.pair[0], f.pair[1])];
-            if (mode === "type") return f.thick ? THICK_COLOR : THIN_COLOR;
-            if (mode === "index") {
-                // color by actual height, so flipping recolors too
-                const idx = d.indexAt(vid);
-                return INDEX_COLORS[Math.min(3, Math.max(0, idx - 1))];
-            }
-            return new THREE.Color(PLAIN_COLOR);
-        },
+        // One resolver, shared with the Hexahedra roof and the Centers shadow, so the
+        // schemes cannot drift apart page to page. `index` is passed the vertex height
+        // rather than the face's, so flipping the surface recolors it.
+        colorOf: (f, vid) => roofFill(mode, f, d.indexAt(vid)),
         // Shading by height: high lighter, low darker. Its strength is |vscale|, the
         // same number that flattens the surface — so at the middle of the slider,
         // where the roof is flat, there is nothing to shade and the shading is gone.
@@ -147,7 +118,7 @@ function build(reframe: boolean): void {
     const hist: Record<number, number> = {};
     for (const v of vertexList) hist[v.index] = (hist[v.index] ?? 0) + 1;
     const cl: Record<string, number> = {};
-    for (const r of allRhombs) cl[r.cluster] = (cl[r.cluster] ?? 0) + 1;
+    for (const r of allRhombs) cl[r.group] = (cl[r.group] ?? 0) + 1;
     const clText = `${cl.Pe5 ?? 0} in stars, ${cl.Pe3 ?? 0} in boats, ${cl.Pe1 ?? 0} in diamonds`;
     const relief = (3 / Math.sqrt(5)) * Math.abs(vscale);
     statusEl.textContent =
@@ -188,6 +159,7 @@ genSel.value = String(prefs.gen);
 // A saved patch or generation that no longer exists must not leave the menu blank.
 if (!patchSel.value) patchSel.value = PREF_DEFAULTS.patch;
 if (!genSel.value) genSel.value = String(PREF_DEFAULTS.gen);
+fillOptions(colorSel);
 colorSel.value = prefs.color;
 if (!colorSel.value) colorSel.value = PREF_DEFAULTS.color;
 vscaleInput.value = String(prefs.vscale);

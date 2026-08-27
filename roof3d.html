@@ -59,15 +59,7 @@
 <div class="bar">
     <label>Patch <select id="patch"></select></label>
     <label>Generation <select id="gen"></select></label>
-    <label>Color <select id="color">
-        <option value="cluster">Star / boat / diamond</option>
-        <option value="mosaic">Mosaic plate</option>
-        <option value="classic">Mosaic classic</option>
-        <option value="five">Kowalewski five</option>
-        <option value="index">Height (index)</option>
-        <option value="type">Thick / thin</option>
-        <option value="plain">Plain</option>
-    </select></label>
+    <label>Color <select id="color"></select></label>
     <label>Vertical scale <span id="vscaleOut" class="mono"></span>
         <input type="range" id="vscale" min="-1" max="1" step="0.02" value="1">
     </label>
@@ -85,11 +77,15 @@
 
 <h2>What you are looking at <span class="mono" id="buildtag" style="font-weight:400;font-size:13px;color:#888"></span></h2>
 <p>
-    Color by star / boat / diamond shows the gen-1 clusters the patch was built
-    from — blue stars, yellow boats, orange diamonds, the same palette as
-    <span class="mono">penrose-mosaic</span>. Every rhomb belongs to exactly one,
-    because the expansion always bottoms out at generation 1. It is the clearest
-    way to see the hierarchy survive the lift into three dimensions.
+    <strong>Rhomb groups</strong> shows the three groups the patch was built from —
+    blue stars, yellow boats, orange diamonds — the rhombs each generation-1 pentagon
+    <span class="mono">Pe5</span>, <span class="mono">Pe3</span>,
+    <span class="mono">Pe1</span> emits. Every rhomb belongs to exactly one, because
+    the expansion always bottoms out at generation 1, and it is the clearest way to
+    see the hierarchy survive the lift into three dimensions. The same three groups
+    come in three strengths: the screen palette, the <strong>classic</strong> colors
+    <span class="mono">penrose-mosaic</span> itself starts up with, and the deeper
+    <strong>plate</strong> tones sampled from the printed figure.
 </p>
 <p>
     Color by height shows the four index levels directly — every vertex of the

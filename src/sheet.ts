@@ -196,7 +196,7 @@ export function renderSheet(
             const idxOf = o.indexOf;
             const fill = tileFill(
                 o.fillMode,
-                p.cluster,
+                p.group,
                 p.thick,
                 idxOf ? Math.min(...p.verts.map(idxOf)) : 1,
                 p.pair,
