@@ -30,7 +30,9 @@ import { hexLayer, VERTICAL_AXIS } from "./hexlayer.js";
 import type { SolidFace, Net, P2 } from "./solidnet.js";
 // `unfold.ts` has a Crease of its own — fold plus mountain, which is what the sheet
 // draws — while this module's Crease also says which faces and of what kind.
-import type { Placed, Piece, Crease as SheetCrease } from "./unfold.js";
+import type { Placed, Piece, Crease as SheetCrease, Analysis, Face } from "./unfold.js";
+import { faceLinks } from "./unfold.js";
+import type { CutSurface } from "./cuttree.js";
 
 export type Role = "top" | "floor" | "wall";
 
@@ -391,4 +393,70 @@ function convex(A: SlabFace, B: SlabFace, cid: (p: V3) => number): boolean {
     const mine = new Set(A.corners.map(cid));
     const far = B.corners.find((c) => !mine.has(cid(c)))!;
     return dot(sub(far, A.corners[0]), n) < 0;
+}
+
+
+/**
+ * The slab as something `cuttree.ts` can route branch cuts through.
+ *
+ * The roof reads its faces off the tiling registries; a closed surface has to hand
+ * them over. `P` is indexed by corner id, which is why the ids are dense — the
+ * developer indexes into it directly.
+ */
+export function slabSurface(S: Slab): {
+    analysis: Analysis;
+    edges: CutSurface;
+    /** height of a corner id, on the roof's index scale continued downward */
+    indexOf: (v: number) => number;
+    indexRange: [number, number];
+} {
+    const KEY = 1e6;
+    const idOf = new Map<string, number>();
+    const P: (V3 | null)[] = [];
+    const cid = (p: V3): number => {
+        const k = p.map((x) => Math.round(x * KEY)).join(",");
+        let id = idOf.get(k);
+        if (id === undefined) { id = idOf.size; idOf.set(k, id); P[id] = p; }
+        return id;
+    };
+
+    const faces: Face[] = S.faces.map((f) => ({
+        id: f.id,
+        thick: f.thick,
+        group: f.group,
+        pair: f.pair,
+        v: f.corners.map(cid),
+    }));
+
+    // Edge use counts, so `buildCutGraph` can tell an interior edge from a rim one.
+    // On a closed slab every edge carries two faces and nothing is contracted.
+    const used = new Map<string, { v1: number; v2: number; faces: number }>();
+    for (const f of faces)
+        for (let i = 0; i < 4; i++) {
+            const a = f.v[i], b = f.v[(i + 1) % 4];
+            const k = ckey(a, b);
+            const cur = used.get(k);
+            if (cur) cur.faces++;
+            else used.set(k, { v1: Math.min(a, b), v2: Math.max(a, b), faces: 1 });
+        }
+
+    // Mountain comes off the solid, not off the fold angle — `foldAngle` is an arccos
+    // and reports a reflex dihedral as its supplement.
+    const byId = new Map(S.faces.map((f) => [f.id, f]));
+    const creases = new Map<string, SheetCrease>();
+    for (const cr of S.creases) {
+        const A = byId.get(cr.a)!, B = byId.get(cr.b)!;
+        const av = A.corners.map(cid), bv = B.corners.map(cid);
+        const shared = av.filter((v) => bv.includes(v));
+        if (shared.length === 2)
+            creases.set(ckey(shared[0], shared[1]), { fold: cr.fold, mountain: convex(A, B, cid) });
+    }
+
+    const hs = P.map((q) => q![2] * Math.sqrt(5));
+    return {
+        analysis: { faces, P, links: faceLinks(faces), creases },
+        edges: { vertices: [...idOf.values()], edges: [...used.values()] },
+        indexOf: (v) => hs[v] ?? 0,
+        indexRange: [Math.min(...hs), Math.max(...hs)],
+    };
 }

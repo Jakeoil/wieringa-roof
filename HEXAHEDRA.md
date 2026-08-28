@@ -577,6 +577,56 @@ Left for the Workbench: the locator mini has no `tilingPoly` for a slab. Top and
 faces map to their rhombus, but a wall is vertical and projects to a line, so the mini
 needs to know to draw the rim rather than the wall.
 
+## Task 1 — branch cuts on a closed surface — **done**
+
+The argument carries over exactly. On a disc the whole boundary contracts to one node
+and a spanning tree of what is left runs from each interior vertex out to the edge. On
+a **closed** surface there is no boundary to contract, and Euler gives
+`E = (F − 1) + (V − 1)` — hinges still `F − 1`, but the cut set is a spanning tree of
+the *whole* vertex graph, `V − 1` edges. `buildCutGraph` now takes the surface it is
+routing and switches the contraction off when there is no boundary; `boundaryDistance`
+becomes distance from an arbitrary root, which is all the heuristic ever wanted.
+
+**Branch cuts unfold every slab to one piece with no overlaps**, against the simple
+BFS unfolder that shatters them:
+
+| patch | faces | BFS pieces / overlaps | branch cuts | ms |
+|---|---|---|---|---|
+| Pe1 gen 1 | 12 | 1 / 0 | **1 / 0** | 2 |
+| Pe5 gen 2 | 70 | 2 / 28 | **1 / 0** | 129 |
+| St5 gen 2 | 50 | 1 / 26 | **1 / 0** | 6 |
+| Pe1 gen 3 | 332 | 7 / 162 | **1 / 0** | 1239 |
+
+### The bug this turned up
+
+`faceLinks(faces)` took a face list and then quietly read `edgeMap` — the tiling's own
+edge registry — for the adjacency. It therefore worked only for the roof, and handed
+back an **empty graph** for anything else, since the ids in `edgeMap` are rhomb ids. A
+slab given to it came back with every face isolated, which develops into one piece per
+face: 12 pieces and 66 overlaps for a twelve-face solid, and it looks like an unfolding
+that merely failed rather than a function reading the wrong data.
+
+It now derives adjacency from the faces, which is what its name always said. Checked
+bit-for-bit identical against the old implementation on five roof patches up to 2,440
+faces, so the roof is untouched: still one piece with zero overlaps through generation
+3, and the gen-4 overlap count moves only with the time budget.
+
+### Which changes the piece policy
+
+With branch cuts the whole slab now beats the three documents at generation 2 as well:
+
+| patch | whole | three documents |
+|---|---|---|
+| Pe1 gen 2 | **1 piece, 3 sheets, 2 joins** | 3 pieces, 4 sheets, 1 join |
+| Pe3 gen 2 | **1 piece, 3 sheets, 2 joins** | 3 pieces, 4 sheets, 1 join |
+| St5 gen 2 | **1 piece, 2 sheets, 1 join** | 3 pieces, 4 sheets, 1 join |
+
+Fewer sheets in every case and never more than one extra taped join. So the earlier
+recommendation — three documents from generation 2 up — no longer has data behind it,
+and **whole is the default**. Heads, tails and collar stay available, because the
+seams a builder would choose himself are still worth having on a large model even when
+they cost a sheet; but that is now a preference rather than a measurement.
+
 ## Open, and worth settling before building
 
 1. **Settled: they interlock, and they need turning over to do it.** Every one of the

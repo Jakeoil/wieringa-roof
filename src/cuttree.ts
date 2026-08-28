@@ -19,7 +19,7 @@
 // one-piece net, and the search can be graded by overlap count rather than by a
 // yes/no.
 
-import { allRhombs, vertexList, edgeMap } from "./geometry.js";
+import { vertexList, edgeMap } from "./geometry.js";
 import {
     intersectionArea,
     FACE_AREA,
@@ -128,29 +128,55 @@ export function overlapPairs(
 }
 
 // ── the vertex graph, boundary contracted ─────────────────────────
+//
+// On a disc the whole boundary contracts to one node, and a spanning tree of what is
+// left runs from each interior vertex out to the edge — a branch cut. **On a closed
+// surface there is no boundary to contract**, and the identity changes with it: Euler
+// gives `E = (F − 1) + (V − 1)`, so the hinges are still `F − 1` but the cut set is a
+// spanning tree of the *whole* vertex graph, `V − 1` edges, with nothing contracted.
+// The two cases are the same code with the contraction switched off, which is why the
+// slab of `slab.ts` can be routed by the method the roof uses.
 
-interface CutGraph {
-    node: Map<number, number>; // tiling vertex -> contracted node, boundary = 0
-    nodes: number; // 1 + interior vertex count
-    arcs: Array<{ key: string; u: number; v: number; a: number; b: number }>;
+/** What the graph is built from. The roof passes its own registries; a slab passes its
+ *  faces' corners. An edge with one face is a boundary edge and cannot be cut. */
+export interface CutSurface {
+    vertices: number[];
+    edges: Array<{ v1: number; v2: number; faces: number }>;
 }
 
-function buildCutGraph(): CutGraph {
+interface CutGraph {
+    node: Map<number, number>; // vertex -> node; on a disc the boundary is all node 0
+    nodes: number;
+    arcs: Array<{ key: string; u: number; v: number; a: number; b: number }>;
+    /** false on a closed surface, where every vertex is its own node */
+    contracted: boolean;
+}
+
+/** The roof's own surface, read off the tiling registries. */
+function patchSurface(): CutSurface {
+    return {
+        vertices: vertexList.map((v) => v.id),
+        edges: [...edgeMap.values()].map((e) => ({ v1: e.v1, v2: e.v2, faces: e.rhombIds.length })),
+    };
+}
+
+function buildCutGraph(src: CutSurface = patchSurface()): CutGraph {
     const onBoundary = new Set<number>();
-    for (const e of edgeMap.values()) {
-        if (e.rhombIds.length === 1) {
+    for (const e of src.edges) {
+        if (e.faces === 1) {
             onBoundary.add(e.v1);
             onBoundary.add(e.v2);
         }
     }
+    const contracted = onBoundary.size > 0;
     const node = new Map<number, number>();
-    let next = 1;
-    for (const v of vertexList) {
-        node.set(v.id, onBoundary.has(v.id) ? 0 : next++);
+    let next = contracted ? 1 : 0;
+    for (const v of src.vertices) {
+        node.set(v, contracted && onBoundary.has(v) ? 0 : next++);
     }
     const arcs: CutGraph["arcs"] = [];
-    for (const e of edgeMap.values()) {
-        if (e.rhombIds.length !== 2) continue; // only interior edges are cuttable
+    for (const e of src.edges) {
+        if (e.faces !== 2) continue; // only interior edges are cuttable
         const u = node.get(e.v1)!;
         const v = node.get(e.v2)!;
         // both ends on the boundary is a self-loop at the root: cutting it would
@@ -158,7 +184,7 @@ function buildCutGraph(): CutGraph {
         if (u === v) continue;
         arcs.push({ key: ekey(e.v1, e.v2), u, v, a: e.v1, b: e.v2 });
     }
-    return { node, nodes: next, arcs };
+    return { node, nodes: next, arcs, contracted };
 }
 
 // ── spanning trees of that graph = candidate cut sets ─────────────
@@ -192,7 +218,10 @@ function spanningCutSet(g: CutGraph, weight: (i: number) => number): Set<string>
     return cuts;
 }
 
-// Distance from the boundary, in edges. The shortest-route tree cuts each interior
+// Distance from the boundary, in edges — or, on a closed surface where there is no
+// boundary, from node 0, which is an arbitrary root. The heuristic only ever wanted a
+// point to cut outward from.
+// The shortest-route tree cuts each interior
 // vertex out by its nearest way to the patch edge, which is the natural first guess
 // and the most literal reading of "branch cut to the boundary".
 function boundaryDistance(g: CutGraph): number[] {
@@ -671,6 +700,9 @@ function reconnectOptions(
 
 export interface CutTreeOptions {
     flip?: boolean;
+    /** A surface other than the current patch — a slab, say. Both must be given. */
+    surface?: Analysis;
+    edges?: CutSurface;
     budgetMs?: number;
     seed?: number;
     // Same contract as the other methods: if given, the winning cut set is
@@ -701,7 +733,7 @@ export interface CutTreeResult extends UnfoldResult {
 
 export function cutTreeUnfold(opts: CutTreeOptions = {}): CutTreeResult {
     const t0 = Date.now();
-    const A = analyzePatch(opts.flip);
+    const A = opts.surface ?? analyzePatch(opts.flip);
 
     // The budget is a *cap*, not a cost: the search returns the moment it reaches
     // zero overlaps, which almost every patch does in a fraction of it. So it has
@@ -713,7 +745,7 @@ export function cutTreeUnfold(opts: CutTreeOptions = {}): CutTreeResult {
     // property of the problem size, not of whoever is asking.
     const budget =
         opts.budgetMs ?? Math.min(12000, Math.max(1500, A.faces.length * 35));
-    const g = buildCutGraph();
+    const g = buildCutGraph(opts.edges);
     const dist = boundaryDistance(g);
 
     // deterministic pseudo-random, so a result is reproducible

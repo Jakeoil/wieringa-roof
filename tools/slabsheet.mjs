@@ -15,8 +15,9 @@
 
 import { writeFileSync } from "node:fs";
 import { generatePatch, allRhombs, seedTypes } from "../dist/geometry.js";
-import { slab, slabDocument } from "../dist/slab.js";
+import { slab, slabDocument, slabSurface } from "../dist/slab.js";
 import { bestUnfold } from "../dist/solidnet.js";
+import { cutTreeUnfold } from "../dist/cuttree.js";
 import { MM_PER_IN } from "../dist/sheet.js";
 import { paginateBest, renderPage, TAB_MM } from "../dist/paginate.js";
 
@@ -35,7 +36,7 @@ console.log("-".repeat(78));
 
 let firstSvg = null;
 for (const [label, gen, how] of [
-    ["Pe1", 1, "whole"], ["Pe1", 2, "whole"], ["St1", 2, "whole"],
+    ["Pe1", 1, "whole"], ["Pe1", 2, "whole"], ["St1", 2, "whole"], ["Pe3", 2, "whole"], ["St5", 2, "whole"],
     ["Pe1", 2, "documents"], ["Pe3", 2, "documents"], ["St5", 2, "documents"],
 ]) {
     quiet(() => generatePatch(idx(label), true, gen));
@@ -57,8 +58,20 @@ for (const [label, gen, how] of [
     let joins = 0;
 
     for (const g of groups) {
-        const net = bestUnfold(g);
-        const doc = slabDocument(S, net);
+        // The whole closed slab goes through branch cuts, which route a spanning tree
+        // of the vertex graph and get one piece with no overlaps. The three documents
+        // stay on the simple unfolder: heads and tails are discs and the collar is an
+        // annulus, and none of them is the case branch cuts were sharpened for.
+        let doc;
+        if (how === "whole") {
+            const sur = slabSurface(S);
+            const r = quiet(() => cutTreeUnfold({ surface: sur.analysis, edges: sur.edges, budgetMs: 4000 }));
+            doc = { placed: r.placed, pieces: r.pieces, creases: r.creases, hinges: r.hinges,
+                    indexOf: sur.indexOf, indexRange: sur.indexRange };
+            if (r.overlaps) fail(`${label} g${gen} ${how}: ${r.overlaps} overlaps`);
+        } else {
+            doc = slabDocument(S, bestUnfold(g));
+        }
         faces += g.length;
         pieces += doc.pieces.length;
 

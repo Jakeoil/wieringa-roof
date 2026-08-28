@@ -112,13 +112,34 @@ export interface Link {
     b: number;
 }
 
+/**
+ * Face adjacency, from the faces themselves.
+ *
+ * This used to take a face list and then quietly read `edgeMap` — the tiling's own
+ * edge registry — for the adjacency, which meant it worked only for the roof and
+ * returned an empty graph for anything else, since the ids in `edgeMap` are rhomb ids.
+ * A slab handed to it came back with every face isolated, which develops into one
+ * piece per face and looks like an unfolding that simply failed.
+ *
+ * Two faces are neighbors when they share two consecutive corners. For the roof that
+ * is exactly what `edgeMap` said, so nothing changes there.
+ */
 export function faceLinks(faces: Face[]): Map<number, Link[]> {
     const nb = new Map<number, Link[]>(faces.map((f) => [f.id, []]));
-    for (const e of edgeMap.values()) {
-        if (e.rhombIds.length !== 2) continue;
-        const [x, y] = e.rhombIds;
-        nb.get(x)?.push({ other: y, a: e.v1, b: e.v2 });
-        nb.get(y)?.push({ other: x, a: e.v1, b: e.v2 });
+    const byEdge = new Map<string, Array<{ id: number; a: number; b: number }>>();
+    for (const f of faces)
+        for (let i = 0; i < f.v.length; i++) {
+            const a = f.v[i], b = f.v[(i + 1) % f.v.length];
+            const k = ekey(a, b);
+            const cur = byEdge.get(k);
+            if (cur) cur.push({ id: f.id, a, b });
+            else byEdge.set(k, [{ id: f.id, a, b }]);
+        }
+    for (const [, on] of byEdge) {
+        if (on.length !== 2) continue; // a boundary edge, or a non-manifold one
+        const [x, y] = on;
+        nb.get(x.id)?.push({ other: y.id, a: x.a, b: x.b });
+        nb.get(y.id)?.push({ other: x.id, a: x.a, b: x.b });
     }
     return nb;
 }
