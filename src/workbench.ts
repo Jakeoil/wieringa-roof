@@ -30,6 +30,7 @@ import {
 } from "./unfold.js";
 import { cutTreeUnfold, assignLayers } from "./cuttree.js";
 import { slab, slabSurface } from "./slab.js";
+import type { RimEdge } from "./slab.js";
 import {
     paginateBest,
     renderPage,
@@ -39,7 +40,7 @@ import {
     TAB_MM,
 } from "./paginate.js";
 import type { Pagination } from "./paginate.js";
-import type { Analysis, Placed, TraceEvent } from "./unfold.js";
+import type { Analysis, Placed, TraceEvent, Crease } from "./unfold.js";
 import { parseLength, layoutSheets, renderSheet, PAGES } from "./sheet.js";
 import { BUILD_ID } from "./build-id.js";
 import { loadPrefs, savePrefs, resetPrefs } from "./prefs.js";
@@ -264,6 +265,16 @@ let viewScale = 1;
 let viewOffX = 0;
 let viewOffY = 0;
 
+/**
+ * When set, the tiling is drawn reflected about this horizontal line — the tails
+ * copy. A slab has two Penrose surfaces, and the second one is the first seen from
+ * underneath, so the canvas shows the pair hinged open along the bottom of the patch:
+ * heads above, tails below, the way they lie before the collar goes round them.
+ */
+let tailsAxis: number | null = null;
+/** true only while the tails pass is drawing, so the patch above it is not reflected */
+let drawingTails = false;
+
 function fitView() {
     if (allRhombs.length === 0) return;
     let minX = Infinity,
@@ -279,7 +290,21 @@ function fitView() {
         }
     }
     const w = maxX - minX;
-    const h = maxY - minY;
+    let h = maxY - minY;
+    // In solid mode the canvas carries the tails copy as well, reflected about the
+    // bottom of the patch and dropped clear of it, so the view has to make room.
+    tailsAxis = null;
+    if (slabMode) {
+        const gap = h * 0.08;
+        // Reflect about a line one gap below the patch, so the two lie hinged along
+        // the rim. The mirror of the *highest* point is the lowest thing on the
+        // canvas, and that is what the view has to reach — not the patch height
+        // subtracted from the axis, which leaves the axis's own offset in and crops
+        // the copy by exactly minY.
+        tailsAxis = 2 * minY - gap;
+        minY = tailsAxis - maxY;
+        h = maxY - minY;
+    }
     const pad = 10;
     viewScale = Math.min(
         (tilingCanvas.width - pad * 2) / w,
@@ -290,7 +315,8 @@ function fitView() {
 }
 
 function toScreen(pt: Pt): { x: number; y: number } {
-    return { x: viewOffX + pt.x * viewScale, y: viewOffY - pt.y * viewScale };
+    const y = drawingTails && tailsAxis !== null ? tailsAxis - pt.y : pt.y;
+    return { x: viewOffX + pt.x * viewScale, y: viewOffY - y * viewScale };
 }
 
 function fromScreen(sx: number, sy: number): Pt {
@@ -306,6 +332,11 @@ let faceSheet = new Map<number, number>();
  * belongs to. A wall inherits its cell's group and type, so the rhomb-group coloring
  * runs over the top, the floor and the walls of a cell alike.
  */
+/** The creases of whatever is being unfolded — the patch, or the solid under it. */
+function activeCreases(): Map<string, Crease> {
+    return slabMode && slabCreases ? slabCreases : analysis!.creases;
+}
+
 function faceStyle(id: number): { thick: boolean; group: string; pair: [number, number]; fill: string } {
     if (slabMode) {
         const st = slabStyle.get(id);
@@ -494,6 +525,78 @@ function drawTiling() {
         ctx.arc(sv.x, sv.y, 2.5, 0, 2 * Math.PI);
         ctx.fill();
     }
+
+    if (slabMode) drawTails(ctx);
+}
+
+/** Boundary edges of the patch — the ones a wall stands on. */
+function collarEdges(): Array<[Pt, Pt]> {
+    const out: Array<[Pt, Pt]> = [];
+    for (const e of edgeMap.values()) {
+        if (e.rhombIds.length !== 1) continue;
+        const a = vertexList[e.v1], b = vertexList[e.v2];
+        if (a && b) out.push([a.pos, b.pos]);
+    }
+    return out;
+}
+
+const COLLAR_COLOR = "#c8791f";
+
+/**
+ * The second surface, and the rim that joins them.
+ *
+ * A slab is two Penrose surfaces one side length apart, and the lower one is the upper
+ * seen from underneath — a reflection. Drawing it hinged below the patch shows the
+ * model laid open: the two faces you will cut, and between them the rim the collar
+ * wraps. The collar itself has no plan view, standing vertically, so it shows as the
+ * **edges** it stands on — highlighted on both surfaces, since every wall meets both.
+ *
+ * Deliberately plainer than the patch above it. This is a preview of what is about to
+ * be cut, not a second working canvas; the hover, the ghosts and the isoglosses all
+ * belong to the surface you are actually editing.
+ */
+function drawTails(ctx: CanvasRenderingContext2D): void {
+    const rim = collarEdges();
+
+    // the rim on the patch itself, first — it is the same rim either way up
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = COLLAR_COLOR;
+    ctx.beginPath();
+    for (const [a, b] of rim) {
+        const p = toScreen(a), q = toScreen(b);
+        ctx.moveTo(p.x, p.y);
+        ctx.lineTo(q.x, q.y);
+    }
+    ctx.stroke();
+
+    if (tailsAxis === null) return;
+    drawingTails = true;
+
+    for (const r of allRhombs) {
+        const sv = r.verts.map(toScreen);
+        ctx.beginPath();
+        ctx.moveTo(sv[0].x, sv[0].y);
+        for (let i = 1; i < 4; i++) ctx.lineTo(sv[i].x, sv[i].y);
+        ctx.closePath();
+        const sh = rhombSheet.get(r.id);
+        ctx.fillStyle = sh != null ? (sheetColors[sh] ?? "#ddd") : (r.fill ?? "#eee");
+        ctx.globalAlpha = 0.55;
+        ctx.fill();
+        ctx.globalAlpha = 1;
+        ctx.strokeStyle = "#9aa0aa";
+        ctx.lineWidth = 1;
+        ctx.stroke();
+    }
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = COLLAR_COLOR;
+    ctx.beginPath();
+    for (const [a, b] of rim) {
+        const p = toScreen(a), q = toScreen(b);
+        ctx.moveTo(p.x, p.y);
+        ctx.lineTo(q.x, q.y);
+    }
+    ctx.stroke();
+    drawingTails = false;
 }
 
 // ── Isoglosses ────────────────────────────────────────────────────
@@ -1464,7 +1567,7 @@ function drawNet() {
             const b = sv[(i + 1) % 4];
             const key = ekey(va, vb);
             const cr = netHinges.has(key)
-                ? analysis?.creases.get(key)
+                ? activeCreases().get(key)
                 : undefined;
             ctx.beginPath();
             ctx.moveTo(a.x, a.y);
@@ -1625,6 +1728,15 @@ let slabRhomb = new Map<number, number>();
 /** faces that are a roof rhombus, so the mini and the partition draw only those */
 let slabTops = new Set<number>();
 let slabHeight: ((v: number) => number) | null = null;
+/**
+ * The slab's own creases. Without these the sheets asked `analysis.creases` — the
+ * *roof's* — whose keys are tiling vertex pairs, so no slab edge ever matched and
+ * every one of them drew as a cut. A page of solid black outlines is what a net looks
+ * like when its creases are being looked up in the wrong surface.
+ */
+let slabCreases: Map<string, Crease> | null = null;
+/** the rim, in order, so the sheets can show where the collar attaches */
+let slabRim: RimEdge[] = [];
 /** group, type, axis pair and default fill per slab face */
 /** sheet index per rhombus, for drawing a slab partition on the tiling */
 let rhombSheet = new Map<number, number>();
@@ -1663,6 +1775,8 @@ function runTraceBody(): void {
     slabRhomb = new Map();
     slabTops = new Set();
     slabHeight = null;
+    slabCreases = null;
+    slabRim = [];
     let res;
     if (slabMode) {
         const S = slab();
@@ -1677,6 +1791,8 @@ function runTraceBody(): void {
             if (f.role === "top") slabTops.add(f.id);
         }
         slabHeight = sur.indexOf;
+        slabCreases = sur.analysis.creases;
+        slabRim = S.rim;
         slabRange = sur.indexRange;
         res = cutTreeUnfold({ surface: sur.analysis, edges: sur.edges, trace: traceEvents });
     } else {
@@ -1930,7 +2046,7 @@ tilingCanvas.addEventListener("mousemove", (e) => {
     scheduleRedraw();
     if (edge) {
         const [x, y] = edge.rhombIds;
-        const cr = analysis?.creases.get(ekey(edge.a, edge.b));
+        const cr = activeCreases().get(ekey(edge.a, edge.b));
         say(
             `Edge ${x}|${y}` +
                 (cr
@@ -2098,6 +2214,41 @@ function tilingPoly(faceId: number): [number, number][] | null {
     return r.verts.map((q) => [q.x, q.y] as [number, number]);
 }
 
+/**
+ * The rim as the sheets want it: tiling coordinates, each edge in the color of the
+ * sheet its wall went to. A collar stands vertically and has no plan view, so on the
+ * mini it can only show as the edge it stands on.
+ */
+function rimForSheets(): Array<{ a: [number, number]; b: [number, number]; color: string }> {
+    return slabRim.flatMap((e) => {
+        const a = vertexList[e.a], b = vertexList[e.b];
+        if (!a || !b) return [];
+        const sh = faceSheet.get(e.face);
+        return [{
+            a: [a.pos.x, a.pos.y] as [number, number],
+            b: [b.pos.x, b.pos.y] as [number, number],
+            color: sh != null ? (sheetColors[sh] ?? "#888") : "#c8791f",
+        }];
+    });
+}
+
+/**
+ * Where to reflect the tails copy in the mini.
+ *
+ * The mini draws tiling y *downward* while the tiling canvas draws it upward, so the
+ * axis has to sit above the patch in tiling terms for the copy to land below it on the
+ * page — the same arrangement either way, which is the point of a locator.
+ */
+function miniTailsAxis(): number | undefined {
+    if (!slabMode || !allRhombs.length) return undefined;
+    let lo = Infinity, hi = -Infinity;
+    for (const r of allRhombs) for (const v of r.verts) {
+        if (v.y < lo) lo = v.y;
+        if (v.y > hi) hi = v.y;
+    }
+    return 2 * hi + (hi - lo) * 0.08;
+}
+
 function sheetOpts(sheet = 0) {
     const [pw, ph] = PAGES.letter;
     return {
@@ -2119,6 +2270,8 @@ function sheetOpts(sheet = 0) {
         indexOf: slabMode && slabHeight ? slabHeight : (v: number) => vertexList[v]?.index ?? 1,
         indexRange: (slabMode ? slabRange : [idxLo, idxHi]) as [number, number],
         tilingPoly,
+        tailsAxis: miniTailsAxis(),
+        rim: slabMode ? rimForSheets() : undefined,
         sheetColor: sheetColors[sheet] ?? "#6a5acd",
         sheetColors: sheetColors,
     };
@@ -2196,7 +2349,7 @@ function sheetSvg(i: number): string {
               pagination!,
               i,
               placedNow,
-              analysis!.creases,
+              activeCreases(),
               netHinges,
               ekey,
               { ...sheetOpts(i), standalone: false },
@@ -2687,7 +2840,7 @@ function printNet(): void {
     const host = document.getElementById("printout")!;
     host.innerHTML = sheets
         .map((sh) =>
-            renderSheet(sh, placed, analysis!.creases, netHinges, {
+            renderSheet(sh, placed, activeCreases(), netHinges, {
                 sideMm,
                 pageW: pw,
                 pageH: ph,

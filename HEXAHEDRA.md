@@ -665,6 +665,44 @@ Measured through the same path the page uses:
 tool passes, but whether the checkbox appears where it should and the canvases redraw
 correctly is exactly the kind of thing that has only ever been caught by looking.
 
+## Task 4 — the overlay, and the creases the sheets were not showing
+
+**A bug first.** In solid mode the sheets drew every edge as a solid black cut and no
+mountains or valleys at all. The sheets asked `analysis.creases` — the *roof's* — whose
+keys are pairs of tiling vertices, so no slab edge ever matched one and everything fell
+through to "cut". A page of solid black outlines is what a net looks like when its
+creases are being looked up in the wrong surface. All four readers now go through
+`activeCreases()`, which returns the creases of whatever is being unfolded.
+
+A slab still shows more black than a patch does, and that part is real: its cut set is
+`V − 1` of `E = (F−1) + (V−1)` edges, so more than half the edges of a closed surface
+are cuts by construction.
+
+**Severed hinges now fold.** Where pagination cuts a hinge to fit the page, the edge
+was drawn plain black. But cutting it is a papering decision — the model does not know
+the net ran out of page — so once the two halves are taped the edge folds through the
+angle it always did. It keeps its heavier stroke, so it still reads as a join, and
+takes the fold's own color and dash. **This applies to ordinary roof sheets too**, and
+it is the one crease hardest to judge by eye, being made across a join.
+
+**The tiling canvas shows the pair hinged open.** In solid mode the patch is drawn as
+before and the tails copy — the same surface seen from underneath — is reflected about
+a line just below it. The collar has no plan view, standing vertically, so it shows as
+the **rim**: the boundary edges highlighted, on both surfaces, since every wall meets
+both. The tails pass is deliberately plainer than the patch above it: it is a preview
+of what is about to be cut, not a second working canvas.
+
+Two arithmetic traps, both caught before they shipped. The reflection has to be scoped
+to the tails pass alone or the patch above it flips too. And the view has to reach the
+mirror of the *highest* point, `axis − maxY`; subtracting the patch height instead
+leaves the axis's own offset in and crops the copy by exactly `minY`.
+
+**The mini reflects too**, and carries the rim in each edge's **sheet color** — so a
+sheet's mini says not only which faces it holds but which parts of the collar go with
+them. The mini draws tiling `y` downward where the canvas draws it upward, so its axis
+sits above the patch rather than below, which puts the copy in the same place on the
+page as on screen.
+
 ## Open, and worth settling before building
 
 1. **Settled: they interlock, and they need turning over to do it.** Every one of the

@@ -463,7 +463,11 @@ export function fitTabHeights(
 // severed hinges carrying a letter and the page number of their partner, so the
 // two halves can be found and taped without hunting.
 
-const DASH: Record<number, string> = { 36: "2 2", 72: "6 3", 108: "11 3" };
+// Longer dashes than `sheet.ts` uses, deliberately: a paginated sheet is printed at
+// true size and read at arm's length, where the finer pattern closes up. Same order,
+// same meaning — dash length grows with the fold angle — and 144 belongs here too,
+// since a slab folds through it wherever a wall meets its rhombus downhill.
+const DASH: Record<number, string> = { 36: "2 2", 72: "6 3", 108: "11 3", 144: "14 3 3 3" };
 export const TAB_MM = 5.0; // tab altitude: enough for 3 mm text with air around it
 
 // The tab on a cut edge, shaped as the adjoining rhombus truncated at height `h`.
@@ -560,6 +564,20 @@ export interface PageRenderOpts {
     /** height at a corner id; see `RenderOpts.indexOf` in `sheet.ts` */
     indexOf?: (v: number) => number;
     indexRange?: [number, number];
+    /**
+     * Slab only: reflect a second copy of the patch about this line in tiling
+     * coordinates. A slab has two Penrose surfaces and the lower one is the upper seen
+     * from underneath, so the mini shows the pair hinged open along the rim — the same
+     * picture the tiling canvas shows while you are building it.
+     */
+    tailsAxis?: number;
+    /**
+     * Slab only: the rim, in tiling coordinates, each edge carrying the color of the
+     * sheet its wall went to. The collar stands vertically and has no plan view, so
+     * where it attaches shows as a colored edge — on both surfaces, since every wall
+     * meets both.
+     */
+    rim?: Array<{ a: P2; b: P2; color: string }>;
     // The tiling itself, for the locator mini: the planar position of a face in the
     // Penrose patch, which is what you can actually recognize. The developed net is
     // a shape nobody has seen before; the tiling is the picture on every other page.
@@ -797,9 +815,22 @@ export function renderPage(
                 // A severed hinge: cut it, then say where its other half went.
                 if (!drawn.has(key)) {
                     drawn.add(key);
+                    // **A severed hinge is still a fold.** Cutting it is a papering
+                    // decision — the model does not know the net ran out of page — so
+                    // once the two halves are taped back together this edge folds
+                    // through the angle it always did. Drawing it plain black threw
+                    // that away and left the builder to guess at the one crease that
+                    // is hardest to judge, being made across a join. It keeps the
+                    // heavier stroke, so it still reads as a cut you will tape, and
+                    // takes the fold's own color and dash.
+                    const jcr = edgeRole(va, vb, hinges, creases);
+                    const jm = jcr && (o.backside ? !jcr.mountain : jcr.mountain);
                     joinLines.push(
                         `<line x1="${n3(a[0])}" y1="${n3(a[1])}" x2="${n3(b[0])}" y2="${n3(b[1])}" ` +
-                            `stroke="#111" stroke-width="0.6" stroke-linecap="round"/>`,
+                            (jcr
+                                ? `stroke="${jm ? M_COLOR : V_COLOR}" stroke-width="0.6" ` +
+                                  `stroke-dasharray="${DASH[jcr.fold] ?? "2 2"}"/>`
+                                : `stroke="#111" stroke-width="0.6" stroke-linecap="round"/>`),
                     );
                 }
                 // The label goes *outside* the cut, on a tab shaped like the start of
@@ -991,6 +1022,11 @@ function thumbnail(
         }
     }
     if (!shape.size) return "";
+    if (o.tailsAxis != null) {
+        const lo = o.tailsAxis - y1, hi = o.tailsAxis - y0;
+        if (lo < y0) y0 = lo;
+        if (hi > y1) y1 = hi;
+    }
     const netW = x1 - x0 || 1;
     const netH = y1 - y0 || 1;
     let k = Math.sqrt(THUMB_AREA_MM2 / (netW * netH));
@@ -1047,11 +1083,40 @@ function thumbnail(
             `fill="#fff" fill-opacity="0.92" stroke="#ddd" stroke-width="0.25"/>`,
     );
     g.push(patchMini(pg, pageIndex, shape, placed, hinges, ekey, T, color, k));
+    if (o.tailsAxis != null) {
+        const axis = o.tailsAxis;
+        const Tm = (q: P2): P2 => T([q[0], axis - q[1]]);
+        g.push(patchMini(pg, pageIndex, shape, placed, hinges, ekey, Tm, color, k));
+        g.push(rimMini(o.rim, T, Tm, k));
+    } else if (o.rim) {
+        g.push(rimMini(o.rim, T, null, k));
+    }
     g.push(
         `<text x="${n3(tx)}" y="${n3(ty + th + 3.4)}" font-size="2.6" font-family="sans-serif" ` +
             `fill="#666">patch · sheet ${pageIndex + 1}</text>`,
     );
     return g.join("\n");
+}
+
+/** The rim, drawn on each surface in the color of the sheet its collar went to. */
+function rimMini(
+    rim: PageRenderOpts["rim"],
+    T: (q: P2) => P2,
+    Tm: ((q: P2) => P2) | null,
+    k: number,
+): string {
+    if (!rim?.length) return "";
+    const w = Math.max(0.3 * k, 0.4);
+    const out: string[] = [];
+    for (const e of rim)
+        for (const M of Tm ? [T, Tm] : [T]) {
+            const a = M(e.a), b = M(e.b);
+            out.push(
+                `<line x1="${n3(a[0])}" y1="${n3(a[1])}" x2="${n3(b[0])}" y2="${n3(b[1])}" ` +
+                    `stroke="${e.color}" stroke-width="${n3(w)}" stroke-linecap="round"/>`,
+            );
+        }
+    return out.join("\n");
 }
 
 /**
