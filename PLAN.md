@@ -20,7 +20,7 @@ golden rhombi for physical models.
 | `intersect.html` | chapter 4 part 2 — what two triacontahedra share | done |
 | `nets.html` | chapter 4 part 3 — solid nets and their coloring schemes | done |
 | `hexroof.html` | chapter 4 part 4 — the roof from hexahedra | built |
-| `unfold.html` | **Workbench** and **Sheets**, two views of one page | done |
+| `unfold.html` | **Workbench** and **Sheets**, two views of one page; **solid** unfolds the slab under the patch | done |
 | `tools.html` | true-size templates, fold gauges, forming jigs, kit list | done |
 | `utilities.html` | odds and ends; currently the favicon designer | done |
 

@@ -29,6 +29,7 @@ import {
     ekey,
 } from "./unfold.js";
 import { cutTreeUnfold, assignLayers } from "./cuttree.js";
+import { slab, slabSurface } from "./slab.js";
 import {
     paginateBest,
     renderPage,
@@ -300,11 +301,36 @@ function fromScreen(sx: number, sy: number): Pt {
 // the tiling canvas into a before-and-after: the same picture you built the net on,
 // now divided and color-keyed to the sheet list.
 let faceSheet = new Map<number, number>();
+/**
+ * What a face is drawn as: which rhombus it is, or in slab mode which rhombus it
+ * belongs to. A wall inherits its cell's group and type, so the rhomb-group coloring
+ * runs over the top, the floor and the walls of a cell alike.
+ */
+function faceStyle(id: number): { thick: boolean; group: string; pair: [number, number]; fill: string } {
+    if (slabMode) {
+        const st = slabStyle.get(id);
+        if (st) return st;
+    }
+    return allRhombs[id];
+}
+
+/** A corner's height, on whichever scale the thing being unfolded uses. */
+function cornerHeight(v: number): number {
+    return slabMode && slabHeight ? slabHeight(v) : displayIndex(vertexList[v].index);
+}
+
 function indexSheets(): void {
     faceSheet = new Map();
+    rhombSheet = new Map();
     if (!pagination) return;
     pagination.pages.forEach((p, i) => {
-        for (const f of p.faceIds) faceSheet.set(f, i);
+        for (const f of p.faceIds) {
+            faceSheet.set(f, i);
+            // In slab mode the tiling canvas has to be told which sheet a *rhombus*
+            // went to, and only its roof face answers that. Built once here rather
+            // than searched per rhomb per redraw, which is quadratic and shows.
+            if (slabTops.has(f)) rhombSheet.set(slabRhomb.get(f)!, i);
+        }
     });
 }
 
@@ -330,7 +356,10 @@ function drawTiling() {
         const faceFill = (): string | CanvasGradient => {
             // Once the net has been split, the tiling shows the partition: the same
             // canvas you built the net on, now divided and keyed to the sheet list.
-            const sh = faceSheet.get(r.id);
+            // In slab mode the sheet ids are slab faces; a rhombus takes the sheet
+            // its own roof face landed on, which is what makes the partition legible
+            // on the tiling at all.
+            const sh = slabMode ? rhombSheet.get(r.id) : faceSheet.get(r.id);
             if (sh != null) return sheetColors[sh] ?? "#ddd";
             // Same tileFill the sheets ask, so a mode added in one place cannot
             // quietly go missing in the other. Flat modes stay flat: thick/thin and
@@ -556,6 +585,9 @@ function pointInQuad(mp: Pt, verts: [Pt, Pt, Pt, Pt]): boolean {
 }
 
 function findRhombAt(sx: number, sy: number): number {
+    // Nothing on the tiling canvas addresses a slab face — a wall is not a rhombus —
+    // so placing, removing and hovering are all off while the solid is being unfolded.
+    if (slabMode) return -1;
     const mp = fromScreen(sx, sy);
     for (const r of allRhombs) {
         if (pointInQuad(mp, r.verts)) return r.id;
@@ -693,7 +725,7 @@ function syncLayerBar(): void {
 function netAsPlaced(): Map<number, Placed> {
     const m = new Map<number, Placed>();
     for (const nr of netRhombs) {
-        const src = allRhombs[nr.sourceId];
+        const src = faceStyle(nr.sourceId);
         m.set(nr.sourceId, {
             faceId: nr.sourceId,
             thick: src.thick,
@@ -1172,7 +1204,7 @@ function refreshNetView(): void {
 }
 
 function asPlaced(nr: NetRhomb): Placed {
-    const src = allRhombs[nr.sourceId];
+    const src = faceStyle(nr.sourceId);
     return {
         faceId: nr.sourceId,
         thick: src.thick,
@@ -1409,8 +1441,8 @@ function drawNet() {
             continue;
         }
 
-        const src = allRhombs[nr.sourceId];
-        const nvi = nr.verts.map((v) => displayIndex(vertexList[v].index));
+        const src = faceStyle(nr.sourceId);
+        const nvi = nr.verts.map(cornerHeight);
         const [nLo, nHi] = extremeCorners(nvi);
         ctx.fillStyle = makeGradient(
             ctx,
@@ -1575,6 +1607,30 @@ let traceSpeed = 15; // events per second, 0 = uncapped
 // still pass their tests; they are simply not choices the page asks you to make.
 const traceMethod = "cuttree";
 
+// ── slab mode ─────────────────────────────────────────────────────
+//
+// The roof is a surface; the slab is the solid under it — the same rhombi on top, the
+// same again as a floor one unit down, and a wall on every boundary edge. It routes
+// through the very same branch cuts, because a closed surface needs only the boundary
+// contraction switched off (HEXAHEDRA.md task 1), so the whole page works on it
+// unchanged: the same net canvas, the same layers, the same sheets, the same print.
+//
+// What it cannot share is the tiling's identity. A wall is not a rhombus and has no
+// planar shape or height index of its own, so the three places that ask the tiling a
+// question — the locator mini, the height fill, and the partition drawn back onto the
+// patch — go through the maps below instead.
+let slabMode = false;
+/** which rhomb a slab face belongs to, for faces that belong to one */
+let slabRhomb = new Map<number, number>();
+/** faces that are a roof rhombus, so the mini and the partition draw only those */
+let slabTops = new Set<number>();
+let slabHeight: ((v: number) => number) | null = null;
+/** group, type, axis pair and default fill per slab face */
+/** sheet index per rhombus, for drawing a slab partition on the tiling */
+let rhombSheet = new Map<number, number>();
+let slabStyle = new Map<number, { thick: boolean; group: string; pair: [number, number]; fill: string }>();
+let slabRange: [number, number] = [1, 4];
+
 // roles for the tiling view at the current step
 const traceRoles = new Map<number, "placed" | "rejected" | "current">();
 let traceGhost: { poly: [number, number][]; kind: TraceEvent["kind"] } | null =
@@ -1604,7 +1660,28 @@ function runTrace(after?: () => void): void {
 
 function runTraceBody(): void {
     traceEvents = [];
-    const res = cutTreeUnfold({ flip: flipHeight, trace: traceEvents });
+    slabRhomb = new Map();
+    slabTops = new Set();
+    slabHeight = null;
+    let res;
+    if (slabMode) {
+        const S = slab();
+        const sur = slabSurface(S);
+        slabStyle = new Map();
+        for (const f of S.faces) {
+            slabRhomb.set(f.id, f.rhomb);
+            slabStyle.set(f.id, {
+                thick: f.thick, group: f.group, pair: f.pair,
+                fill: tileFill("groups", f.group, f.thick, 1, f.pair) ?? "#bbb",
+            });
+            if (f.role === "top") slabTops.add(f.id);
+        }
+        slabHeight = sur.indexOf;
+        slabRange = sur.indexRange;
+        res = cutTreeUnfold({ surface: sur.analysis, edges: sur.edges, trace: traceEvents });
+    } else {
+        res = cutTreeUnfold({ flip: flipHeight, trace: traceEvents });
+    }
 
     // fit to the finished net once, then hold it for the whole replay
     netRhombs.length = 0;
@@ -1810,6 +1887,7 @@ function tilingPointFromEvent(e: MouseEvent): [number, number] {
 }
 
 function netRhombAt(x: number, y: number): NetRhomb | null {
+    if (slabMode) return null;
     for (let i = netRhombs.length - 1; i >= 0; i--) {
         const q = netRhombs[i].poly;
         if (
@@ -2010,7 +2088,12 @@ let renderBackside = false;
 // The patch in its own plane, for the locator mini and the map. Rhomb.verts is
 // exactly that — the tiling, which is the picture you can recognize.
 function tilingPoly(faceId: number): [number, number][] | null {
-    const r = allRhombs[faceId];
+    // In slab mode only the roof faces have a planar shape to show. A floor rhombus
+    // lies exactly under its roof one and would draw twice; a wall is vertical and
+    // projects to a line. Drawing the roof alone gives the mini the patch, which is
+    // the picture that can be recognized.
+    const id = slabMode ? (slabTops.has(faceId) ? slabRhomb.get(faceId) : undefined) : faceId;
+    const r = id === undefined ? undefined : allRhombs[id];
     if (!r) return null;
     return r.verts.map((q) => [q.x, q.y] as [number, number]);
 }
@@ -2031,8 +2114,10 @@ function sheetOpts(sheet = 0) {
         // …and swaps mountain for valley with it. Turning the sheet over turns the
         // whole reading over, shading and folds together.
         backside: renderBackside,
-        indexOf: (v: number) => vertexList[v]?.index ?? 1,
-        indexRange: [idxLo, idxHi] as [number, number],
+        // A slab's corners are its own, numbered by position, and its heights run
+        // below the roof's — a floor corner under an index-3 one sits at 3 − √5.
+        indexOf: slabMode && slabHeight ? slabHeight : (v: number) => vertexList[v]?.index ?? 1,
+        indexRange: (slabMode ? slabRange : [idxLo, idxHi]) as [number, number],
         tilingPoly,
         sheetColor: sheetColors[sheet] ?? "#6a5acd",
         sheetColors: sheetColors,
@@ -3021,6 +3106,27 @@ function buildControls() {
     });
     isoWrap.append(isoChk, document.createTextNode("isoglosses"));
     controls.insertBefore(isoWrap, heightWrap.nextSibling);
+
+    // Slab mode goes on the drawing line rather than the patch line, because it does
+    // not change the patch: the same rhombi are still the roof of it. What it changes
+    // is what gets unfolded — the surface, or the solid underneath it.
+    const slabWrap = document.createElement("label");
+    slabWrap.style.cssText = "font-size:13px;display:inline-flex;align-items:center;gap:5px";
+    slabWrap.title =
+        "Unfold the solid rather than the surface: the same rhombi on top, the same " +
+        "again as a floor one side length down, and a wall on every boundary edge. " +
+        "One piece, and it folds into a slab you can hold.";
+    const slabChk = document.createElement("input");
+    slabChk.type = "checkbox";
+    slabChk.checked = slabMode;
+    slabChk.addEventListener("change", () => {
+        slabMode = slabChk.checked;
+        // The net on screen is of the wrong surface now, and so is any pagination.
+        pagination = null;
+        runTrace();
+    });
+    slabWrap.append(slabChk, document.createTextNode("solid"));
+    controls.insertBefore(slabWrap, heightWrap.nextSibling);
 
     const colorSel = document.createElement("select");
     colorSel.style.cssText = "padding:4px;font-size:13px;";

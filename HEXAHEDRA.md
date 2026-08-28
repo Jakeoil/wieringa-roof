@@ -627,6 +627,44 @@ and **whole is the default**. Heads, tails and collar stay available, because th
 seams a builder would choose himself are still worth having on a large model even when
 they cost a sheet; but that is now a preference rather than a measurement.
 
+## Task 3 — the Slab switch on the Workbench
+
+`unfold.html` gains a **solid** checkbox on the drawing line. It does not change the
+patch — the same rhombi are still the roof of it — it changes what gets unfolded: the
+surface, or the solid underneath. With it on, `runTraceBody` builds the slab, hands
+`cutTreeUnfold` the closed surface, and everything downstream runs unaltered: the same
+net canvas, the same layers, the same Sheets view, the same print buttons.
+
+Three places had to be told where to look, because a wall is not a rhombus and has no
+tiling identity:
+
+- **the locator mini** draws only the roof faces of the slab. A floor rhombus lies
+  exactly under its roof one and would draw twice; a wall is vertical and projects to
+  a line. Drawing the roof alone gives the mini the patch, which is the picture that
+  can be recognized — and it answers the loose end left by task 2.
+- **the height fill** takes the slab's own corner heights, which run below the roof's.
+- **the partition on the tiling canvas** needs to know which sheet a *rhombus* went to,
+  and only its roof face answers that. Built once when the pagination is indexed rather
+  than searched per rhombus per redraw.
+
+**Editing is off while the solid is unfolded.** Nothing on the tiling canvas addresses
+a slab face, so placing, removing and hovering would all be addressing the wrong thing.
+`findRhombAt` and `netRhombAt` return nothing in slab mode, which turns all three off
+at once rather than guarding a dozen handlers.
+
+Measured through the same path the page uses:
+
+| patch | faces | pieces | overlaps | layers | ms |
+|---|---|---|---|---|---|
+| Pe1 gen 1 | 12 | 1 | 0 | 1 | 2 |
+| Pe1 gen 2 | 58 | 1 | 0 | 1 | 17 |
+| St5 gen 2 | 50 | 1 | 0 | 1 | 11 |
+| Pe3 gen 3 | 336 | 1 | 0 | 1 | 2204 |
+
+**Not verified in a browser.** The data path is checked end to end in node and every
+tool passes, but whether the checkbox appears where it should and the canvases redraw
+correctly is exactly the kind of thing that has only ever been caught by looking.
+
 ## Open, and worth settling before building
 
 1. **Settled: they interlock, and they need turning over to do it.** Every one of the
