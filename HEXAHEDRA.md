@@ -111,28 +111,36 @@ nothing else, so no rhomb in that group is ever thin. The scheme is five colors,
 six. (The other two are exact by construction — `Pe3` is 3:1 thick to thin and `Pe1` is
 1:2, on every patch.)
 
-### The rim as a matching rule
+### The rim as a matching rule — tried, and not needed
 
-The top and the floor of a slab are spoken for — they carry the surface. The **rim** is
-free, and it is exactly where a matching rule can live. A wall spans one lifting axis
+The top and the floor of a slab are spoken for. The rim is free, so it is where a
+matching rule could live, and there is a natural one: a wall spans one lifting axis
 `E_m` and the vertical, and `pairColor(m, 5) = m`, so **a wall's Kowalewski color is
-its own axis** — the one place the five-coloring is a plain fact about the edge rather
-than an orientation-dependent scheme.
+its own axis** — the one place that coloring is a fact about the edge rather than an
+orientation-dependent scheme. The axis says how a tile is turned; which end of the
+wall's top edge is high says which way up it is.
 
-That gives two marks, and between them they pin down the two things a builder can get
-wrong:
+The which-way-up mark works exactly, and is forced rather than lucky. Going
+counter-clockwise round a rhombus the lift steps +1, +1, −1, −1, so **every rhombus has
+two climbing walls and two falling ones**, and a shared wall is traversed the opposite
+way by its two cells. Measured: **15,910 interior walls over three patches, every one
+of them a climbing wall meeting a falling one, no exceptions.**
 
-- **the axis** — five colors — says how the tile is **turned**;
-- **the rise**, which end of the wall's top edge is high, says **which way up** it is,
-  since turning the tile over inverts every height.
+Jake proposed flipping the mark between thick and thin rhombi. Measured, that breaks
+it, and on the majority of joins: same-type neighbors still complement (thick\|thick
+1,520, thin\|thin 345 on Sun gen 3) but **thick\|thin neighbors come out identical**
+(2,850, or 60%) — because the mark already flips when you cross an edge, and flipping
+it again by type undoes it exactly when the types differ.
 
-Both are sound by construction: two tiles abutting on a shared edge see the same edge,
-so a correct placement always agrees. Whether agreement everywhere *forces* a correct
-placement is not proved and is worth testing.
+The intuition behind the proposal is real even though the rule is not: **the hill runs
+along a different diagonal on the two rhombi** — the long one on a thick rhombus
+(1.618 a against 1.176 a), the short one on a thin (0.618 a against 1.902 a). A thin
+rhombus lies as a sliver *across* its own slope, so the two do look mirrored.
 
-Visible now on `hexroof.html` under **Rim**: *Same as cell* (the default, and the
-expectation — a group color runs over the top, the floor and the walls alike), *By
-axis*, and *By axis + rise*.
+**Decided: no markers.** At generation 2 the rim's own zigzag is its key — the shape
+is intrinsic and a builder needs no other cue. The finding is kept because it is what
+a larger set would need. The **Rim** control on `hexroof.html` (*Same as cell*, *By
+axis*, *By axis + rise*) stays as a way to see the structure.
 
 **One deliberate exception**, recorded where it lives: the favicon designer keeps its
 own deeper group colors. A favicon is read at 16 px against browser chrome of unknown
@@ -152,17 +160,32 @@ rhombi each; the rim is one vertical rhomb per boundary edge. A wall is spanned 
 a wall is the *same golden rhombus* as every roof face. **One cut shape for the entire
 model**, walls included.
 
-**No new fold angle and no new gauge.** Computed exactly:
+**One new fold angle — and it is the tight one.** The first draft of this document
+claimed the slab folds on the roof's own {36°, 72°, 108°} and needed no new tooling.
+`tools/slab.mjs` measured every crease on fifteen patches and found a fourth:
 
-| crease | dihedral | fold |
+| crease | fold angles | count over gens 1–3 |
 |---|---|---|
-| roof \| roof | 144°, 108°, 72° | 36°, 72°, 108° |
-| roof \| wall (along a rim edge) | **108° or 144°** | 72° or 36° |
-| wall \| wall (along a vertical edge) | 72°, 144°, 216°, 288° | 108°, 36°, and the same two folded outward |
+| roof \| roof | 36°, 72°, 108° | 879 / 412 / 139 |
+| floor \| floor | the same, exactly | 879 / 412 / 139 |
+| roof \| wall | 36°, 72°, 108°, **144°** | 216 / 8 / 198 / **78** |
+| floor \| wall | 36°, 72°, 108°, **144°** | 78 / 198 / 8 / **216** |
+| wall \| wall | 36°, 108° | 330 / 170 |
 
-The union of fold magnitudes is **{36°, 72°, 108°}** — the roof's own set, unchanged.
-The three gauge notches already specified on `tools.html` (144° / 108° / 72°) measure
-every crease in the model, the reflex ones from the outside.
+A **144° fold is a 36° dihedral** — a sharper wedge than anything on the roof, whose
+tightest is 72°. It happens wherever a wall meets the rhombus it hangs from on that
+rhombus's *downhill* side: the roof face slopes away from the rim edge while the wall
+drops straight, and the two close on each other.
+
+Look at the two wall rows and they are each other reversed. That is exact and obvious
+once seen: **the roof and the floor are parallel, so a wall's fold to one and its fold
+to the other add to 180°.** Every rim edge therefore has a tight joint at one end or
+the other, and 294 of the 500 rim edges measured carry the 144° one.
+
+So `tools.html`'s three gauge notches (144° / 108° / 72°, which measure dihedrals) do
+**not** cover the model. A fourth at **36°** is needed, and it is the one a builder
+will struggle with — that is where the collar wants hinging to the surface rather than
+taping to it, since a fold holds an acute joint and tape does not.
 
 ### Heads and tails
 
@@ -483,21 +506,39 @@ to grip. `St1` gen 2 is three cells; at 1 in it is barely 2½ inches across.
 
 ## Open, and worth settling before building
 
-1. **Do the six interlock?** This is now the point of the set, not a curiosity.
-   Adjacent P1 tiles share an edge, so their rhomb patches should abut wall to wall and
-   height to height. Two things are unverified: whether the parity and index offsets
-   agree across a shared edge, and how the gaps behave, since the star-family tiles at
-   the bottom level emit no rhombi and leave holes in the assembled map. **There is a
-   ready-made test**: the composite seeds. `Sun` is one `Pe5` ringed by five `Pe3` and
-   `Star` is five `Pe1` ringed by five `Pe3` — generate those at gen 2 and check that
-   their rhombi are exactly the union of the separately-generated pieces, correctly
-   placed. If that holds, the models interlock.
+1. **Settled: they interlock, and they need turning over to do it.** Every one of the
+   six drops into a composite arrangement as a rigid piece — same rhombi, same heights,
+   nothing distorted. `tools/probes/compose.mjs` searches for a turn about the vertical,
+   a translation and a whole-number height shift that lands a tile inside `Sun`, `Star`
+   or `Deca`, and finds:
+
+   | host | Pe5 | Pe3 | Pe1 | St5 | St3 | St1 | covered |
+   |---|---|---|---|---|---|---|---|
+   | Sun gen 3 | 1 | 5 | 10 | 5 | 25 | 35 | 2440 / 2440 |
+   | Star gen 3 | — | 5 | 5 | 6 | 30 | 50 | 2075 / 2075 |
+   | Deca gen 3 | — | 1 | 2 | — | 3 | 15 | 610 / 610 |
+
+   Two exact regularities run through every placement found, with no exceptions:
+
+   - **Even tenths sit upright; odd tenths are turned over.** All of them. The five
+     generators sit 72° apart while the planar edge directions sit 36° apart, so a
+     half-step turn maps each direction to its own negative and inverts the lift.
+     (This is also the answer to why the first version of the probe found no `Pe3`
+     anywhere in a `Sun`: it turned patches without inverting their heights.)
+   - **Nothing is ever raised.** An upright placement takes a height shift of 0 and a
+     turned-over one takes 5, which is exactly the reflection sending 1↔4 and 2↔3. Every
+     tile occupies the same four levels, so every slab sits at the same z.
+
+   So the set is a kit, it is six pieces rather than twelve, and **turning a tile over
+   is not an optimization — it is required**, since the ring of a Sun is five `Pe3`
+   upside down.
+
 2. **Double walls where models meet.** If they interlock, two abutting models put two
    thicknesses of paper between them. Accept it, or key them with alternating tab and
    slot on the collar.
-3. **Is the rim always one height step?** True at every generation measured. If it is
-   general, the collar band height is a constant of the construction and belongs on the
-   page.
+3. **Settled: the rim is always one height step.** `tools/slab.mjs` asserts it on all
+   six seeds at generations 1, 2 and 3 — every rim edge climbs or falls by exactly one.
+   The collar band height `(1 + 1/√5) s = 1.4472 s` is a constant of the construction.
 4. **Are supports needed at all at gen 2?** Only building one answers it.
 5. **Settled: the gen-2 star family is one color under rhomb groups.** `St5`, `St3` and
    `St1` at generation 2 are *entirely* diamond group — 15, 9 and 3 rhombi, all `Pe1`.
@@ -515,11 +556,12 @@ to grip. `St1` gen 2 is three cells; at 1 in it is barely 2½ inches across.
 2. ~~`cluster` renamed to `group` throughout; the palettes renamed with it.~~
 3. ~~Page checks and the tool suite.~~
 
-**B. The geometry** *(nothing visible ships)*
-4. `src/slab.ts` — roles, rim ring, rim numbering, dihedrals.
-5. `tools/slab.mjs` — the checks in Part 6, all six seeds, generations 1–3.
-6. Settle open question 1 with the `Sun` / `Star` composite test. It decides whether
-   the set is a map or six ornaments.
+**B. The geometry** — **done**
+4. ~~`src/slab.ts` — roles, the rim as an ordered ring, creases with measured folds.~~
+5. ~~`tools/slab.mjs` — eight checks, all six seeds, generations 1–3. It caught the
+   fourth fold angle the plan had claimed did not exist.~~
+6. ~~`tools/probes/compose.mjs` — the set interlocks, and needs turning over to do it.~~
+7. Still open: a 36° dihedral gauge for `tools.html`, now that the model needs one.
 
 **C. Build the smallest thing that exists**
 7. `Pe1` at generation 1: three cells, twelve faces, one sheet. Heads, tails, collar,
