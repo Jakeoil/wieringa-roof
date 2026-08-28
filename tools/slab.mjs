@@ -12,6 +12,11 @@ import { generatePatch, allRhombs, seedTypes, vertexMap, roundKey } from "../dis
 import { slab } from "../dist/slab.js";
 
 const GOLDEN = (Math.acos(1 / Math.sqrt(5)) * 180) / Math.PI; // 63.4349
+// Derived from the Gram determinant of three unit vectors with pairwise dots ±1/√5,
+// so the check cannot agree with the code by sharing a typo with it.
+const t = 1 / Math.sqrt(5);
+const ACUTE_V = Math.sqrt(1 + 2 * t ** 3 - 3 * t ** 2);
+const OBTUSE_V = Math.sqrt(1 - 2 * t ** 3 - 3 * t ** 2);
 // The roof folds on 36, 72 and 108. The slab adds **144** — a 36-degree dihedral,
 // sharper than anything on the surface — and only ever where a wall meets the rhombus
 // it hangs from on that rhombus's downhill side. Measured, not assumed: the first
@@ -109,11 +114,28 @@ for (const [label, gen] of CASES) {
     }
     if (kindsSeen.has("floor|top")) fail(`${label} g${gen}: a roof rhombus shares an edge with a floor rhombus`);
 
+    // 9 · every face wound outward, checked the only way that cannot be fooled: the
+    // solid encloses a positive volume, and that volume is the sum of the cells it is
+    // made of. An inward-facing face subtracts instead of adding and the total misses.
+    let vol = 0;
+    for (const f of S.faces)
+        for (let i = 1; i + 1 < f.corners.length; i++) {
+            const [a, b, cc] = [f.corners[0], f.corners[i], f.corners[i + 1]];
+            vol += (a[0] * (b[1] * cc[2] - b[2] * cc[1])
+                  - a[1] * (b[0] * cc[2] - b[2] * cc[0])
+                  + a[2] * (b[0] * cc[1] - b[1] * cc[0])) / 6;
+        }
+    const cells = ACUTE_V * allRhombs.filter((r) => r.thick).length
+                + OBTUSE_V * allRhombs.filter((r) => !r.thick).length;
+    if (Math.abs(vol - cells) > 1e-9)
+        fail(`${label} g${gen}: encloses ${vol.toFixed(9)} against ${cells.toFixed(9)} of cells`);
+
     console.log(
         `${label.padEnd(5)} ${gen} ${String(c.F).padStart(6)} ${String(c.B).padStart(6)} ` +
         `${String(S.faces.length).padStart(6)} ${String(c.euler).padStart(6)}   ` +
         `${worstEdge.toExponential(1)}     ${worstAng.toExponential(1)}°   ` +
-        `${[...here].sort((a, b) => a - b).join(", ")}`,
+        `${[...here].sort((a, b) => a - b).join(", ")}` +
+        `   vol ${vol.toFixed(6)}`,
     );
 }
 

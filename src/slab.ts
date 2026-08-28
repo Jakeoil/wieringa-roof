@@ -158,9 +158,13 @@ export function slab(): Slab {
         for (let i = 0; i < 4; i++) {
             const k = ekey(ids[i], ids[(i + 1) % 4]);
             if ((use.get(k) ?? 0) !== 1) continue; // interior: pressed against a neighbor
+            // Reversed for the same reason the floor is: a rhomb is stored
+            // counter-clockwise seen from above, so a wall built by walking that
+            // traversal comes out facing *into* the solid. A closed solid wants every
+            // face facing out, and `tools/slab.mjs` checks it by enclosing a volume.
             const w: SlabFace = {
                 id: faces.length,
-                corners: c.faces[2 + i],
+                corners: [...c.faces[2 + i]].reverse(),
                 role: "wall",
                 axis: c.wallAxis[i],
                 ...common,

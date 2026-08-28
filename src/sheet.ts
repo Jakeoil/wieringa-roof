@@ -35,10 +35,13 @@ export function parseLength(raw: string): { mm: number; label: string } | null {
 
 // ── crease styling ────────────────────────────────────────────────
 
+// The roof folds on 36, 72 and 108. The slab adds 144 — a 36 degree dihedral, where a
+// wall meets its rhombus on that rhombus's downhill side (HEXAHEDRA.md Part 2).
 export const DASH: Record<number, string> = {
     36: "1.4 1.4",
     72: "3.2 1.6",
     108: "6 1.8",
+    144: "8 1.6 1.6 1.6",
 };
 export const M_COLOR = "#c0392b";
 

@@ -504,6 +504,40 @@ to grip. `St1` gen 2 is three cells; at 1 in it is barely 2½ inches across.
 
 ---
 
+## The first build — `Pe1` generation 1
+
+`node tools/pe1.mjs > out/pe1-gen1.svg`. Three cells, six walls, twelve faces, on one
+Letter sheet at the standard 25.4 mm side. Nothing in it is laid out by hand: the three
+documents come off the same general unfolder `nets.html` uses on the polyhedra, and
+mountain and valley come from the sign of the dihedral against the outward normal.
+
+| piece | faces | pieces | folds | size |
+|---|---|---|---|---|
+| heads | 3 | 1, no overlaps | 2 | 62.2 × 45.4 mm |
+| tails | 3 | derived from heads by reflection | 2 | 62.2 × 45.4 mm |
+| collar | 6 | 1, no overlaps | 5 | **136.3 × 36.8 mm** |
+
+**The collar came out at exactly its closed form.** `B · 2/√5 · s` by `(1 + 1/√5) · s`
+is 136.3107 × 36.7592 mm, and the strip measures 136.3107 × 36.7592. Its five creases
+are parallel to 0.00e+0° — the ribbon theorem, arrived at by a general unfolder that
+knows nothing about it.
+
+**Tails must be derived, not unfolded.** Unfolding the floor faces separately is the
+obvious thing and it is wrong: the two surfaces are isometric so both unfoldings are
+valid, but the search picks its own cut tree for each and you end up cutting two
+different shapes for one model. The floor is the roof translated down by exactly one
+(measured: worst error 0.00e+0), so the same cut serves, mirrored — and only the
+mountains and valleys have to be worked out again. They come out **exactly reversed**:
+every mountain on heads is a valley on tails, which is the "hills become dales" of the
+heads-and-tails argument turning up as a fold direction.
+
+Six checks, all passing: developed edges 25.4 mm to 1.4e-14, one piece each with no
+overlaps, the collar's creases parallel, the floor a pure translate, the folds reversed
+between the two faces, and the strip at its closed form.
+
+**And the rim needs no marking, as Jake said.** The collar's zigzag fits the heads rim
+one way round and one way up; the shape is its own key.
+
 ## Open, and worth settling before building
 
 1. **Settled: they interlock, and they need turning over to do it.** Every one of the
@@ -563,9 +597,9 @@ to grip. `St1` gen 2 is three cells; at 1 in it is barely 2½ inches across.
 6. ~~`tools/probes/compose.mjs` — the set interlocks, and needs turning over to do it.~~
 7. Still open: a 36° dihedral gauge for `tools.html`, now that the model needs one.
 
-**C. Build the smallest thing that exists**
-7. `Pe1` at generation 1: three cells, twelve faces, one sheet. Heads, tails, collar,
-   outside tape. Everything in Parts 4 and 5 is tested by it in an afternoon.
+**C. Build the smallest thing that exists** — **the sheet is drawn**
+7. ~~`Pe1` at generation 1 — `tools/pe1.mjs`, one Letter sheet at a 25.4 mm side.~~
+8. Cut it and fold it. Everything below waits on what that build says.
 
 **D. The collar and the sheets**
 8. Strip layout, paginated with the existing join machinery.
