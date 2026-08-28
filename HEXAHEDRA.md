@@ -703,6 +703,41 @@ them. The mini draws tiling `y` downward where the canvas draws it upward, so it
 sits above the patch rather than below, which puts the copy in the same place on the
 page as on screen.
 
+## A cut is not a free edge
+
+Jake's walkthrough turned up the general form of the join fix, and it is a better rule
+than the one the sheets had been drawing for as long as they have existed.
+
+**An interior edge the unfolding cut still folds in the finished model.** You cut it,
+tape it to its partner, and it then bends through the angle it always had. Drawing it
+plain black threw that away. So now:
+
+> **unbroken means cut, dashed means fold, and the color says which way it goes either
+> way.** Only an edge with no crease at all — a genuine free boundary — is black.
+
+On a slab this is not a nicety. A closed surface has no free edges at all, so *every*
+cut is one of these and the whole sheet came out in black outline. Measured on `Pe3`
+generation 2 solid: 45 of 45 cuts now carry their fold direction, and the only black
+line left on the page is the legend's own swatch.
+
+And it earns something beyond legibility, which was Jake's point: **knowing which way an
+edge folds lets a builder leave a tab instead of taping**, on the correct side.
+
+The same rule now applies on the net canvas and to severed hinges across a page join.
+
+## Solid belongs on the patch line
+
+It is not a way of drawing the patch; it is a choice of what is being unfolded. Hung on
+the drawing line it only re-ran the search, so the view stayed fitted to the patch alone
+and the tails copy fell off the bottom of the canvas — while changing seed or generation
+*did* draw it, because those go through `regenerate()` and its `fitView()`. It now sits
+beside Seed and Gen and takes the same path they do.
+
+The tails copy also drew from its own simplified painting code, and came out flat and
+faded where the patch above it was shaded and colored, and did not follow the replay at
+all. Both now call one `rhombFill`, and the tails pass carries the same placed-and-
+current wash — a copy that does not look like what it copies is worse than no copy.
+
 ## Open, and worth settling before building
 
 1. **Settled: they interlock, and they need turning over to do it.** Every one of the

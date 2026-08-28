@@ -898,9 +898,20 @@ export function renderPage(
                         `stroke-dasharray="${DASH[cr.fold] ?? "2 2"}"/>`,
                 );
             } else {
+            // **A cut is not the same as a free edge.** An interior edge that the
+            // unfolding cut still folds in the finished model: you cut it, tape it,
+            // and it bends through the angle it always had. Drawing it plain black
+            // threw that away — and with a slab, which is closed, *every* cut is one
+            // of these, so the whole sheet came out in black outline. Solid says cut,
+            // dashed says fold, and the color says which way it goes either way, so
+            // the builder can leave a tab on the right side instead of taping.
+            // Only an edge with no crease at all is a true boundary.
+                const seam = creases.get(key);
+                const sm = seam && (o.backside ? !seam.mountain : seam.mountain);
                 cutLines.push(
                     `<line x1="${n3(a[0])}" y1="${n3(a[1])}" x2="${n3(b[0])}" y2="${n3(b[1])}" ` +
-                        `stroke="#111" stroke-width="0.5" stroke-linecap="round"/>`,
+                        `stroke="${seam ? (sm ? M_COLOR : V_COLOR) : "#111"}" ` +
+                        `stroke-width="0.5" stroke-linecap="round"/>`,
                 );
             }
         }
@@ -952,12 +963,18 @@ export function renderPage(
             );
             lx += 13;
         };
+        // The key has to say what the drawing now says: unbroken means cut, dashed
+        // means fold, and the color is the direction it goes either way — because a
+        // cut edge is taped back to its partner and folds after that, so it needs its
+        // direction as much as a crease does. Only a free boundary is plain black.
         txt("cut", "#666");
         lx += 8;
-        swatch("#111", null, 0.5);
-        for (const f of [36, 72, 108]) {
+        swatch(M_COLOR, null, 0.5);
+        txt("fold", "#666");
+        lx += 9;
+        for (const f of [36, 72, 108, 144]) {
             txt(`${f}°`, "#666");
-            lx += f === 108 ? 8 : 6.5;
+            lx += f >= 108 ? 8 : 6.5;
             swatch("#666", DASH[f], 0.28);
         }
         txt("mountain", M_COLOR);

@@ -384,24 +384,7 @@ function drawTiling() {
 
         const vi = r.vertIndices.map(displayIndex);
         const [cLo, cHi] = extremeCorners(vi);
-        const faceFill = (): string | CanvasGradient => {
-            // Once the net has been split, the tiling shows the partition: the same
-            // canvas you built the net on, now divided and keyed to the sheet list.
-            // In slab mode the sheet ids are slab faces; a rhombus takes the sheet
-            // its own roof face landed on, which is what makes the partition legible
-            // on the tiling at all.
-            const sh = slabMode ? rhombSheet.get(r.id) : faceSheet.get(r.id);
-            if (sh != null) return sheetColors[sh] ?? "#ddd";
-            // Same tileFill the sheets ask, so a mode added in one place cannot
-            // quietly go missing in the other. Flat modes stay flat: thick/thin and
-            // height already *are* the information, and ramping them muddles it.
-            const base = tileFill(tileColor, r.group, r.thick, vi[cLo], r.pair) ?? r.fill;
-            // These modes carry their own meaning in the flat color and must not be
-            // shaded away — the five-coloring least of all, since two rhombi differing
-            // only by shade would read as the same color.
-            if (tileColor === "type" || tileColor === "index" || tileColor === "five") return base;
-            return makeGradient(ctx, base, sv[cLo], sv[cHi], vi[cLo], vi[cHi]);
-        };
+        const faceFill = (): string | CanvasGradient => rhombFill(ctx, r, sv, vi, cLo, cHi);
         // The search's own colors — yellow placed, red rejected, violet current —
         // are about the run, not about the net. Once the run is over they are just a
         // wash sitting on top of whichever theme you picked, so they stop here.
@@ -529,6 +512,32 @@ function drawTiling() {
     if (slabMode) drawTails(ctx);
 }
 
+/**
+ * How one rhombus is painted on the tiling canvas.
+ *
+ * Extracted so the tails copy asks the same question the patch above it does. Drawn
+ * separately the two disagreed — the reflection came out flat and faded where the
+ * patch was shaded and colored — and a copy that does not look like what it copies is
+ * worse than no copy.
+ */
+function rhombFill(
+    ctx: CanvasRenderingContext2D,
+    r: Rhomb,
+    sv: Array<{ x: number; y: number }>,
+    vi: number[],
+    cLo: number,
+    cHi: number,
+): string | CanvasGradient {
+    const sh = slabMode ? rhombSheet.get(r.id) : faceSheet.get(r.id);
+    if (sh != null) return sheetColors[sh] ?? "#ddd";
+    const base = tileFill(tileColor, r.group, r.thick, vi[cLo], r.pair) ?? r.fill;
+    // These modes carry their own meaning in the flat color and must not be shaded
+    // away — the five-coloring least of all, since two rhombi differing only by shade
+    // would read as the same color.
+    if (tileColor === "type" || tileColor === "index" || tileColor === "five") return base;
+    return makeGradient(ctx, base, sv[cLo], sv[cHi], vi[cLo], vi[cHi]);
+}
+
 /** Boundary edges of the patch — the ones a wall stands on. */
 function collarEdges(): Array<[Pt, Pt]> {
     const out: Array<[Pt, Pt]> = [];
@@ -574,16 +583,27 @@ function drawTails(ctx: CanvasRenderingContext2D): void {
 
     for (const r of allRhombs) {
         const sv = r.verts.map(toScreen);
+        const vi = r.vertIndices.map(displayIndex);
+        const [cLo, cHi] = extremeCorners(vi);
         ctx.beginPath();
         ctx.moveTo(sv[0].x, sv[0].y);
         for (let i = 1; i < 4; i++) ctx.lineTo(sv[i].x, sv[i].y);
         ctx.closePath();
-        const sh = rhombSheet.get(r.id);
-        ctx.fillStyle = sh != null ? (sheetColors[sh] ?? "#ddd") : (r.fill ?? "#eee");
-        ctx.globalAlpha = 0.55;
+        ctx.fillStyle = rhombFill(ctx, r, sv, vi, cLo, cHi);
         ctx.fill();
-        ctx.globalAlpha = 1;
-        ctx.strokeStyle = "#9aa0aa";
+        // The replay wash too: a copy that does not follow the animation is not
+        // showing you the same model being built.
+        const role = replayRunning() ? traceRoles.get(r.id) : undefined;
+        if (role || (placedRhombs.has(r.id) && !replayFinished())) {
+            ctx.fillStyle =
+                role === "current"
+                    ? "rgba(106, 90, 205, 0.55)"
+                    : role === "rejected"
+                      ? "rgba(192, 57, 43, 0.35)"
+                      : "rgba(255, 200, 0, 0.45)";
+            ctx.fill();
+        }
+        ctx.strokeStyle = "#4a4a4a";
         ctx.lineWidth = 1;
         ctx.stroke();
     }
@@ -1577,7 +1597,14 @@ function drawNet() {
                 ctx.lineWidth = 1;
                 ctx.setLineDash(FOLD_DASH[cr.fold] ?? [3, 3]);
             } else {
-                ctx.strokeStyle = "#222";
+                // A cut is not the same as a free edge. An interior edge the
+                // unfolding cut still folds in the finished model — you cut it, tape
+                // it, and it bends through the angle it always had — so it takes the
+                // fold's color while keeping the heavy unbroken stroke that says cut.
+                // On a slab, which is closed, every cut is one of these. Knowing which
+                // way it folds is also what lets a builder leave a tab instead of tape.
+                const seam = activeCreases().get(key);
+                ctx.strokeStyle = seam ? (seam.mountain ? "#c0392b" : "#2469b8") : "#222";
                 ctx.lineWidth = 1.6;
                 ctx.setLineDash([]);
             }
@@ -3183,6 +3210,29 @@ function buildControls() {
     genLabel.appendChild(genSelect);
     shared.appendChild(genLabel);
 
+    // **Solid belongs on the patch line.** It is not a way of drawing the patch, it is
+    // a choice of what is being unfolded — the surface, or the solid under it — so it
+    // sits beside Seed and Gen and goes through the same re-initialization they do.
+    // Hung on the drawing line it only re-ran the search, which left the view fitted
+    // to the patch alone and the tails copy off the bottom of the canvas.
+    const slabWrap = document.createElement("label");
+    slabWrap.style.cssText = "font-size:13px;display:inline-flex;align-items:center;gap:5px";
+    slabWrap.title =
+        "Unfold the solid rather than the surface: the same rhombi on top, the same " +
+        "again as a floor one side length down, and a wall on every boundary edge.";
+    const slabChk = document.createElement("input");
+    slabChk.type = "checkbox";
+    slabChk.checked = slabMode;
+    slabChk.addEventListener("change", () => {
+        slabMode = slabChk.checked;
+        pagination = null;
+        regenerate();
+        afterPatchChange();
+    });
+    slabWrap.append(slabChk, document.createTextNode("solid"));
+    shared.appendChild(slabWrap);
+
+
     // one height control: sign flips the roof, magnitude sets shading depth
     const heightWrap = document.createElement("label");
     heightWrap.style.cssText = "font-size:13px;display:flex;align-items:center;gap:6px;";
@@ -3259,27 +3309,6 @@ function buildControls() {
     });
     isoWrap.append(isoChk, document.createTextNode("isoglosses"));
     controls.insertBefore(isoWrap, heightWrap.nextSibling);
-
-    // Slab mode goes on the drawing line rather than the patch line, because it does
-    // not change the patch: the same rhombi are still the roof of it. What it changes
-    // is what gets unfolded — the surface, or the solid underneath it.
-    const slabWrap = document.createElement("label");
-    slabWrap.style.cssText = "font-size:13px;display:inline-flex;align-items:center;gap:5px";
-    slabWrap.title =
-        "Unfold the solid rather than the surface: the same rhombi on top, the same " +
-        "again as a floor one side length down, and a wall on every boundary edge. " +
-        "One piece, and it folds into a slab you can hold.";
-    const slabChk = document.createElement("input");
-    slabChk.type = "checkbox";
-    slabChk.checked = slabMode;
-    slabChk.addEventListener("change", () => {
-        slabMode = slabChk.checked;
-        // The net on screen is of the wrong surface now, and so is any pagination.
-        pagination = null;
-        runTrace();
-    });
-    slabWrap.append(slabChk, document.createTextNode("solid"));
-    controls.insertBefore(slabWrap, heightWrap.nextSibling);
 
     const colorSel = document.createElement("select");
     colorSel.style.cssText = "padding:4px;font-size:13px;";

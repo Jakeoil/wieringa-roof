@@ -138,6 +138,13 @@ export interface RenderOpts {
     activeLayer?: number | null;
 }
 
+/** The color a cut is drawn in: a fold's own, if the edge is one, else plain ink. */
+function seamColor(va: number, vb: number, creases: Map<string, Crease>): string {
+    const seam = creases.get(va < vb ? `${va}-${vb}` : `${vb}-${va}`);
+    if (!seam) return "#111";
+    return seam.mountain ? M_COLOR : V_COLOR;
+}
+
 export function renderSheet(
     sheet: Sheet,
     placed: Map<number, Placed>,
@@ -238,9 +245,10 @@ export function renderSheet(
                         );
                     }
                 } else {
+                    // see paginate.ts: an interior cut is a seam that folds once taped
                     cutLines.push(
                         `<line x1="${n3(a[0])}" y1="${n3(a[1])}" x2="${n3(b[0])}" y2="${n3(b[1])}" ` +
-                            `stroke="#111" stroke-width="0.5" stroke-linecap="round"/>`,
+                            `stroke="${seamColor(va, vb, creases)}" stroke-width="0.5" stroke-linecap="round"/>`,
                     );
                 }
             }
