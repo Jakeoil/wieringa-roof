@@ -31,12 +31,25 @@ const cross3 = (a: V3, b: V3): V3 => [
 
 // ── types ─────────────────────────────────────────────────────────
 
+/**
+ * A face to be unfolded.
+ *
+ * The roof fills this in from the tiling, and for a long time the comments here said
+ * "tiling vertex id" as though that were a requirement. **It is not.** Nothing
+ * downstream — `sheet.ts`, `paginate.ts`, the crease lookup, the shared-edge search —
+ * ever asks what an id means. All any of them needs is that two faces meeting at a
+ * corner name that corner with the same number. Any surface that can number its own
+ * corners consistently can be printed by this machinery, which is what lets the slab
+ * of `slab.ts` — with floor faces and wall faces that are not rhombi at all — go
+ * through it unchanged.
+ */
 export interface Face {
     id: number;
     thick: boolean;
     group: string; // gen-1 P1 group: Pe5 star / Pe3 boat / Pe1 diamond
-    pair: [number, number]; // the two lifting axes, for the five-coloring
-    v: number[]; // tiling vertex ids, cyclic
+    pair: [number, number]; // the two axes the face spans, for the five-coloring
+    /** corner ids, cyclic. Shared corners must share an id; nothing else is assumed. */
+    v: number[];
 }
 
 export interface Placed {
@@ -45,7 +58,8 @@ export interface Placed {
     group: string;
     pair: [number, number];
     poly: P2[]; // net-space corners, matching `verts` order
-    verts: number[]; // tiling vertex ids in the same order
+    /** corner ids in the same order — see `Face.v`; they need not be tiling vertices */
+    verts: number[];
     piece: number;
 }
 
@@ -67,7 +81,7 @@ export interface UnfoldResult {
     faces: Face[];
     placed: Map<number, Placed>;
     pieces: Piece[];
-    creases: Map<string, Crease>; // keyed "min-max" of tiling vertex ids
+    creases: Map<string, Crease>; // keyed "min-max" of the two corner ids
     // Interior edges actually used as hinges during the unfolding — a spanning
     // tree of the face graph, so |hinges| = faces - pieces. Every OTHER interior
     // edge is a cut, even when both its faces land in the same piece: that is

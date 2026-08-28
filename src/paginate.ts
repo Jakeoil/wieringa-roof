@@ -557,6 +557,7 @@ export interface PageRenderOpts {
     backside?: boolean;
     // Height index per tiling vertex, and the range, so paginate need not import the
     // tiling itself.
+    /** height at a corner id; see `RenderOpts.indexOf` in `sheet.ts` */
     indexOf?: (v: number) => number;
     indexRange?: [number, number];
     // The tiling itself, for the locator mini: the planar position of a face in the

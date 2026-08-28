@@ -122,7 +122,10 @@ export interface RenderOpts {
     pageH: number;
     margin: number;
     fillMode: FillMode;
-    /** Height index per vertex; only "index" fill needs it. */
+    /**
+     * Height at a corner id — the roof passes its lift index, but any number on a
+     * consistent scale will do. Only the "index" fill and the shading need it.
+     */
     indexOf?: (v: number) => number;
     showAngles: boolean;
     showLegend: boolean;

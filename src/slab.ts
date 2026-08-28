@@ -26,13 +26,22 @@
 
 import { allRhombs, vertexMap, roundKey } from "./geometry.js";
 import type { V3, Pt } from "./geometry.js";
-import { hexLayer } from "./hexlayer.js";
-import type { SolidFace } from "./solidnet.js";
+import { hexLayer, VERTICAL_AXIS } from "./hexlayer.js";
+import type { SolidFace, Net, P2 } from "./solidnet.js";
+// `unfold.ts` has a Crease of its own — fold plus mountain, which is what the sheet
+// draws — while this module's Crease also says which faces and of what kind.
+import type { Placed, Piece, Crease as SheetCrease } from "./unfold.js";
 
 export type Role = "top" | "floor" | "wall";
 
 export interface SlabFace extends SolidFace {
     role: Role;
+    /**
+     * The two of the six axes this face spans, so the five-coloring reads on it.
+     * A top or a floor spans the rhomb's own pair; a wall spans its axis and the
+     * vertical, and `pairColor(m, 5) = m`, so a wall wears its own axis.
+     */
+    pair: [number, number];
     /** the rhomb this face belongs to — the cell it is a face of, either way */
     rhomb: number;
     /** which pentagon group that rhomb came from, so a face can be colored */
@@ -141,7 +150,7 @@ export function slab(): Slab {
     for (const c of layer.cells) {
         const r = allRhombs[c.rhomb];
         const ids = r.verts.map((p) => vid(p).id);
-        const common = { rhomb: c.rhomb, group: r.group, thick: r.thick };
+        const common = { rhomb: c.rhomb, group: r.group, thick: r.thick, pair: c.pair };
         const t: SlabFace = { id: faces.length, corners: c.faces[0], role: "top", ...common };
         faces.push(t);
         top.push(t);
@@ -168,6 +177,7 @@ export function slab(): Slab {
                 role: "wall",
                 axis: c.wallAxis[i],
                 ...common,
+                pair: [c.wallAxis[i], VERTICAL_AXIS] as [number, number],
             };
             faces.push(w);
             wall.push(w);
@@ -259,4 +269,126 @@ export function slab(): Slab {
             euler: 2 * V - (2 * (Eint + B) + B) + (2 * F + B),
         },
     };
+}
+
+
+// ── the slab as a document the sheet machinery understands ────────
+//
+// `sheet.ts` and `paginate.ts` were written for the roof and their comments said
+// "tiling vertex id" throughout, which read like a requirement and is not one: nothing
+// downstream asks what an id means, only that two faces meeting at a corner name it
+// the same. So the slab needs no refactor of that machinery — it needs to number its
+// own corners, which it can do by position, and to say how high each one is.
+
+/** What `renderSheet` and `paginateNet` take, built from a `solidnet` unfolding. */
+export interface SlabDocument {
+    placed: Map<number, Placed>;
+    pieces: Piece[];
+    creases: Map<string, SheetCrease>;
+    hinges: Set<string>;
+    /** height of a corner id, on the roof's own index scale */
+    indexOf: (v: number) => number;
+    indexRange: [number, number];
+}
+
+const ckey = (a: number, b: number) => (a < b ? `${a}-${b}` : `${b}-${a}`);
+
+/**
+ * Adapt an unfolding of slab faces into the roof's document shape.
+ *
+ * Corners are numbered by position, so a corner shared by a top face and the wall
+ * hanging from it gets one id and the crease between them is found the same way a
+ * crease between two rhombi is. Height is the z of the corner in units of `s/√5`,
+ * which is the roof's index extended downward — a floor corner under an index-3 roof
+ * corner comes out at 3 − √5, and the shading ramp handles the wider range on its own.
+ */
+export function slabDocument(S: Slab, net: Net): SlabDocument {
+    const KEY = 1e6;
+    const idOf = new Map<string, number>();
+    const heightAt = new Map<number, number>();
+    const cid = (p: V3): number => {
+        const k = p.map((x) => Math.round(x * KEY)).join(",");
+        let id = idOf.get(k);
+        if (id === undefined) {
+            id = idOf.size;
+            idOf.set(k, id);
+            heightAt.set(id, p[2] * Math.sqrt(5));
+        }
+        return id;
+    };
+
+    const byId = new Map(S.faces.map((f) => [f.id, f]));
+    const placed = new Map<number, Placed>();
+    for (const pf of net.placed) {
+        const f = byId.get(pf.id)!;
+        placed.set(pf.id, {
+            faceId: pf.id,
+            thick: f.thick,
+            group: f.group,
+            pair: f.pair,
+            poly: pf.poly as P2[],
+            verts: f.corners.map(cid),
+            piece: pf.piece,
+        });
+    }
+
+    // Pieces, with the bounding box `layoutSheets` packs them by.
+    const pieces: Piece[] = [];
+    for (const pf of net.placed) {
+        let piece = pieces[pf.piece];
+        if (!piece) piece = pieces[pf.piece] = { id: pf.piece, faceIds: [], w: 0, h: 0, minX: Infinity, minY: Infinity };
+        piece.faceIds.push(pf.id);
+    }
+    for (const piece of pieces) {
+        const pts = piece.faceIds.flatMap((id) => placed.get(id)!.poly);
+        const xs = pts.map((q) => q[0]), ys = pts.map((q) => q[1]);
+        piece.minX = Math.min(...xs);
+        piece.minY = Math.min(...ys);
+        piece.w = Math.max(...xs) - piece.minX;
+        piece.h = Math.max(...ys) - piece.minY;
+    }
+
+    // Creases, keyed by corner id like the roof's, with mountain read from the solid
+    // rather than from the fold angle — `foldAngle` is an arccos and cannot tell a
+    // reflex dihedral from its supplement.
+    const creases = new Map<string, SheetCrease>();
+    for (const cr of S.creases) {
+        const A = byId.get(cr.a)!, B = byId.get(cr.b)!;
+        const shared = A.corners.map(cid).filter((v) => B.corners.map(cid).includes(v));
+        if (shared.length !== 2) continue;
+        creases.set(ckey(shared[0], shared[1]), { fold: cr.fold, mountain: convex(A, B, cid) });
+    }
+    const hinges = new Set<string>();
+    for (const [a, b] of net.hinges) {
+        const A = byId.get(a)!, B = byId.get(b)!;
+        const shared = A.corners.map(cid).filter((v) => B.corners.map(cid).includes(v));
+        if (shared.length === 2) hinges.add(ckey(shared[0], shared[1]));
+    }
+
+    const hs = [...heightAt.values()];
+    return {
+        placed, pieces, creases, hinges,
+        indexOf: (v) => heightAt.get(v) ?? 0,
+        indexRange: [Math.min(...hs), Math.max(...hs)],
+    };
+}
+
+/**
+ * Is the edge between two faces convex, seen from outside?
+ *
+ * With every face wound outward, it is convex exactly when the neighbor's far corner
+ * lies on the inner side of this face's plane — and a convex edge read from outside is
+ * a ridge, which is a mountain.
+ */
+function convex(A: SlabFace, B: SlabFace, cid: (p: V3) => number): boolean {
+    const u = sub(A.corners[1], A.corners[0]);
+    const v = sub(A.corners[3], A.corners[0]);
+    const n: V3 = [
+        u[1] * v[2] - u[2] * v[1],
+        u[2] * v[0] - u[0] * v[2],
+        u[0] * v[1] - u[1] * v[0],
+    ];
+    const mine = new Set(A.corners.map(cid));
+    const far = B.corners.find((c) => !mine.has(cid(c)))!;
+    return dot(sub(far, A.corners[0]), n) < 0;
 }

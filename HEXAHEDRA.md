@@ -538,6 +538,45 @@ between the two faces, and the strip at its closed form.
 **And the rim needs no marking, as Jake said.** The collar's zigzag fits the heads rim
 one way round and one way up; the shape is its own key.
 
+## Task 2 — the sheet machinery stops assuming rhombi — **done**
+
+It turned out to be smaller than claimed, and the claim was the problem. `sheet.ts` and
+`paginate.ts` say "tiling vertex id" throughout, which reads like a requirement.
+**Nothing downstream ever asks what an id means** — not the crease lookup, not the
+shared-edge search, not the tab fitting. All they need is that two faces meeting at a
+corner name that corner with the same number, and a height per corner. So there was no
+refactor to do: there was a promise to write down, and an adapter.
+
+`slabDocument()` in `slab.ts` numbers the slab's corners by position and reports each
+one's height as `z·√5` — the roof's index scale continued downward, so a floor corner
+under an index-3 roof corner comes out at `3 − √5` and the ramp copes on its own.
+Mountain comes from the sign of the dihedral against the outward normal, since
+`foldAngle` is an arccos and cannot tell a reflex dihedral from its supplement.
+
+`tools/slabsheet.mjs` runs slabs through `paginateBest` and `renderPage` — the real
+path, with joins, tabs and the shared page orientation — and checks every face reaches
+a sheet:
+
+| patch | how | pieces | sheets | taped joins |
+|---|---|---|---|---|
+| Pe1 gen 1 | **whole** | **1** | **1** | **0** |
+| St1 gen 2 | whole | 1 | 1 | 0 |
+| Pe1 gen 2 | whole | 1 | 4 | 3 |
+| Pe1 gen 2 | documents | 3 | 4 | 1 |
+| Pe3 gen 2 | documents | 3 | 4 | 1 |
+| St5 gen 2 | documents | 3 | 4 | 1 |
+
+**Which settles the policy empirically.** At generation 1 the whole slab unfolds to one
+piece on one sheet with nothing to tape — three documents there was three pieces for no
+reason. At generation 2 the two cost the same four sheets, but the documents want one
+taped join where the whole slab wants three, because heads, tails and the collar are
+already the seams a builder would choose. So: **whole for the small ones, three
+documents from generation 2 up**, and it is a setting rather than a rule.
+
+Left for the Workbench: the locator mini has no `tilingPoly` for a slab. Top and floor
+faces map to their rhombus, but a wall is vertical and projects to a line, so the mini
+needs to know to draw the rim rather than the wall.
+
 ## Open, and worth settling before building
 
 1. **Settled: they interlock, and they need turning over to do it.** Every one of the
