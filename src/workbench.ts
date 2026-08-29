@@ -119,6 +119,11 @@ function generate() {
         idxHi = 4;
     }
     analysis = allRhombs.length ? analyzePatch(flipHeight) : null;
+    // The collar stands outside the outline, so `fitView` has to know about it — and
+    // `fitView` runs from `regenerate`, long before the unfolding does. Built here,
+    // where the patch is, rather than left until the search: the view was being fitted
+    // to the faces alone and chopping the band off the top and bottom.
+    slabBand = slabMode && allRhombs.length ? collarBand(slab()) : [];
 
     // Reports what the shading path actually computes, so a flat-looking tile can
     // be traced without guessing. Two wrong diagnoses have already been paid for.
@@ -275,49 +280,48 @@ let tailsAxis: number | null = null;
 /** true only while the tails pass is drawing, so the patch above it is not reflected */
 let drawingTails = false;
 
-function fitView() {
-    if (allRhombs.length === 0) return;
-    let minX = Infinity,
-        minY = Infinity,
-        maxX = -Infinity,
-        maxY = -Infinity;
-    for (const r of allRhombs) {
-        for (const v of r.verts) {
-            if (v.x < minX) minX = v.x;
-            if (v.y < minY) minY = v.y;
-            if (v.x > maxX) maxX = v.x;
-            if (v.y > maxY) maxY = v.y;
-        }
+/**
+ * What the tiling canvas has to show: the patch, its collar, and the tails copy.
+ *
+ * Also settles `tailsAxis`, since the reflection line and the extent it produces are
+ * the same calculation and splitting them invites the two to disagree.
+ */
+function viewBounds(): { minX: number; minY: number; maxX: number; maxY: number } | null {
+    if (allRhombs.length === 0) return null;
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    for (const r of allRhombs) for (const v of r.verts) {
+        if (v.x < minX) minX = v.x;
+        if (v.y < minY) minY = v.y;
+        if (v.x > maxX) maxX = v.x;
+        if (v.y > maxY) maxY = v.y;
     }
-    let w = maxX - minX;
-    let h = maxY - minY;
-    // In solid mode the canvas carries the tails copy as well, reflected about the
-    // bottom of the patch and dropped clear of it, so the view has to make room.
     tailsAxis = null;
     if (slabMode) {
-        // The band stands outside the outline, so the canvas has to reach it as well
-        // as the copy reflected below it.
+        // The collar stands outside the outline, and the tails copy hangs below it.
         for (const cell of slabBand) for (const v of cell.pts) {
             if (v[0] < minX) minX = v[0];
             if (v[0] > maxX) maxX = v[0];
             if (v[1] < minY) minY = v[1];
             if (v[1] > maxY) maxY = v[1];
         }
-        // The mirror of the *highest* point is the lowest thing on the canvas, and
-        // that is what the view has to reach — not the patch height subtracted from
-        // the axis, which leaves the axis's own offset in and crops the copy.
         tailsAxis = tailsAxisFor(true) ?? 2 * minY;
         minY = tailsAxis - maxY;
-        h = maxY - minY;
     }
-    w = maxX - minX;
+    return { minX, minY, maxX, maxY };
+}
+
+function fitView() {
+    const b = viewBounds();
+    if (!b) return;
+    const w = b.maxX - b.minX;
+    const h = b.maxY - b.minY;
     const pad = 10;
     viewScale = Math.min(
         (tilingCanvas.width - pad * 2) / w,
         (tilingCanvas.height - pad * 2) / h,
     );
-    viewOffX = tilingCanvas.width / 2 - ((minX + maxX) / 2) * viewScale;
-    viewOffY = tilingCanvas.height / 2 + ((minY + maxY) / 2) * viewScale;
+    viewOffX = tilingCanvas.width / 2 - ((b.minX + b.maxX) / 2) * viewScale;
+    viewOffY = tilingCanvas.height / 2 + ((b.minY + b.maxY) / 2) * viewScale;
 }
 
 function toScreen(pt: Pt): { x: number; y: number } {
@@ -616,18 +620,14 @@ function drawCollar(ctx: CanvasRenderingContext2D): void {
         ctx.globalAlpha = 0.75;
         ctx.fill();
         ctx.globalAlpha = 1;
-        const e = slabWallEdges.get(w.face);
-        const cut = e ? !netHinges.has(drawingTails ? e.roof : e.floor) : false;
         ctx.strokeStyle = "#5a5f66";
         ctx.lineWidth = 1;
         ctx.beginPath();
-        // the two legs, always; the outer boundary only where the unfolding cut it
+        // The legs, and only the legs. The outer boundary is left open on purpose:
+        // it is the middle of a rhombus, not the edge of anything, and drawing it
+        // would close a shape that is meant to continue onto the other surface.
         ctx.moveTo(q[1].x, q[1].y); ctx.lineTo(q[2].x, q[2].y);
         ctx.moveTo(q[q.length - 1].x, q[q.length - 1].y); ctx.lineTo(q[0].x, q[0].y);
-        if (cut) {
-            ctx.moveTo(q[2].x, q[2].y);
-            for (let i = 3; i < q.length; i++) ctx.lineTo(q[i].x, q[i].y);
-        }
         ctx.stroke();
     }
 }
@@ -1220,11 +1220,26 @@ function sizeTilingCanvas(): void {
     const workspace = tilingCanvas.closest(".workspace") as HTMLElement | null;
     const total = workspace?.clientWidth ?? 1120;
     const cssW = Math.max(300, Math.min(Math.round(total * 0.42), 560));
+
+    // **The width holds the patch; the height gives way.** Square, a slab's two
+    // surfaces had to shrink to fit the taller dimension, so the patch came out half
+    // the size it does without the slab and the width went unused. The canvas grows
+    // downward instead, as far as the net canvas beside it — past that the two stop
+    // lining up, and the drawing goes back to scaling down.
+    const b = viewBounds();
+    let cssH = cssW;
+    if (b) {
+        const netW = Math.max(320, Math.min(workspace ? workspace.clientWidth - cssW - 24 : 620, 780));
+        const cap = Math.round(netW * (PAPER[1] / PAPER[0]));
+        const want = Math.round((cssW * (b.maxY - b.minY)) / (b.maxX - b.minX || 1));
+        cssH = Math.max(cssW, Math.min(want, cap));
+    }
+
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
     tilingCanvas.style.width = `${cssW}px`;
-    tilingCanvas.style.height = `${cssW}px`;
+    tilingCanvas.style.height = `${cssH}px`;
     tilingCanvas.width = Math.round(cssW * dpr);
-    tilingCanvas.height = Math.round(cssW * dpr);
+    tilingCanvas.height = Math.round(cssH * dpr);
 }
 
 function sizeNetCanvas(): void {
@@ -1767,8 +1782,6 @@ let slabMode = false;
 let slabRhomb = new Map<number, number>();
 /** faces that are a roof rhombus, so the mini and the partition draw only those */
 let slabTops = new Set<number>();
-/** the wall faces, so the collar can be told from the two surfaces */
-let slabWalls = new Set<number>();
 let slabHeight: ((v: number) => number) | null = null;
 /**
  * The slab's own creases. Without these the sheets asked `analysis.creases` — the
@@ -1779,12 +1792,6 @@ let slabHeight: ((v: number) => number) | null = null;
 let slabCreases: Map<string, Crease> | null = null;
 /** the collar as a mitred band round the outline, in tiling coordinates */
 let slabBand: CollarCell[] = [];
-/**
- * Per wall, the edge keys of its two long sides — the one against the roof and the one
- * against the floor. Whichever of them the unfolding cut is the side whose outer base
- * gets drawn; a wall is told apart by height, since its roof corners are the high pair.
- */
-let slabWallEdges = new Map<number, { roof: string; floor: string }>();
 /** floor face id -> the roof face directly above it */
 let topOfFloor = new Map<number, number>();
 /** group, type, axis pair and default fill per slab face */
@@ -1824,18 +1831,15 @@ function runTraceBody(): void {
     traceEvents = [];
     slabRhomb = new Map();
     slabTops = new Set();
-    slabWalls = new Set();
     slabHeight = null;
     slabCreases = null;
     slabBand = [];
-    slabWallEdges = new Map();
     topOfFloor = new Map();
     let res;
     if (slabMode) {
         const S = slab();
         const sur = slabSurface(S);
         slabStyle = new Map();
-        slabWalls = new Set(S.wall.map((f) => f.id));
         for (const f of S.faces) {
             slabRhomb.set(f.id, f.rhomb);
             slabStyle.set(f.id, {
@@ -1873,27 +1877,6 @@ function runTraceBody(): void {
     // parent tree at all — degrading continuation back to plain lowest-fit, the
     // very confetti it exists to avoid.
     for (const k of res.hinges) netHinges.add(k);
-    if (slabMode && slabHeight) {
-        const h = slabHeight;
-        for (const nr of netRhombs) {
-            if (!slabWalls.has(nr.sourceId)) continue;
-            // A wall has two long sides — the one against the roof and the one against
-            // the floor — and two vertical ones. Told apart by how far their ends
-            // differ in height: a long side climbs one index step, a vertical side
-            // drops a whole unit, which is √5 of them. Read off rather than taken from
-            // the corner order, which is a detail of how the cell was built.
-            const v = nr.verts;
-            const sides = [[0, 1], [1, 2], [2, 3], [3, 0]]
-                .map(([i, j]) => ({
-                    key: ekey(v[i], v[j]),
-                    rise: Math.abs(h(v[i]) - h(v[j])),
-                    mid: (h(v[i]) + h(v[j])) / 2,
-                }))
-                .sort((x, y) => x.rise - y.rise);
-            const [p1, p2] = sides.slice(0, 2).sort((x, y) => y.mid - x.mid);
-            if (p1 && p2) slabWallEdges.set(nr.sourceId, { roof: p1.key, floor: p2.key });
-        }
-    }
     refreshNetView();
 
     // Layers for the completed net, pinned for the whole replay.
@@ -2308,7 +2291,7 @@ function tilingPoly(faceId: number): [number, number][] | null {
  */
 function rimForSheets(
     sheet: number | "all",
-): Array<{ pts: Array<[number, number]>; color: string; cutOuter?: boolean; cutOuterTail?: boolean }> {
+): Array<{ pts: Array<[number, number]>; color: string }> {
     return slabBand.flatMap((w) => {
         // **Only this sheet's walls**, on a sheet. A wall that went elsewhere drawn in
         // that other sheet's color read as though the collar were partly here and
@@ -2316,14 +2299,9 @@ function rimForSheets(
         // each in the color of the sheet it went to.
         const sh = faceSheet.size ? faceSheet.get(w.face) : 0;
         if (sheet !== "all" && sh !== sheet) return [];
-        const e = slabWallEdges.get(w.face);
         return [{
             pts: w.pts,
             color: wallFill(w.rhomb, sheet === "all" ? sh : sheet),
-            // The band runs over the fold onto the other side, so its outer base is
-            // only a real edge where the unfolding cut it.
-            cutOuter: e ? !netHinges.has(e.floor) : false,
-            cutOuterTail: e ? !netHinges.has(e.roof) : false,
         }];
     });
 }
@@ -2380,7 +2358,12 @@ function tailsAxisFor(below: boolean): number | undefined {
             if (v.y > hi) hi = v.y;
         }
     }
-    return below ? 2 * lo - side : 2 * hi + side;
+    // **Touching**, not held apart. The two halves of a wall meet at the reflection
+    // point and, with no outer boundary drawn on either, read as one whole rhombus
+    // spanning the fold — which is what they are. It also gives the height back: a
+    // gap between them was costing scale on every one of the three pictures.
+    void side;
+    return below ? 2 * lo : 2 * hi;
 }
 
 function sheetOpts(sheet = 0) {
@@ -3339,7 +3322,6 @@ function buildControls() {
     slabChk.checked = slabMode;
     slabChk.addEventListener("change", () => {
         slabMode = slabChk.checked;
-        pagination = null;
         regenerate();
         afterPatchChange();
     });
@@ -3628,7 +3610,15 @@ function regenerate() {
     placedRhombs.clear();
     moveHints.clear();
     history.length = 0;
+    // **A new patch has no sheets.** The old split is of a net that no longer exists,
+    // and its face ids mean nothing against the new one — so the sheet list, the minis
+    // and the partition drawn back onto the tiling were all still showing the previous
+    // patch's answer. Cleared here rather than in each control, since every control on
+    // the patch line comes through this and none of them should have to remember.
+    pagination = null;
+    indexSheets();
     generate();
+    sizeTilingCanvas();
     fitView();
     refreshNetView();
     if (allRhombs.length === 0) {

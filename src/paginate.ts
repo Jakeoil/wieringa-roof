@@ -578,7 +578,7 @@ export interface PageRenderOpts {
      * curves where the rim turns outward. Drawn on both surfaces: every wall meets
      * both, and each copy shows half of it.
      */
-    rim?: Array<{ pts: P2[]; color: string; cutOuter?: boolean; cutOuterTail?: boolean }>;
+    rim?: Array<{ pts: P2[]; color: string }>;
     /**
      * Slab only: for a face on the lower surface, the face directly above it. The
      * mini fills the upper copy from a sheet's roof faces and the lower copy from its
@@ -1143,9 +1143,9 @@ function thumbnail(
  *
  * The inner base is the rim itself and is already drawn by the outline. The legs are
  * the divisions between one wall and the next, so they are what has to be seen. **The
- * outer base is left open** unless that wall's far edge is a cut — an unbroken line
- * all the way round would read as the edge of a second surface, which it is not: the
- * collar continues over the fold onto the other side.
+ * outer boundary is never drawn**: it is the middle of a rhombus, not the edge of
+ * anything. With the two rings touching at the reflection point and neither closed,
+ * a wall's two halves read as the one rhombus they are.
  */
 function rimMini(
     rim: PageRenderOpts["rim"],
@@ -1157,9 +1157,7 @@ function rimMini(
     const w = Math.max(0.09 * k, 0.12);
     const out: string[] = [];
     for (const e of rim)
-        for (const [M, cut] of (Tm ? [[T, e.cutOuter], [Tm, e.cutOuterTail]] : [[T, e.cutOuter]]) as Array<
-            [(q: P2) => P2, boolean | undefined]
-        >) {
+        for (const M of Tm ? [T, Tm] : [T]) {
             const q = e.pts.map(M);
             const pts = q.map((v) => `${n3(v[0])},${n3(v[1])}`).join(" ");
             out.push(`<polygon points="${pts}" fill="${e.color}" fill-opacity="0.75" stroke="none"/>`);
@@ -1167,10 +1165,6 @@ function rimMini(
                 `<polyline points="${vs.map((v) => `${n3(v[0])},${n3(v[1])}`).join(" ")}" fill="none" ` +
                 `stroke="${e.color}" stroke-width="${n3(w)}" stroke-linecap="round" stroke-linejoin="round"/>`;
             out.push(poly([q[1], q[2]]), poly([q[q.length - 1], q[0]]));
-            // Which side is outward differs between the two copies: round the upper
-            // surface the outer base is the wall's edge to the floor, round the lower
-            // one it is its edge to the roof.
-            if (cut) out.push(poly(q.slice(2)));
         }
     return out.join("\n");
 }

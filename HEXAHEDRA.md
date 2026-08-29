@@ -818,17 +818,46 @@ Four things fell out of doing it:
   which is half a model.
 - **The band stands outside the outline, and no one's bounds knew.** All three scaled to
   fit the *faces*, so the drawing ran off by exactly the band's depth.
-- **The closest approach is band to band**, not outline to outline, and it is now
-  exactly one side length.
+- **The two rings touch** at the reflection point. Held a side apart they cost scale on
+  every one of the three pictures, and with no outer boundary drawn on either, touching
+  is what makes a wall's two halves read as the one rhombus they are — which answers
+  "treat the rhombus as one where reasonable" without a special case for it.
+- **The outer boundary is never drawn.** It is the middle of a rhombus, not the edge of
+  anything.
 - **The mini and the map draw tiling y downward where the canvas draws it upward**, so
   their reflection axis has to sit *above* the patch for the copy to land below on the
   page. Getting that backwards put heads under tails on the map.
 
-**Not done: "treat the rhombus as one where reasonable."** Where a wall's two halves
-face each other across the axis they could be closed up and drawn as one whole rhombus
-rather than two open ones. Which pairs qualify, and whether the join is a straight or an
-angled line, is a judgement about the picture rather than something the geometry
-decides — it needs saying before it can be built.
+And one that had been chopping the picture all along: **`fitView` runs from
+`regenerate`, long before the unfolding does**, so the band did not exist yet when the
+view was measured. The canvas was being fitted to the faces alone and cutting the collar
+off the top and bottom. The band is built in `generate()` now, where the patch is.
+
+## The tiling canvas grows instead of the patch shrinking
+
+The canvas was square, so a slab's two surfaces had to shrink to fit the taller
+dimension: the patch came out at less than half the size it does without the slab, and
+the canvas's whole width went unused. **The width holds the patch and the height gives
+way** — the canvas grows downward, as far as the net canvas beside it, past which the
+two stop lining up and the drawing goes back to scaling down.
+
+| patch | with collar and tails | square canvas | grown canvas |
+|---|---|---|---|
+| Pe3 gen 2 | 64 × 110 | ×4.10 | **×7.06** |
+| Pe5 gen 3 | 136 × 259 | ×1.74 | **×3.05** |
+| St5 gen 2 | 53 × 102 | ×4.40 | **×7.73** |
+
+Between 72% and 76% bigger, and the width is what binds at a slab's aspect of about
+1.7 against the net canvas's 1.72.
+
+Splitting `viewBounds()` out of `fitView()` is what makes it possible: the canvas has to
+be sized from what it will hold, and until now only the fit knew that.
+
+**And a patch change clears the split.** Changing Seed or Gen left the old pagination in
+place — a split of a net that no longer exists, whose face ids mean nothing against the
+new one — so the sheet list, the minis and the partition drawn back onto the tiling were
+all still answering for the previous patch. Cleared in `regenerate()`, since every
+control on the patch line comes through it and none of them should have to remember.
 
 ## Open, and worth settling before building
 
