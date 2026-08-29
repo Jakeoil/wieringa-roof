@@ -24,7 +24,7 @@
 // Nothing here lays anything out. This is the solid; unfolding it is somebody else's
 // job, and the faces come out shaped the way `solidnet.ts` wants to be handed them.
 
-import { allRhombs, vertexMap, roundKey } from "./geometry.js";
+import { allRhombs, vertexMap, vertexList, roundKey } from "./geometry.js";
 import type { V3, Pt } from "./geometry.js";
 import { hexLayer, VERTICAL_AXIS } from "./hexlayer.js";
 import type { SolidFace, Net, P2 } from "./solidnet.js";
@@ -459,4 +459,91 @@ export function slabSurface(S: Slab): {
         indexOf: (v) => hs[v] ?? 0,
         indexRange: [Math.min(...hs), Math.max(...hs)],
     };
+}
+
+
+// ── the collar, drawn in plan ─────────────────────────────────────
+//
+// A wall stands vertically, so in a plan view of the patch it is a line and nothing
+// else — invisible on a thumbnail, and useless as a way of saying where the collar
+// goes. Two attempts got this wrong before the third: colored rim lines were too thin
+// to find, and walls folded flat outward about their own edges leaned into one another
+// at 63.4349° and overlapped confusingly wherever the rim turned.
+//
+// The answer is not to draw each wall in isolation but to draw the collar as one
+// **band around the outline** and let the rim's own corners divide it. Each wall gets
+// the trapezoid whose inner base is its rim edge and whose legs run out along the
+// **angle bisector** at each end — which is exactly what an offset of the outline by a
+// constant distance gives, since the two offset edges meet on the bisector. Mitred
+// that way the trapezoids tile the band: they share their legs, and no two can
+// overlap however the rim turns.
+
+const PHI = (1 + Math.sqrt(5)) / 2;
+/** Band width, as a fraction of the tiling's edge length. */
+export const COLLAR_DEPTH = PHI / 2;
+
+export interface CollarQuad {
+    /** inner a, inner b, outer b, outer a — so edge 0 is the rim and edge 2 the outer base */
+    quad: Array<[number, number]>;
+    /** the wall this stands for */
+    face: number;
+    /** the cell it hangs from, whose fill rules it follows */
+    rhomb: number;
+}
+
+/**
+ * The collar as a mitred band around the patch outline, in tiling coordinates.
+ *
+ * `S.rim` is already one ordered cycle — every patch measured has a simple closed
+ * boundary — so the band is built by offsetting each rim edge outward and intersecting
+ * consecutive offsets. Where two offsets are parallel the corner is straight and the
+ * intersection degenerates, so that case falls back to the plain offset point.
+ */
+export function collarBand(S: Slab): CollarQuad[] {
+    const n = S.rim.length;
+    if (!n) return [];
+    const pos = (v: number): [number, number] => {
+        const q = vertexList[v].pos;
+        return [q.x, q.y];
+    };
+    const A = S.rim.map((e) => pos(e.a));
+    const B = S.rim.map((e) => pos(e.b));
+
+    // Which way is out? The ring is traversed with the patch on one side throughout;
+    // the sign of its enclosed area says which, once and for all rather than per edge.
+    let area = 0;
+    for (let i = 0; i < n; i++) area += A[i][0] * B[i][1] - B[i][0] * A[i][1];
+    const sgn = area > 0 ? -1 : 1;
+
+    const L = Math.hypot(B[0][0] - A[0][0], B[0][1] - A[0][1]) || 1;
+    const h = COLLAR_DEPTH * L;
+
+    // each edge's outward normal, and a point on its offset line
+    const nrm: Array<[number, number]> = [];
+    for (let i = 0; i < n; i++) {
+        const ux = B[i][0] - A[i][0], uy = B[i][1] - A[i][1];
+        const d = Math.hypot(ux, uy) || 1;
+        nrm.push([(sgn * -uy) / d, (sgn * ux) / d]);
+    }
+
+    /** Where the offsets of edges i and j meet — the mitre, and so the bisector point. */
+    const corner = (i: number, j: number, v: [number, number]): [number, number] => {
+        const [nix, niy] = nrm[i], [njx, njy] = nrm[j];
+        const det = nix * njy - niy * njx;
+        if (Math.abs(det) < 1e-9) return [v[0] + nix * h, v[1] + niy * h];
+        // both offset lines pass at distance h from v along their own normals
+        const x = (njy * h - niy * h) / det;
+        const y = (nix * h - njx * h) / det;
+        return [v[0] + x, v[1] + y];
+    };
+
+    const out: CollarQuad[] = [];
+    for (let i = 0; i < n; i++) {
+        const prev = (i + n - 1) % n;
+        const next = (i + 1) % n;
+        const oa = corner(prev, i, A[i]);
+        const ob = corner(i, next, B[i]);
+        out.push({ quad: [A[i], B[i], ob, oa], face: S.rim[i].face, rhomb: S.rim[i].rhomb });
+    }
+    return out;
 }

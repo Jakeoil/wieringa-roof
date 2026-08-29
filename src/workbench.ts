@@ -29,8 +29,8 @@ import {
     ekey,
 } from "./unfold.js";
 import { cutTreeUnfold, assignLayers } from "./cuttree.js";
-import { slab, slabSurface } from "./slab.js";
-import type { RimEdge } from "./slab.js";
+import { slab, slabSurface, collarBand, COLLAR_DEPTH } from "./slab.js";
+import type { CollarQuad } from "./slab.js";
 import {
     paginateBest,
     renderPage,
@@ -295,7 +295,7 @@ function fitView() {
     // bottom of the patch and dropped clear of it, so the view has to make room.
     tailsAxis = null;
     if (slabMode) {
-        const gap = h * 0.08;
+        const gap = tailsGap(minY, maxY);
         // Reflect about a line one gap below the patch, so the two lie hinged along
         // the rim. The mirror of the *highest* point is the lowest thing on the
         // canvas, and that is what the view has to reach — not the patch height
@@ -538,19 +538,6 @@ function rhombFill(
     return makeGradient(ctx, base, sv[cLo], sv[cHi], vi[cLo], vi[cHi]);
 }
 
-/** Boundary edges of the patch — the ones a wall stands on. */
-function collarEdges(): Array<[Pt, Pt]> {
-    const out: Array<[Pt, Pt]> = [];
-    for (const e of edgeMap.values()) {
-        if (e.rhombIds.length !== 1) continue;
-        const a = vertexList[e.v1], b = vertexList[e.v2];
-        if (a && b) out.push([a.pos, b.pos]);
-    }
-    return out;
-}
-
-const COLLAR_COLOR = "#c8791f";
-
 /**
  * The second surface, and the rim that joins them.
  *
@@ -565,18 +552,8 @@ const COLLAR_COLOR = "#c8791f";
  * belong to the surface you are actually editing.
  */
 function drawTails(ctx: CanvasRenderingContext2D): void {
-    const rim = collarEdges();
-
-    // the rim on the patch itself, first — it is the same rim either way up
-    ctx.lineWidth = 3;
-    ctx.strokeStyle = COLLAR_COLOR;
-    ctx.beginPath();
-    for (const [a, b] of rim) {
-        const p = toScreen(a), q = toScreen(b);
-        ctx.moveTo(p.x, p.y);
-        ctx.lineTo(q.x, q.y);
-    }
-    ctx.stroke();
+    // The collar, as the band it is drawn as everywhere else.
+    drawCollar(ctx);
 
     if (tailsAxis === null) return;
     drawingTails = true;
@@ -612,16 +589,37 @@ function drawTails(ctx: CanvasRenderingContext2D): void {
         ctx.lineWidth = 1;
         ctx.stroke();
     }
-    ctx.lineWidth = 3;
-    ctx.strokeStyle = COLLAR_COLOR;
-    ctx.beginPath();
-    for (const [a, b] of rim) {
-        const p = toScreen(a), q = toScreen(b);
-        ctx.moveTo(p.x, p.y);
-        ctx.lineTo(q.x, q.y);
-    }
-    ctx.stroke();
+    drawCollar(ctx);
     drawingTails = false;
+}
+
+/**
+ * The collar band on the tiling canvas, the same mitred trapezoids the mini and the
+ * map draw. Legs only: the inner base is the patch outline, already there, and the
+ * outer base is left open because the band continues over the fold onto the other
+ * surface — closing it would draw a border that is not an edge of anything.
+ */
+function drawCollar(ctx: CanvasRenderingContext2D): void {
+    for (const w of slabBand) {
+        const q = w.quad.map((v) => toScreen(p(v[0], v[1])));
+        ctx.beginPath();
+        ctx.moveTo(q[0].x, q[0].y);
+        for (let i = 1; i < 4; i++) ctx.lineTo(q[i].x, q[i].y);
+        ctx.closePath();
+        ctx.fillStyle = wallFill(w.rhomb, slabMode ? rhombSheet.get(w.rhomb) : undefined);
+        ctx.globalAlpha = 0.75;
+        ctx.fill();
+        ctx.globalAlpha = 1;
+        const e = slabWallEdges.get(w.face);
+        const cut = drawingTails ? (e ? !netHinges.has(e.roof) : false) : e ? !netHinges.has(e.floor) : false;
+        ctx.strokeStyle = "#5a5f66";
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(q[1].x, q[1].y); ctx.lineTo(q[2].x, q[2].y);
+        ctx.moveTo(q[3].x, q[3].y); ctx.lineTo(q[0].x, q[0].y);
+        if (cut) { ctx.moveTo(q[2].x, q[2].y); ctx.lineTo(q[3].x, q[3].y); }
+        ctx.stroke();
+    }
 }
 
 // ── Isoglosses ────────────────────────────────────────────────────
@@ -1759,6 +1757,8 @@ let slabMode = false;
 let slabRhomb = new Map<number, number>();
 /** faces that are a roof rhombus, so the mini and the partition draw only those */
 let slabTops = new Set<number>();
+/** the wall faces, so the collar can be told from the two surfaces */
+let slabWalls = new Set<number>();
 let slabHeight: ((v: number) => number) | null = null;
 /**
  * The slab's own creases. Without these the sheets asked `analysis.creases` — the
@@ -1767,8 +1767,14 @@ let slabHeight: ((v: number) => number) | null = null;
  * like when its creases are being looked up in the wrong surface.
  */
 let slabCreases: Map<string, Crease> | null = null;
-/** the rim, in order, so the sheets can show where the collar attaches */
-let slabRim: RimEdge[] = [];
+/** the collar as a mitred band round the outline, in tiling coordinates */
+let slabBand: CollarQuad[] = [];
+/**
+ * Per wall, the edge keys of its two long sides — the one against the roof and the one
+ * against the floor. Whichever of them the unfolding cut is the side whose outer base
+ * gets drawn; a wall is told apart by height, since its roof corners are the high pair.
+ */
+let slabWallEdges = new Map<number, { roof: string; floor: string }>();
 /** floor face id -> the roof face directly above it */
 let topOfFloor = new Map<number, number>();
 /** group, type, axis pair and default fill per slab face */
@@ -1808,15 +1814,18 @@ function runTraceBody(): void {
     traceEvents = [];
     slabRhomb = new Map();
     slabTops = new Set();
+    slabWalls = new Set();
     slabHeight = null;
     slabCreases = null;
-    slabRim = [];
+    slabBand = [];
+    slabWallEdges = new Map();
     topOfFloor = new Map();
     let res;
     if (slabMode) {
         const S = slab();
         const sur = slabSurface(S);
         slabStyle = new Map();
+        slabWalls = new Set(S.wall.map((f) => f.id));
         for (const f of S.faces) {
             slabRhomb.set(f.id, f.rhomb);
             slabStyle.set(f.id, {
@@ -1827,7 +1836,7 @@ function runTraceBody(): void {
         }
         slabHeight = sur.indexOf;
         slabCreases = sur.analysis.creases;
-        slabRim = S.rim;
+        slabBand = collarBand(S);
         topOfFloor = new Map(S.floor.map((f, i) => [f.id, S.top[i].id]));
         slabRange = sur.indexRange;
         res = cutTreeUnfold({ surface: sur.analysis, edges: sur.edges, trace: traceEvents });
@@ -1854,6 +1863,27 @@ function runTraceBody(): void {
     // parent tree at all — degrading continuation back to plain lowest-fit, the
     // very confetti it exists to avoid.
     for (const k of res.hinges) netHinges.add(k);
+    if (slabMode && slabHeight) {
+        const h = slabHeight;
+        for (const nr of netRhombs) {
+            if (!slabWalls.has(nr.sourceId)) continue;
+            // A wall has two long sides — the one against the roof and the one against
+            // the floor — and two vertical ones. Told apart by how far their ends
+            // differ in height: a long side climbs one index step, a vertical side
+            // drops a whole unit, which is √5 of them. Read off rather than taken from
+            // the corner order, which is a detail of how the cell was built.
+            const v = nr.verts;
+            const sides = [[0, 1], [1, 2], [2, 3], [3, 0]]
+                .map(([i, j]) => ({
+                    key: ekey(v[i], v[j]),
+                    rise: Math.abs(h(v[i]) - h(v[j])),
+                    mid: (h(v[i]) + h(v[j])) / 2,
+                }))
+                .sort((x, y) => x.rise - y.rise);
+            const [p1, p2] = sides.slice(0, 2).sort((x, y) => y.mid - x.mid);
+            if (p1 && p2) slabWallEdges.set(nr.sourceId, { roof: p1.key, floor: p2.key });
+        }
+    }
     refreshNetView();
 
     // Layers for the completed net, pinned for the whole replay.
@@ -2266,36 +2296,55 @@ function tilingPoly(faceId: number): [number, number][] | null {
  * vertical, and those meet at `arccos(1/√5) = 63.4349°`, so the flap leans at exactly
  * that and reaches one side length out.
  */
-function rimForSheets(sheet: number): Array<{ quad: Array<[number, number]>; color: string }> {
-    const C = 1 / Math.sqrt(5);   // cos 63.4349
-    const S = 2 / Math.sqrt(5);   // sin 63.4349
-    return slabRim.flatMap((e) => {
-        // **Only this sheet's walls.** A mini says what you are about to hold, so a
-        // wall that went to another sheet does not belong on it — drawn in that other
-        // sheet's color it read as though the collar were partly here and partly
-        // elsewhere, when what it meant was "not on this page at all". Before the net
-        // has been split there is one sheet and everything is on it.
-        const sh = faceSheet.size ? faceSheet.get(e.face) : 0;
-        if (sh !== sheet) return [];
-        const va = vertexList[e.a], vb = vertexList[e.b];
-        const r = allRhombs[e.rhomb];
-        if (!va || !vb || !r) return [];
-        const ax = va.pos.x, ay = va.pos.y, bx = vb.pos.x, by = vb.pos.y;
-        const ux = bx - ax, uy = by - ay;
-        const L = Math.hypot(ux, uy) || 1;
-        // Outward is away from the cell the wall hangs from — the only thing that
-        // decides which side of the rim the flap falls on.
-        const cx = r.verts.reduce((t, q) => t + q.x, 0) / 4;
-        const cy = r.verts.reduce((t, q) => t + q.y, 0) / 4;
-        let nx = -uy / L, ny = ux / L;
-        if (nx * (cx - ax) + ny * (cy - ay) > 0) { nx = -nx; ny = -ny; }
-        const dx = (ux / L) * L * C + nx * L * S;
-        const dy = (uy / L) * L * C + ny * L * S;
+function rimForSheets(
+    sheet: number | "all",
+): Array<{ quad: Array<[number, number]>; color: string; cutOuter?: boolean; cutOuterTail?: boolean }> {
+    return slabBand.flatMap((w) => {
+        // **Only this sheet's walls**, on a sheet. A wall that went elsewhere drawn in
+        // that other sheet's color read as though the collar were partly here and
+        // partly away; what it meant was "not on this page". The map wants all of them,
+        // each in the color of the sheet it went to.
+        const sh = faceSheet.size ? faceSheet.get(w.face) : 0;
+        if (sheet !== "all" && sh !== sheet) return [];
+        const e = slabWallEdges.get(w.face);
         return [{
-            quad: [[ax, ay], [bx, by], [bx + dx, by + dy], [ax + dx, ay + dy]] as Array<[number, number]>,
-            color: sheetColors[sheet] ?? "#6a5acd",
+            quad: w.quad,
+            color: wallFill(w.rhomb, sheet === "all" ? sh : sheet),
+            // The band runs over the fold onto the other side, so its outer base is
+            // only a real edge where the unfolding cut it.
+            cutOuter: e ? !netHinges.has(e.floor) : false,
+            cutOuterTail: e ? !netHinges.has(e.roof) : false,
         }];
     });
+}
+
+/**
+ * A wall's fill: the rules of the rhombus it hangs from. Under a color scheme that is
+ * the cell's own color, so the collar reads as part of the cell rather than as a
+ * separate object; once the net is split it is the sheet's color, like everything else.
+ */
+function wallFill(rid: number, sheet?: number): string {
+    if (sheet != null && faceSheet.size) return sheetColors[sheet] ?? "#6a5acd";
+    const r = allRhombs[rid];
+    if (!r) return "#c8791f";
+    const vi = r.vertIndices.map(displayIndex);
+    return tileFill(tileColor, r.group, r.thick, Math.min(...vi), r.pair) ?? r.fill;
+}
+
+/**
+ * How far apart to set the two surfaces.
+ *
+ * Each carries a collar band standing `φ/2` of a side length outside its outline, so a
+ * gap chosen from the patch alone lets the two bands run into each other in the middle
+ * — which is what happened. Two band depths and a little air, or a fraction of the
+ * patch, whichever is larger.
+ */
+function tailsGap(lo: number, hi: number): number {
+    const side = allRhombs.length
+        ? Math.hypot(allRhombs[0].verts[1].x - allRhombs[0].verts[0].x,
+                     allRhombs[0].verts[1].y - allRhombs[0].verts[0].y)
+        : 1;
+    return Math.max((hi - lo) * 0.08, 2.4 * COLLAR_DEPTH * side);
 }
 
 /**
@@ -2312,7 +2361,7 @@ function miniTailsAxis(): number | undefined {
         if (v.y < lo) lo = v.y;
         if (v.y > hi) hi = v.y;
     }
-    return 2 * hi + (hi - lo) * 0.08;
+    return 2 * hi + tailsGap(lo, hi);
 }
 
 function sheetOpts(sheet = 0) {
@@ -2413,6 +2462,9 @@ function sheetSvg(i: number): string {
     return i === -1
         ? renderMap(pagination!, placedNow, netHinges, ekey, {
               ...sheetOpts(),
+              // The map is every sheet at once, so it takes the whole collar, each
+              // wall in the color of the sheet it went to.
+              rim: slabMode ? rimForSheets("all") : undefined,
               standalone: false,
           })
         : renderPage(

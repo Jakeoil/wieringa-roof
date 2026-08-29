@@ -572,13 +572,12 @@ export interface PageRenderOpts {
      */
     tailsAxis?: number;
     /**
-     * Slab only: the collar, in tiling coordinates. A wall stands vertically and has
-     * no plan view, so each one is given here already **folded flat outward** about
-     * the rim edge it stands on — a real golden rhombus of real area, rather than the
-     * line it would otherwise collapse to. Drawn on both surfaces, since every wall
-     * meets both, and filled in the color of the sheet it went to.
+     * Slab only: the collar, in tiling coordinates, as a mitred band around the
+     * outline — see `collarBand` in `slab.ts`. Each entry is one wall's trapezoid,
+     * corners in the order inner a, inner b, outer b, outer a, so edge 0 is the rim
+     * and edge 2 the outer base. Drawn on both surfaces, since every wall meets both.
      */
-    rim?: Array<{ quad: P2[]; color: string }>;
+    rim?: Array<{ quad: P2[]; color: string; cutOuter?: boolean; cutOuterTail?: boolean }>;
     /**
      * Slab only: for a face on the lower surface, the face directly above it. The
      * mini fills the upper copy from a sheet's roof faces and the lower copy from its
@@ -1047,6 +1046,15 @@ function thumbnail(
         }
     }
     if (!shape.size) return "";
+    // The collar stands outside the outline, so the bounds have to include it or the
+    // drawing runs off the page — which it did, by exactly the band's depth.
+    for (const w of o.rim ?? [])
+        for (const q of w.quad) {
+            if (q[0] < x0) x0 = q[0];
+            if (q[1] < y0) y0 = q[1];
+            if (q[0] > x1) x1 = q[0];
+            if (q[1] > y1) y1 = q[1];
+        }
     if (o.tailsAxis != null) {
         const lo = o.tailsAxis - y1, hi = o.tailsAxis - y0;
         if (lo < y0) y0 = lo;
@@ -1129,6 +1137,15 @@ function thumbnail(
 }
 
 /** The rim, drawn on each surface in the color of the sheet its collar went to. */
+/**
+ * The collar band.
+ *
+ * The inner base is the rim itself and is already drawn by the outline. The legs are
+ * the divisions between one wall and the next, so they are what has to be seen. **The
+ * outer base is left open** unless that wall's far edge is a cut — an unbroken line
+ * all the way round would read as the edge of a second surface, which it is not: the
+ * collar continues over the fold onto the other side.
+ */
 function rimMini(
     rim: PageRenderOpts["rim"],
     T: (q: P2) => P2,
@@ -1139,12 +1156,20 @@ function rimMini(
     const w = Math.max(0.09 * k, 0.12);
     const out: string[] = [];
     for (const e of rim)
-        for (const M of Tm ? [T, Tm] : [T]) {
-            const pts = e.quad.map(M).map((q) => `${n3(q[0])},${n3(q[1])}`).join(" ");
-            out.push(
-                `<polygon points="${pts}" fill="${e.color}" fill-opacity="0.75" ` +
-                    `stroke="${e.color}" stroke-width="${n3(w)}" stroke-linejoin="round"/>`,
-            );
+        for (const [M, cut] of (Tm ? [[T, e.cutOuter], [Tm, e.cutOuterTail]] : [[T, e.cutOuter]]) as Array<
+            [(q: P2) => P2, boolean | undefined]
+        >) {
+            const q = e.quad.map(M);
+            const pts = q.map((v) => `${n3(v[0])},${n3(v[1])}`).join(" ");
+            out.push(`<polygon points="${pts}" fill="${e.color}" fill-opacity="0.75" stroke="none"/>`);
+            const seg = (a: P2, b: P2) =>
+                `<line x1="${n3(a[0])}" y1="${n3(a[1])}" x2="${n3(b[0])}" y2="${n3(b[1])}" ` +
+                `stroke="${e.color}" stroke-width="${n3(w)}" stroke-linecap="round"/>`;
+            out.push(seg(q[1], q[2]), seg(q[3], q[0]));
+            // Which side is outward differs between the two copies: round the upper
+            // surface the outer base is the wall's edge to the floor, round the lower
+            // one it is its edge to the roof.
+            if (cut) out.push(seg(q[2], q[3]));
         }
     return out.join("\n");
 }
@@ -1267,6 +1292,23 @@ export function renderMap(
             if (q[1] > y1) y1 = q[1];
         }
     }
+    // The collar stands outside the outline, so the bounds have to include it or the
+    // drawing runs off the page — which it did, by exactly the band's depth.
+    for (const w of o.rim ?? [])
+        for (const q of w.quad) {
+            if (q[0] < x0) x0 = q[0];
+            if (q[1] < y0) y0 = q[1];
+            if (q[0] > x1) x1 = q[0];
+            if (q[1] > y1) y1 = q[1];
+        }
+    // Room for the tails copy, reflected about a line beyond the patch, the same way
+    // the mini makes room for it. The cover sheet was showing the upper surface only,
+    // which is half a slab.
+    if (o.tailsAxis != null) {
+        const lo = o.tailsAxis - y1, hi = o.tailsAxis - y0;
+        if (lo < y0) y0 = lo;
+        if (hi > y1) y1 = hi;
+    }
     const availW = pageW - 2 * margin;
     const availH = pageH - 2 * margin - 14;
     const k = Math.min(availW / (x1 - x0 || 1), availH / (y1 - y0 || 1));
@@ -1285,18 +1327,31 @@ export function renderMap(
             `font-weight="bold" fill="#111">Map — ${pg.pages.length} sheets</text>`,
     );
 
+    const axis = o.tailsAxis;
+    const Tm = axis == null ? null : (q: P2): P2 => T([q[0], axis - q[1]]);
+
     // every face faint, then each sheet in its color, then each sheet's outline
-    for (const [, pts] of shape) {
-        const d = pts.map(T).map((q) => `${n3(q[0])},${n3(q[1])}`).join(" ");
-        out.push(
-            `<polygon points="${d}" fill="none" stroke="${PATCH_GRAY}" ` +
-                `stroke-width="${n3(Math.max(0.06 * k, 0.12))}"/>`,
-        );
-    }
+    for (const [, pts] of shape)
+        for (const M of Tm ? [T, Tm] : [T]) {
+            const d = pts.map(M).map((q) => `${n3(q[0])},${n3(q[1])}`).join(" ");
+            out.push(
+                `<polygon points="${d}" fill="none" stroke="${PATCH_GRAY}" ` +
+                    `stroke-width="${n3(Math.max(0.06 * k, 0.12))}"/>`,
+            );
+        }
+    if (o.rim) out.push(rimMini(o.rim, T, Tm, k));
     pg.pages.forEach((page, i) => {
         out.push(
             patchMini(pg, i, shape, placed, hinges, ekey, T, colors[i % colors.length], k, false),
         );
+        if (Tm) {
+            const below = o.tailsOf
+                ? page.faceIds.map((f) => o.tailsOf!(f)).filter((f): f is number => f !== undefined)
+                : undefined;
+            out.push(
+                patchMini(pg, i, shape, placed, hinges, ekey, Tm, colors[i % colors.length], k, false, below),
+            );
+        }
         // sheet number at the centroid of its region
         let cx = 0;
         let cy = 0;

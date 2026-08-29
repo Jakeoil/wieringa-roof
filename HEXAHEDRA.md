@@ -775,6 +775,39 @@ argument it should shade as seen from below. A corner shared by a floor face and
 has one id and one height, so this cannot simply be negated per corner; it needs
 deciding rather than patching.
 
+## The collar, drawn the same way in all three places
+
+Three pictures show the patch — the **tiling canvas**, the sheet **mini**, and the
+cover-sheet **map** — and the collar had a different answer in each, none of them good.
+Jake's rule replaces all three.
+
+> The collar is a **ring of trapezoids** around each outline. The inner base is the rim
+> edge. The altitude is **φ/2** of a side. The legs **bisect the angle** between
+> consecutive inner bases. The outer base is not drawn unless it is a cut. The fill
+> follows the rules of the rhombus the wall hangs from.
+
+The mitre is what makes it work, and it is the reason the earlier attempts failed. Two
+consecutive walls drawn in isolation lean into each other and overlap wherever the rim
+turns — that is what the folded-out golden rhombi did. Offset the *outline* by a
+constant depth instead and the corner falls on the bisector automatically, because both
+offset edges are equidistant from it. So the trapezoids share their legs exactly and
+**tile the band**: measured on four patches, consecutive legs coincide to 0.0, and
+every outer corner sits its depth from its own base to 5e-15.
+
+`collarBand()` in `slab.ts` is the one implementation; the canvas, the mini and the map
+all draw its output.
+
+Three things fell out of doing it:
+
+- **The map had no tails copy at all** — it was showing the upper surface of a solid,
+  which is half a model. It has both now, each with its own collar ring.
+- **The band stands outside the outline, and no one's bounds knew.** The map and the
+  mini both scale to fit the *faces*, so the drawing ran off the page by exactly the
+  band's depth. Both now measure the collar too.
+- **The two collars met in the middle.** The gap between the surfaces was a fraction of
+  the patch, chosen before there was anything standing outside the outline. It is now
+  at least two band depths, so the rings stay clear of each other.
+
 ## Open, and worth settling before building
 
 1. **Settled: they interlock, and they need turning over to do it.** Every one of the
