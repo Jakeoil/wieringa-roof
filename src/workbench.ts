@@ -583,7 +583,12 @@ function drawTails(ctx: CanvasRenderingContext2D): void {
 
     for (const r of allRhombs) {
         const sv = r.verts.map(toScreen);
-        const vi = r.vertIndices.map(displayIndex);
+        // **Seen from underneath.** The floor is the roof translated down, so its
+        // heights are the same numbers — but you are looking at the other side of it,
+        // and from there a hill is a trough. Drawn with the roof's own heights the two
+        // copies came out shaded identically, which made the pair look symmetric when
+        // it is not. Same reversal the sheets call `dales`.
+        const vi = r.vertIndices.map((i) => idxLo + idxHi - displayIndex(i));
         const [cLo, cHi] = extremeCorners(vi);
         ctx.beginPath();
         ctx.moveTo(sv[0].x, sv[0].y);
@@ -1764,6 +1769,8 @@ let slabHeight: ((v: number) => number) | null = null;
 let slabCreases: Map<string, Crease> | null = null;
 /** the rim, in order, so the sheets can show where the collar attaches */
 let slabRim: RimEdge[] = [];
+/** floor face id -> the roof face directly above it */
+let topOfFloor = new Map<number, number>();
 /** group, type, axis pair and default fill per slab face */
 /** sheet index per rhombus, for drawing a slab partition on the tiling */
 let rhombSheet = new Map<number, number>();
@@ -1804,6 +1811,7 @@ function runTraceBody(): void {
     slabHeight = null;
     slabCreases = null;
     slabRim = [];
+    topOfFloor = new Map();
     let res;
     if (slabMode) {
         const S = slab();
@@ -1820,6 +1828,7 @@ function runTraceBody(): void {
         slabHeight = sur.indexOf;
         slabCreases = sur.analysis.creases;
         slabRim = S.rim;
+        topOfFloor = new Map(S.floor.map((f, i) => [f.id, S.top[i].id]));
         slabRange = sur.indexRange;
         res = cutTreeUnfold({ surface: sur.analysis, edges: sur.edges, trace: traceEvents });
     } else {
@@ -2246,15 +2255,45 @@ function tilingPoly(faceId: number): [number, number][] | null {
  * sheet its wall went to. A collar stands vertically and has no plan view, so on the
  * mini it can only show as the edge it stands on.
  */
-function rimForSheets(): Array<{ a: [number, number]; b: [number, number]; color: string }> {
+/**
+ * The collar as the mini wants it: each wall folded flat outward about the rim edge
+ * it stands on, in tiling coordinates, colored by the sheet it went to.
+ *
+ * A wall is vertical, so in plan it is a line — and a line a fraction of a millimetre
+ * long on a thumbnail is not something you can see or count. Folded out about its own
+ * edge it becomes what it actually is, a golden rhombus of real area, lying against
+ * the rim like a flap. The angle is not a drawing choice: a wall spans `E_m` and the
+ * vertical, and those meet at `arccos(1/√5) = 63.4349°`, so the flap leans at exactly
+ * that and reaches one side length out.
+ */
+function rimForSheets(sheet: number): Array<{ quad: Array<[number, number]>; color: string }> {
+    const C = 1 / Math.sqrt(5);   // cos 63.4349
+    const S = 2 / Math.sqrt(5);   // sin 63.4349
     return slabRim.flatMap((e) => {
-        const a = vertexList[e.a], b = vertexList[e.b];
-        if (!a || !b) return [];
-        const sh = faceSheet.get(e.face);
+        // **Only this sheet's walls.** A mini says what you are about to hold, so a
+        // wall that went to another sheet does not belong on it — drawn in that other
+        // sheet's color it read as though the collar were partly here and partly
+        // elsewhere, when what it meant was "not on this page at all". Before the net
+        // has been split there is one sheet and everything is on it.
+        const sh = faceSheet.size ? faceSheet.get(e.face) : 0;
+        if (sh !== sheet) return [];
+        const va = vertexList[e.a], vb = vertexList[e.b];
+        const r = allRhombs[e.rhomb];
+        if (!va || !vb || !r) return [];
+        const ax = va.pos.x, ay = va.pos.y, bx = vb.pos.x, by = vb.pos.y;
+        const ux = bx - ax, uy = by - ay;
+        const L = Math.hypot(ux, uy) || 1;
+        // Outward is away from the cell the wall hangs from — the only thing that
+        // decides which side of the rim the flap falls on.
+        const cx = r.verts.reduce((t, q) => t + q.x, 0) / 4;
+        const cy = r.verts.reduce((t, q) => t + q.y, 0) / 4;
+        let nx = -uy / L, ny = ux / L;
+        if (nx * (cx - ax) + ny * (cy - ay) > 0) { nx = -nx; ny = -ny; }
+        const dx = (ux / L) * L * C + nx * L * S;
+        const dy = (uy / L) * L * C + ny * L * S;
         return [{
-            a: [a.pos.x, a.pos.y] as [number, number],
-            b: [b.pos.x, b.pos.y] as [number, number],
-            color: sh != null ? (sheetColors[sh] ?? "#888") : "#c8791f",
+            quad: [[ax, ay], [bx, by], [bx + dx, by + dy], [ax + dx, ay + dy]] as Array<[number, number]>,
+            color: sheetColors[sheet] ?? "#6a5acd",
         }];
     });
 }
@@ -2298,7 +2337,11 @@ function sheetOpts(sheet = 0) {
         indexRange: (slabMode ? slabRange : [idxLo, idxHi]) as [number, number],
         tilingPoly,
         tailsAxis: miniTailsAxis(),
-        rim: slabMode ? rimForSheets() : undefined,
+        rim: slabMode ? rimForSheets(sheet) : undefined,
+        // The mini fills its upper copy from a sheet's roof faces and its lower copy
+        // from that sheet's floor faces, which is what makes the second copy say
+        // anything at all about the sheet it is on.
+        tailsOf: slabMode ? (id: number) => topOfFloor.get(id) : undefined,
         sheetColor: sheetColors[sheet] ?? "#6a5acd",
         sheetColors: sheetColors,
     };
@@ -3218,7 +3261,7 @@ function buildControls() {
     const slabWrap = document.createElement("label");
     slabWrap.style.cssText = "font-size:13px;display:inline-flex;align-items:center;gap:5px";
     slabWrap.title =
-        "Unfold the solid rather than the surface: the same rhombi on top, the same " +
+        "Unfold the slab rather than the surface: the same rhombi on top, the same " +
         "again as a floor one side length down, and a wall on every boundary edge.";
     const slabChk = document.createElement("input");
     slabChk.type = "checkbox";
@@ -3229,7 +3272,7 @@ function buildControls() {
         regenerate();
         afterPatchChange();
     });
-    slabWrap.append(slabChk, document.createTextNode("solid"));
+    slabWrap.append(slabChk, document.createTextNode("slab"));
     shared.appendChild(slabWrap);
 
 
@@ -3278,7 +3321,14 @@ function buildControls() {
     });
 
     heightWrap.append(document.createTextNode("Height "), heightSlider, heightOut);
-    controls.insertBefore(heightWrap, genLabel.nextSibling);
+    // Appended, not inserted. This read `controls.insertBefore(heightWrap,
+    // genLabel.nextSibling)` and worked only by accident: `genLabel` belongs to the
+    // *shared* bar, and its next sibling happened to be null, so `insertBefore` fell
+    // back to appending. The moment anything was added to the shared bar after it —
+    // the solid checkbox — that sibling became a real node with the wrong parent and
+    // the call threw, taking the whole control bar down with it. The two inserts
+    // below are honest ones: `heightWrap` really is a child of `controls`.
+    controls.appendChild(heightWrap);
     syncHeight(false);
 
     // Color, shading and isoglosses are one field each, shown on more than one

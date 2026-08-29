@@ -58,6 +58,20 @@ longer.
 
 ## Naming and vocabulary
 
+**The Workbench's own parts**, so a walkthrough can name them:
+
+| name | what it is |
+|---|---|
+| **tiling canvas** | the left figure in *Tiling vs Net* — the patch itself |
+| **net canvas** | the right figure — the development |
+| **patch line** | the top control bar: Seed, Gen, **slab**. What is being unfolded |
+| **drawing line** | the second bar: Height, Color, isoglosses. How it is drawn |
+| **slab** | the checkbox on the patch line. Unfolds the solid rather than the surface. Called *solid* for a day and renamed: the thing itself is the slab |
+| **heads / tails** | the upper surface and the lower one, the latter seen from underneath |
+| **collar** | the ring of walls; a **wall** is one of them, standing on a **rim** edge |
+| **mini** | the locator thumbnail in a sheet's corner |
+| **map** | the same drawing full size, every sheet in its own color |
+
 **Penrose vertex figures.** Conway named the seven vertex figures of the P2
 (kite-and-dart) tiling: sun · star · ace · deuce · jack · queen · king. (The ace is
 sometimes the *fool's kite*; naming varies between sources.)

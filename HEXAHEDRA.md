@@ -697,7 +697,13 @@ to the tails pass alone or the patch above it flips too. And the view has to rea
 mirror of the *highest* point, `axis − maxY`; subtracting the patch height instead
 leaves the axis's own offset in and crops the copy by exactly `minY`.
 
-**The mini reflects too**, and carries the rim in each edge's **sheet color** — so a
+**The mini reflects too**, and carries **only this sheet's walls, in this sheet's
+color**. Showing every wall colored by whichever sheet it went to read as though the
+collar were partly here and partly elsewhere; what it meant was "not on this page at
+all", and a mini says what you are about to hold. Checked on `Pe3` gen 2: 4 + 8 + 6 =
+18 walls across three sheets, the whole rim partitioned with nothing doubled.
+
+An earlier draft carried the rim in each edge's sheet color — so a
 sheet's mini says not only which faces it holds but which parts of the collar go with
 them. The mini draws tiling `y` downward where the canvas draws it upward, so its axis
 sits above the patch rather than below, which puts the copy in the same place on the
@@ -737,6 +743,37 @@ The tails copy also drew from its own simplified painting code, and came out fla
 faded where the patch above it was shaded and colored, and did not follow the replay at
 all. Both now call one `rhombFill`, and the tails pass carries the same placed-and-
 current wash — a copy that does not look like what it copies is worse than no copy.
+
+## The tails copy looked symmetric because it was — and that was the bug
+
+Jake, walking the gen-2 patches: *"the tiling canvas mirror images are always
+symmetric. I'm skeptical. The bottom half is a tail configuration so mountains and
+valleys would at least be reversed."*
+
+Both halves of that are right, and they fit together. Measured on all six seeds at
+generations 2 and 3:
+
+> **The horizontal mirror of a patch is congruent to the patch, heights and all** — Pe5
+> and St5 after a 36° turn, the other four after 180°. Not one is congruent to its
+> mirror with the heights *reversed*.
+
+So a reflected copy drawn with the roof's own heights is not merely similar to the
+patch, it is **the same picture**, and no amount of staring would have found anything
+in it. The one thing that distinguishes the lower surface is exactly the thing that had
+been left out.
+
+The floor is the roof translated down, so its heights are the same numbers — but you
+are looking at the other side of it, and from there a hill is a trough. The tails copy
+now reverses them, the same `dales` reversal the sheets use, and the two halves are
+genuinely different pictures. It is the plan-view form of the fact `tools/pe1.mjs`
+already asserts: **every mountain on heads is a valley on tails.**
+
+Still open, and the same question one level along: a **floor face on a printed sheet**
+is shaded by its own corner heights, which are the roof's minus √5 — the same pattern,
+not the reversed one. Its ink faces downward in the finished model, so by the same
+argument it should shade as seen from below. A corner shared by a floor face and a wall
+has one id and one height, so this cannot simply be negated per corner; it needs
+deciding rather than patching.
 
 ## Open, and worth settling before building
 

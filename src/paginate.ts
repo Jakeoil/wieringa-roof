@@ -572,12 +572,20 @@ export interface PageRenderOpts {
      */
     tailsAxis?: number;
     /**
-     * Slab only: the rim, in tiling coordinates, each edge carrying the color of the
-     * sheet its wall went to. The collar stands vertically and has no plan view, so
-     * where it attaches shows as a colored edge — on both surfaces, since every wall
-     * meets both.
+     * Slab only: the collar, in tiling coordinates. A wall stands vertically and has
+     * no plan view, so each one is given here already **folded flat outward** about
+     * the rim edge it stands on — a real golden rhombus of real area, rather than the
+     * line it would otherwise collapse to. Drawn on both surfaces, since every wall
+     * meets both, and filled in the color of the sheet it went to.
      */
-    rim?: Array<{ a: P2; b: P2; color: string }>;
+    rim?: Array<{ quad: P2[]; color: string }>;
+    /**
+     * Slab only: for a face on the lower surface, the face directly above it. The
+     * mini fills the upper copy from a sheet's roof faces and the lower copy from its
+     * floor ones — without it a sheet holding only floor faces highlighted nothing at
+     * all on the mini's second copy, which is most of what the second copy is for.
+     */
+    tailsOf?: (faceId: number) => number | undefined;
     // The tiling itself, for the locator mini: the planar position of a face in the
     // Penrose patch, which is what you can actually recognize. The developed net is
     // a shape nobody has seen before; the tiling is the picture on every other page.
@@ -1103,7 +1111,12 @@ function thumbnail(
     if (o.tailsAxis != null) {
         const axis = o.tailsAxis;
         const Tm = (q: P2): P2 => T([q[0], axis - q[1]]);
-        g.push(patchMini(pg, pageIndex, shape, placed, hinges, ekey, Tm, color, k));
+        const below = o.tailsOf
+            ? pg.pages[pageIndex].faceIds
+                  .map((f) => o.tailsOf!(f))
+                  .filter((f): f is number => f !== undefined)
+            : undefined;
+        g.push(patchMini(pg, pageIndex, shape, placed, hinges, ekey, Tm, color, k, true, below));
         g.push(rimMini(o.rim, T, Tm, k));
     } else if (o.rim) {
         g.push(rimMini(o.rim, T, null, k));
@@ -1123,14 +1136,14 @@ function rimMini(
     k: number,
 ): string {
     if (!rim?.length) return "";
-    const w = Math.max(0.3 * k, 0.4);
+    const w = Math.max(0.09 * k, 0.12);
     const out: string[] = [];
     for (const e of rim)
         for (const M of Tm ? [T, Tm] : [T]) {
-            const a = M(e.a), b = M(e.b);
+            const pts = e.quad.map(M).map((q) => `${n3(q[0])},${n3(q[1])}`).join(" ");
             out.push(
-                `<line x1="${n3(a[0])}" y1="${n3(a[1])}" x2="${n3(b[0])}" y2="${n3(b[1])}" ` +
-                    `stroke="${e.color}" stroke-width="${n3(w)}" stroke-linecap="round"/>`,
+                `<polygon points="${pts}" fill="${e.color}" fill-opacity="0.75" ` +
+                    `stroke="${e.color}" stroke-width="${n3(w)}" stroke-linejoin="round"/>`,
             );
         }
     return out.join("\n");
@@ -1151,9 +1164,10 @@ function patchMini(
     color: string,
     k: number,
     withFaint = true,
+    hereIds?: number[],
 ): string {
     const page = pg.pages[pageIndex];
-    const here = new Set(page.faceIds);
+    const here = new Set(hereIds ?? page.faceIds);
 
     // Weights scale with the mini but never vanish: at thumbnail size a width
     // proportional to k alone rounds to nothing and the outline disappears.
