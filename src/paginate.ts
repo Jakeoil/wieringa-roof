@@ -29,6 +29,19 @@ import type { FillMode } from "./geometry.js";
 
 type P2 = [number, number];
 
+/**
+ * How the net treats one of a collar cell's legs: the vertical edge between two
+ * neighboring walls. It is an edge of the model like any other and is either kept as a
+ * fold or cut and taped, so it is drawn like any other — dashed for a fold, unbroken
+ * for a cut, colored by which way it goes.
+ */
+export interface CollarEdge {
+    fold: number;
+    mountain: boolean;
+    /** true if the unfolding kept it as a hinge */
+    crease: boolean;
+}
+
 export interface Join {
     letter: string; // A, B, … AA, AB — unique per severed hinge
     key: string; // edge key of the severed hinge
@@ -578,7 +591,13 @@ export interface PageRenderOpts {
      * curves where the rim turns outward. Drawn on both surfaces: every wall meets
      * both, and each copy shows half of it.
      */
-    rim?: Array<{ pts: P2[]; color: string }>;
+    rim?: Array<{
+        pts: P2[];
+        color: string;
+        /** the legs at `pts[0]` and at `pts[1]`, as the net actually treats them */
+        legA?: CollarEdge;
+        legB?: CollarEdge;
+    }>;
     /**
      * Slab only: for a face on the lower surface, the face directly above it. The
      * mini fills the upper copy from a sheet's roof faces and the lower copy from its
@@ -1161,10 +1180,15 @@ function rimMini(
             const q = e.pts.map(M);
             const pts = q.map((v) => `${n3(v[0])},${n3(v[1])}`).join(" ");
             out.push(`<polygon points="${pts}" fill="${e.color}" fill-opacity="0.75" stroke="none"/>`);
-            const poly = (vs: P2[]) =>
-                `<polyline points="${vs.map((v) => `${n3(v[0])},${n3(v[1])}`).join(" ")}" fill="none" ` +
-                `stroke="${e.color}" stroke-width="${n3(w)}" stroke-linecap="round" stroke-linejoin="round"/>`;
-            out.push(poly([q[1], q[2]]), poly([q[q.length - 1], q[0]]));
+            const leg = (a: P2, b: P2, st: CollarEdge | undefined) => {
+                const col = st ? (st.mountain ? M_COLOR : V_COLOR) : e.color;
+                const dash = st?.crease ? ` stroke-dasharray="${DASH[st.fold] ?? "2 2"}"` : "";
+                return (
+                    `<line x1="${n3(a[0])}" y1="${n3(a[1])}" x2="${n3(b[0])}" y2="${n3(b[1])}" ` +
+                    `stroke="${col}" stroke-width="${n3(st ? w * 1.6 : w)}" stroke-linecap="round"${dash}/>`
+                );
+            };
+            out.push(leg(q[1], q[2], e.legB), leg(q[q.length - 1], q[0], e.legA));
         }
     return out.join("\n");
 }

@@ -39,7 +39,7 @@ import {
     sheetPalette,
     TAB_MM,
 } from "./paginate.js";
-import type { Pagination } from "./paginate.js";
+import type { Pagination, CollarEdge } from "./paginate.js";
 import type { Analysis, Placed, TraceEvent, Crease } from "./unfold.js";
 import { parseLength, layoutSheets, renderSheet, PAGES } from "./sheet.js";
 import { BUILD_ID } from "./build-id.js";
@@ -304,8 +304,11 @@ function viewBounds(): { minX: number; minY: number; maxX: number; maxY: number 
             if (v[1] < minY) minY = v[1];
             if (v[1] > maxY) maxY = v[1];
         }
-        tailsAxis = tailsAxisFor(true) ?? 2 * minY;
-        minY = tailsAxis - maxY;
+        // Reflecting about the far side sends the copy to larger y, which with y
+        // downward is below — the same arrangement, and now the same axis, as the
+        // mini and the map.
+        tailsAxis = tailsAxisFor() ?? 2 * maxY;
+        maxY = tailsAxis - minY;
     }
     return { minX, minY, maxX, maxY };
 }
@@ -321,16 +324,25 @@ function fitView() {
         (tilingCanvas.height - pad * 2) / h,
     );
     viewOffX = tilingCanvas.width / 2 - ((b.minX + b.maxX) / 2) * viewScale;
-    viewOffY = tilingCanvas.height / 2 + ((b.minY + b.maxY) / 2) * viewScale;
+    viewOffY = tilingCanvas.height / 2 - ((b.minY + b.maxY) / 2) * viewScale;
 }
 
+/**
+ * Tiling coordinates to canvas pixels, **y downward**.
+ *
+ * It used to run y upward, and was the only thing here that did: the net canvas, the
+ * printed net, the locator mini and the map all draw y downward, so the tiling canvas
+ * showed the patch mirrored against every other picture of it. On a patch with a
+ * mirror axis — which all of these have — that is nearly invisible, which is how it
+ * survived from the first day to this one.
+ */
 function toScreen(pt: Pt): { x: number; y: number } {
     const y = drawingTails && tailsAxis !== null ? tailsAxis - pt.y : pt.y;
-    return { x: viewOffX + pt.x * viewScale, y: viewOffY - y * viewScale };
+    return { x: viewOffX + pt.x * viewScale, y: viewOffY + y * viewScale };
 }
 
 function fromScreen(sx: number, sy: number): Pt {
-    return p((sx - viewOffX) / viewScale, -(sy - viewOffY) / viewScale);
+    return p((sx - viewOffX) / viewScale, (sy - viewOffY) / viewScale);
 }
 
 // Which sheet a rhomb landed on, once the net has been split. This is what turns
@@ -363,16 +375,22 @@ function cornerHeight(v: number): number {
 function indexSheets(): void {
     faceSheet = new Map();
     rhombSheet = new Map();
+    rhombSheetTail = new Map();
     if (!pagination) return;
     pagination.pages.forEach((p, i) => {
-        for (const f of p.faceIds) {
-            faceSheet.set(f, i);
-            // In slab mode the tiling canvas has to be told which sheet a *rhombus*
-            // went to, and only its roof face answers that. Built once here rather
-            // than searched per rhomb per redraw, which is quadratic and shows.
-            if (slabTops.has(f)) rhombSheet.set(slabRhomb.get(f)!, i);
-        }
+        for (const f of p.faceIds) faceSheet.set(f, i);
     });
+    // A rhomb's two faces can land on different sheets, and each copy on the canvas
+    // has to answer for its own. Built once here rather than searched per rhomb per
+    // redraw, which is quadratic and shows.
+    for (const [rid, fid] of topFaceOf) {
+        const sh = faceSheet.get(fid);
+        if (sh != null) rhombSheet.set(rid, sh);
+    }
+    for (const [rid, fid] of floorFaceOf) {
+        const sh = faceSheet.get(fid);
+        if (sh != null) rhombSheetTail.set(rid, sh);
+    }
 }
 
 function drawTiling() {
@@ -537,8 +555,9 @@ function rhombFill(
     vi: number[],
     cLo: number,
     cHi: number,
+    sheet?: number,
 ): string | CanvasGradient {
-    const sh = slabMode ? rhombSheet.get(r.id) : faceSheet.get(r.id);
+    const sh = sheet ?? (slabMode ? rhombSheet.get(r.id) : faceSheet.get(r.id));
     if (sh != null) return sheetColors[sh] ?? "#ddd";
     const base = tileFill(tileColor, r.group, r.thick, vi[cLo], r.pair) ?? r.fill;
     // These modes carry their own meaning in the flat color and must not be shaded
@@ -581,12 +600,16 @@ function drawTails(ctx: CanvasRenderingContext2D): void {
         ctx.moveTo(sv[0].x, sv[0].y);
         for (let i = 1; i < 4; i++) ctx.lineTo(sv[i].x, sv[i].y);
         ctx.closePath();
-        ctx.fillStyle = rhombFill(ctx, r, sv, vi, cLo, cHi);
+        // **Drawn from its own face.** This copy is the floor, not a mirror of the
+        // roof: its faces have their own sheet and their own place in the replay, and
+        // they can differ from the roof's above them. Painting it from the roof's made
+        // the lower half a reflection and nothing more, which is exactly what it
+        // looked like.
+        const fid = floorFaceOf.get(r.id);
+        ctx.fillStyle = rhombFill(ctx, r, sv, vi, cLo, cHi, rhombSheetTail.get(r.id));
         ctx.fill();
-        // The replay wash too: a copy that does not follow the animation is not
-        // showing you the same model being built.
-        const role = replayRunning() ? traceRoles.get(r.id) : undefined;
-        if (role || (placedRhombs.has(r.id) && !replayFinished())) {
+        const role = replayRunning() && fid != null ? traceRoles.get(fid) : undefined;
+        if (role || (fid != null && placedRhombs.has(fid) && !replayFinished())) {
             ctx.fillStyle =
                 role === "current"
                     ? "rgba(106, 90, 205, 0.55)"
@@ -610,26 +633,48 @@ function drawTails(ctx: CanvasRenderingContext2D): void {
  * surface — closing it would draw a border that is not an edge of anything.
  */
 function drawCollar(ctx: CanvasRenderingContext2D): void {
-    for (const w of slabBand) {
+    const legs = collarLegs();
+    slabBand.forEach((w, i) => {
         const q = w.pts.map((v) => toScreen(p(v[0], v[1])));
         ctx.beginPath();
         ctx.moveTo(q[0].x, q[0].y);
         for (let i = 1; i < q.length; i++) ctx.lineTo(q[i].x, q[i].y);
         ctx.closePath();
-        ctx.fillStyle = wallFill(w.rhomb, slabMode ? rhombSheet.get(w.rhomb) : undefined);
+        // A wall is a face of the model like any other: it goes to a sheet of its
+        // own, and it is placed at its own moment in the replay. Colored from the
+        // rhombus above it the collar sat outside the animation entirely, appearing
+        // whole from the first frame.
+        ctx.fillStyle = wallFill(w.rhomb, faceSheet.get(w.face));
         ctx.globalAlpha = 0.75;
         ctx.fill();
         ctx.globalAlpha = 1;
-        ctx.strokeStyle = "#5a5f66";
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        // The legs, and only the legs. The outer boundary is left open on purpose:
-        // it is the middle of a rhombus, not the edge of anything, and drawing it
-        // would close a shape that is meant to continue onto the other surface.
-        ctx.moveTo(q[1].x, q[1].y); ctx.lineTo(q[2].x, q[2].y);
-        ctx.moveTo(q[q.length - 1].x, q[q.length - 1].y); ctx.lineTo(q[0].x, q[0].y);
-        ctx.stroke();
-    }
+        const role = replayRunning() ? traceRoles.get(w.face) : undefined;
+        if (role || (placedRhombs.has(w.face) && !replayFinished())) {
+            ctx.fillStyle =
+                role === "current"
+                    ? "rgba(106, 90, 205, 0.55)"
+                    : role === "rejected"
+                      ? "rgba(192, 57, 43, 0.35)"
+                      : "rgba(255, 200, 0, 0.45)";
+            ctx.fill();
+        }
+        // The legs, and only the legs — the outer boundary is the middle of a
+        // rhombus, not the edge of anything. Each is drawn the way the net treats it,
+        // dashed for a kept fold and unbroken for a cut, as every other edge here is.
+        const draw = (a: { x: number; y: number }, b: { x: number; y: number }, st: CollarEdge | undefined) => {
+            ctx.beginPath();
+            ctx.moveTo(a.x, a.y);
+            ctx.lineTo(b.x, b.y);
+            ctx.strokeStyle = st ? (st.mountain ? "#c0392b" : "#2469b8") : "#5a5f66";
+            ctx.lineWidth = st ? 1.4 : 1;
+            ctx.setLineDash(st?.crease ? (FOLD_DASH[st.fold] ?? [3, 3]) : []);
+            ctx.stroke();
+            ctx.setLineDash([]);
+        };
+        const n = slabBand.length;
+        draw(q[1], q[2], legs[i]);
+        draw(q[q.length - 1], q[0], legs[(i + n - 1) % n]);
+    });
 }
 
 // ── Isoglosses ────────────────────────────────────────────────────
@@ -1797,6 +1842,11 @@ let topOfFloor = new Map<number, number>();
 /** group, type, axis pair and default fill per slab face */
 /** sheet index per rhombus, for drawing a slab partition on the tiling */
 let rhombSheet = new Map<number, number>();
+/** and for its floor face, which may have gone to a different sheet entirely */
+let rhombSheetTail = new Map<number, number>();
+/** rhomb -> its face on each surface, so each copy is drawn from its own */
+let topFaceOf = new Map<number, number>();
+let floorFaceOf = new Map<number, number>();
 let slabStyle = new Map<number, { thick: boolean; group: string; pair: [number, number]; fill: string }>();
 let slabRange: [number, number] = [1, 4];
 
@@ -1831,6 +1881,8 @@ function runTraceBody(): void {
     traceEvents = [];
     slabRhomb = new Map();
     slabTops = new Set();
+    topFaceOf = new Map();
+    floorFaceOf = new Map();
     slabHeight = null;
     slabCreases = null;
     slabBand = [];
@@ -1840,6 +1892,8 @@ function runTraceBody(): void {
         const S = slab();
         const sur = slabSurface(S);
         slabStyle = new Map();
+        topFaceOf = new Map(S.top.map((f) => [f.rhomb, f.id]));
+        floorFaceOf = new Map(S.floor.map((f) => [f.rhomb, f.id]));
         for (const f of S.faces) {
             slabRhomb.set(f.id, f.rhomb);
             slabStyle.set(f.id, {
@@ -2291,8 +2345,9 @@ function tilingPoly(faceId: number): [number, number][] | null {
  */
 function rimForSheets(
     sheet: number | "all",
-): Array<{ pts: Array<[number, number]>; color: string }> {
-    return slabBand.flatMap((w) => {
+): Array<{ pts: Array<[number, number]>; color: string; legA?: CollarEdge; legB?: CollarEdge }> {
+    const legs = collarLegs();
+    return slabBand.flatMap((w, i) => {
         // **Only this sheet's walls**, on a sheet. A wall that went elsewhere drawn in
         // that other sheet's color read as though the collar were partly here and
         // partly away; what it meant was "not on this page". The map wants all of them,
@@ -2301,8 +2356,35 @@ function rimForSheets(
         if (sheet !== "all" && sh !== sheet) return [];
         return [{
             pts: w.pts,
-            color: wallFill(w.rhomb, sheet === "all" ? sh : sheet),
+            color: wallFill(w.rhomb, sh),
+            legA: legs[(i + slabBand.length - 1) % slabBand.length],
+            legB: legs[i],
         }];
+    });
+}
+
+/**
+ * The state of each leg of the collar — the vertical edge two neighboring walls share.
+ *
+ * The net either kept it as a fold or cut it, and it is an edge of the model like any
+ * other, so it is drawn like any other. Found by intersecting the two walls' corners
+ * rather than by reasoning about which of a wall's four sides is vertical: the shared
+ * edge is the thing being asked about, so ask for it directly.
+ *
+ * Entry `i` is the leg between wall `i` and wall `i + 1`.
+ */
+function collarLegs(): Array<CollarEdge | undefined> {
+    const vertsOf = new Map(netRhombs.map((n) => [n.sourceId, n.verts]));
+    return slabBand.map((_, i) => {
+        const a = vertsOf.get(slabBand[i].face);
+        const b = vertsOf.get(slabBand[(i + 1) % slabBand.length].face);
+        if (!a || !b) return undefined;
+        const both = a.filter((v) => b.includes(v));
+        if (both.length !== 2) return undefined;
+        const k = ekey(both[0], both[1]);
+        const cr = activeCreases().get(k);
+        if (!cr) return undefined;
+        return { fold: cr.fold, mountain: cr.mountain, crease: netHinges.has(k) };
     });
 }
 
@@ -2312,7 +2394,7 @@ function rimForSheets(
  * separate object; once the net is split it is the sheet's color, like everything else.
  */
 function wallFill(rid: number, sheet?: number): string {
-    if (sheet != null && faceSheet.size) return sheetColors[sheet] ?? "#6a5acd";
+    if (sheet != null) return sheetColors[sheet] ?? "#6a5acd";
     const r = allRhombs[rid];
     if (!r) return "#c8791f";
     const vi = r.vertIndices.map(displayIndex);
@@ -2341,29 +2423,21 @@ function wallFill(rid: number, sheet?: number): string {
  * the whole point of a locator. Getting this backwards put heads under tails on the
  * map, which is legible enough to miss and wrong.
  */
-function tailsAxisFor(below: boolean): number | undefined {
+function tailsAxisFor(): number | undefined {
     if (!slabMode || !allRhombs.length) return undefined;
     const side = Math.hypot(
         allRhombs[0].verts[1].x - allRhombs[0].verts[0].x,
         allRhombs[0].verts[1].y - allRhombs[0].verts[0].y,
     );
-    let lo = Infinity, hi = -Infinity;
-    for (const w of slabBand) for (const v of w.pts) {
-        if (v[1] < lo) lo = v[1];
-        if (v[1] > hi) hi = v[1];
-    }
-    if (!Number.isFinite(lo)) {
-        for (const r of allRhombs) for (const v of r.verts) {
-            if (v.y < lo) lo = v.y;
-            if (v.y > hi) hi = v.y;
-        }
-    }
+    let hi = -Infinity;
+    for (const w of slabBand) for (const v of w.pts) if (v[1] > hi) hi = v[1];
+    if (!Number.isFinite(hi)) for (const r of allRhombs) for (const v of r.verts) if (v.y > hi) hi = v.y;
     // **Touching**, not held apart. The two halves of a wall meet at the reflection
     // point and, with no outer boundary drawn on either, read as one whole rhombus
     // spanning the fold — which is what they are. It also gives the height back: a
     // gap between them was costing scale on every one of the three pictures.
     void side;
-    return below ? 2 * lo : 2 * hi;
+    return 2 * hi;
 }
 
 function sheetOpts(sheet = 0) {
@@ -2387,7 +2461,7 @@ function sheetOpts(sheet = 0) {
         indexOf: slabMode && slabHeight ? slabHeight : (v: number) => vertexList[v]?.index ?? 1,
         indexRange: (slabMode ? slabRange : [idxLo, idxHi]) as [number, number],
         tilingPoly,
-        tailsAxis: tailsAxisFor(false),
+        tailsAxis: tailsAxisFor(),
         rim: slabMode ? rimForSheets(sheet) : undefined,
         // The mini fills its upper copy from a sheet's roof faces and its lower copy
         // from that sheet's floor faces, which is what makes the second copy say

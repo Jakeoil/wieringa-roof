@@ -859,6 +859,33 @@ new one — so the sheet list, the minis and the partition drawn back onto the t
 all still answering for the previous patch. Cleared in `regenerate()`, since every
 control on the patch line comes through it and none of them should have to remember.
 
+## The collar as a face of the model, and one orientation for every picture
+
+**The tiling canvas was drawing y upward.** Nothing else was: the net canvas, the
+printed net, the locator mini and the map all draw it downward, so the tiling canvas
+had been showing the patch mirrored against every other picture of it since the first
+day. It is invisible on a patch with a mirror axis — which every patch here has — which
+is how it lasted this long. The canvas draws y downward now, and with all five agreeing
+there is one reflection axis rather than one per convention.
+
+**The lower half was a reflection because it was drawn as one.** It took the roof's
+sheet colors and the roof's place in the replay, mirrored. But a rhomb's floor face is
+a face in its own right: it goes to its own sheet, which can differ from the roof's
+above it, and it is placed at its own moment. Each copy is drawn from its own face now,
+which is why the mini and the map already looked more accurate — they had been filled
+from the sheet's floor faces since the day the mini learned to reflect.
+
+**And the collar is a face of the model like any other.** It was colored from the
+rhombus above it and sat outside the animation entirely, appearing whole from the first
+frame. A wall goes to its own sheet and is placed at its own moment, and both now show.
+
+**Its legs carry their real state.** A leg is the vertical edge two neighboring walls
+share, and the net either kept it as a fold or cut it — so it is drawn like every other
+edge: dashed for a fold, unbroken for a cut, colored by which way it goes. On `Pe3`
+gen 2 that is all 72 legs across the two copies, none of them a plain line any more.
+Found by intersecting the two walls' corners rather than by working out which of a
+wall's four sides is vertical: the shared edge is the thing being asked about.
+
 ## Open, and worth settling before building
 
 1. **Settled: they interlock, and they need turning over to do it.** Every one of the
