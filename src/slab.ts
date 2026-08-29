@@ -478,13 +478,23 @@ export function slabSurface(S: Slab): {
 // that way the trapezoids tile the band: they share their legs, and no two can
 // overlap however the rim turns.
 
-const PHI = (1 + Math.sqrt(5)) / 2;
-/** Band width, as a fraction of the tiling's edge length. */
-export const COLLAR_DEPTH = PHI / 2;
+/**
+ * Band depth: **half a side length**, because half of each wall is drawn here and the
+ * other half on the opposite surface's collar. That is what the open outer base says —
+ * the rhombus is not finished, it continues over the fold.
+ */
+export const COLLAR_DEPTH = 0.5;
 
-export interface CollarQuad {
-    /** inner a, inner b, outer b, outer a — so edge 0 is the rim and edge 2 the outer base */
-    quad: Array<[number, number]>;
+/** Segments per corner arc. At a quarter of a degree the arc is exact for any paper. */
+const ARC_STEP = (0.25 * Math.PI) / 180;
+
+export interface CollarCell {
+    /**
+     * The closed outline. `pts[0]→pts[1]` is the inner base — the rim edge itself —
+     * `pts[1]→pts[2]` and `pts[n-1]→pts[0]` are the legs, and everything between is
+     * the outer boundary.
+     */
+    pts: Array<[number, number]>;
     /** the wall this stands for */
     face: number;
     /** the cell it hangs from, whose fill rules it follows */
@@ -492,58 +502,100 @@ export interface CollarQuad {
 }
 
 /**
- * The collar as a mitred band around the patch outline, in tiling coordinates.
+ * The collar as a band at constant **distance** from the patch outline.
  *
- * `S.rim` is already one ordered cycle — every patch measured has a simple closed
- * boundary — so the band is built by offsetting each rim edge outward and intersecting
- * consecutive offsets. Where two offsets are parallel the corner is straight and the
- * intersection degenerates, so that case falls back to the plain offset point.
+ * The depth is a distance, not an offset applied edge by edge, and that decides what
+ * happens at a corner. Where the rim turns outward there is no edge to offset, only the
+ * vertex itself, and the set of points half a side from a *point* is an **arc**. Mitring
+ * instead — which is what this did first — pushes the corner out to `h/sin(θ/2)`, which
+ * at a 72° spike is 1.7 times the depth and simply wrong: those points are further from
+ * the patch than the band is supposed to reach.
+ *
+ * Where the rim turns inward there is no arc to draw. The two offset lines cross, and
+ * the crossing is the corner; it lies on the bisector too, so the legs are bisectors
+ * either way and consecutive cells still share them exactly.
  */
-export function collarBand(S: Slab): CollarQuad[] {
+export function collarBand(S: Slab): CollarCell[] {
     const n = S.rim.length;
     if (!n) return [];
     const pos = (v: number): [number, number] => {
         const q = vertexList[v].pos;
         return [q.x, q.y];
     };
-    const A = S.rim.map((e) => pos(e.a));
-    const B = S.rim.map((e) => pos(e.b));
+    const V = S.rim.map((e) => pos(e.a));
 
-    // Which way is out? The ring is traversed with the patch on one side throughout;
-    // the sign of its enclosed area says which, once and for all rather than per edge.
+    // Which way is out? The ring keeps the patch on one side throughout, so the sign of
+    // its enclosed area settles it once rather than edge by edge.
     let area = 0;
-    for (let i = 0; i < n; i++) area += A[i][0] * B[i][1] - B[i][0] * A[i][1];
+    for (let i = 0; i < n; i++) {
+        const j = (i + 1) % n;
+        area += V[i][0] * V[j][1] - V[j][0] * V[i][1];
+    }
     const sgn = area > 0 ? -1 : 1;
 
-    const L = Math.hypot(B[0][0] - A[0][0], B[0][1] - A[0][1]) || 1;
+    const L = Math.hypot(V[1][0] - V[0][0], V[1][1] - V[0][1]) || 1;
     const h = COLLAR_DEPTH * L;
 
-    // each edge's outward normal, and a point on its offset line
     const nrm: Array<[number, number]> = [];
     for (let i = 0; i < n; i++) {
-        const ux = B[i][0] - A[i][0], uy = B[i][1] - A[i][1];
+        const j = (i + 1) % n;
+        const ux = V[j][0] - V[i][0], uy = V[j][1] - V[i][1];
         const d = Math.hypot(ux, uy) || 1;
         nrm.push([(sgn * -uy) / d, (sgn * ux) / d]);
     }
 
-    /** Where the offsets of edges i and j meet — the mitre, and so the bisector point. */
-    const corner = (i: number, j: number, v: [number, number]): [number, number] => {
-        const [nix, niy] = nrm[i], [njx, njy] = nrm[j];
-        const det = nix * njy - niy * njx;
-        if (Math.abs(det) < 1e-9) return [v[0] + nix * h, v[1] + niy * h];
-        // both offset lines pass at distance h from v along their own normals
-        const x = (njy * h - niy * h) / det;
-        const y = (nix * h - njx * h) / det;
-        return [v[0] + x, v[1] + y];
+    // Per vertex: is the turn outward, and where does its leg end?
+    const convex: boolean[] = [];
+    const legEnd: Array<[number, number]> = [];
+    for (let i = 0; i < n; i++) {
+        const p = (i + n - 1) % n;
+        const [ax, ay] = nrm[p], [bx, by] = nrm[i];
+        // The bisector of the two outward normals is the bisector of the rim angle.
+        let bxx = ax + bx, byy = ay + by;
+        const bl = Math.hypot(bxx, byy);
+        const det = ax * by - ay * bx;
+        convex[i] = det * sgn < 0;
+        if (bl < 1e-9) {
+            legEnd[i] = [V[i][0] + ax * h, V[i][1] + ay * h]; // a fold back on itself
+            continue;
+        }
+        bxx /= bl; byy /= bl;
+        if (convex[i]) {
+            // outward turn: the leg reaches the arc, at exactly the depth
+            legEnd[i] = [V[i][0] + bxx * h, V[i][1] + byy * h];
+        } else {
+            // inward turn: the offset lines cross, and that crossing is the corner
+            const t = Math.abs(det) < 1e-9 ? h : h / ((ax * bxx + ay * byy) || 1);
+            legEnd[i] = [V[i][0] + bxx * t, V[i][1] + byy * t];
+        }
+    }
+
+    /** Points along the arc of radius `h` about `c`, from `from` to `to`, inclusive. */
+    const arc = (c: [number, number], from: [number, number], to: [number, number]) => {
+        const a0 = Math.atan2(from[1] - c[1], from[0] - c[0]);
+        let a1 = Math.atan2(to[1] - c[1], to[0] - c[0]);
+        while (a1 - a0 > Math.PI) a1 -= 2 * Math.PI;
+        while (a0 - a1 > Math.PI) a1 += 2 * Math.PI;
+        const steps = Math.max(1, Math.ceil(Math.abs(a1 - a0) / ARC_STEP));
+        const out: Array<[number, number]> = [];
+        for (let k = 0; k <= steps; k++) {
+            const a = a0 + ((a1 - a0) * k) / steps;
+            out.push([c[0] + Math.cos(a) * h, c[1] + Math.sin(a) * h]);
+        }
+        return out;
     };
 
-    const out: CollarQuad[] = [];
+    const cells: CollarCell[] = [];
     for (let i = 0; i < n; i++) {
-        const prev = (i + n - 1) % n;
-        const next = (i + 1) % n;
-        const oa = corner(prev, i, A[i]);
-        const ob = corner(i, next, B[i]);
-        out.push({ quad: [A[i], B[i], ob, oa], face: S.rim[i].face, rhomb: S.rim[i].rhomb });
+        const j = (i + 1) % n;
+        const A: [number, number] = [V[i][0] + nrm[i][0] * h, V[i][1] + nrm[i][1] * h];
+        const B: [number, number] = [V[j][0] + nrm[i][0] * h, V[j][1] + nrm[i][1] * h];
+        const pts: Array<[number, number]> = [V[i], V[j]];
+        if (convex[j]) pts.push(...arc(V[j], legEnd[j], B));
+        else pts.push(legEnd[j]);
+        if (convex[i]) pts.push(...arc(V[i], A, legEnd[i]));
+        else pts.push(legEnd[i]);
+        cells.push({ pts, face: S.rim[i].face, rhomb: S.rim[i].rhomb });
     }
-    return out;
+    return cells;
 }

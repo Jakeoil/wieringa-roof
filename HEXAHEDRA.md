@@ -781,32 +781,54 @@ Three pictures show the patch — the **tiling canvas**, the sheet **mini**, and
 cover-sheet **map** — and the collar had a different answer in each, none of them good.
 Jake's rule replaces all three.
 
-> The collar is a **ring of trapezoids** around each outline. The inner base is the rim
-> edge. The altitude is **φ/2** of a side. The legs **bisect the angle** between
-> consecutive inner bases. The outer base is not drawn unless it is a cut. The fill
-> follows the rules of the rhombus the wall hangs from.
+> The collar is a ring around each outline, **half a side deep**. The inner base is the
+> rim edge. The legs bisect the angle between consecutive inner bases. **The depth is a
+> distance**, so where the rim turns outward the outer boundary is an **arc** at that
+> radius. The outer base is not drawn unless it is a cut. The fill follows the rules of
+> the rhombus the wall hangs from.
 
-The mitre is what makes it work, and it is the reason the earlier attempts failed. Two
-consecutive walls drawn in isolation lean into each other and overlap wherever the rim
-turns — that is what the folded-out golden rhombi did. Offset the *outline* by a
-constant depth instead and the corner falls on the bisector automatically, because both
-offset edges are equidistant from it. So the trapezoids share their legs exactly and
-**tile the band**: measured on four patches, consecutive legs coincide to 0.0, and
-every outer corner sits its depth from its own base to 5e-15.
+**Half a side, because half of each wall is drawn here** and the other half on the
+opposite surface's ring. That is what the open outer base means: the rhombus is not
+finished, it continues over the fold. The two halves together are the wall.
+
+**The depth is a distance, and that is what decides the corners.** Where the rim turns
+outward there is no edge to offset, only the vertex — and the points half a side from a
+*point* lie on an arc. Mitring instead, which is what this did first, pushes the corner
+out to `h/sin(θ/2)`: at a 72° spike that is 1.7 times the depth, and those points are
+simply further from the patch than the band is meant to reach. Where the rim turns
+inward there is no arc; the two offset lines cross, and the crossing is the corner. It
+lies on the bisector too, so the legs are bisectors either way and consecutive cells
+still share them exactly.
+
+Measured on four patches, `Pe1` gen 1 through `Pe1` gen 3:
+
+| | |
+|---|---|
+| depth against half a side | exact |
+| every outer point's distance from the outline | off by ≤ **8e-15** |
+| consecutive cells' shared legs | coincide to ≤ **4e-15** |
+| heads-to-tails closest approach against one side | exact |
 
 `collarBand()` in `slab.ts` is the one implementation; the canvas, the mini and the map
 all draw its output.
 
-Three things fell out of doing it:
+Four things fell out of doing it:
 
 - **The map had no tails copy at all** — it was showing the upper surface of a solid,
-  which is half a model. It has both now, each with its own collar ring.
-- **The band stands outside the outline, and no one's bounds knew.** The map and the
-  mini both scale to fit the *faces*, so the drawing ran off the page by exactly the
-  band's depth. Both now measure the collar too.
-- **The two collars met in the middle.** The gap between the surfaces was a fraction of
-  the patch, chosen before there was anything standing outside the outline. It is now
-  at least two band depths, so the rings stay clear of each other.
+  which is half a model.
+- **The band stands outside the outline, and no one's bounds knew.** All three scaled to
+  fit the *faces*, so the drawing ran off by exactly the band's depth.
+- **The closest approach is band to band**, not outline to outline, and it is now
+  exactly one side length.
+- **The mini and the map draw tiling y downward where the canvas draws it upward**, so
+  their reflection axis has to sit *above* the patch for the copy to land below on the
+  page. Getting that backwards put heads under tails on the map.
+
+**Not done: "treat the rhombus as one where reasonable."** Where a wall's two halves
+face each other across the axis they could be closed up and drawn as one whole rhombus
+rather than two open ones. Which pairs qualify, and whether the join is a straight or an
+angled line, is a judgement about the picture rather than something the geometry
+decides — it needs saying before it can be built.
 
 ## Open, and worth settling before building
 

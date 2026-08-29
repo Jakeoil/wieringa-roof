@@ -30,7 +30,7 @@ import {
 } from "./unfold.js";
 import { cutTreeUnfold, assignLayers } from "./cuttree.js";
 import { slab, slabSurface, collarBand, COLLAR_DEPTH } from "./slab.js";
-import type { CollarQuad } from "./slab.js";
+import type { CollarCell } from "./slab.js";
 import {
     paginateBest,
     renderPage,
@@ -289,22 +289,28 @@ function fitView() {
             if (v.y > maxY) maxY = v.y;
         }
     }
-    const w = maxX - minX;
+    let w = maxX - minX;
     let h = maxY - minY;
     // In solid mode the canvas carries the tails copy as well, reflected about the
     // bottom of the patch and dropped clear of it, so the view has to make room.
     tailsAxis = null;
     if (slabMode) {
-        const gap = tailsGap(minY, maxY);
-        // Reflect about a line one gap below the patch, so the two lie hinged along
-        // the rim. The mirror of the *highest* point is the lowest thing on the
-        // canvas, and that is what the view has to reach — not the patch height
-        // subtracted from the axis, which leaves the axis's own offset in and crops
-        // the copy by exactly minY.
-        tailsAxis = 2 * minY - gap;
+        // The band stands outside the outline, so the canvas has to reach it as well
+        // as the copy reflected below it.
+        for (const cell of slabBand) for (const v of cell.pts) {
+            if (v[0] < minX) minX = v[0];
+            if (v[0] > maxX) maxX = v[0];
+            if (v[1] < minY) minY = v[1];
+            if (v[1] > maxY) maxY = v[1];
+        }
+        // The mirror of the *highest* point is the lowest thing on the canvas, and
+        // that is what the view has to reach — not the patch height subtracted from
+        // the axis, which leaves the axis's own offset in and crops the copy.
+        tailsAxis = tailsAxisFor(true) ?? 2 * minY;
         minY = tailsAxis - maxY;
         h = maxY - minY;
     }
+    w = maxX - minX;
     const pad = 10;
     viewScale = Math.min(
         (tilingCanvas.width - pad * 2) / w,
@@ -601,23 +607,27 @@ function drawTails(ctx: CanvasRenderingContext2D): void {
  */
 function drawCollar(ctx: CanvasRenderingContext2D): void {
     for (const w of slabBand) {
-        const q = w.quad.map((v) => toScreen(p(v[0], v[1])));
+        const q = w.pts.map((v) => toScreen(p(v[0], v[1])));
         ctx.beginPath();
         ctx.moveTo(q[0].x, q[0].y);
-        for (let i = 1; i < 4; i++) ctx.lineTo(q[i].x, q[i].y);
+        for (let i = 1; i < q.length; i++) ctx.lineTo(q[i].x, q[i].y);
         ctx.closePath();
         ctx.fillStyle = wallFill(w.rhomb, slabMode ? rhombSheet.get(w.rhomb) : undefined);
         ctx.globalAlpha = 0.75;
         ctx.fill();
         ctx.globalAlpha = 1;
         const e = slabWallEdges.get(w.face);
-        const cut = drawingTails ? (e ? !netHinges.has(e.roof) : false) : e ? !netHinges.has(e.floor) : false;
+        const cut = e ? !netHinges.has(drawingTails ? e.roof : e.floor) : false;
         ctx.strokeStyle = "#5a5f66";
         ctx.lineWidth = 1;
         ctx.beginPath();
+        // the two legs, always; the outer boundary only where the unfolding cut it
         ctx.moveTo(q[1].x, q[1].y); ctx.lineTo(q[2].x, q[2].y);
-        ctx.moveTo(q[3].x, q[3].y); ctx.lineTo(q[0].x, q[0].y);
-        if (cut) { ctx.moveTo(q[2].x, q[2].y); ctx.lineTo(q[3].x, q[3].y); }
+        ctx.moveTo(q[q.length - 1].x, q[q.length - 1].y); ctx.lineTo(q[0].x, q[0].y);
+        if (cut) {
+            ctx.moveTo(q[2].x, q[2].y);
+            for (let i = 3; i < q.length; i++) ctx.lineTo(q[i].x, q[i].y);
+        }
         ctx.stroke();
     }
 }
@@ -1768,7 +1778,7 @@ let slabHeight: ((v: number) => number) | null = null;
  */
 let slabCreases: Map<string, Crease> | null = null;
 /** the collar as a mitred band round the outline, in tiling coordinates */
-let slabBand: CollarQuad[] = [];
+let slabBand: CollarCell[] = [];
 /**
  * Per wall, the edge keys of its two long sides — the one against the roof and the one
  * against the floor. Whichever of them the unfolding cut is the side whose outer base
@@ -2298,7 +2308,7 @@ function tilingPoly(faceId: number): [number, number][] | null {
  */
 function rimForSheets(
     sheet: number | "all",
-): Array<{ quad: Array<[number, number]>; color: string; cutOuter?: boolean; cutOuterTail?: boolean }> {
+): Array<{ pts: Array<[number, number]>; color: string; cutOuter?: boolean; cutOuterTail?: boolean }> {
     return slabBand.flatMap((w) => {
         // **Only this sheet's walls**, on a sheet. A wall that went elsewhere drawn in
         // that other sheet's color read as though the collar were partly here and
@@ -2308,7 +2318,7 @@ function rimForSheets(
         if (sheet !== "all" && sh !== sheet) return [];
         const e = slabWallEdges.get(w.face);
         return [{
-            quad: w.quad,
+            pts: w.pts,
             color: wallFill(w.rhomb, sheet === "all" ? sh : sheet),
             // The band runs over the fold onto the other side, so its outer base is
             // only a real edge where the unfolding cut it.
@@ -2339,29 +2349,38 @@ function wallFill(rid: number, sheet?: number): string {
  * — which is what happened. Two band depths and a little air, or a fraction of the
  * patch, whichever is larger.
  */
-function tailsGap(lo: number, hi: number): number {
-    const side = allRhombs.length
-        ? Math.hypot(allRhombs[0].verts[1].x - allRhombs[0].verts[0].x,
-                     allRhombs[0].verts[1].y - allRhombs[0].verts[0].y)
-        : 1;
-    return Math.max((hi - lo) * 0.08, 2.4 * COLLAR_DEPTH * side);
-}
-
 /**
- * Where to reflect the tails copy in the mini.
+ * Where to reflect the tails copy, so the two surfaces come within exactly one side
+ * length of each other.
  *
- * The mini draws tiling y *downward* while the tiling canvas draws it upward, so the
- * axis has to sit above the patch in tiling terms for the copy to land below it on the
- * page — the same arrangement either way, which is the point of a locator.
+ * The closest approach is **band to band**, not outline to outline — the collar stands
+ * half a side outside each. Reflecting about `axis` sends the band's extreme point `e`
+ * to `axis - e`, so setting the separation to one side gives `axis = 2e ∓ side`.
+ *
+ * `below` is the tiling canvas, which draws y upward and wants the copy underneath.
+ * The mini and the map draw y *downward*, so for their copy to land below on the page
+ * the axis has to sit above the patch instead — the same arrangement in both, which is
+ * the whole point of a locator. Getting this backwards put heads under tails on the
+ * map, which is legible enough to miss and wrong.
  */
-function miniTailsAxis(): number | undefined {
+function tailsAxisFor(below: boolean): number | undefined {
     if (!slabMode || !allRhombs.length) return undefined;
+    const side = Math.hypot(
+        allRhombs[0].verts[1].x - allRhombs[0].verts[0].x,
+        allRhombs[0].verts[1].y - allRhombs[0].verts[0].y,
+    );
     let lo = Infinity, hi = -Infinity;
-    for (const r of allRhombs) for (const v of r.verts) {
-        if (v.y < lo) lo = v.y;
-        if (v.y > hi) hi = v.y;
+    for (const w of slabBand) for (const v of w.pts) {
+        if (v[1] < lo) lo = v[1];
+        if (v[1] > hi) hi = v[1];
     }
-    return 2 * hi + tailsGap(lo, hi);
+    if (!Number.isFinite(lo)) {
+        for (const r of allRhombs) for (const v of r.verts) {
+            if (v.y < lo) lo = v.y;
+            if (v.y > hi) hi = v.y;
+        }
+    }
+    return below ? 2 * lo - side : 2 * hi + side;
 }
 
 function sheetOpts(sheet = 0) {
@@ -2385,7 +2404,7 @@ function sheetOpts(sheet = 0) {
         indexOf: slabMode && slabHeight ? slabHeight : (v: number) => vertexList[v]?.index ?? 1,
         indexRange: (slabMode ? slabRange : [idxLo, idxHi]) as [number, number],
         tilingPoly,
-        tailsAxis: miniTailsAxis(),
+        tailsAxis: tailsAxisFor(false),
         rim: slabMode ? rimForSheets(sheet) : undefined,
         // The mini fills its upper copy from a sheet's roof faces and its lower copy
         // from that sheet's floor faces, which is what makes the second copy say

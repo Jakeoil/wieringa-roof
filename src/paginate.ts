@@ -572,12 +572,13 @@ export interface PageRenderOpts {
      */
     tailsAxis?: number;
     /**
-     * Slab only: the collar, in tiling coordinates, as a mitred band around the
-     * outline — see `collarBand` in `slab.ts`. Each entry is one wall's trapezoid,
-     * corners in the order inner a, inner b, outer b, outer a, so edge 0 is the rim
-     * and edge 2 the outer base. Drawn on both surfaces, since every wall meets both.
+     * Slab only: the collar as a band at constant distance from the outline — see
+     * `collarBand` in `slab.ts`. `pts[0]→pts[1]` is the rim edge, `pts[1]→pts[2]` and
+     * `pts[n-1]→pts[0]` the legs, and everything between the outer boundary, which
+     * curves where the rim turns outward. Drawn on both surfaces: every wall meets
+     * both, and each copy shows half of it.
      */
-    rim?: Array<{ quad: P2[]; color: string; cutOuter?: boolean; cutOuterTail?: boolean }>;
+    rim?: Array<{ pts: P2[]; color: string; cutOuter?: boolean; cutOuterTail?: boolean }>;
     /**
      * Slab only: for a face on the lower surface, the face directly above it. The
      * mini fills the upper copy from a sheet's roof faces and the lower copy from its
@@ -1049,7 +1050,7 @@ function thumbnail(
     // The collar stands outside the outline, so the bounds have to include it or the
     // drawing runs off the page — which it did, by exactly the band's depth.
     for (const w of o.rim ?? [])
-        for (const q of w.quad) {
+        for (const q of w.pts) {
             if (q[0] < x0) x0 = q[0];
             if (q[1] < y0) y0 = q[1];
             if (q[0] > x1) x1 = q[0];
@@ -1159,17 +1160,17 @@ function rimMini(
         for (const [M, cut] of (Tm ? [[T, e.cutOuter], [Tm, e.cutOuterTail]] : [[T, e.cutOuter]]) as Array<
             [(q: P2) => P2, boolean | undefined]
         >) {
-            const q = e.quad.map(M);
+            const q = e.pts.map(M);
             const pts = q.map((v) => `${n3(v[0])},${n3(v[1])}`).join(" ");
             out.push(`<polygon points="${pts}" fill="${e.color}" fill-opacity="0.75" stroke="none"/>`);
-            const seg = (a: P2, b: P2) =>
-                `<line x1="${n3(a[0])}" y1="${n3(a[1])}" x2="${n3(b[0])}" y2="${n3(b[1])}" ` +
-                `stroke="${e.color}" stroke-width="${n3(w)}" stroke-linecap="round"/>`;
-            out.push(seg(q[1], q[2]), seg(q[3], q[0]));
+            const poly = (vs: P2[]) =>
+                `<polyline points="${vs.map((v) => `${n3(v[0])},${n3(v[1])}`).join(" ")}" fill="none" ` +
+                `stroke="${e.color}" stroke-width="${n3(w)}" stroke-linecap="round" stroke-linejoin="round"/>`;
+            out.push(poly([q[1], q[2]]), poly([q[q.length - 1], q[0]]));
             // Which side is outward differs between the two copies: round the upper
             // surface the outer base is the wall's edge to the floor, round the lower
             // one it is its edge to the roof.
-            if (cut) out.push(seg(q[2], q[3]));
+            if (cut) out.push(poly(q.slice(2)));
         }
     return out.join("\n");
 }
@@ -1295,7 +1296,7 @@ export function renderMap(
     // The collar stands outside the outline, so the bounds have to include it or the
     // drawing runs off the page — which it did, by exactly the band's depth.
     for (const w of o.rim ?? [])
-        for (const q of w.quad) {
+        for (const q of w.pts) {
             if (q[0] < x0) x0 = q[0];
             if (q[1] < y0) y0 = q[1];
             if (q[0] > x1) x1 = q[0];
