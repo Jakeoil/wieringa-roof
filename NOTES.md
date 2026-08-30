@@ -1097,6 +1097,88 @@ undo it, which is why the answer tracks the seed's symmetry rather than its fami
 
 ---
 
+## Wishlist — raised, not started
+
+Three things Jake raised together. They are one thing more than they look, which is the
+first point worth making.
+
+### 1 · State should survive moving between pages
+
+Switching between Hexahedra, Workbench, 3D, Centers and the rest should keep the
+configuration until it is reset.
+
+Every page calls `loadPrefs` with a key of its own — `wr-nets`, `wr-centers`,
+`wr-hexroof` — so the settings that mean the *same thing* everywhere are stored
+separately and drift apart. Seed, generation, parity, and now the color scheme are the
+same question on every page and should be answered once.
+
+The shape of it: a shared record for the parameters that are genuinely common, each
+page keeping its own for what is not (RT extent, cell surface, shrink, side length).
+Two things to settle before writing any of it.
+
+**Not every page can honor every value.** `patchsize.ts` caps generations per page, and
+the 3D pages cap harder than the flat ones — a Sun at generation 4 is a fine Workbench
+patch and far too much for Centers. So an arriving value has to be *clamped and said
+out loud*, the way `syncCupControls` reconciles the Voronoi option, not silently
+dropped or silently obeyed.
+
+**Preferences already reset on every build.** During development that is deliberate and
+documented. A shared record inherits it, so "until reset" also means "until the next
+`npm run build`" while we are working. Worth knowing rather than rediscovering.
+
+### 2 · Parameterized links, and parameterized images
+
+Two separate wishes that share one answer.
+
+**A link that restores a view** — `?patch=Pe3&gen=2&slab=1&color=groups` — for pasting
+into a document. `unfold.html#sheets` is the existing precedent for a deep link.
+
+**An image for embedding** in a web page.
+
+The point worth making: **this is the same schema as item 1.** The shared preference
+record and the query string are the same list of names and values, one stored and one
+in a URL, so doing item 1 first makes this nearly free — and doing this one first would
+mean inventing the vocabulary twice.
+
+Three things to settle:
+
+- **Precedence.** A query should win over stored preferences for that visit, and
+  arriving *without* one should leave them alone. Otherwise following a shared link
+  quietly overwrites the reader's own settings, which is a nasty surprise from a link.
+- **The camera is state too.** For 3D, Centers, Packing and the Cage, the control values
+  do not determine the picture — the orbit does. A link that restores the controls but
+  not the camera gives a different image every time it is opened, which is the one thing
+  an embedded image must not do.
+- **SVG where we have it.** The Workbench and Sheets already produce SVG at true size,
+  which embeds better than a raster. Only the WebGL pages need `canvas.toDataURL()`.
+  So "export an image" is two mechanisms, not one.
+
+### 3 · The color lists, finished
+
+Partly done: `FILL_MODES` in `geometry.ts` is already the one list, and five pages build
+their menus from it — rhomb groups, classic, plate, tinted, Kowalewski five, height,
+thick/thin, plain. What is left is the rest of the vocabulary, and it has a pattern.
+
+**Several controls are booleans that want to be three-way.** Edges are off or on;
+Jake wants off / thin / thick. Isoglosses are off or on; he wants a heavy option.
+Shading is a checkbox on some pages and the magnitude of the height slider on the
+Workbench; he wants mild / strong. These are the same change three times over and
+should be made once, as a shared control kind, not page by page.
+
+**Thick / thin / collar wants to be a scheme of its own.** A wall currently inherits
+the type of the cell it hangs from, which is right for the rhomb groups and wrong for
+thick-versus-thin: the collar is neither, and on a slab it is a third of what you are
+looking at.
+
+**"Palette is post-production"** — agreed, and the `FILL_MODES` work is the argument
+for it. A palette is a presentation decision made after all the geometry is settled, so
+it belongs in one table that the drawing code asks, never in the drawing code itself.
+Every time that rule was broken here it produced the same bug: the favicon's own group
+colors, the sheets' washed-out copy of the palette, `paginate.ts`'s second `DASH`, the
+3D pages' drifted thick/thin. Three of the four are fixed; the two `DASH` tables are
+not, and are deliberate — a printed sheet is read at arm's length and wants a coarser
+pattern than a screen.
+
 ## Chapters
 
 Jeff's organization of the project, recorded because the pages had grown past the point
