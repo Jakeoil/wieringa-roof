@@ -50,13 +50,13 @@ const PREFS_KEY = "wr-workbench";
 const PREF_DEFAULTS = {
     seed: 1,
     gen: 2,
+    slab: false,
     method: "cuttree",
     color: "groups",
     sideIn: 1,
     heightU: 1,
     isogloss: false,
     shading: true,
-    renderIso: false,
 };
 const prefs = loadPrefs(PREFS_KEY, PREF_DEFAULTS);
 
@@ -720,6 +720,16 @@ function isoglossSegments(
     return out;
 }
 
+/**
+ * Isoglosses — **one setting, shown in two places.**
+ *
+ * The drawing line has a checkbox and so does Sheets, and both drive this. The
+ * preferences carried a second field, `renderIso`, from when they were meant to be
+ * separate: it was written on every save from *this* variable and never read back by
+ * anything. A stored field that no reader consumes is worse than none, since it looks
+ * like a setting exists when it does not. If the two ever do need to part company, the
+ * place to start is a second variable, not a second preference key.
+ */
 let showIsogloss = prefs.isogloss;
 
 // Ease a range input from one value to another, calling back each frame. Used to
@@ -1822,7 +1832,7 @@ const traceMethod = "cuttree";
 // planar shape or height index of its own, so the three places that ask the tiling a
 // question — the locator mini, the height fill, and the partition drawn back onto the
 // patch — go through the maps below instead.
-let slabMode = false;
+let slabMode = prefs.slab;
 /** which rhomb a slab face belongs to, for faces that belong to one */
 let slabRhomb = new Map<number, number>();
 /** faces that are a roof rhombus, so the mini and the partition draw only those */
@@ -3723,13 +3733,13 @@ function persist(): void {
     savePrefs(PREFS_KEY, {
         seed: currentSeedIdx,
         gen,
+        slab: slabMode,
         method: traceMethod,
         color: tileColor,
         sideIn,
         heightU,
         isogloss: showIsogloss,
         shading: renderShading,
-        renderIso: showIsogloss,
     });
 }
 window.addEventListener("beforeunload", persist);
@@ -3747,9 +3757,14 @@ console.log(`workbench build ${BUILD_ID}`);
 
 buildControls();
 buildViewTabs();
+// `generate` first: it builds the patch and its collar, and `sizeTilingCanvas` sizes
+// the canvas from what there is to show. The other way round — which is how this ran —
+// the first load measured an empty patch, got a square canvas, and fitted a slab's two
+// stacked surfaces into it. Nothing showed the mistake until `slab` began to persist,
+// because until then the first load was never a slab.
+generate();
 sizeTilingCanvas();
 sizeNetCanvas();
-generate();
 fitView();
 refreshNetView();
 drawTiling();

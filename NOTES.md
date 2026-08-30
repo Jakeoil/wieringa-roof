@@ -1099,56 +1099,60 @@ undo it, which is why the answer tracks the seed's symmetry rather than its fami
 
 ## Wishlist — raised, not started
 
-Three things Jake raised together. They are one thing more than they look, which is the
-first point worth making.
+Three things Jake raised together, recorded for discussion.
 
-### 1 · State should survive moving between pages
+### 1 · A reload should not reset everything
 
-Switching between Hexahedra, Workbench, 3D, Centers and the rest should keep the
-configuration until it is reset.
+**Not** every page following the others' settings — each page keeping *its own*, the
+way a cookie would, instead of coming back to defaults every time it is loaded.
 
-Every page calls `loadPrefs` with a key of its own — `wr-nets`, `wr-centers`,
-`wr-hexroof` — so the settings that mean the *same thing* everywhere are stored
-separately and drift apart. Seed, generation, parity, and now the color scheme are the
-same question on every page and should be answered once.
+They already do, and I am the reason it does not look like it. `loadPrefs` stores the
+build id alongside the settings and **drops everything whole when a different build
+reads them**, so a page remembers perfectly until the next `npm run build` — which in
+this project is most messages. From the far side of that, nothing is ever remembered.
 
-The shape of it: a shared record for the parameters that are genuinely common, each
-page keeping its own for what is not (RT extent, cell surface, shrink, side length).
-Two things to settle before writing any of it.
+The rationale is in "Preferences reset on every build" above and is sound as far as it
+goes: field-by-field validation catches a value whose *type* changed, not one whose
+*meaning* moved, and those restore silently and wrongly. But **the build id is a very
+loose proxy for "a meaning moved"**. It changes every time anything is compiled,
+including a comment, and the schema changes perhaps once a week.
 
-**Not every page can honor every value.** `patchsize.ts` caps generations per page, and
-the 3D pages cap harder than the flat ones — a Sun at generation 4 is a fine Workbench
-patch and far too much for Centers. So an arriving value has to be *clamped and said
-out loud*, the way `syncCupControls` reconciles the Voronoi option, not silently
-dropped or silently obeyed.
+The fix is to say what is actually meant:
 
-**Preferences already reset on every build.** During development that is deliberate and
-documented. A shared record inherits it, so "until reset" also means "until the next
-`npm run build`" while we are working. Worth knowing rather than rediscovering.
+- **A hand-bumped schema version per page**, raised only when a stored value's meaning
+  really moves — a mode renamed, a generation redefined. Compilation stops being the
+  trigger and intent becomes it.
+- **Scoped per page key.** Renaming a mode on Centers has no business clearing the
+  Workbench's side length.
+- The per-field validation stays, and it is already better than it was: `fillOptions`
+  falls back to the first option when a saved scheme names one that no longer exists,
+  which is the failure this was most afraid of.
+
+This is small and worth doing before the two below.
 
 ### 2 · Parameterized links, and parameterized images
 
-Two separate wishes that share one answer.
+Two separate wishes.
 
 **A link that restores a view** — `?patch=Pe3&gen=2&slab=1&color=groups` — for pasting
 into a document. `unfold.html#sheets` is the existing precedent for a deep link.
 
-**An image for embedding** in a web page.
+**An image for embedding** in a web page. Particularly 3D, Centers, Packing, the Cage
+and Hexahedra.
 
-The point worth making: **this is the same schema as item 1.** The shared preference
-record and the query string are the same list of names and values, one stored and one
-in a URL, so doing item 1 first makes this nearly free — and doing this one first would
-mean inventing the vocabulary twice.
+The link shares its vocabulary with item 1: **a page's preference record already is the
+list of names a URL would carry for it**, so the query is that record spelled out
+rather than stored, and neither needs a second vocabulary invented for it.
 
 Three things to settle:
 
 - **Precedence.** A query should win over stored preferences for that visit, and
   arriving *without* one should leave them alone. Otherwise following a shared link
   quietly overwrites the reader's own settings, which is a nasty surprise from a link.
-- **The camera is state too.** For 3D, Centers, Packing and the Cage, the control values
+- **The camera is state too.** For 3D, Centers, Packing and the Cage the control values
   do not determine the picture — the orbit does. A link that restores the controls but
-  not the camera gives a different image every time it is opened, which is the one thing
-  an embedded image must not do.
+  not the camera gives a different image every time it is opened, which is the one
+  thing an embedded image must not do.
 - **SVG where we have it.** The Workbench and Sheets already produce SVG at true size,
   which embeds better than a raster. Only the WebGL pages need `canvas.toDataURL()`.
   So "export an image" is two mechanisms, not one.
