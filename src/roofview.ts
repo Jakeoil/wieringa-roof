@@ -16,59 +16,27 @@ import {
     isoglossSegments,
 } from "./roofgeom.js";
 import type { RoofData, RoofFaceInfo } from "./roofgeom.js";
-import {
-    GROUP_COLORS,
-    TINTED_COLORS,
-    PLATE_COLORS,
-    CLASSIC_COLORS,
-    TYPE_COLORS,
-    INDEX_COLORS,
-    FIVE_COLORS,
-    PLAIN_FILL,
-    pairColor,
-} from "./geometry.js";
+import { tileFill, PLAIN_FILL } from "./geometry.js";
 
 // ── palettes ──────────────────────────────────────────────────────
 //
-// **Derived, never restated.** Every color here is the same string `geometry.ts`
-// hands the flat pages, turned into a `THREE.Color`. The two used to be kept
-// separately and had drifted — thick was `#9292e3` on paper and `0x8f8fdc` on screen,
-// and the height ramp was a four-color ramp in three dimensions against an
-// eight-color wrapping palette on the canvas. One table now, and a scheme added to it
-// reaches every page at once.
+// **Not restated at all, now.** This held six tables derived from the flat ones — the
+// groups, the classic and plate palettes, the five, the height ramp, thick and thin —
+// each a `THREE.Color` copy kept in step by construction. `tileFill` already answers
+// the whole question, so the tables are gone and this asks it, memoizing the conversion
+// from hex. A palette is a presentation decision made after the geometry, and it should
+// live in one table that everything reads rather than in a copy per renderer.
 
-const toColor = (hex: string): THREE.Color => new THREE.Color(hex);
-const toColors = (m: Record<string, string>): Record<string, THREE.Color> =>
-    Object.fromEntries(Object.entries(m).map(([k, v]) => [k, toColor(v)]));
-
-/** The screen strengths: Pe5 blue star, Pe3 yellow boat, Pe1 orange diamond. */
-export const GROUP_3D = toColors(GROUP_COLORS);
-/** The same three, with each group's thin rhomb carried away from it. */
-export const TINTED_3D = toColors(TINTED_COLORS);
-/** penrose-mosaic's start-up colors — the deep version of the same three. */
-export const CLASSIC_3D = toColors(CLASSIC_COLORS);
-/** Sampled from the plate. Wants the height shading and the isoglosses on. */
-export const PLATE_3D = toColors(PLATE_COLORS);
-export const FIVE_3D = FIVE_COLORS.map(toColor);
-export const INDEX_3D = INDEX_COLORS.map(toColor);
-export const THICK_COLOR = toColor(TYPE_COLORS.thick);
-export const THIN_COLOR = toColor(TYPE_COLORS.thin);
 export const PLAIN_COLOR = Number.parseInt(PLAIN_FILL.slice(1), 16);
-export const GROUP_FALLBACK = toColor(PLAIN_FILL);
 
-/**
- * One rhomb's color under one scheme — the three-dimensional answer to the question
- * `tileFill` answers on paper, and deliberately the same answer.
- *
- * `index` is the one mode that cannot come from the flat function: on the canvas a
- * face takes the color of its low corner, while here it can take the color of the
- * vertex being written, so a rhomb ramps across its own height. Pass `idx` to get
- * that; leave it out and the face is colored by its low corner as the print is.
- *
- * A page with schemes of its own — Centers colors by solid and by class — handles
- * those first and calls this for the rest, so the shared names cannot drift apart
- * while the local ones stay local.
- */
+const FALLBACK = new THREE.Color(PLAIN_FILL);
+const cache = new Map<string, THREE.Color>();
+const colorOf = (hex: string): THREE.Color => {
+    let c = cache.get(hex);
+    if (!c) cache.set(hex, (c = new THREE.Color(hex)));
+    return c;
+};
+
 export interface FillInfo {
     /** which pentagon group the rhomb came from: Pe5 star, Pe3 boat, Pe1 diamond */
     group: string;
@@ -76,25 +44,21 @@ export interface FillInfo {
     pair: readonly [number, number];
 }
 
-export function roofFill(mode: string, f: FillInfo, idx?: number): THREE.Color {
-    switch (mode) {
-        case "tinted":
-            return (f.thick ? GROUP_3D : TINTED_3D)[f.group] ?? GROUP_FALLBACK;
-        case "classic":
-            return CLASSIC_3D[f.group] ?? GROUP_FALLBACK;
-        case "plate":
-            return PLATE_3D[f.group] ?? GROUP_FALLBACK;
-        case "five":
-            return FIVE_3D[pairColor(f.pair[0], f.pair[1])];
-        case "type":
-            return f.thick ? THICK_COLOR : THIN_COLOR;
-        case "index":
-            return INDEX_3D[Math.min(3, Math.max(0, (idx ?? 1) - 1))];
-        case "plain":
-            return GROUP_FALLBACK;
-        default:
-            return GROUP_3D[f.group] ?? GROUP_FALLBACK;
-    }
+/**
+ * One rhomb's color under one scheme — the same answer `tileFill` gives on paper,
+ * because it is that answer.
+ *
+ * A page with schemes of its own — Centers colors by solid and by class — handles
+ * those first and calls this for the rest, so the shared names cannot drift apart
+ * while the local ones stay local.
+ */
+export function roofFill(
+    scheme: string,
+    palette: string,
+    f: FillInfo,
+    markThin = false,
+): THREE.Color {
+    return colorOf(tileFill(scheme, palette, markThin, f.group, f.thick, f.pair));
 }
 
 const WHITE = new THREE.Color(0xffffff);

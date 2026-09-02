@@ -25,7 +25,6 @@ import { edgeRole, intersectionArea } from "./unfold.js";
 import type { Placed, Crease } from "./unfold.js";
 import { M_COLOR, V_COLOR } from "./sheet.js";
 import { tileFill } from "./geometry.js";
-import type { FillMode } from "./geometry.js";
 
 type P2 = [number, number];
 
@@ -554,7 +553,11 @@ export interface PageRenderOpts {
     pageW: number; // physical page, mm
     pageH: number;
     margin: number; // mm
-    fillMode: FillMode;
+    /** the color scheme, and the palette it wears */
+    scheme: string;
+    palette: string;
+    /** tell thin rhombi apart within whichever palette `fillMode` names */
+    markThin?: boolean;
     showLegend?: boolean;
     standalone?: boolean;
     // Height-derived decoration. Whether these appear is a *rendering* choice,
@@ -800,13 +803,7 @@ export function renderPage(
         const pts = p.poly.map((q) => map(q as P2));
 
         const vidx0 = p.verts.map(heightOf);
-        const base = tileFill(
-            o.fillMode,
-            p.group,
-            p.thick,
-            Math.min(...vidx0),
-            p.pair,
-        );
+        const base = tileFill(o.scheme, o.palette, o.markThin ?? false, p.group, p.thick, p.pair);
         if (base) {
             const shape = pts.map((q) => `${n3(q[0])},${n3(q[1])}`).join(" ");
             const vidx = vidx0;

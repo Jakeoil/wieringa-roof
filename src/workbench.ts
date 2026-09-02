@@ -18,8 +18,7 @@ import {
 } from "./geometry.js";
 // `FillMode` must be imported by name: the DOM lib declares one too (the Web
 // Animations fill mode), and the global would win silently.
-import type { Rhomb, Vertex, FillMode } from "./geometry.js";
-import { fillOptions } from "./schemes.js";
+import type { Rhomb, Vertex } from "./geometry.js";
 import {
     analyzePatch,
     placeSeed,
@@ -56,6 +55,8 @@ const PREF_DEFAULTS = {
     parity: true,
     method: "cuttree",
     color: "groups",
+    palette: "screen",
+    markthin: false,
     sideIn: 1,
     heightU: 1,
     isogloss: false,
@@ -98,9 +99,11 @@ function biasedHeight(u: number): number {
 
 // Face coloring in the tiling view. "Colored by type or by vertex index" was in
 // the original spec and never got built.
-// The schemes are `FILL_MODES` in `geometry.ts`, shared with every other page.
-type TileColor = FillMode;
-let tileColor: TileColor = prefs.color as TileColor;
+// A scheme and the palette it wears — `SCHEMES` and `PALETTES` in `geometry.ts`.
+let tileScheme = prefs.color;
+let tilePalette = prefs.palette;
+/** Tell thin rhombi apart, in whichever palette `tileColor` names. */
+let markThin = prefs.markthin;
 
 function faceIndexLow(r: Rhomb): number {
     return Math.min(...r.vertIndices);
@@ -181,7 +184,7 @@ function generate() {
             if (shadeOf(r.fill, a) !== shadeOf(r.fill, c)) distinct++;
         }
         console.log(
-            `shading: color=${tileColor} depth=${shadeDepth.toFixed(2)} ` +
+            `shading: ${tileScheme}/${tilePalette} depth=${shadeDepth.toFixed(2)} ` +
                 `range ${idxLo}..${idxHi} · ${distinct}/${allRhombs.length} tiles ` +
                 `get two different stops · spans ${JSON.stringify(Object.fromEntries(pairs))}`,
         );
@@ -515,7 +518,7 @@ function drawTiling() {
             ctx.strokeStyle = hint === "clean" ? "#2ea043" : "#c0392b";
             ctx.lineWidth = r.id === hoveredRhomb ? 2.5 : 1.5;
             ctx.stroke();
-        } else if (tileColor === "plate" || tileColor === "classic") {
+        } else if (tilePalette === "plate" || tilePalette === "classic") {
             // Heavy black outlines are half of what the plate looks like — the ramp
             // and the isoglosses do nothing without them. Scale with the rhomb so a
             // gen-4 patch does not turn solid black: the plate is gen 2, where a
@@ -605,11 +608,11 @@ function rhombFill(
 ): string | CanvasGradient {
     const sh = sheet ?? (slabMode ? rhombSheet.get(r.id) : faceSheet.get(r.id));
     if (sh != null) return sheetColors[sh] ?? "#ddd";
-    const base = tileFill(tileColor, r.group, r.thick, vi[cLo], r.pair) ?? r.fill;
+    const base = tileFill(tileScheme, tilePalette, markThin, r.group, r.thick, r.pair);
     // These modes carry their own meaning in the flat color and must not be shaded
     // away — the five-coloring least of all, since two rhombi differing only by shade
     // would read as the same color.
-    if (tileColor === "type" || tileColor === "index" || tileColor === "five") return base;
+    if (tileScheme === "five") return base;
     return makeGradient(ctx, base, sv[cLo], sv[cHi], vi[cLo], vi[cHi]);
 }
 
@@ -1698,7 +1701,7 @@ function drawNet() {
         const [nLo, nHi] = extremeCorners(nvi);
         ctx.fillStyle = makeGradient(
             ctx,
-            tileFill(tileColor, src.group, src.thick, nvi[nLo], src.pair) ?? src.fill,
+            tileFill(tileScheme, tilePalette, markThin, src.group, src.thick, src.pair),
             { x: sv[nLo].x, y: sv[nLo].y },
             { x: sv[nHi].x, y: sv[nHi].y },
             nvi[nLo],
@@ -1947,7 +1950,7 @@ function runTraceBody(): void {
             slabRhomb.set(f.id, f.rhomb);
             slabStyle.set(f.id, {
                 thick: f.thick, group: f.group, pair: f.pair,
-                fill: tileFill("groups", f.group, f.thick, 1, f.pair) ?? "#bbb",
+                fill: tileFill("groups", tilePalette, markThin, f.group, f.thick, f.pair),
             });
             if (f.role === "top") slabTops.add(f.id);
         }
@@ -2454,7 +2457,7 @@ function wallFill(rid: number, sheet?: number): string {
     const r = allRhombs[rid];
     if (!r) return "#c8791f";
     const vi = r.vertIndices.map(displayIndex);
-    return tileFill(tileColor, r.group, r.thick, Math.min(...vi), r.pair) ?? r.fill;
+    return tileFill(tileScheme, tilePalette, markThin, r.group, r.thick, r.pair);
 }
 
 /**
@@ -2503,7 +2506,9 @@ function sheetOpts(sheet = 0) {
         pageW: pw,
         pageH: ph,
         margin: MARGIN_IN * 25.4,
-        fillMode: tileColor,
+        scheme: tileScheme,
+        palette: tilePalette,
+        markThin,
         shading: shadeDepth,
         isoglosses: showIsogloss,
         // A flat height setting carries no hills-or-dales information, so rendering
@@ -3098,7 +3103,9 @@ function printNet(): void {
                 pageW: pw,
                 pageH: ph,
                 margin: marginMm,
-                fillMode: tileColor,
+                scheme: tileScheme,
+        palette: tilePalette,
+        markThin,
                 indexOf: (v: number) => vertexList[v]?.index ?? 1,
                 showAngles: false,
                 showLegend: true,
@@ -3404,7 +3411,8 @@ function buildControls() {
 
     renderLine = buildRenderLine({
         host: drawbar,
-        color: tileColor,
+        scheme: tileScheme,
+        palette: tilePalette,
         // Light, not geometry: on this page there is no relief to set, only how
         // strongly height is drawn and which end of it is brightened.
         shading: {
@@ -3416,9 +3424,12 @@ function buildControls() {
                 return d < 0.005 ? "flat" : `${v < 0 ? "brighten dales" : "brighten hills"} ${d.toFixed(2)}`;
             },
         },
+        markThin,
         isoglosses: showIsogloss,
         onChange: (v: RenderValues) => {
-            tileColor = v.color as TileColor;
+            tileScheme = v.scheme;
+            tilePalette = v.palette;
+            markThin = v.markThin;
             heightU = v.shading;
             const b = biasedHeight(heightU);
             shadeDepth = Math.abs(b);
@@ -3649,7 +3660,9 @@ function persist(): void {
         slab: slabMode,
         parity: parityHeads,
         method: traceMethod,
-        color: tileColor,
+        color: tileScheme,
+        palette: tilePalette,
+        markthin: markThin,
         sideIn,
         heightU,
         isogloss: showIsogloss,

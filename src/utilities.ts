@@ -4,7 +4,7 @@
 import { seedTypes } from "./geometry.js";
 import { iconSvg, iconDataUri, ICON_DEFAULTS } from "./favicon.js";
 import type { IconOpts } from "./favicon.js";
-import { fillOptions } from "./schemes.js";
+import { schemeOptions } from "./schemes.js";
 import { loadPrefs, savePrefs, resetPrefs } from "./prefs.js";
 import { BUILD_ID } from "./build-id.js";
 
@@ -56,7 +56,7 @@ genSel.value = String(prefs.gen);
 subjectSel.value = prefs.subject;
 // The favicon draws from rhomb data that carries no axis pair, so the five-coloring
 // has nothing to read; everything else is the shared list, plus the icon's own mono.
-fillOptions(colorSel, { omit: ["five", "plain"], trail: [["mono", "Mono", "One color, for a silhouette"]] });
+schemeOptions(colorSel, { omit: ["five"], trail: [["mono", "Mono", "One color, for a silhouette"]] });
 colorSel.value = prefs.color;
 bgSel.value = prefs.background;
 for (const [sel, def] of [

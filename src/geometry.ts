@@ -539,11 +539,14 @@ const PLATE_COLORS: Record<string, string> = {
  * are looking at. Carrying the thin one a few steps away separates them without
  * spending a new hue, and the hierarchy still reads across the patch.
  *
- * Away from *what* has to depend on the color: lightening pure yellow does nothing and
- * darkening a dark slate does nothing either. So it moves toward white when the color
- * is dark and toward black when it is light, by the same amount either way.
+ * **One rule, and a strong one.** Jake's call: darken, big contrast — two weights of
+ * one color that can be told apart across a room, not a subtlety. Away from *what* has
+ * to depend on the color, since lightening pure yellow does nothing and darkening a
+ * dark slate does nothing either, so it moves toward white when the color is dark and
+ * toward black when it is light. A choice of rules may earn a dropdown one day; one
+ * rule earns none.
  */
-const TINT = 0.76;
+const TINT = 0.52;
 function tintThin(hex: string): string {
     const n = Number.parseInt(hex.slice(1), 16);
     const r = ((n >> 16) & 255) / 255, g = ((n >> 8) & 255) / 255, b = (n & 255) / 255;
@@ -623,111 +626,99 @@ function pairColor(i: number, j: number): number {
 /** The five, at the strengths the 3D pages use, so a printed net matches the screen. */
 const FIVE_COLORS = ["#d94f3d", "#e8a33d", "#4f9d4a", "#3d7fc4", "#9b59b6"];
 
-/** The color every scheme falls back to, and what "Plain" paints. */
+/** The color every scheme falls back to when it is asked something it cannot answer. */
 const PLAIN_FILL = "#c9cbd4";
 
-type FillMode =
-    | "none"
-    | "groups"
-    | "tinted"
-    | "classic"
-    | "plate"
-    | "five"
-    | "index"
-    | "type"
-    | "plain";
-
 /**
- * Every color scheme the roof surface has, in the order the controls should offer
- * them, with the one label each is called by.
+ * **A scheme decides what class a face is in; a palette decides what color a class
+ * gets.** They were one list — `groups`, `classic`, `plate` and `tinted` being four
+ * entries for one scheme wearing four coats — and separating them is Jake's, along with
+ * the observation that a palette is simply an ordered list of colors and a scheme takes
+ * the first few: none takes one, rhomb groups three, the Kowalewski five all five.
  *
- * The point of the table is that no page invents a name. "Cluster", "Star / boat /
- * diamond", "Mosaic classic" and "Mosaic plate" were four labels for two schemes,
- * spread over five pages, and a reader had no way to know which of them agreed.
- * `type` reads differently on a solid than on the surface, so it carries the one
- * alternative label; nothing else needs one.
+ * A palette is offered only where it is long enough for the scheme asking, which is why
+ * the three-color palettes do not appear under Kowalewski. Lengthening them to five
+ * would let every palette serve every scheme, at the cost of two colors that mean
+ * nothing under rhomb groups. That is the open end of this.
  */
-const FILL_MODES: ReadonlyArray<{
-    value: FillMode;
+export interface Scheme {
+    value: string;
     label: string;
-    /** what `type` is called when the thing being colored is a cell, not a rhomb */
-    cellLabel?: string;
+    /** how many colors it takes from the front of a palette */
+    classes: number;
     title: string;
-}> = [
+}
+
+const SCHEMES: readonly Scheme[] = [
+    { value: "none", label: "None", classes: 1, title: "One color, so the shading and the edges carry everything" },
     {
         value: "groups",
         label: "Rhomb groups",
-        title: "Star, boat and diamond — the rhombs each pentagon Pe5 / Pe3 / Pe1 emits",
-    },
-    {
-        value: "tinted",
-        label: "Tinted rhomb groups",
-        title: "The three groups, with the thin rhomb of each carried away from its group color",
-    },
-    {
-        value: "classic",
-        label: "Classic rhomb groups",
-        title: "The same three groups in penrose-mosaic's own start-up colors: blue, yellow, orange",
-    },
-    {
-        value: "plate",
-        label: "Plate rhomb groups",
-        title: "The same three groups sampled from the penrose-mosaic plate. Wants the shading and isoglosses on",
+        classes: 3,
+        title: "Star, boat and diamond — the rhombi each pentagon Pe5 / Pe3 / Pe1 emits",
     },
     {
         value: "five",
         label: "Kowalewski five",
+        classes: 5,
         title: "A proper edge coloring of K\u2086 on the six axes, so every rosette shows all five",
     },
-    { value: "index", label: "Height", title: "The height index of the rhomb's low corner, 1 to 4" },
-    {
-        value: "type",
-        label: "Thick / thin",
-        cellLabel: "Acute / obtuse",
-        title: "Which of the two rhombi it is",
-    },
-    { value: "plain", label: "Plain", title: "One color, so the shading and the edges carry everything" },
 ];
 
+export interface Palette {
+    value: string;
+    label: string;
+    colors: readonly string[];
+}
+
+const PALETTES: readonly Palette[] = [
+    { value: "neutral", label: "Neutral", colors: [PLAIN_FILL] },
+    { value: "screen", label: "Screen", colors: Object.values(GROUP_COLORS) },
+    { value: "classic", label: "Classic", colors: Object.values(CLASSIC_COLORS) },
+    { value: "plate", label: "Plate", colors: Object.values(PLATE_COLORS) },
+    { value: "five", label: "Five", colors: FIVE_COLORS },
+];
+
+const SCHEME_OF = new Map(SCHEMES.map((x) => [x.value, x]));
+const PALETTE_OF = new Map(PALETTES.map((x) => [x.value, x]));
+
+/** The palettes long enough for a scheme. */
+function palettesFor(scheme: string): readonly Palette[] {
+    const need = SCHEME_OF.get(scheme)?.classes ?? 1;
+    return PALETTES.filter((p) => p.colors.length >= need);
+}
+
+const GROUP_INDEX: Record<string, number> = { Pe5: 0, Pe3: 1, Pe1: 2 };
+
+/** Which of a scheme's classes a rhomb belongs to. */
+function classOf(scheme: string, group: string, pair?: readonly [number, number]): number {
+    if (scheme === "groups") return GROUP_INDEX[group] ?? 0;
+    // No pair means the caller has not been taught this scheme; fall back rather than
+    // paint everything one color and look deliberate.
+    if (scheme === "five") return pair ? pairColor(pair[0], pair[1]) : 0;
+    return 0;
+}
+
 /**
- * The base color of one rhomb under a given color mode — the single answer the
- * workbench, the sheets, the printable map and the three-dimensional pages all ask
- * for.
+ * A rhomb's color — the single answer the workbench, the sheets, the printable map and
+ * the three-dimensional pages all ask for.
  *
- * It lives here because the sheets used to keep their own washed-out copy of the
- * group palette, so the same net came out one color on screen and another on paper.
- * One function, one answer: what you build is what prints, and what you turned over
- * in three dimensions.
+ * It lives here because the sheets used to keep their own washed-out copy of the group
+ * palette, so the same net came out one color on screen and another on paper. One
+ * function, one answer: what you build is what prints, and what you turned over in
+ * three dimensions.
  */
 function tileFill(
-    mode: FillMode,
+    scheme: string,
+    palette: string,
+    markThin: boolean,
     group: string,
     thick: boolean,
-    lowIndex: number,
     pair?: readonly [number, number],
-): string | null {
-    switch (mode) {
-        case "none":
-            return null;
-        case "five":
-            // No pair means the caller has not been taught this mode; fall back rather
-            // than paint everything one color and look deliberate.
-            return pair ? FIVE_COLORS[pairColor(pair[0], pair[1])] : PLAIN_FILL;
-        case "tinted":
-            return (thick ? GROUP_COLORS : TINTED_COLORS)[group] ?? PLAIN_FILL;
-        case "classic":
-            return CLASSIC_COLORS[group] ?? PLAIN_FILL;
-        case "plate":
-            return PLATE_COLORS[group] ?? PLAIN_FILL;
-        case "type":
-            return thick ? TYPE_COLORS.thick : TYPE_COLORS.thin;
-        case "index":
-            return indexColor(lowIndex);
-        case "plain":
-            return PLAIN_FILL;
-        default:
-            return GROUP_COLORS[group] ?? PLAIN_FILL;
-    }
+): string {
+    const pal = PALETTE_OF.get(palette)?.colors;
+    const c = pal?.[classOf(scheme, group, pair)] ?? pal?.[0] ?? PLAIN_FILL;
+    return markThin && !thick ? tintThin(c) : c;
 }
 
 let allRhombs: Rhomb[] = [];
@@ -1570,12 +1561,12 @@ function generatePatch(seedIdx: number, isHeads: boolean, gen: number): void {
 
 // ── Exports ───────────────────────────────────────────────────────
 
-export type { FillMode };
 export {
     GROUP_COLORS,
-    TINTED_COLORS,
     PLAIN_FILL,
-    FILL_MODES,
+    SCHEMES,
+    PALETTES,
+    palettesFor,
     PLATE_COLORS,
     CLASSIC_COLORS,
     TYPE_COLORS,

@@ -27,7 +27,7 @@ import { LineSegments2 } from "three/addons/lines/LineSegments2.js";
 import { LineSegmentsGeometry } from "three/addons/lines/LineSegmentsGeometry.js";
 import { LineMaterial } from "three/addons/lines/LineMaterial.js";
 import { createRoofView, roofFill, PLAIN_COLOR } from "./roofview.js";
-import { fillOptions } from "./schemes.js";
+import { schemeOptions } from "./schemes.js";
 import {
     triacontahedra, pe5Rosettes, cupIndices, ownedFaceIndices, solidFace,
     RT_FACES, A6, RHO, MIDRADIUS,
@@ -960,14 +960,14 @@ function build(reframe: boolean): void {
         // ones every roof surface offers. The local ones are answered here, the shared
         // ones by `roofFill`, so "Rhomb groups" means the same thing on every page and
         // "By class" stays where it makes sense.
-        colorOf: (f, vid) => {
+        colorOf: (f) => {
             const s = cen.solids[assign[f.id]];
             if (mode === "complete") return s.complete ? solidColor(s) : WASH.clone();
             if (mode === "class") {
                 const rf = cen.byRhomb[f.id];
                 return rf && isShared(rf, cen.solids) ? SHARED : solidColor(s);
             }
-            return roofFill(mode, f, d.indexAt(vid));
+            return roofFill(mode, "screen", f);
         },
         // Shading strength is the depth, so it goes out with it rather than lying
         // about a flat sheet.
@@ -1671,7 +1671,7 @@ function fillGenerations(prefer?: number): void {
 }
 // The shared schemes, plus this page's own two. Built from `FILL_MODES` so the list
 // cannot drift from the 3D page's or the workbench's.
-fillOptions(colorSel, {
+schemeOptions(colorSel, {
     lead: [["class", "Proper class", "Color each rhomb by the triacontahedron that owns it"]],
 });
 colorSel.value = prefs.color;

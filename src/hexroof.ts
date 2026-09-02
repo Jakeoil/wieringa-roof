@@ -22,7 +22,7 @@ import { buildRoof } from "./roofgeom.js";
 import type { RoofData } from "./roofgeom.js";
 import { createRoofView, shadeColor, roofFill, PLAIN_COLOR } from "./roofview.js";
 import type { FillInfo } from "./roofview.js";
-import { fillOptions } from "./schemes.js";
+import { schemeOptions } from "./schemes.js";
 import { buildPatchLine, buildRenderLine } from "./bars.js";
 import { hexLayer } from "./hexlayer.js";
 import type { HexLayer, HexCell } from "./hexlayer.js";
@@ -54,7 +54,7 @@ const statusEl = el<HTMLElement>("status");
 const PREFS_KEY = "wr-hexroof";
 const PREF_DEFAULTS = {
     patch: "Pe3", gen: 3, tails: false,
-    cellcolor: "type", cellmode: "solid", cellshow: "both", rim: "cell", shrink: 1,
+    cellcolor: "groups", cellpalette: "screen", markthin: false, cellmode: "solid", cellshow: "both", rim: "cell", shrink: 1,
     tops: true, floors: true, edges: true, shade: false, isogloss: false,
     roofmode: "invisible", roofcolor: "groups", flat: false,
     roofedges: true, roofiso: false, roofopen: false,
@@ -193,7 +193,7 @@ function build(reframe: boolean): void {
 
     const cellMode = cellSel.value;
     const showMode = cellShowSel.value;
-    const colorMode = renderLine.values.color;
+    const rv2 = renderLine.values;
     const rimMode = rimSel.value;
     let drawnCells = 0;
     let topZ = -Infinity;
@@ -215,9 +215,9 @@ function build(reframe: boolean): void {
             // Everything else colors the whole cell, and comes from the same resolver
             // the roof and the flat pages use, so a rhomb and the cell hanging from it
             // are never two different colors.
-            const base = colorMode === "five" ? null
-                : colorMode === "type" ? (c.acute ? ACUTE : OBTUSE)
-                : roofFill(colorMode, fillInfo(c), Math.min(...c.index));
+            const base = rv2.scheme === "five" ? null
+                : false ? (c.acute ? ACUTE : OBTUSE)
+                : roofFill(rv2.scheme, rv2.palette, fillInfo(c), rv2.markThin);
             c.faces.forEach((f, fi) => {
                 if (fi === 0 && !topsChk.checked) return;
                 if (fi === 1 && !floorsChk.checked) return;
@@ -228,7 +228,7 @@ function build(reframe: boolean): void {
                 const wall = fi >= 2;
                 const face = wall && rimMode !== "cell"
                     ? FIVE[c.colors[fi]]
-                    : colorMode === "five" ? FIVE[c.colors[fi]] : base!;
+                    : rv2.scheme === "five" ? FIVE[c.colors[fi]] : base!;
                 // A floor is the same rhomb as the top; darkening it a little is the only
                 // thing keeping the two surfaces apart when both are on.
                 const tinted = fi === 1 ? face.clone().multiplyScalar(FLOOR_TINT) : face;
@@ -292,7 +292,7 @@ function build(reframe: boolean): void {
         const rmode = roofColorSel.value;
         rv.drawRoof(dRoof, {
             // The roof's own index range, so height coloring matches the 3D page.
-            colorOf: (f, vid) => roofFill(rmode, f, dRoof.indexAt(vid)),
+            colorOf: (f) => roofFill(rv2.scheme, rv2.palette, f, rv2.markThin),
             shade: 0,
             useVertexColors: rmode !== "plain",
             flatColor: PLAIN_COLOR,
@@ -339,13 +339,13 @@ const patchLine = buildPatchLine({
 
 const renderLine = buildRenderLine({
     host: el<HTMLElement>("renderbar"),
-    color: prefs.cellcolor || PREF_DEFAULTS.cellcolor,
+    scheme: prefs.cellcolor || PREF_DEFAULTS.cellcolor,
+    palette: prefs.cellpalette || PREF_DEFAULTS.cellpalette,
     // A checkbox rather than a slider: these cells are solid, and what the control
     // decides is whether height is read on them at all, not how hard.
     shading: { name: "", value: prefs.shade ? 1 : 0, slider: false },
+    markThin: prefs.markthin,
     isoglosses: prefs.isogloss,
-    // A cell is acute or obtuse where a rhomb is thick or thin.
-    schemes: { cells: true },
     onChange: () => rebuild(false),
 });
 // `cellmode` meant something else in the previous layout — it carried the color scheme
@@ -354,7 +354,7 @@ const renderLine = buildRenderLine({
 // Both color lists come from `FILL_MODES`, so the cells and the roof over them offer
 // the same schemes and call them the same thing. Only `type` differs: a cell is acute
 // or obtuse where a rhomb is thick or thin.
-fillOptions(roofColorSel);
+schemeOptions(roofColorSel);
 cellSel.value = prefs.cellmode || PREF_DEFAULTS.cellmode;
 cellShowSel.value = prefs.cellshow || PREF_DEFAULTS.cellshow;
 rimSel.value = prefs.rim || PREF_DEFAULTS.rim;
@@ -409,11 +409,12 @@ function persist(): void {
     savePrefs(PREFS_KEY, {
         patch: patchLine.values.patch, gen: patchLine.values.gen,
         tails: !patchLine.values.heads,
-        cellcolor: renderLine.values.color, cellmode: cellSel.value,
+        cellcolor: renderLine.values.scheme, cellpalette: renderLine.values.palette, cellmode: cellSel.value,
         cellshow: cellShowSel.value, rim: rimSel.value,
         shrink: Number(shrinkInput.value),
         tops: topsChk.checked, floors: floorsChk.checked, edges: edgesChk.checked,
         shade: renderLine.values.shading !== 0, isogloss: renderLine.values.isoglosses,
+        markthin: renderLine.values.markThin,
         roofmode: roofSel.value, roofcolor: roofColorSel.value, flat: flatChk.checked,
         roofedges: roofEdgesChk.checked, roofiso: roofIsoChk.checked,
         roofopen: roofPanel.open,

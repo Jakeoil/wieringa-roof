@@ -19,8 +19,8 @@
 // here.
 
 import { seedTypes } from "./geometry.js";
-import { fillOptions } from "./schemes.js";
-import type { FillOptionsOpts } from "./schemes.js";
+import { schemeOptions, paletteOptions } from "./schemes.js";
+import type { SchemeOptionsOpts } from "./schemes.js";
 import { patchSize, MAX_GENERATION } from "./patchsize.js";
 
 /** The names the seeds go by on a control, as against their codes. */
@@ -165,10 +165,15 @@ export function buildPatchLine(o: PatchLineOpts): PatchLine {
         wrap.title =
             "Which side of the surface this is. Heads is seen from above, tails from " +
             "below: the same thing mirrored, with hills and dales exchanged.";
+        // **One name for the pair.** This read `Math.random()` inside the loop, so the
+        // two radios were given *different* names and were never a group: clicking
+        // tails checked it and fired, but heads was never unchecked, so clicking back
+        // raised no change event at all and parity appeared to stick after one use.
+        const group = `parity-${Math.random().toString(36).slice(2, 8)}`;
         for (const [text, heads] of [["heads", true], ["tails", false]] as Array<[string, boolean]>) {
             const radio = document.createElement("input");
             radio.type = "radio";
-            radio.name = `parity-${Math.random().toString(36).slice(2, 8)}`;
+            radio.name = group;
             radio.checked = values.heads === heads;
             radio.addEventListener("change", () => {
                 if (!radio.checked) return;
@@ -212,7 +217,12 @@ export function buildPatchLine(o: PatchLineOpts): PatchLine {
 // ── the rendering line ────────────────────────────────────────────
 
 export interface RenderValues {
-    color: string;
+    /** what class a face is in */
+    scheme: string;
+    /** what color that class gets */
+    palette: string;
+    /** tell thin rhombi apart, in whatever palette is chosen */
+    markThin: boolean;
     /** the slider's position, −1 … 1, or the checkbox as 0 and 1 */
     shading: number;
     isoglosses: boolean;
@@ -220,7 +230,8 @@ export interface RenderValues {
 
 export interface RenderLineOpts {
     host: HTMLElement;
-    color: string;
+    scheme: string;
+    palette: string;
     /**
      * The shading control, and **what it is called here**, because the magnitude does
      * not mean the same thing on every page. On the flat pages it is how strongly
@@ -236,6 +247,12 @@ export interface RenderLineOpts {
         min?: number;
         format?: (v: number) => string;
     };
+    /**
+     * Offer the mark-thin switch. It is not a scheme of its own — it applies to
+     * whichever palette is chosen, which is where "tinted classic" and "tinted plate"
+     * come from without either being built.
+     */
+    markThin?: boolean;
     isoglosses?: boolean;
     /**
      * Page-specific controls, placed between the shading control and the isoglosses.
@@ -244,32 +261,61 @@ export interface RenderLineOpts {
      * one.
      */
     extras?: HTMLElement[];
-    /** passed through to `fillOptions` — page-specific schemes, and what to leave out */
-    schemes?: FillOptionsOpts;
+    /** page-specific schemes, and any the page cannot answer */
+    schemes?: SchemeOptionsOpts;
     onChange: (v: RenderValues) => void;
 }
 
 export function buildRenderLine(o: RenderLineOpts): { values: RenderValues; sync(): void } {
     const values: RenderValues = {
-        color: o.color,
+        scheme: o.scheme,
+        palette: o.palette,
+        markThin: o.markThin ?? false,
         shading: o.shading?.value ?? 0,
         isoglosses: o.isoglosses ?? false,
     };
     const emit = () => o.onChange({ ...values });
 
-    // Color first: it is the one that changes what you are looking at rather than how
-    // brightly, and it is the one reached for most.
-    const colorSel = document.createElement("select");
-    colorSel.style.cssText = "padding:4px;font-size:13px;";
-    fillOptions(colorSel, o.schemes);
-    colorSel.value = values.color;
-    if (!colorSel.value) colorSel.selectedIndex = 0;
-    values.color = colorSel.value;
-    colorSel.addEventListener("change", () => {
-        values.color = colorSel.value;
+    // Scheme first, then the palette it wears: what you are looking at, then what it
+    // is painted in. The palette menu disables itself when the scheme leaves no
+    // choice, rather than offering one entry.
+    const schemeSel = document.createElement("select");
+    schemeSel.style.cssText = "padding:4px;font-size:13px;";
+    schemeOptions(schemeSel, o.schemes);
+    schemeSel.value = values.scheme;
+    if (!schemeSel.value) schemeSel.selectedIndex = 0;
+    values.scheme = schemeSel.value;
+
+    const paletteSel = document.createElement("select");
+    paletteSel.style.cssText = "padding:4px;font-size:13px;";
+    values.palette = paletteOptions(paletteSel, values.scheme, values.palette);
+
+    schemeSel.addEventListener("change", () => {
+        values.scheme = schemeSel.value;
+        // A three-color palette cannot serve the five, so the choice may have to move.
+        values.palette = paletteOptions(paletteSel, values.scheme, values.palette);
         emit();
     });
-    o.host.appendChild(label("Color: ", colorSel));
+    paletteSel.addEventListener("change", () => {
+        values.palette = paletteSel.value;
+        emit();
+    });
+    o.host.appendChild(label("Color: ", schemeSel));
+    o.host.appendChild(label("", paletteSel));
+
+    let thinBox: HTMLInputElement | null = null;
+    if (o.markThin !== undefined) {
+        thinBox = document.createElement("input");
+        thinBox.type = "checkbox";
+        thinBox.checked = values.markThin;
+        thinBox.addEventListener("change", () => {
+            values.markThin = thinBox!.checked;
+            emit();
+        });
+        const l = label("", thinBox, document.createTextNode("thin"));
+        l.title = "Carry the thin rhomb of each class away from its color, so the two read apart";
+        o.host.appendChild(l);
+    }
 
     let out: HTMLElement | null = null;
     let input: HTMLInputElement | null = null;
@@ -328,12 +374,14 @@ export function buildRenderLine(o: RenderLineOpts): { values: RenderValues; sync
     return {
         values,
         sync() {
-            colorSel.value = values.color;
+            schemeSel.value = values.scheme;
+            values.palette = paletteOptions(paletteSel, values.scheme, values.palette);
             if (input) {
                 if (o.shading?.slider) input.value = String(values.shading);
                 else input.checked = values.shading !== 0;
                 if (out && o.shading?.format) out.textContent = o.shading.format(values.shading);
             }
+            if (thinBox) thinBox.checked = values.markThin;
             if (isoBox) isoBox.checked = values.isoglosses;
         },
     };

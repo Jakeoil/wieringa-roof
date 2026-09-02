@@ -38,8 +38,10 @@ const PREF_DEFAULTS = {
     gen: 3,
     heads: true,
     color: "groups",
+    palette: "screen",
     vscale: 1,
     edges: true,
+    markthin: false,
     isogloss: false,
     transparent: false,
     shade: false,
@@ -86,21 +88,21 @@ function build(reframe: boolean): void {
         return;
     }
 
-    const mode = renderLine.values.color;
+    const rv2 = renderLine.values;
     const shade = shadeChk.checked ? Math.abs(vscale) : 0;
 
     rv.drawRoof(d, {
         // One resolver, shared with the Hexahedra roof and the Centers shadow, so the
         // schemes cannot drift apart page to page. `index` is passed the vertex height
         // rather than the face's, so flipping the surface recolors it.
-        colorOf: (f, vid) => roofFill(mode, f, d.indexAt(vid)),
+        colorOf: (f) => roofFill(rv2.scheme, rv2.palette, f, rv2.markThin),
         // Shading by height: high lighter, low darker. Its strength is |vscale|, the
         // same number that flattens the surface — so at the middle of the slider,
         // where the roof is flat, there is nothing to shade and the shading is gone.
         // No separate control can then contradict the geometry by shading a flat
         // sheet.
         shade,
-        useVertexColors: mode !== "plain" || shade > 0,
+        useVertexColors: rv2.scheme !== "none" || shade > 0,
         flatColor: PLAIN_COLOR,
         transparent: transpChk.checked,
         edges: edgesChk.checked,
@@ -147,7 +149,8 @@ const patchLine = buildPatchLine({
 
 const renderLine = buildRenderLine({
     host: el<HTMLElement>("renderbar"),
-    color: prefs.color || PREF_DEFAULTS.color,
+    scheme: prefs.color || PREF_DEFAULTS.color,
+    palette: prefs.palette || PREF_DEFAULTS.palette,
     // **Relief, not shading.** In three dimensions the magnitude is the model's own
     // vertical scale — it really flattens the roof — and the shading follows it, which
     // is why a flattened roof cannot be shaded. On the flat pages the same slider only
@@ -159,6 +162,7 @@ const renderLine = buildRenderLine({
         min: 0,
         format: (v: number) => `${Math.pow(Math.abs(v), 1.6).toFixed(2)}×`,
     },
+    markThin: prefs.markthin,
     isoglosses: prefs.isogloss,
     onChange: () => rebuild(false),
 });
@@ -184,10 +188,11 @@ function persist(): void {
         patch: patchLine.values.patch,
         gen: patchLine.values.gen,
         heads: patchLine.values.heads,
-        color: renderLine.values.color,
+        color: renderLine.values.scheme, palette: renderLine.values.palette,
         vscale: renderLine.values.shading,
-        edges: edgesChk.checked,
+        markthin: renderLine.values.markThin,
         isogloss: renderLine.values.isoglosses,
+        edges: edgesChk.checked,
         transparent: transpChk.checked,
         shade: shadeChk.checked,
     });

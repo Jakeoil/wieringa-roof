@@ -1265,7 +1265,7 @@ One thing lost on purpose: the slider used to ease to the nearest of −1, 0, +1
 release, those being the three settings that meant anything when the sign was the
 parity. With the sign gone from the 3D slider there is nothing to land on.
 
-### 5 · Schemes and palettes, separated
+### 5 · Schemes and palettes, separated — **built**
 
 Jake's model: a **scheme** decides what class a face is in, a **palette** decides what
 color each class gets, and one boolean says whether thin rhombi are told apart. Coherent
@@ -1309,10 +1309,45 @@ The better answer is probably that the collar reads by position, and that wantin
 pick it out is a **highlight** — a temporary overlay, like the sheet partition — rather
 than a scheme.
 
-What the menu becomes: **scheme** (4), **palette** (offered only where there is more
-than one, so only for the groups today), **mark thin** (a checkbox). Twelve
-combinations from two controls and a box, against eight from one long list — and
-`tinted classic` and `tinted plate`, which do not exist today, come free.
+Settled and built. **Height is out** — a fourth scheme nobody reached for. **Mark thin
+is a checkbox on the rendering line**, applying to whichever palette is chosen rather
+than being an entry of its own, so `tinted` stops being a menu item and the tinted
+classic, plate and five come free. **One rule, no thin palette**: darken, big contrast.
+`TINT` went from 0.76 to 0.52 — `#9292e3` to `#28289a`, luminance 0.60 to 0.19, two
+weights of one color that read apart across a room. A choice of rules may earn a
+dropdown one day, the way isoglosses may one day become none / isoglosses / image.
+**And the collar keeps inheriting**: a wall takes the color of the cell it hangs from,
+and picking it out is a highlight rather than a scheme.
+
+The menu went from eight entries to six — groups, classic, plate, five, type, plain —
+with a checkbox beside it that multiplies all of them.
+
+Doing it collapsed `roofview.ts`'s palettes entirely. It held six `THREE.Color` tables
+derived from the flat ones and kept in step by construction; `tileFill` already answers
+the whole question, so `roofFill` asks it and memoizes the conversion from hex. The
+tables are gone. That is what "palette is post-production" is worth in practice.
+
+`type` is gone with it: under the model it is not a scheme but "none, mark thin", and
+it never owned its colors anyway. Hexahedra now opens on rhomb groups; its acute and
+obtuse are still there in the code and want re-attaching as a two-color palette for the
+none scheme, which is the neat way to say what it was saying.
+
+**Two controls now**, `Color` and the palette beside it, the second disabling itself
+when the scheme leaves no choice. A scheme takes the first *n* colors of a palette —
+none one, rhomb groups three, Kowalewski all five — so a palette is offered only where
+it is long enough:
+
+| scheme | takes | can wear |
+|---|---|---|
+| None | 1 | neutral, screen, classic, plate, five |
+| Rhomb groups | 3 | screen, classic, plate, five |
+| Kowalewski five | 5 | five |
+
+**The open end is the duds.** The three group palettes stop at three, so Kowalewski can
+only wear its own. Lengthening them to five would let every palette serve every scheme,
+at the price of two colors that mean nothing under rhomb groups — which is the trade to
+make deliberately rather than by accident. Naming the palettes is the cheaper half of
+it, and is done: neutral, screen, classic, plate, five.
 
 ## Chapters
 

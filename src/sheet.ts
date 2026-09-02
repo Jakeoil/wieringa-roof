@@ -5,7 +5,6 @@
 
 import { edgeRole } from "./unfold.js";
 import { tileFill } from "./geometry.js";
-import type { FillMode } from "./geometry.js";
 import type { Placed, Piece, Crease } from "./unfold.js";
 
 type P2 = [number, number];
@@ -121,7 +120,11 @@ export interface RenderOpts {
     pageW: number;
     pageH: number;
     margin: number;
-    fillMode: FillMode;
+    /** the color scheme, and the palette it wears */
+    scheme: string;
+    palette: string;
+    /** tell thin rhombi apart within whichever palette `fillMode` names */
+    markThin?: boolean;
     /**
      * Height at a corner id — the roof passes its lift index, but any number on a
      * consistent scale will do. Only the "index" fill and the shading need it.
@@ -206,14 +209,7 @@ export function renderSheet(
                 continue;
             }
 
-            const idxOf = o.indexOf;
-            const fill = tileFill(
-                o.fillMode,
-                p.group,
-                p.thick,
-                idxOf ? Math.min(...p.verts.map(idxOf)) : 1,
-                p.pair,
-            );
+            const fill = tileFill(o.scheme, o.palette, o.markThin ?? false, p.group, p.thick, p.pair);
             if (fill) {
                 fills.push(
                     `<polygon points="${pts
