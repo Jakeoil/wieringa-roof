@@ -1183,6 +1183,56 @@ colors, the sheets' washed-out copy of the palette, `paginate.ts`'s second `DASH
 not, and are deliberate — a printed sheet is read at arm's length and wants a coarser
 pattern than a screen.
 
+### 4 · One patch line and one rendering line across the pages
+
+Jake's proposal: the patch line common to every page that has a patch, the rendering
+line common too, and whatever is left getting its own line. **No fundamental problem.**
+What is there now:
+
+| page | patch · gen | parity | color | shading | isoglosses |
+|---|---|---|---|---|---|
+| Workbench | yes | yes | yes | slider | yes |
+| 3D | yes | **no** | yes | slider (`vscale`) | yes |
+| Hexahedra | yes | yes | two of them | checkbox | yes |
+| Centers | yes | yes | yes | checkbox | yes |
+| Packing | yes | **no** | yes | — | — |
+
+The Cage, Intersection and Solid nets have no patch at all — they show solids — so only
+the color applies to them, and theirs is a coloring of a solid rather than of a tiling.
+
+Four things to settle before writing any of it.
+
+**The 3D slider's magnitude is geometry, not shading.** On `roof3d` `vscale` is the
+model's actual vertical scale — it flattens the roof — and the shading strength is
+`|vscale|` on purpose, so that a flat roof cannot be shaded (see "3D shading follows the
+vertical scale"). On the Workbench the same slider is cosmetic and moves nothing. So the
+*sign* is parity on every page and lifts cleanly to the patch line; the *magnitude* is
+**relief** in three dimensions and **shading** on the flat pages. One control, and it
+should keep the name of what it does rather than be forced to one word.
+
+**Parity is display-only in three dimensions and geometric on the Workbench.** On
+Hexahedra and Centers it is `zsign`, a mirror applied when drawing; `generatePatch` is
+always called heads. On the Workbench it decides which side of the surface the net
+develops from, so it changes the net and clears the sheets. The two agree about what
+parity *means* — the surface seen from the other side — but not about what it costs, and
+a shared control should not imply shared consequences.
+
+**Hexahedra has two color controls**, one for the cells and one for the roof over them.
+The rendering line takes the cells, which are the subject; the roof panel keeps its own,
+being an accessory that is off by default.
+
+**The risk is drift, not difficulty.** Every page hand-builds its controls, with its own
+ids and its own preference key. Unifying how they *look* is cosmetic; unifying what they
+*mean* is the value — and doing that by hand five times is how this project got four
+labels for two color schemes, two `DASH` tables, and a thick/thin that differed between
+paper and screen. The move that works is the one `fillOptions` made for the color menu:
+**one builder that makes the patch line and the rendering line from a short
+description**, so there is one place to change and no fifth copy to forget.
+
+`slab` being implicit on Hexahedra is right — that page *is* the hexahedra layer — so
+the patch line is the same shape everywhere with slab appearing only where it is a
+choice.
+
 ## Chapters
 
 Jeff's organization of the project, recorded because the pages had grown past the point

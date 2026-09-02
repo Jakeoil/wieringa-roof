@@ -110,6 +110,15 @@ function faceIndexLow(r: Rhomb): number {
 // same thing as negating z and renormalizing the lowest level back to 1, which is
 // why it is a mirror rather than a negation.
 let flipHeight = false;
+/**
+ * The span the shading ramp runs over.
+ *
+ * The patch's own index range for a surface; a slab reaches a whole unit lower, its
+ * floor sitting at `index − √5`. Kept apart from `idxLo`/`idxHi`, which are the
+ * *patch's* indices and are what `displayIndex` reflects about.
+ */
+let shadeLo = 1;
+let shadeHi = 4;
 let idxLo = 1;
 let idxHi = 4;
 
@@ -152,6 +161,11 @@ function generate() {
     // where the patch is, rather than left until the search: the view was being fitted
     // to the faces alone and chopping the band off the top and bottom.
     slabBand = slabMode && allRhombs.length ? collarBand(slab()) : [];
+    // A slab is a unit deep, so its floor sits √5 index steps below the roof and the
+    // ramp has to reach it — spanning the patch's 1..4 alone left every face of a slab
+    // clamped to one end of the ramp, which is to say flat.
+    shadeLo = slabMode ? idxLo - Math.sqrt(5) : idxLo;
+    shadeHi = idxHi;
 
     // Reports what the shading path actually computes, so a flat-looking tile can
     // be traced without guessing. Two wrong diagnoses have already been paid for.
@@ -245,8 +259,8 @@ function extremeCorners(idx: number[]): [number, number] {
 // a relief lit from underneath, and it contradicted the 3D page, which has always
 // shaded high toward white.
 function shadeOf(fill: string, index: number): string {
-    const span = idxHi - idxLo || 1;
-    const t = Math.max(0, Math.min(1, (index - idxLo) / span));
+    const span = shadeHi - shadeLo || 1;
+    const t = Math.max(0, Math.min(1, (index - shadeLo) / span));
     // shadeDepth 0 leaves the tile flat; 1 is the full dark-to-light range
     const lo = lerpColor(fill, "#000000", 0.42 * shadeDepth);
     const hi = lerpColor(fill, "#ffffff", 0.55 * shadeDepth);
@@ -395,7 +409,11 @@ function faceStyle(id: number): { thick: boolean; group: string; pair: [number, 
 
 /** A corner's height, on whichever scale the thing being unfolded uses. */
 function cornerHeight(v: number): number {
-    return slabMode && slabHeight ? slabHeight(v) : displayIndex(vertexList[v].index);
+    if (!(slabMode && slabHeight)) return displayIndex(vertexList[v].index);
+    const h = slabHeight(v);
+    // Reflected about the slab's own span, not the patch's — same rule as
+    // `displayIndex`, wider range.
+    return shadeInverted() ? shadeLo + shadeHi - h : h;
 }
 
 function indexSheets(): void {

@@ -452,7 +452,15 @@ export function slabSurface(S: Slab): {
             creases.set(ckey(shared[0], shared[1]), { fold: cr.fold, mountain: convex(A, B, cid) });
     }
 
-    const hs = P.map((q) => q![2] * Math.sqrt(5));
+    // **On the roof's own index scale.** `pos3D` centers the lift, so `z·√5` came out
+    // running −5.24 to 0 on a patch whose indices are 1 to 4 — true, and on a scale
+    // nothing else here uses. Shifted so a roof corner reads the index it has, which
+    // puts a floor corner at `index − √5`, one unit lower in the units the roof
+    // measures itself in.
+    const top = Math.max(...vertexList.map((v) => v.index));
+    const raw = P.map((q) => q![2] * Math.sqrt(5));
+    const lift = top - Math.max(...raw);
+    const hs = raw.map((h) => h + lift);
     return {
         analysis: { faces, P, links: faceLinks(faces), creases },
         edges: { vertices: [...idOf.values()], edges: [...used.values()] },
