@@ -62,10 +62,10 @@ longer.
 
 | name | what it is |
 |---|---|
-| **tiling canvas** | the left figure in *Tiling vs Net* — the patch itself |
+| **tiling canvas** | the left figure in *Unfold Patch* — the patch itself |
 | **net canvas** | the right figure — the development |
-| **patch line** | the top control bar: Seed, Gen, **slab**. What is being unfolded |
-| **drawing line** | the second bar: Height, Color, isoglosses. How it is drawn |
+| **patch line** | the top bar: Seed, Gen, parity, **slab**, Side. What a net is *made of*, settled once it exists, so it ghosts on Sheets |
+| **rendering line** | the second bar: Color, Shading, isoglosses. How a net is *shown* — and, unlike the patch line, changeable after the sheets exist |
 | **slab** | the checkbox on the patch line. Unfolds the solid rather than the surface. Called *solid* for a day and renamed: the thing itself is the slab |
 | **heads / tails** | the upper surface and the lower one, the latter seen from underneath |
 | **collar** | the ring of walls; a **wall** is one of them, standing on a **rim** edge |

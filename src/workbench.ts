@@ -113,9 +113,24 @@ let flipHeight = false;
 let idxLo = 1;
 let idxHi = 4;
 
+/**
+ * Whether the shading ramp runs the other way round, from **two** causes.
+ *
+ * Parity reverses the z of every point, so a tails net's hills are where a heads net's
+ * dales are — that is geometry and it applies whatever the slider says. The slider then
+ * chooses which end to brighten. Only one of them inverting the ramp inverts it; both
+ * cancel.
+ *
+ * Separating parity from the slider left this behind: the slider was asked and parity
+ * was not, so switching parity moved every mountain and valley and left the brightness
+ * exactly where it was.
+ */
+function shadeInverted(): boolean {
+    return !parityHeads !== flipHeight;
+}
+
 function displayIndex(i: number): number {
-    if (i === -999) return i;
-    return flipHeight ? idxLo + idxHi - i : i;
+    return shadeInverted() ? idxLo + idxHi - i : i;
 }
 
 function generate() {
@@ -2488,8 +2503,9 @@ function sheetOpts(sheet = 0) {
         isoglosses: showIsogloss,
         // A flat height setting carries no hills-or-dales information, so rendering
         // falls back to hills; Back side swaps whatever that came to.
-        // Light, not geometry: which of hills and dales is brightened.
-        dales: shadeDepth !== 0 && flipHeight,
+        // The same two causes as on the canvas: the parity reverses the heights and
+        // the slider chooses which end to brighten.
+        dales: shadeDepth !== 0 && shadeInverted(),
         // …and swaps mountain for valley with it. Turning the sheet over turns the
         // whole reading over, shading and folds together.
         // The folds already follow the parity, `analyzePatch` having been given it,
@@ -2655,9 +2671,10 @@ function drawSheets(): void {
     });
 
     document.getElementById("sheet-view")!.innerHTML = sheetSvg(currentSheet);
+    // What the patch is, and how big, is on the patch line above — ghosted, but read
+    // as easily as anything else. This says only what splitting it produced.
     document.getElementById("sheet-status")!.textContent =
-        `${seedTypes[currentSeedIdx]?.label} gen ${gen}, ${netRhombs.length} rhombi, ` +
-        `${sideIn} in side — ${pagination.pages.length} sheets, ` +
+        `${netRhombs.length} rhombi — ${pagination.pages.length} sheets, ` +
         `${pagination.joins.length} taped join${pagination.joins.length === 1 ? "" : "s"}, ` +
         `one shared orientation. Build ${BUILD_ID}.`;
 }
@@ -2926,9 +2943,10 @@ function showView(v: View): void {
     // title you are under should agree.
     const titles: Record<View, [string, string]> = {
         work: [
-            "Workbench",
-            "Watch branch-cut routing lay a net out step by step — or take over at " +
-                "any point and choose the route yourself.",
+            "Unfold Patch",
+            "The patch on the left, the net it unfolds into on the right. Branch-cut " +
+                "routing lays the net out a rhombus at a time — press Play, step " +
+                "through it, or take over and choose the route yourself.",
         ],
         sheets: [
             "Sheets",
