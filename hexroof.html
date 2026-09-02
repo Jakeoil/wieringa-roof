@@ -74,23 +74,22 @@
 
 <div class="bar">
     <span class="grp">Global</span>
-    <label>Patch <select id="patch"></select></label>
-    <label>Generation <select id="gen"></select></label>
-    <span class="zgrp">
-        <span class="grp">Z-orientation</span>
-        <span class="zrow">
-            <label title="The reflection: index runs downward"><input type="radio" name="parity" id="ptails"> tails</label>
-            <label title="The default: index runs upward"><input type="radio" name="parity" id="pheads" checked> heads</label>
-        </span>
-    </span>
+    <!-- Patch line and rendering line come from `src/bars.ts`, the same two the 3D
+         page and the Workbench carry. Slab is not a choice here: this page *is* the
+         hexahedra layer. -->
+    <span id="patchbar" style="display:contents"></span>
     <span class="checks">
         <button id="reset" title="Forget saved settings and start again from the defaults">Reset</button>
     </span>
 </div>
 
 <div class="bar">
+    <span class="grp">Rendering</span>
+    <span id="renderbar" style="display:contents"></span>
+</div>
+
+<div class="bar">
     <span class="grp">Hexahedra</span>
-    <label>Color <select id="cellcolor"></select></label>
     <label>Surface <select id="cellmode">
         <option value="solid">Solid</option>
         <option value="transparent">Transparent</option>
@@ -112,8 +111,6 @@
         <label title="The upper rhomb of each cell — the roof surface itself"><input type="checkbox" id="tops" checked> tops</label>
         <label title="The lower rhomb of each cell — the second Penrose surface"><input type="checkbox" id="floors" checked> floors</label>
         <label><input type="checkbox" id="edges" checked> edges</label>
-        <label title="Light where high, dark where low, in the orientation on screen"><input type="checkbox" id="shade"> shading</label>
-        <label title="Height contours on the tops and floors. Side walls are plumb, so their contours would be horizontal lines carrying no information."><input type="checkbox" id="isogloss"> isoglosses</label>
     </span>
 </div>
 

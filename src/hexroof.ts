@@ -23,7 +23,7 @@ import type { RoofData } from "./roofgeom.js";
 import { createRoofView, shadeColor, roofFill, PLAIN_COLOR } from "./roofview.js";
 import type { FillInfo } from "./roofview.js";
 import { fillOptions } from "./schemes.js";
-import { patchSize, MAX_GENERATION } from "./patchsize.js";
+import { buildPatchLine, buildRenderLine } from "./bars.js";
 import { hexLayer } from "./hexlayer.js";
 import type { HexLayer, HexCell } from "./hexlayer.js";
 import type { V3 } from "./geometry.js";
@@ -34,11 +34,6 @@ const el = <T extends HTMLElement>(id: string): T => {
     return found as T;
 };
 const view = el<HTMLDivElement>("view");
-const patchSel = el<HTMLSelectElement>("patch");
-const genSel = el<HTMLSelectElement>("gen");
-const tailsRadio = el<HTMLInputElement>("ptails");
-const headsRadio = el<HTMLInputElement>("pheads");
-const cellColorSel = el<HTMLSelectElement>("cellcolor");
 const cellSel = el<HTMLSelectElement>("cellmode");
 const cellShowSel = el<HTMLSelectElement>("cellshow");
 const rimSel = el<HTMLSelectElement>("rim");
@@ -47,8 +42,6 @@ const shrinkOut = el<HTMLElement>("shrinkOut");
 const topsChk = el<HTMLInputElement>("tops");
 const floorsChk = el<HTMLInputElement>("floors");
 const edgesChk = el<HTMLInputElement>("edges");
-const shadeChk = el<HTMLInputElement>("shade");
-const isoChk = el<HTMLInputElement>("isogloss");
 const roofSel = el<HTMLSelectElement>("roofmode");
 const roofColorSel = el<HTMLSelectElement>("roofcolor");
 const flatChk = el<HTMLInputElement>("flat");
@@ -98,71 +91,14 @@ let layerCache: HexLayer | null = null;
 const BUSY = 8000;   // drawn, but the edge overlay starts to tell
 const LIMIT = 45000; // beyond this the page stops being usable, so the option is ghosted
 
-function fillGenerations(prefer?: number): void {
-    const code = patchSel.value || PREF_DEFAULTS.patch;
-    // On the first call there are no options yet, so the wanted generation has to be
-    // handed in rather than read back off the empty select.
-    const keep = prefer ?? Number(genSel.value);
-    genSel.textContent = "";
-    for (let g = 1; g <= MAX_GENERATION; g++) {
-        const n = patchSize(code, g);
-        const o = document.createElement("option");
-        o.value = String(g);
-        if (n === 0) {
-            // The star seeds have no generation 1 — a star, boat or diamond is not
-            // produced until the first deflation.
-            o.textContent = `Generation ${g} — none`;
-            o.disabled = true;
-            o.title = `${code} does not exist at generation ${g}`;
-        } else if (n > LIMIT) {
-            o.textContent = `Generation ${g} — ${n.toLocaleString()} rhombs`;
-            o.disabled = true;
-            o.title = `${n.toLocaleString()} rhombs is past what this page can draw`;
-        } else {
-            o.textContent = `Generation ${g} — ${n.toLocaleString()}${n > BUSY ? " (slow)" : ""}`;
-            o.title = `${n.toLocaleString()} rhombs, so ${n.toLocaleString()} hexahedra`;
-        }
-        genSel.appendChild(o);
-    }
-    // Keep the current generation if the new patch still supports it, else fall back to
-    // the largest one it does support at or below the old choice.
-    const usable = (g: number) => {
-        const n = patchSize(code, g);
-        return n > 0 && n <= LIMIT;
-    };
-    let g = keep || PREF_DEFAULTS.gen;
-    if (!usable(g)) {
-        let best = 0;
-        for (let i = 1; i <= MAX_GENERATION; i++) if (usable(i) && (i <= g || best === 0)) best = i;
-        g = best || 2;
-    }
-    genSel.value = String(g);
-    // Belt and braces: if that value somehow matched no option the select would report
-    // "" and every later comparison against it would quietly fail, which is the failure
-    // mode `tools/pagecheck.mjs` exists to catch.
-    if (!genSel.value) {
-        const first = Array.from(genSel.options).find((o) => !o.disabled);
-        if (first) genSel.value = first.value;
-    }
-}
 // Codes are what `generatePatch` matches on; the nicknames are for reading.
-for (const [code, nick] of [
-    ["Pe5", "Pe5 pentagon"], ["Pe3", "Pe3 pentagon"], ["Pe1", "Pe1 pentagon"],
-    ["St5", "St5 star"], ["St3", "St3 boat"], ["St1", "St1 diamond"],
-    ["Deca", "Queen (composite)"], ["Sun", "Sun (composite)"], ["Star", "Star (composite)"],
-] as Array<[string, string]>) {
-    const o = document.createElement("option");
-    o.value = code;
-    o.textContent = nick;
-    patchSel.appendChild(o);
-}
 
 function ensurePatch(): void {
-    const key = `${patchSel.value}|${genSel.value}`;
+    const key = `${patchLine.values.patch}|${patchLine.values.gen}`;
     if (patchKey === key) return;
     const quiet = console.log;
     console.log = () => {};
-    generatePatch(seedTypes.findIndex((s) => s.label === patchSel.value), true, Number(genSel.value));
+    generatePatch(seedTypes.findIndex((s) => s.label === patchLine.values.patch), true, patchLine.values.gen);
     console.log = quiet;
     patchKey = key;
     layerCache = null;
@@ -217,10 +153,10 @@ function build(reframe: boolean): void {
     shrinkOut.textContent = `${(100 * Number(shrinkInput.value)).toFixed(0)}%`;
     ensurePatch();
 
-    const flip = tailsRadio.checked;
+    const flip = !patchLine.values.heads;
     const d = buildRoof(1, flip);
     if (!d) {
-        statusEl.textContent = `${patchSel.value} generation ${genSel.value}: no rhombi yet — try a later generation.`;
+        statusEl.textContent = `${patchLine.values.patch} generation ${patchLine.values.gen}: no rhombi yet — try a later generation.`;
         rv.renderer.render(rv.scene, rv.camera);
         return;
     }
@@ -252,12 +188,12 @@ function build(reframe: boolean): void {
     const zLo = Math.min(...layer.cells.flatMap((c) => c.corners.map((p) => p[2] * zsign)));
     const zHi = Math.max(...layer.cells.flatMap((c) => c.corners.map((p) => p[2] * zsign)));
     const span = Math.max(1e-9, zHi - zLo);
-    const shading = shadeChk.checked;
+    const shading = renderLine.values.shading !== 0;
     const tOf = (z: number) => ((z * zsign - zLo) / span - 0.5) * 2;
 
     const cellMode = cellSel.value;
     const showMode = cellShowSel.value;
-    const colorMode = cellColorSel.value;
+    const colorMode = renderLine.values.color;
     const rimMode = rimSel.value;
     let drawnCells = 0;
     let topZ = -Infinity;
@@ -321,7 +257,7 @@ function build(reframe: boolean): void {
                     const a = q[i], b = q[(i + 1) % 4];
                     seg.push(a[0], a[1], a[2], b[0], b[1], b[2]);
                 }
-                if (isoChk.checked && fi < 2) {
+                if (renderLine.values.isoglosses && fi < 2) {
                     contours(f as V3[], c.index, iso, (p) => place(p, c));
                 }
             });
@@ -388,33 +324,48 @@ function build(reframe: boolean): void {
         `${shown} · ${Math.round(performance.now() - t0)} ms`;
 }
 
-patchSel.value = prefs.patch || PREF_DEFAULTS.patch;
-if (!patchSel.value) patchSel.value = PREF_DEFAULTS.patch;
-fillGenerations(Number(prefs.gen) || PREF_DEFAULTS.gen);
-tailsRadio.checked = !!prefs.tails;
-headsRadio.checked = !prefs.tails;
+// The patch line and the rendering line, the same two the 3D page and the Workbench
+// carry. Slab is not offered: this page *is* the hexahedra layer.
+const patchLine = buildPatchLine({
+    host: el<HTMLElement>("patchbar"),
+    patch: prefs.patch || PREF_DEFAULTS.patch,
+    gen: Number(prefs.gen) || PREF_DEFAULTS.gen,
+    heads: !prefs.tails,
+    limit: LIMIT,
+    busy: BUSY,
+    noun: "hexahedra",
+    onChange: () => rebuild(true),
+});
+
+const renderLine = buildRenderLine({
+    host: el<HTMLElement>("renderbar"),
+    color: prefs.cellcolor || PREF_DEFAULTS.cellcolor,
+    // A checkbox rather than a slider: these cells are solid, and what the control
+    // decides is whether height is read on them at all, not how hard.
+    shading: { name: "", value: prefs.shade ? 1 : 0, slider: false },
+    isoglosses: prefs.isogloss,
+    // A cell is acute or obtuse where a rhomb is thick or thin.
+    schemes: { cells: true },
+    onChange: () => rebuild(false),
+});
 // `cellmode` meant something else in the previous layout — it carried the color scheme
 // as well as the surface. A stored value with no matching option leaves a select
 // reporting "", so each one falls back explicitly rather than silently reading empty.
 // Both color lists come from `FILL_MODES`, so the cells and the roof over them offer
 // the same schemes and call them the same thing. Only `type` differs: a cell is acute
 // or obtuse where a rhomb is thick or thin.
-fillOptions(cellColorSel, { cells: true });
 fillOptions(roofColorSel);
-cellColorSel.value = prefs.cellcolor || PREF_DEFAULTS.cellcolor;
 cellSel.value = prefs.cellmode || PREF_DEFAULTS.cellmode;
 cellShowSel.value = prefs.cellshow || PREF_DEFAULTS.cellshow;
 rimSel.value = prefs.rim || PREF_DEFAULTS.rim;
 for (const [sel, def] of [
-    [cellColorSel, PREF_DEFAULTS.cellcolor], [cellSel, PREF_DEFAULTS.cellmode],
+    [cellSel, PREF_DEFAULTS.cellmode],
     [cellShowSel, PREF_DEFAULTS.cellshow], [rimSel, PREF_DEFAULTS.rim],
 ] as Array<[HTMLSelectElement, string]>) if (!sel.value) sel.value = def;
 shrinkInput.value = String(prefs.shrink ?? 1);
 topsChk.checked = prefs.tops;
 floorsChk.checked = prefs.floors;
 edgesChk.checked = prefs.edges;
-shadeChk.checked = prefs.shade;
-isoChk.checked = prefs.isogloss;
 roofSel.value = prefs.roofmode || PREF_DEFAULTS.roofmode;
 roofColorSel.value = prefs.roofcolor || PREF_DEFAULTS.roofcolor;
 for (const [sel, def] of [
@@ -427,9 +378,10 @@ roofPanel.open = !!prefs.roofopen;
 roofPanel.addEventListener("toggle", persist);
 
 function rebuild(reframe: boolean): void {
-    if (`${patchSel.value}|${genSel.value}` !== patchKey) {
+    if (`${patchLine.values.patch}|${patchLine.values.gen}` !== patchKey) {
         rv.clear();
-        statusEl.textContent = `building ${patchSel.value} generation ${genSel.value}…`;
+        statusEl.textContent =
+            `building ${patchLine.values.patch} generation ${patchLine.values.gen}…`;
         rv.renderer.render(rv.scene, rv.camera);
         requestAnimationFrame(() => build(reframe));
         return;
@@ -438,14 +390,9 @@ function rebuild(reframe: boolean): void {
     build(reframe);
 }
 
-patchSel.addEventListener("change", () => {
-    fillGenerations();
-    rebuild(true);
-});
-genSel.addEventListener("change", () => rebuild(true));
 for (const c of [
-    tailsRadio, headsRadio, cellColorSel, cellSel, cellShowSel, rimSel, topsChk, floorsChk,
-    edgesChk, shadeChk, isoChk, roofSel, roofColorSel, flatChk, roofEdgesChk, roofIsoChk,
+    cellSel, cellShowSel, rimSel, topsChk, floorsChk,
+    edgesChk, roofSel, roofColorSel, flatChk, roofEdgesChk, roofIsoChk,
 ]) c.addEventListener("change", () => rebuild(false));
 
 // Through `rebuild`, not `build` — `build` only adds to the scene and `rebuild` is what
@@ -460,11 +407,13 @@ shrinkInput.addEventListener("wheel", (e) => {
 
 function persist(): void {
     savePrefs(PREFS_KEY, {
-        patch: patchSel.value, gen: Number(genSel.value), tails: tailsRadio.checked,
-        cellcolor: cellColorSel.value, cellmode: cellSel.value, cellshow: cellShowSel.value, rim: rimSel.value,
+        patch: patchLine.values.patch, gen: patchLine.values.gen,
+        tails: !patchLine.values.heads,
+        cellcolor: renderLine.values.color, cellmode: cellSel.value,
+        cellshow: cellShowSel.value, rim: rimSel.value,
         shrink: Number(shrinkInput.value),
         tops: topsChk.checked, floors: floorsChk.checked, edges: edgesChk.checked,
-        shade: shadeChk.checked, isogloss: isoChk.checked,
+        shade: renderLine.values.shading !== 0, isogloss: renderLine.values.isoglosses,
         roofmode: roofSel.value, roofcolor: roofColorSel.value, flat: flatChk.checked,
         roofedges: roofEdgesChk.checked, roofiso: roofIsoChk.checked,
         roofopen: roofPanel.open,

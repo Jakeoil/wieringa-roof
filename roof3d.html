@@ -56,16 +56,14 @@
     numbers, but the hills and dales read unmistakably.
 </p>
 
+<!-- The patch line and the rendering line are built by `src/bars.ts`, the same two
+     the Workbench and Hexahedra carry. What is left is this page's own. -->
+<div class="bar" id="patchbar"></div>
+<div class="bar" id="renderbar"></div>
+
 <div class="bar">
-    <label>Patch <select id="patch"></select></label>
-    <label>Generation <select id="gen"></select></label>
-    <label>Color <select id="color"></select></label>
-    <label>Vertical scale <span id="vscaleOut" class="mono"></span>
-        <input type="range" id="vscale" min="-1" max="1" step="0.02" value="1">
-    </label>
     <span class="checks">
         <label><input type="checkbox" id="edges" checked> edges</label>
-        <label><input type="checkbox" id="isogloss"> isoglosses</label>
         <label><input type="checkbox" id="transparent"> transparent</label>
         <label><input type="checkbox" id="shade"> shading</label>
         <button id="reset" title="Forget saved settings and start again from the defaults">Reset</button>

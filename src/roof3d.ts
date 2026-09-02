@@ -15,7 +15,7 @@ import { loadPrefs, savePrefs, resetPrefs } from "./prefs.js";
 import { BUILD_ID } from "./build-id.js";
 import { seedTypes, generatePatch, allRhombs, vertexList } from "./geometry.js";
 import { buildRoof } from "./roofgeom.js";
-import { fillOptions } from "./schemes.js";
+import { buildPatchLine, buildRenderLine } from "./bars.js";
 import { createRoofView, roofFill, PLAIN_COLOR } from "./roofview.js";
 
 // Naming the missing id turns a silent null-dereference three frames later into
@@ -27,11 +27,6 @@ const el = <T extends HTMLElement>(id: string): T => {
 };
 
 const view = el<HTMLDivElement>("view");
-const patchSel = el<HTMLSelectElement>("patch");
-const genSel = el<HTMLSelectElement>("gen");
-const colorSel = el<HTMLSelectElement>("color");
-const vscaleInput = el<HTMLInputElement>("vscale");
-const vscaleOut = el<HTMLElement>("vscaleOut");
 const shadeChk = el<HTMLInputElement>("shade");
 
 // Session settings. Same treatment as the workbench: these are preferences, not a
@@ -41,6 +36,7 @@ const PREFS_KEY = "wr-roof3d";
 const PREF_DEFAULTS = {
     patch: "Pe3",
     gen: 3,
+    heads: true,
     color: "groups",
     vscale: 1,
     edges: true,
@@ -50,7 +46,6 @@ const PREF_DEFAULTS = {
 };
 const prefs = loadPrefs(PREFS_KEY, PREF_DEFAULTS);
 const edgesChk = el<HTMLInputElement>("edges");
-const isoChk = el<HTMLInputElement>("isogloss");
 const transpChk = el<HTMLInputElement>("transparent");
 const statusEl = el<HTMLElement>("status");
 
@@ -59,8 +54,8 @@ const rv = createRoofView(view);
 // ── build ─────────────────────────────────────────────────────────
 
 function build(reframe: boolean): void {
-    const seedIdx = seedTypes.findIndex((s) => s.label === patchSel.value);
-    const gen = Number(genSel.value);
+    const seedIdx = seedTypes.findIndex((s) => s.label === patchLine.values.patch);
+    const gen = patchLine.values.gen;
 
     const t0 = performance.now();
     const quiet = console.log;
@@ -68,12 +63,14 @@ function build(reframe: boolean): void {
     generatePatch(seedIdx, true, gen);
     console.log = quiet;
 
-    // The slider is one control doing two jobs: sign is the flip, magnitude is the
-    // flattening. Biased so the middle of the travel is spread out, since near-flat
-    // is where the shape is worth studying.
-    const u = Number(vscaleInput.value);
-    const flip = u < 0;
-    const vscale = Math.sign(u) * Math.pow(Math.abs(u), 1.6);
+    // **Two controls now, for two questions.** The slider was doing both: its sign
+    // was the parity and its magnitude the flattening, so asking for a shallower roof
+    // and asking to see it from underneath were the same dial. Parity is on the patch
+    // line, which is where what-this-is lives; the slider keeps the relief, biased so
+    // the middle of the travel is spread out, near-flat being where the shape is
+    // worth studying.
+    const flip = !patchLine.values.heads;
+    const vscale = Math.pow(Math.abs(renderLine.values.shading), 1.6);
 
     // An empty patch is a legitimate answer — the star family emits no rhombs until
     // a generation later — but it used to wreck the view permanently. With no
@@ -83,13 +80,13 @@ function build(reframe: boolean): void {
     const d = buildRoof(vscale, flip);
     if (!d) {
         statusEl.textContent =
-            `${patchSel.value} generation ${gen}: no rhombs at this generation. ` +
+            `${patchLine.values.patch} generation ${gen}: no rhombs at this generation. ` +
             `Star-type seeds emit none until one generation later — try ${gen + 1}.`;
         rv.renderer.render(rv.scene, rv.camera);
         return;
     }
 
-    const mode = colorSel.value;
+    const mode = renderLine.values.color;
     const shade = shadeChk.checked ? Math.abs(vscale) : 0;
 
     rv.drawRoof(d, {
@@ -107,7 +104,7 @@ function build(reframe: boolean): void {
         flatColor: PLAIN_COLOR,
         transparent: transpChk.checked,
         edges: edgesChk.checked,
-        isoglosses: isoChk.checked,
+        isoglosses: renderLine.values.isoglosses,
     });
 
     // Frame only when the patch itself changes — reframing on every rebuild
@@ -130,92 +127,67 @@ function build(reframe: boolean): void {
 }
 
 // ── controls ──────────────────────────────────────────────────────
+//
+// The patch line and the rendering line come from `src/bars.ts`, so this page offers
+// the same two the Workbench and Hexahedra do, in the same order and with the same
+// words. What is particular to a three-dimensional view — edges, transparency, and
+// whether the height shading reaches the surface at all — stays on a line of its own.
 
-for (const [code, nick] of [
-    ["Pe5", "Pe5 pentagon"],
-    ["Pe3", "Pe3 pentagon"],
-    ["Pe1", "Pe1 pentagon"],
-    ["St5", "St5 star"],
-    ["St3", "St3 boat"],
-    ["St1", "St1 diamond"],
-    ["Deca", "Queen (composite)"],
-    ["Sun", "Sun (composite)"],
-    ["Star", "Star (composite)"],
-] as Array<[string, string]>) {
-    const o = document.createElement("option");
-    o.value = code;
-    o.textContent = nick;
-    patchSel.appendChild(o);
-}
-patchSel.value = prefs.patch;
+const patchLine = buildPatchLine({
+    host: el<HTMLElement>("patchbar"),
+    patch: prefs.patch || PREF_DEFAULTS.patch,
+    gen: Number(prefs.gen) || PREF_DEFAULTS.gen,
+    heads: prefs.heads,
+    // Generously: this page draws a surface and nothing else, so it manages patches
+    // that the pages carrying solids over them cannot.
+    limit: 45000,
+    busy: 8000,
+    onChange: () => rebuild(true),
+});
 
-for (const g of [1, 2, 3, 4, 5]) {
-    const o = document.createElement("option");
-    o.value = String(g);
-    o.textContent = `Generation ${g}`;
-    genSel.appendChild(o);
-}
-genSel.value = String(prefs.gen);
-// A saved patch or generation that no longer exists must not leave the menu blank.
-if (!patchSel.value) patchSel.value = PREF_DEFAULTS.patch;
-if (!genSel.value) genSel.value = String(PREF_DEFAULTS.gen);
-fillOptions(colorSel);
-colorSel.value = prefs.color;
-if (!colorSel.value) colorSel.value = PREF_DEFAULTS.color;
-vscaleInput.value = String(prefs.vscale);
+const renderLine = buildRenderLine({
+    host: el<HTMLElement>("renderbar"),
+    color: prefs.color || PREF_DEFAULTS.color,
+    // **Relief, not shading.** In three dimensions the magnitude is the model's own
+    // vertical scale — it really flattens the roof — and the shading follows it, which
+    // is why a flattened roof cannot be shaded. On the flat pages the same slider only
+    // decides how strongly height is drawn. One control, named for what it does here.
+    shading: {
+        name: "Relief",
+        value: Math.abs(Number(prefs.vscale)),
+        slider: true,
+        min: 0,
+        format: (v: number) => `${Math.pow(Math.abs(v), 1.6).toFixed(2)}×`,
+    },
+    isoglosses: prefs.isogloss,
+    onChange: () => rebuild(false),
+});
+
 edgesChk.checked = prefs.edges;
-isoChk.checked = prefs.isogloss;
 transpChk.checked = prefs.transparent;
 shadeChk.checked = prefs.shade;
 
 function rebuild(reframe: boolean): void {
-    const uu = Number(vscaleInput.value);
-    const vv = Math.sign(uu) * Math.pow(Math.abs(uu), 1.6);
-    vscaleOut.textContent = `${vv.toFixed(2)}×`;
     rv.clear();
     build(reframe);
 }
-
-for (const c of [patchSel, genSel]) {
-    c.addEventListener("change", () => rebuild(true));
-}
-for (const c of [colorSel, edgesChk, isoChk, transpChk, shadeChk]) {
+for (const c of [edgesChk, transpChk, shadeChk]) {
     c.addEventListener("change", () => rebuild(false));
 }
-vscaleInput.addEventListener("input", () => rebuild(false));
+// The slider used to ease to the nearest of −1, 0, +1 on release — dales up, flat,
+// hills up — because those three were the settings that meant anything. With the sign
+// gone to the patch line the travel is all magnitude and there is nothing to land on.
 
-// Released, the slider eases to the nearest of −1, 0, +1 — dales up, flat, hills
-// up. Those three are the settings that mean anything; the travel between them is
-// worth having, so it is free and only the landing snaps.
-let snapAnim = 0;
-vscaleInput.addEventListener("change", () => {
-    const from = Number(vscaleInput.value);
-    const to = from < -0.5 ? -1 : from > 0.5 ? 1 : 0;
-    cancelAnimationFrame(snapAnim);
-    if (Math.abs(from - to) < 1e-3) {
-        vscaleInput.value = String(to);
-        rebuild(false);
-        return;
-    }
-    const t0 = performance.now();
-    const step = (now: number) => {
-        const k = Math.min(1, (now - t0) / 260);
-        const e = 1 - Math.pow(1 - k, 3);
-        vscaleInput.value = String(from + (to - from) * e);
-        rebuild(false);
-        if (k < 1) snapAnim = requestAnimationFrame(step);
-    };
-    snapAnim = requestAnimationFrame(step);
-});
 
 function persist(): void {
     savePrefs(PREFS_KEY, {
-        patch: patchSel.value,
-        gen: Number(genSel.value),
-        color: colorSel.value,
-        vscale: Number(vscaleInput.value),
+        patch: patchLine.values.patch,
+        gen: patchLine.values.gen,
+        heads: patchLine.values.heads,
+        color: renderLine.values.color,
+        vscale: renderLine.values.shading,
         edges: edgesChk.checked,
-        isogloss: isoChk.checked,
+        isogloss: renderLine.values.isoglosses,
         transparent: transpChk.checked,
         shade: shadeChk.checked,
     });

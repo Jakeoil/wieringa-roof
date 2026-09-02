@@ -1183,7 +1183,7 @@ colors, the sheets' washed-out copy of the palette, `paginate.ts`'s second `DASH
 not, and are deliberate — a printed sheet is read at arm's length and wants a coarser
 pattern than a screen.
 
-### 4 · One patch line and one rendering line across the pages
+### 4 · One patch line and one rendering line across the pages — **built**
 
 Jake's proposal: the patch line common to every page that has a patch, the rendering
 line common too, and whatever is left getting its own line. **No fundamental problem.**
@@ -1232,6 +1232,38 @@ description**, so there is one place to change and no fifth copy to forget.
 `slab` being implicit on Hexahedra is right — that page *is* the hexahedra layer — so
 the patch line is the same shape everywhere with slab appearing only where it is a
 choice.
+
+**Built as `src/bars.ts`**, and carried by the Workbench, 3D and Hexahedra. Centers and
+Packing are left alone for now; they are not where the Workbench is prototyped.
+
+Each page hands over what it is and what it can afford, and appends its own controls to
+the same bars afterwards. What that settled:
+
+- **3D has parity.** Its slider was doing both jobs — sign the flip, magnitude the
+  flattening — so asking for a shallower roof and asking to see it from underneath were
+  the same dial. `buildRoof(vscale, flip)` already took them as two arguments; only the
+  page was tying them together. The slider is **Relief** there and runs 0…1, since with
+  the sign gone there is nothing for it to mean.
+- **The generation menu is the priced one everywhere.** Hexahedra's was the good version
+  — the rhomb count on every entry, and anything past what the page can draw offered but
+  disabled with the reason on it. 3D had a bare list of five and the Workbench a bare
+  list of four. Each page now says what it can afford and gets the same menu:
+
+  | | limit | Pe3 | St5 | Deca | Sun |
+  |---|---|---|---|---|---|
+  | Workbench | 5,000 | 1–4 | 2–4 | 1–4 | 1–3 |
+  | 3D · Hexahedra | 45,000 | 1–6 | 2–5 | 1–5 | 1–4 |
+
+  The Workbench is the tighter one because branch cuts are a *search*, not a draw.
+- **A zero is still offered, disabled, saying why.** The star seeds have no generation 1,
+  and a menu that silently omits the entry makes "why can I not pick 1" unanswerable.
+- **The shading control keeps its own name**, being a slider on the flat pages, a
+  0…1 relief slider in three dimensions, and a checkbox on Hexahedra where the cells are
+  solid and the question is whether height is read at all.
+
+One thing lost on purpose: the slider used to ease to the nearest of −1, 0, +1 on
+release, those being the three settings that meant anything when the sign was the
+parity. With the sign gone from the 3D slider there is nothing to land on.
 
 ## Chapters
 

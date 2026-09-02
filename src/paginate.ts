@@ -560,7 +560,15 @@ export interface PageRenderOpts {
     // Height-derived decoration. Whether these appear is a *rendering* choice,
     // independent of the height slider — the slider says which way up the surface
     // sits and how strongly the screen shades it, these say what reaches the paper.
-    shading?: boolean;
+    /**
+     * How strongly height is shaded, 0 to 1 — **not** whether it is.
+     *
+     * It was a boolean, and `shadeAt` answered it at full strength, so the slider's
+     * magnitude stopped at the edge of the paper: a sheet was shaded hard or not at
+     * all while the canvas beside it ran continuously. `true` still means full, for
+     * callers that only have the one question.
+     */
+    shading?: boolean | number;
     isoglosses?: boolean;
     // Which way up to render. The slider decides, except that a flat setting carries
     // no hills-or-dales information, so rendering falls back to hills.
@@ -660,14 +668,22 @@ function hslHex(h: number, s: number, l: number): string {
 // identically to one spanning 2→4, so the shading said only which way a face tilted
 // and nothing about how high it sat — the same defect the canvas ramp was rebuilt to
 // fix, which the print never got.
+/**
+ * One end of a tile's gradient.
+ *
+ * The 0.42 and 0.55 are the canvas's own, in `shadeOf` — they were 0.4 and 0.5 here,
+ * near enough to look right and far enough to be a second answer to one question.
+ * What you build is what prints.
+ */
 function shadeAt(
     fill: string,
     index: number,
     idxLo: number,
     idxHi: number,
+    depth: number,
 ): string {
     const t = Math.max(0, Math.min(1, (index - idxLo) / (idxHi - idxLo || 1)));
-    return mixHex(mixHex(fill, "#000000", 0.4), mixHex(fill, "#ffffff", 0.5), t);
+    return mixHex(mixHex(fill, "#000000", 0.42 * depth), mixHex(fill, "#ffffff", 0.55 * depth), t);
 }
 
 function mixHex(a: string, b: string, t: number): string {
@@ -761,6 +777,9 @@ export function renderPage(
         }
     }
 
+    // `true` from a caller that only has the one question; a number from one that has
+    // a slider.
+    const shadeDepth = typeof o.shading === "number" ? o.shading : o.shading ? 1 : 0;
     const defs: string[] = [];
     const isoLines: string[] = [];
     const [idxLo, idxHi] = o.indexRange ?? [1, 4];
@@ -791,7 +810,7 @@ export function renderPage(
         if (base) {
             const shape = pts.map((q) => `${n3(q[0])},${n3(q[1])}`).join(" ");
             const vidx = vidx0;
-            if (o.shading) {
+            if (shadeDepth > 0) {
                 // Gradient along the tile's own fall line, low corner to high.
                 let cLo = 0;
                 let cHi = 0;
@@ -799,8 +818,8 @@ export function renderPage(
                     if (vidx[t] < vidx[cLo]) cLo = t;
                     if (vidx[t] > vidx[cHi]) cHi = t;
                 }
-                const s0 = shadeAt(base, vidx[cLo], idxLo, idxHi);
-                const s1 = shadeAt(base, vidx[cHi], idxLo, idxHi);
+                const s0 = shadeAt(base, vidx[cLo], idxLo, idxHi, shadeDepth);
+                const s1 = shadeAt(base, vidx[cHi], idxLo, idxHi, shadeDepth);
                 const gid = `g${scope}_${fid}`;
                 defs.push(
                     `<linearGradient id="${gid}" gradientUnits="userSpaceOnUse" ` +
