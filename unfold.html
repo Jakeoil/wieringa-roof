@@ -407,7 +407,12 @@ since there is no net on screen there to route.
 
     <!-- Which patch you are looking at is not a per-view setting: it is the subject
          of every view, so it lives outside them and stays put when you switch. -->
-    <div class="controls" id="sharedbar" style="margin:0 0 12px"></div>
+    <div class="controls" id="sharedbar" style="margin:0 0 8px"></div>
+
+    <!-- How it is drawn, as against what it is: color, shading and isoglosses mean the
+         same thing on the net and on a sheet, so they live outside the views too and
+         there is one of each rather than two kept in step. -->
+    <div class="controls" id="drawbar" style="margin:0 0 12px"></div>
 
     <div id="view-work">
     <div class="bars">
@@ -469,11 +474,9 @@ since there is no net on screen there to route.
     <div id="view-sheets" style="display:none">
         <span class="info" id="sheet-status" style="display:block;margin:0 0 12px"></span>
 
+        <!-- A sheet is a finished net, so the patch line above is ghosted rather than
+             repeated here, and what is left is what you do with the sheets. -->
         <div class="controls" style="margin:0 0 14px">
-            <span>Side <span class="mono" id="sheet-side">1</span> in <span class="info">— set on the Workbench</span></span>
-            <label><input type="checkbox" id="sheet-shade"> shade</label>
-            <label><input type="checkbox" id="sheet-iso"> isoglosses</label>
-            <label><input type="checkbox" id="sheet-back"> back side</label>
             <button id="sheet-printall">Print all</button>
             <button id="sheet-reset">Reset</button>
         </div>

@@ -51,19 +51,32 @@ const PREF_DEFAULTS = {
     seed: 1,
     gen: 2,
     slab: false,
+    parity: true,
     method: "cuttree",
     color: "groups",
     sideIn: 1,
     heightU: 1,
     isogloss: false,
-    shading: true,
 };
 const prefs = loadPrefs(PREFS_KEY, PREF_DEFAULTS);
 
 // ── UI State ──────────────────────────────────────────────────────
 
 let currentSeedIdx = prefs.seed; // default Pe3, the boat — 23 rhombi at gen 2
-const currentIsHeads = true;
+/**
+ * **Parity: which side of the surface the net is the development of.**
+ *
+ * This is a property of the net, not of how it is drawn, and it is what decides the
+ * mountains and valleys. It had been tangled up with the height slider, which drove
+ * `analyzePatch` and `cutTreeUnfold` as well as the shading — so asking for a darker
+ * relief silently rebuilt the net. Jake's separation: **parity is geometry, height is
+ * light.** They are two questions and now two controls.
+ *
+ * Note that `generatePatch`'s own `isHeads` argument is *not* this. The lift is
+ * integrated from the positions, so both values give the same patch, vertex for vertex
+ * and index for index — measured on all six seeds. Parity lives in the development.
+ */
+let parityHeads: boolean = prefs.parity;
 let gen = prefs.gen;
 
 // One control for height, matching the 3D page. Sign is the flip — real geometry,
@@ -106,7 +119,7 @@ function displayIndex(i: number): number {
 }
 
 function generate() {
-    generatePatch(currentSeedIdx, currentIsHeads, gen);
+    generatePatch(currentSeedIdx, true, gen);
     idxLo = Infinity;
     idxHi = -Infinity;
     for (const v of vertexList) {
@@ -118,7 +131,7 @@ function generate() {
         idxLo = 1;
         idxHi = 4;
     }
-    analysis = allRhombs.length ? analyzePatch(flipHeight) : null;
+    analysis = allRhombs.length ? analyzePatch(!parityHeads) : null;
     // The collar stands outside the outline, so `fitView` has to know about it — and
     // `fitView` runs from `regenerate`, long before the unfolding does. Built here,
     // where the patch is, rather than left until the search: the view was being fitted
@@ -233,10 +246,8 @@ function makeGradient(
     iLow: number,
     iHigh: number,
 ): CanvasGradient | string {
-    // Shading is one shared field across the views, so "off" has to mean off here
-    // as well — the workbench used to gradient unconditionally while the sheets
-    // had a checkbox, which is half of why the two never looked alike.
-    if (!renderShading) return fill;
+    // One slider across both views, and zero means off — here and on the sheets.
+    if (shadeDepth === 0) return fill;
     const grad = ctx.createLinearGradient(pLow.x, pLow.y, pHigh.x, pHigh.y);
     grad.addColorStop(0, shadeOf(fill, iLow));
     grad.addColorStop(1, shadeOf(fill, iHigh));
@@ -1804,12 +1815,23 @@ let syncButtons: () => void = () => {};
 // True only while paginateBest is running, which is the yellow light on the sheets
 // button. Pagination is synchronous, so the paint has to happen before it starts.
 let sheetsBusy = false;
-/** Report the side on the Sheets view, which reads it but does not set it. */
-function showSide(): void {
-    const out = document.getElementById("sheet-side");
-    // Round-tripping "0.75in" through millimetres lands on 0.7499999999999999,
-    // which is true and useless on screen.
-    if (out) out.textContent = String(Number(sideIn.toFixed(4)));
+/**
+ * The patch line, ghosted on the Sheets view.
+ *
+ * A sheet is a **finished net**: its patch, generation, parity, whether it is a slab
+ * and how big a rhombus is are all settled by the time it exists, and changing any of
+ * them means a different net. Rather than repeat them as a readout — a second place to
+ * go stale — the controls that hold them are shown disabled, which says both what they
+ * are and that they are not yours to move here.
+ */
+function ghostPatchLine(fixed: boolean): void {
+    const bar = document.getElementById("sharedbar");
+    if (!bar) return;
+    bar.style.opacity = fixed ? "0.5" : "1";
+    bar.style.pointerEvents = fixed ? "none" : "";
+    bar.querySelectorAll("input, select, button").forEach((el) => {
+        (el as HTMLInputElement).disabled = fixed;
+    });
 }
 
 let traceEvents: TraceEvent[] = [];
@@ -1919,7 +1941,7 @@ function runTraceBody(): void {
         slabRange = sur.indexRange;
         res = cutTreeUnfold({ surface: sur.analysis, edges: sur.edges, trace: traceEvents });
     } else {
-        res = cutTreeUnfold({ flip: flipHeight, trace: traceEvents });
+        res = cutTreeUnfold({ flip: !parityHeads, trace: traceEvents });
     }
 
     // fit to the finished net once, then hold it for the whole replay
@@ -2315,14 +2337,18 @@ let currentSheet = 0; // −1 is the map
 
 // Rendering settings: print decisions, so they live with the sheets rather than
 // with the height slider, which only says which way up the surface sits.
-let renderShading = prefs.shading;
+// `renderShading` is gone: the Shading slider *is* the setting, and zero is off.
+// It was a checkbox beside a slider that could already say the same thing, so the two
+// could disagree and the sheets and the canvas would stop looking alike.
 // Set once the workbench controls exist; mirrors the shared appearance fields into
 // every control that shows them.
 let appearanceControls: (() => void) | null = null;
 function syncAppearance(): void {
     appearanceControls?.();
 }
-let renderBackside = false;
+// `renderBackside` is gone. Printing the underside of a net *is* the other parity —
+// the drawing mirrored with its folds reversed — and parity is now a control of its
+// own, so the checkbox was the same question asked twice in different words.
 
 // The patch in its own plane, for the locator mini and the map. Rhomb.verts is
 // exactly that — the tiling, which is the picture you can recognize.
@@ -2458,14 +2484,17 @@ function sheetOpts(sheet = 0) {
         pageH: ph,
         margin: MARGIN_IN * 25.4,
         fillMode: tileColor,
-        shading: renderShading,
+        shading: shadeDepth !== 0,
         isoglosses: showIsogloss,
         // A flat height setting carries no hills-or-dales information, so rendering
         // falls back to hills; Back side swaps whatever that came to.
-        dales: renderBackside ? !(shadeDepth !== 0 && flipHeight) : shadeDepth !== 0 && flipHeight,
+        // Light, not geometry: which of hills and dales is brightened.
+        dales: shadeDepth !== 0 && flipHeight,
         // …and swaps mountain for valley with it. Turning the sheet over turns the
         // whole reading over, shading and folds together.
-        backside: renderBackside,
+        // The folds already follow the parity, `analyzePatch` having been given it,
+        // so nothing is turned over a second time here.
+        backside: false,
         // A slab's corners are its own, numbered by position, and its heights run
         // below the roof's — a floor corner under an index-3 one sits at 3 − √5.
         indexOf: slabMode && slabHeight ? slabHeight : (v: number) => vertexList[v]?.index ?? 1,
@@ -2660,23 +2689,10 @@ function buildViewTabs(): void {
         showView("sheets");
     });
 
-    const box = (id: string, get: () => boolean, set: (v: boolean) => void) => {
-        const cb = document.getElementById(id) as HTMLInputElement;
-        cb.checked = get();
-        cb.addEventListener("change", () => {
-            set(cb.checked);
-            syncAppearance();
-            drawSheets();
-        });
-    };
-    box("sheet-shade", () => renderShading, (v) => (renderShading = v));
-    box("sheet-iso", () => showIsogloss, (v) => (showIsogloss = v));
-    box("sheet-back", () => renderBackside, (v) => (renderBackside = v));
 
     // Side is set on the Workbench and only reported here. It was editable in both
     // places, which meant two boxes for one number and a split silently redone from
     // under you; the Workbench owns it, and this shows what it currently is.
-    showSide();
 
     document
         .getElementById("sheet-printall")!
@@ -2893,6 +2909,9 @@ let view: View = "work";
 
 function showView(v: View): void {
     view = v;
+    // The patch line is live on the Workbench and ghosted on the Sheets, where the net
+    // it describes is already finished.
+    ghostPatchLine(v === "sheets");
     document.getElementById("view-work")!.style.display = v === "work" ? "" : "none";
     document.getElementById("view-sheets")!.style.display =
         v === "sheets" ? "" : "none";
@@ -3357,6 +3376,7 @@ function buildControls() {
     // not disappear when you switch to P1/P3, and you should be able to step through
     // seeds and generations while looking at whichever view answers your question.
     const shared = document.getElementById("sharedbar")!;
+    const drawbar = document.getElementById("drawbar")!;
     const typeLabel = document.createElement("label");
     typeLabel.textContent = "Type: ";
     typeLabel.style.fontSize = "13px";
@@ -3412,6 +3432,33 @@ function buildControls() {
     slabWrap.append(slabChk, document.createTextNode("slab"));
     shared.appendChild(slabWrap);
 
+    // Parity, beside Seed and Gen because it is the same kind of question: which net
+    // is this. Heads is the surface seen from above, tails from below — the same
+    // paper mirrored with every fold reversed. Changing it comes through
+    // `regenerate`, so the sheets clear like they do for any other patch change.
+    const parWrap = document.createElement("span");
+    parWrap.style.cssText = "font-size:13px;display:inline-flex;align-items:center;gap:8px";
+    parWrap.title =
+        "Which side of the surface the net develops. Heads is seen from above, tails " +
+        "from below: the same net mirrored, with mountains and valleys exchanged.";
+    for (const [label, heads] of [["heads", true], ["tails", false]] as Array<[string, boolean]>) {
+        const l = document.createElement("label");
+        l.style.cssText = "display:inline-flex;align-items:center;gap:4px";
+        const r = document.createElement("input");
+        r.type = "radio";
+        r.name = "wb-parity";
+        r.checked = parityHeads === heads;
+        r.addEventListener("change", () => {
+            if (!r.checked) return;
+            parityHeads = heads;
+            regenerate();
+            afterPatchChange();
+        });
+        l.append(r, document.createTextNode(label));
+        parWrap.appendChild(l);
+    }
+    shared.appendChild(parWrap);
+
 
     // one height control: sign flips the roof, magnitude sets shading depth
     const heightWrap = document.createElement("label");
@@ -3427,23 +3474,21 @@ function buildControls() {
     heightSlider.value = String(heightU);
     heightSlider.style.width = "130px";
     heightSlider.title =
-        "Height: sign flips hills and dales, magnitude sets how strongly height is shaded";
+        "Light: which of hills and dales is brightened, and how strongly. Cosmetic — " +
+        "the net's own parity is on the patch line.";
     const syncHeight = (regen: boolean) => {
         heightU = Number(heightSlider.value);
         const v = biasedHeight(heightU);
         shadeDepth = Math.abs(v);
-        const wasFlipped = flipHeight;
         flipHeight = v < 0;
         heightOut.textContent =
             shadeDepth < 0.005
                 ? "flat"
-                : `${v < 0 ? "dales" : "hills"} ${shadeDepth.toFixed(2)}`;
-        // creases follow the lift, so a change of sign needs the analysis rebuilt
-        if (regen && flipHeight !== wasFlipped && allRhombs.length) {
-            analysis = analyzePatch(flipHeight);
-        }
+                : `${v < 0 ? "brighten dales" : "brighten hills"} ${shadeDepth.toFixed(2)}`;
+        void regen;
         drawTiling();
         drawNet();
+        if (pagination) drawSheets();
     };
     heightSlider.addEventListener("input", () => syncHeight(true));
 
@@ -3457,7 +3502,7 @@ function buildControls() {
         animateSlider(heightSlider, from, to, () => syncHeight(true));
     });
 
-    heightWrap.append(document.createTextNode("Height "), heightSlider, heightOut);
+    heightWrap.append(document.createTextNode("Shading "), heightSlider, heightOut);
     // Appended, not inserted. This read `controls.insertBefore(heightWrap,
     // genLabel.nextSibling)` and worked only by accident: `genLabel` belongs to the
     // *shared* bar, and its next sibling happened to be null, so `insertBefore` fell
@@ -3465,19 +3510,17 @@ function buildControls() {
     // the solid checkbox — that sibling became a real node with the wrong parent and
     // the call threw, taking the whole control bar down with it. The two inserts
     // below are honest ones: `heightWrap` really is a child of `controls`.
-    controls.appendChild(heightWrap);
+    drawbar.appendChild(heightWrap);
     syncHeight(false);
 
     // Color, shading and isoglosses are one field each, shown on more than one
     // overlay. Whichever copy of a control you touch, every copy has to agree —
     // otherwise the checkbox you are looking at lies about what will print.
+    // There is one of each control now, shown above both views, so there is nothing
+    // to hold in step — this only refreshes the pair that are built in code.
     appearanceControls = () => {
         isoChk.checked = showIsogloss;
         colorSel.value = tileColor;
-        const shadeBox = document.getElementById("sheet-shade") as HTMLInputElement | null;
-        const isoBox = document.getElementById("sheet-iso") as HTMLInputElement | null;
-        if (shadeBox) shadeBox.checked = renderShading;
-        if (isoBox) isoBox.checked = showIsogloss;
     };
 
     const isoWrap = document.createElement("label");
@@ -3495,7 +3538,7 @@ function buildControls() {
         if (pagination) drawSheets();
     });
     isoWrap.append(isoChk, document.createTextNode("isoglosses"));
-    controls.insertBefore(isoWrap, heightWrap.nextSibling);
+    drawbar.appendChild(isoWrap);
 
     const colorSel = document.createElement("select");
     colorSel.style.cssText = "padding:4px;font-size:13px;";
@@ -3521,7 +3564,7 @@ function buildControls() {
     colorLabel.textContent = "Color: ";
     colorLabel.style.fontSize = "13px";
     colorLabel.appendChild(colorSel);
-    controls.insertBefore(colorLabel, heightWrap.nextSibling);
+    drawbar.insertBefore(colorLabel, heightWrap);
 
     const sideInput = document.createElement("input");
     sideInput.type = "text";
@@ -3540,8 +3583,7 @@ function buildControls() {
         drawNet();
         // Round-tripping "0.75in" through millimetres lands on 0.7499999999999999,
         // which is true and useless in a text box.
-        showSide();
-        say(`Rhombus side ${parsed.label}. ${fitReport()}`);
+            say(`Rhombus side ${parsed.label}. ${fitReport()}`);
     };
     sideInput.addEventListener("change", applySide);
     sideInput.addEventListener("keydown", (ev) => {
@@ -3702,6 +3744,8 @@ function regenerate() {
     pagination = null;
     indexSheets();
     generate();
+    // The Sheets view names what it is a net of, so it has to be told when that
+    // changes — the label is the only thing there that could go quietly stale.
     sizeTilingCanvas();
     fitView();
     refreshNetView();
@@ -3734,12 +3778,12 @@ function persist(): void {
         seed: currentSeedIdx,
         gen,
         slab: slabMode,
+        parity: parityHeads,
         method: traceMethod,
         color: tileColor,
         sideIn,
         heightU,
         isogloss: showIsogloss,
-        shading: renderShading,
     });
 }
 window.addEventListener("beforeunload", persist);
