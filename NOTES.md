@@ -1265,6 +1265,55 @@ One thing lost on purpose: the slider used to ease to the nearest of −1, 0, +1
 release, those being the three settings that meant anything when the sign was the
 parity. With the sign gone from the 3D slider there is nothing to land on.
 
+### 5 · Schemes and palettes, separated
+
+Jake's model: a **scheme** decides what class a face is in, a **palette** decides what
+color each class gets, and one boolean says whether thin rhombi are told apart. Coherent
+— and it dissolves a muddle that is visible in the source right now.
+
+Two pieces of evidence that this is the right cut:
+
+- **Half the menu is one scheme.** `groups`, `classic`, `plate` and `tinted` are four
+  entries for *rhomb groups* wearing four different palettes. Nothing in the drawing
+  code distinguishes them; only the table they read does.
+- **Thick/thin is not a scheme at all.** It is "no scheme, thin told apart" — and today
+  it does not even have colors of its own: `TYPE_COLORS` is `#9292e3` and `#eec09b`,
+  which are `GROUP_COLORS.Pe5` and `GROUP_COLORS.Pe1`. Thick/thin has been borrowing
+  two of the group colors, which is exactly the conflation the model dissolves.
+
+Two amendments, and one caution.
+
+**Height is a fourth scheme.** It does not fit "three incommensurate schemes" but it
+fits the model perfectly: four classes, four colors, and telling thin apart is as
+meaningful there as anywhere. So: none (1), rhomb groups (3), Kowalewski five (5),
+height (4).
+
+**Do not list the thin palette; derive it.** A palette of `2N` hand-written colors is
+two halves that can drift, and this project has paid for that four times over —
+`paginate.ts`'s second `DASH`, the favicon's own group colors, thick/thin differing
+between paper and screen, `shadeAt` mixing at 0.4 where `shadeOf` mixed at 0.42. A
+palette should be **N colors and one rule**. `tintThin` already is that rule: same hue,
+same saturation, lower lightness. Then the thin half cannot disagree with the thick, a
+new palette costs N colors rather than 2N, and an explicit override stays available for
+the one case where the derived color is genuinely wrong.
+
+**Do not call the boolean "shaded".** Shading is the height ramp, on the rendering line,
+and conflating those two words is how parity ended up inside the height slider for
+months. **Mark thin** says what it does.
+
+One conflict to settle. "Thin rhombs are also thin hexahedra, so the side faces take the
+front face color" is right, and is what the code does — but it means the collar cannot
+have a color of its own, which the earlier wish for a *thick / thin / collar* list
+wanted. Walls inherit, or role becomes a third dimension and the palette doubles again.
+The better answer is probably that the collar reads by position, and that wanting to
+pick it out is a **highlight** — a temporary overlay, like the sheet partition — rather
+than a scheme.
+
+What the menu becomes: **scheme** (4), **palette** (offered only where there is more
+than one, so only for the groups today), **mark thin** (a checkbox). Twelve
+combinations from two controls and a box, against eight from one long list — and
+`tinted classic` and `tinted plate`, which do not exist today, come free.
+
 ## Chapters
 
 Jeff's organization of the project, recorded because the pages had grown past the point
