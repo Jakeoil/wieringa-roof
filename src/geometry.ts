@@ -671,12 +671,29 @@ export interface Palette {
     colors: readonly string[];
 }
 
+// Five colors, ordered so that the **front of the list stands on its own**: the first
+// is what the none scheme paints everything, the first three are what rhomb groups
+// wears, and all five serve Kowalewski. So the leading trio has to be varied in its own
+// right rather than three-fifths of a set — which is why neither of these two runs
+// round the hue circle in order.
+//
+// The leading trio is spread in **luminance** as well as hue, so it survives a
+// greyscale print: two colors that differ only in hue come out the same grey, and the
+// plate palette exists precisely because these get printed.
+//
+// `Slate` opens on the grey that was the plain color, so none keeps the look it had.
+// `Paper` opens on white: a rhombus painted white on a white page is its edges and
+// nothing else, which is a drawing rather than a failure, and is the point of it.
+const SLATE_FIVE = ["#c9cbd4", "#5f83b8", "#dda078", "#7fae76", "#a685c4"];
+const PAPER_FIVE = ["#ffffff", "#3f6395", "#d9906c", "#6b9e5f", "#8a6bb0"];
+
 const PALETTES: readonly Palette[] = [
-    { value: "neutral", label: "Neutral", colors: [PLAIN_FILL] },
     { value: "screen", label: "Screen", colors: Object.values(GROUP_COLORS) },
     { value: "classic", label: "Classic", colors: Object.values(CLASSIC_COLORS) },
     { value: "plate", label: "Plate", colors: Object.values(PLATE_COLORS) },
     { value: "five", label: "Five", colors: FIVE_COLORS },
+    { value: "slate", label: "Slate", colors: SLATE_FIVE },
+    { value: "paper", label: "Paper", colors: PAPER_FIVE },
 ];
 
 const SCHEME_OF = new Map(SCHEMES.map((x) => [x.value, x]));

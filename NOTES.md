@@ -1343,11 +1343,25 @@ it is long enough:
 | Rhomb groups | 3 | screen, classic, plate, five |
 | Kowalewski five | 5 | five |
 
-**The open end is the duds.** The three group palettes stop at three, so Kowalewski can
-only wear its own. Lengthening them to five would let every palette serve every scheme,
-at the price of two colors that mean nothing under rhomb groups — which is the trade to
-make deliberately rather than by accident. Naming the palettes is the cheaper half of
-it, and is done: neutral, screen, classic, plate, five.
+**Two five-color palettes answer most of the duds.** `Slate` and `Paper` are ordered so
+that the front of the list stands on its own: the first color is what none paints
+everything, the first three are what rhomb groups wears, and all five serve Kowalewski.
+So the leading trio is chosen as a trio rather than taken as three-fifths of a set —
+neither runs round the hue circle in order.
+
+`Slate` opens on the grey that was the plain color, so none keeps the look it had.
+`Paper` opens on white: a rhombus painted white on a white page is its edges and nothing
+else, which is a drawing rather than a failure and is the point of it.
+
+Kowalewski can wear three palettes now instead of one, and the old `neutral` — a palette
+of one color, useful to one scheme — is gone, `Slate` covering it and three schemes more.
+
+The trios are spread in **luminance** as well as hue, since two colors differing only in
+hue print as the same grey and the plate palette exists because these get printed. The
+closest pair in each: Paper 0.24, Slate 0.13, Five 0.11, Screen 0.10, Plate 0.09.
+
+Still open: `screen`, `classic` and `plate` stop at three, so Kowalewski cannot wear
+them. Two more colors each would finish it.
 
 ## Chapters
 
