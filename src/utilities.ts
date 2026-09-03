@@ -56,6 +56,9 @@ genSel.value = String(prefs.gen);
 subjectSel.value = prefs.subject;
 // The favicon draws from rhomb data that carries no axis pair, so the five-coloring
 // has nothing to read; everything else is the shared list, plus the icon's own mono.
+// The icon has a palette of its own — deeper than the page colors, because 16 px
+// against unknown browser chrome needs the punch — so it takes schemes and no palette
+// menu. `five` is out for want of an axis pair in the data it draws from.
 schemeOptions(colorSel, { omit: ["five"], trail: [["mono", "Mono", "One color, for a silhouette"]] });
 colorSel.value = prefs.color;
 bgSel.value = prefs.background;

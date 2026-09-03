@@ -1,0 +1,52 @@
+# The colors this site paints a rhombus with.
+#
+# A **palette** is an ordered list of colors; a **scheme** takes the first few of it —
+# none takes one, rhomb groups three, the Kowalewski five all five. So the front of a
+# list has to stand on its own: the first color is what none paints everything, and the
+# first three are what rhomb groups wears. A palette is offered only to the schemes it
+# is long enough for, so a three-color palette never appears under Kowalewski.
+#
+# Worth knowing when you add one: spread the leading trio in **luminance** as well as
+# hue. Two colors that differ only in hue print as the same grey, and these get printed.
+#
+# Edit this file and run `npm run build`. It generates `src/palettes.ts`, which is what
+# the pages import; nothing reads this file at runtime, so there is no parser in the
+# browser and the tools under `tools/` keep working unchanged.
+#
+# `id` must be unique. `label` is what the menu says. Colors are `#rrggbb`.
+
+screen:
+  label: Screen
+  # The strengths the pages use — pale enough to shade over and read under isoglosses.
+  colors: ["#9292e3", "#e6e68e", "#eec09b"]
+
+classic:
+  label: Classic
+  # penrose-mosaic's own start-up colors, verbatim from penrose.js:11-13. Pure blue and
+  # pure yellow are far more saturated than anything else here, which is the point.
+  colors: ["#0000ff", "#ffff00", "#e46c0a"]
+
+plate:
+  label: Plate
+  # Sampled from deca-shape-expansion.png at mid lightness. Meant to be used *with* the
+  # shading and the isoglosses — the plate's character is a wide ramp inside every tile
+  # crossed by contour stripes over heavy black edges, and the color alone is a third
+  # of it.
+  colors: ["#5b5b8a", "#9f9f46", "#ac6d38"]
+
+five:
+  label: Five
+  # Kowalewski's own, at the strengths the 3D pages use.
+  colors: ["#d94f3d", "#e8a33d", "#4f9d4a", "#3d7fc4", "#9b59b6"]
+
+slate:
+  label: Slate
+  # Opens on the grey that used to be the plain color, so the none scheme keeps the
+  # look it had before palettes existed.
+  colors: ["#c9cbd4", "#5f83b8", "#dda078", "#7fae76", "#a685c4"]
+
+paper:
+  label: Paper
+  # Opens on white. A rhombus painted white on a white page is its edges and nothing
+  # else, which is a drawing rather than a failure.
+  colors: ["#ffffff", "#3f6395", "#d9906c", "#6b9e5f", "#8a6bb0"]

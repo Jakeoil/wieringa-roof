@@ -14,5 +14,8 @@ vendor/
 # generated each build so the page can report which build it is running
 src/build-id.ts
 
+# generated from palettes.yaml, which is the file to edit
+src/palettes.ts
+
 # Jeff's own source material — chat exports, scratch scripts. Local only.
 jake/

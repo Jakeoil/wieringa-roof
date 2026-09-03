@@ -15,9 +15,6 @@ import {
     generatePatch,
     seedTypes,
     vertexList,
-    PLATE_COLORS,
-    CLASSIC_COLORS,
-    indexColor,
 } from "./geometry.js";
 import { cutTreeUnfold } from "./cuttree.js";
 
@@ -26,7 +23,8 @@ export interface IconOpts {
     gen: number;
     /** "net" unfolds the patch; "tiling" uses the flat Penrose patch */
     subject: "net" | "tiling";
-    color: "groups" | "plate" | "classic" | "type" | "index" | "mono";
+    /** a scheme, not a palette: the icon carries its own colors — see `GROUPS` */
+    color: "none" | "groups" | "mono";
     /** stroke width as a fraction of a rhomb edge; 0 for none */
     stroke: number;
     strokeColor: string;
@@ -74,12 +72,18 @@ function subjectPolys(o: IconOpts): Array<{ poly: P2[]; fill: string }> {
     console.log = quiet;
 
     const out: Array<{ poly: P2[]; fill: string }> = [];
+    // **Schemes, in the vocabulary everything else uses.** This branched on `plate`,
+    // `classic`, `type` and `index` — palette names and two schemes that no longer
+    // exist — so after the split its menu offered `none` and `five`, which fell through
+    // to the group colors, and the icon quietly ignored half its own control.
+    //
+    // `none` takes the first color of the palette, as it does everywhere; the icon's
+    // palette is `GROUPS`, so that is the star's.
     const fillFor = (group: string, thick: boolean, lowIndex: number): string => {
+        void thick;
+        void lowIndex;
         if (o.color === "mono") return "#333333";
-        if (o.color === "plate") return PLATE_COLORS[group] ?? "#888888";
-        if (o.color === "classic") return CLASSIC_COLORS[group] ?? "#888888";
-        if (o.color === "type") return thick ? "#6f6fd0" : "#e39a5c";
-        if (o.color === "index") return indexColor(lowIndex);
+        if (o.color === "none") return Object.values(GROUPS)[0];
         return GROUPS[group] ?? "#bbbbbb";
     };
 

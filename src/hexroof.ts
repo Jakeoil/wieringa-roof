@@ -292,7 +292,11 @@ function build(reframe: boolean): void {
         const rmode = roofColorSel.value;
         rv.drawRoof(dRoof, {
             // The roof's own index range, so height coloring matches the 3D page.
-            colorOf: (f) => roofFill(rv2.scheme, rv2.palette, f, rv2.markThin),
+            // **The roof panel's own scheme**, which a bulk edit had replaced with the
+            // cells' — the select was still built and still saved and no longer did
+            // anything. It shares the page's palette: two schemes over one set of
+            // colors, rather than a second palette menu inside a folded panel.
+            colorOf: (f) => roofFill(roofColorSel.value, rv2.palette, f, rv2.markThin),
             shade: 0,
             useVertexColors: rmode !== "plain",
             flatColor: PLAIN_COLOR,

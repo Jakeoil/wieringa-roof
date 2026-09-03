@@ -27,7 +27,7 @@ import { LineSegments2 } from "three/addons/lines/LineSegments2.js";
 import { LineSegmentsGeometry } from "three/addons/lines/LineSegmentsGeometry.js";
 import { LineMaterial } from "three/addons/lines/LineMaterial.js";
 import { createRoofView, roofFill, PLAIN_COLOR } from "./roofview.js";
-import { schemeOptions } from "./schemes.js";
+import { bindColorPair } from "./schemes.js";
 import {
     triacontahedra, pe5Rosettes, cupIndices, ownedFaceIndices, solidFace,
     RT_FACES, A6, RHO, MIDRADIUS,
@@ -90,6 +90,7 @@ const PREF_DEFAULTS = {
     patch: "Sun",
     gen: 2,
     color: "class",
+    palette: "screen",
     parity: "heads",
     flat: false,
     headsolids: true,
@@ -967,7 +968,7 @@ function build(reframe: boolean): void {
                 const rf = cen.byRhomb[f.id];
                 return rf && isShared(rf, cen.solids) ? SHARED : solidColor(s);
             }
-            return roofFill(mode, "screen", f);
+            return roofFill(mode, colorPair.palette, f);
         },
         // Shading strength is the depth, so it goes out with it rather than lying
         // about a flat sheet.
@@ -1671,8 +1672,17 @@ function fillGenerations(prefer?: number): void {
 }
 // The shared schemes, plus this page's own two. Built from `FILL_MODES` so the list
 // cannot drift from the 3D page's or the workbench's.
-schemeOptions(colorSel, {
-    lead: [["class", "Proper class", "Color each rhomb by the triacontahedron that owns it"]],
+const colorPair = bindColorPair(colorSel, el<HTMLSelectElement>("palette"), {
+    scheme: prefs.color,
+    palette: prefs.palette,
+    // The shared schemes, plus this page's own. Built from `SCHEMES` so the list
+    // cannot drift from the 3D page's or the Workbench's, and paired with a palette
+    // so the classic and plate colors it used to offer are reachable again — hard-
+    // coding `screen` had quietly taken them away.
+    schemes: {
+        lead: [["class", "Proper class", "Color each rhomb by the triacontahedron that owns it"]],
+    },
+    onChange: () => rebuild(false),
 });
 colorSel.value = prefs.color;
 if (!colorSel.value) colorSel.value = PREF_DEFAULTS.color;
@@ -1896,7 +1906,8 @@ function persist(): void {
     savePrefs(PREFS_KEY, {
         patch: patchSel.value,
         gen: Number(genSel.value),
-        color: colorSel.value,
+        color: colorPair.scheme,
+        palette: colorPair.palette,
         parity: flip ? "tails" : "heads",
         flat: flatChk.checked,
         headsolids: headSolidsChk.checked,

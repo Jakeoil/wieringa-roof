@@ -19,7 +19,7 @@
 // here.
 
 import { seedTypes } from "./geometry.js";
-import { schemeOptions, paletteOptions } from "./schemes.js";
+import { bindColorPair } from "./schemes.js";
 import type { SchemeOptionsOpts } from "./schemes.js";
 import { patchSize, MAX_GENERATION } from "./patchsize.js";
 
@@ -277,29 +277,24 @@ export function buildRenderLine(o: RenderLineOpts): { values: RenderValues; sync
     const emit = () => o.onChange({ ...values });
 
     // Scheme first, then the palette it wears: what you are looking at, then what it
-    // is painted in. The palette menu disables itself when the scheme leaves no
-    // choice, rather than offering one entry.
+    // is painted in. Held together by `bindColorPair`, so a page that builds its own
+    // two selects gets the same behaviour rather than half of it.
     const schemeSel = document.createElement("select");
     schemeSel.style.cssText = "padding:4px;font-size:13px;";
-    schemeOptions(schemeSel, o.schemes);
-    schemeSel.value = values.scheme;
-    if (!schemeSel.value) schemeSel.selectedIndex = 0;
-    values.scheme = schemeSel.value;
-
     const paletteSel = document.createElement("select");
     paletteSel.style.cssText = "padding:4px;font-size:13px;";
-    values.palette = paletteOptions(paletteSel, values.scheme, values.palette);
-
-    schemeSel.addEventListener("change", () => {
-        values.scheme = schemeSel.value;
-        // A three-color palette cannot serve the five, so the choice may have to move.
-        values.palette = paletteOptions(paletteSel, values.scheme, values.palette);
-        emit();
+    const pair = bindColorPair(schemeSel, paletteSel, {
+        scheme: values.scheme,
+        palette: values.palette,
+        schemes: o.schemes,
+        onChange: (v) => {
+            values.scheme = v.scheme;
+            values.palette = v.palette;
+            emit();
+        },
     });
-    paletteSel.addEventListener("change", () => {
-        values.palette = paletteSel.value;
-        emit();
-    });
+    values.scheme = pair.scheme;
+    values.palette = pair.palette;
     o.host.appendChild(label("Color: ", schemeSel));
     o.host.appendChild(label("", paletteSel));
 
@@ -374,8 +369,10 @@ export function buildRenderLine(o: RenderLineOpts): { values: RenderValues; sync
     return {
         values,
         sync() {
-            schemeSel.value = values.scheme;
-            values.palette = paletteOptions(paletteSel, values.scheme, values.palette);
+            pair.scheme = values.scheme;
+            pair.palette = values.palette;
+            pair.sync();
+            values.palette = pair.palette;
             if (input) {
                 if (o.shading?.slider) input.value = String(values.shading);
                 else input.checked = values.shading !== 0;

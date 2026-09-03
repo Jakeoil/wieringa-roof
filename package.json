@@ -3,11 +3,12 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "build": "npm run vendor && npm run stamp && tsc",
+    "build": "npm run vendor && npm run stamp && npm run palettes && tsc",
     "dev": "tsc --watch",
     "vendor": "mkdir -p vendor && cp node_modules/three/build/three.module.min.js vendor/three.module.js && cp node_modules/three/build/three.core.min.js vendor/three.core.min.js && cp node_modules/three/examples/jsm/controls/OrbitControls.js vendor/OrbitControls.js && cp node_modules/three/examples/jsm/lines/LineSegments2.js node_modules/three/examples/jsm/lines/LineSegmentsGeometry.js node_modules/three/examples/jsm/lines/LineMaterial.js vendor/",
     "serve": "python3 tools/serve.py",
-    "stamp": "node tools/stamp.mjs"
+    "stamp": "node tools/stamp.mjs",
+    "palettes": "node tools/palettes.mjs"
   },
   "keywords": [],
   "author": "Jeff Coyle",

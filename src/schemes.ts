@@ -62,4 +62,45 @@ export function paletteOptions(sel: HTMLSelectElement, scheme: string, want: str
     return sel.value;
 }
 
+/**
+ * Wire a scheme select and a palette select together as **one control**.
+ *
+ * The pair is the unit, not the two menus: choosing a scheme can invalidate the palette
+ * in hand, and every place that forgot this went wrong in its own way. The Hexahedra
+ * roof panel kept a scheme and lost its palette; Centers kept a scheme and had its
+ * palette hard-coded to `screen`, so the classic and plate colors it used to offer
+ * simply went; the favicon kept a menu that no longer named anything its own code
+ * understood. One function, and there is one way to hold them.
+ */
+export function bindColorPair(
+    schemeSel: HTMLSelectElement,
+    paletteSel: HTMLSelectElement,
+    o: { scheme: string; palette: string; schemes?: SchemeOptionsOpts; onChange: (v: { scheme: string; palette: string }) => void },
+): { scheme: string; palette: string; sync(): void } {
+    const v = { scheme: o.scheme, palette: o.palette, sync: () => {} };
+
+    schemeOptions(schemeSel, o.schemes);
+    schemeSel.value = v.scheme;
+    if (!schemeSel.value) schemeSel.selectedIndex = 0;
+    v.scheme = schemeSel.value;
+    v.palette = paletteOptions(paletteSel, v.scheme, v.palette);
+
+    schemeSel.addEventListener("change", () => {
+        v.scheme = schemeSel.value;
+        // A three-color palette cannot serve the five, so the choice may have to move.
+        v.palette = paletteOptions(paletteSel, v.scheme, v.palette);
+        o.onChange({ scheme: v.scheme, palette: v.palette });
+    });
+    paletteSel.addEventListener("change", () => {
+        v.palette = paletteSel.value;
+        o.onChange({ scheme: v.scheme, palette: v.palette });
+    });
+
+    v.sync = () => {
+        schemeSel.value = v.scheme;
+        v.palette = paletteOptions(paletteSel, v.scheme, v.palette);
+    };
+    return v;
+}
+
 export { PALETTES, SCHEMES };
