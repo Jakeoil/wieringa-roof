@@ -38,16 +38,18 @@ export const AXES6: AxisSet = [0, 1, 2, 3, 4, 5];
  *
  * *Which* subset is taken does not matter for the two middle ones — all six 5-subsets
  * are congruent, and so are all fifteen 4-subsets, measured in RHOMBOHEDRA.md §2½. The
- * rhombohedron is the exception: a triple is acute or obtuse depending on which one it
- * is, ten of each among the twenty, and {0,1,2} is an obtuse one. It is listed for
- * completeness — it is the base case the dissection has to handle anyway — but the Cage
- * offers the first three, a single cell having no dissection to show.
+ * Three axes are the exception, and there the choice of triple is the whole point: ten
+ * of the twenty triples span the acute hexahedron and ten the oblate one, so both are
+ * listed. {0,1,3} is an acute triple and {0,1,2} an oblate one. They are the two shapes
+ * every larger solid in the family is built from, which is why they belong here even
+ * though a single cell has no dissection to show.
  */
 export const SOLIDS: Array<{ key: string; label: string; axes: AxisSet }> = [
     { key: "rt", label: "Triacontahedron", axes: AXES6 },
     { key: "ico", label: "Golden icosahedron", axes: [0, 1, 2, 3, 4] },
     { key: "dod", label: "Golden dodecahedron", axes: [0, 1, 2, 3] },
-    { key: "rh", label: "Golden rhombohedron", axes: [0, 1, 2] },
+    { key: "acute", label: "Acute hexahedron", axes: [0, 1, 3] },
+    { key: "oblate", label: "Oblate hexahedron", axes: [0, 1, 2] },
 ];
 
 /** Faces and cells of the solid on `axes` — k(k−1) and C(k,3). */
@@ -424,17 +426,86 @@ export { allDissections };
 // the roof and the printed nets can reach it without closing a cycle back through here.
 export { pairColor };
 
-/** Color 0–4 of face `f` of a cell. Faces `2q` and `2q+1` are the opposite pair
- *  perpendicular to the cell's `q`-th edge, and are spanned by the other two axes —
- *  which is why they come out the same color. */
-export function faceColor(c: Cell, f: number): number {
-    const q = f >> 1;
-    return pairColor(c.triple[(q + 1) % 3], c.triple[(q + 2) % 3]);
+// ── the coloring on fewer axes ────────────────────────────────────
+//
+// On k axes the same demand — faces sharing an axis must differ — is a proper edge
+// coloring of K_k, and χ′(K_k) is k−1 for even k and k for odd. So the number of colors
+// is **not** five for the whole family:
+//
+//   k = 6  five   ·  k = 5  five  ·  k = 4  **three**  ·  k = 3  three
+//
+// Restricting K₆'s five to a subset is already optimal at five axes and at three: at
+// five, each perfect matching loses the one pair through the dropped axis and the other
+// two survive, so all five classes stay non-empty; at three, two pairs of a triple
+// always share an axis and so never share a class. **Four axes is the exception** — all
+// fifteen 4-subsets take colors from all five classes, where three would do — and it
+// gets K₄'s own coloring instead, its three perfect matchings.
+//
+// Where the restriction is used, the classes it leaves are renumbered to run from zero,
+// so a scheme still takes colors from the front of a palette rather than from wherever
+// the six-axis numbering happened to put them.
+
+interface Coloring {
+    /** the class of the face spanned by axes `i` and `j` */
+    of: (i: number, j: number) => number;
+    /** how many classes there are — the scheme's color count on this solid */
+    n: number;
 }
 
-/** The three colors a cell wears, sorted — one of the ten 3-subsets of five. */
-export function cellColors(c: Cell): number[] {
-    return [0, 2, 4].map((f) => faceColor(c, f)).sort((a, b) => a - b);
+const COLORINGS = new Map<string, Coloring>();
+
+function coloring(axes: AxisSet): Coloring {
+    const key = axes.join("");
+    const hit = COLORINGS.get(key);
+    if (hit) return hit;
+    let built: Coloring;
+    if (axes.length === 4) {
+        // K₄'s three perfect matchings, by position in the set rather than by axis, so
+        // which four axes they are makes no difference: {01,23}, {02,13}, {03,12}. The
+        // partner of a pair {p,q} with p > 0 is {0,r} with r = 6 − p − q, the positions
+        // summing to six.
+        const pos = new Map(axes.map((m, q) => [m, q]));
+        built = {
+            n: 3,
+            of: (i, j) => {
+                const a = pos.get(i)!, b = pos.get(j)!;
+                const p = Math.min(a, b), q = Math.max(a, b);
+                return p === 0 ? q - 1 : 6 - p - q - 1;
+            },
+        };
+    } else {
+        const used = new Set<number>();
+        for (let a = 0; a < axes.length; a++)
+            for (let b = a + 1; b < axes.length; b++) used.add(pairColor(axes[a], axes[b]));
+        const rank = new Map([...used].sort((x, y) => x - y).map((c, r) => [c, r]));
+        built = { n: rank.size, of: (i, j) => rank.get(pairColor(i, j))! };
+    }
+    COLORINGS.set(key, built);
+    return built;
+}
+
+/** How many colors the five-coloring scheme actually needs on this solid. */
+export function classCount(axes: AxisSet = AXES6): number {
+    return coloring(axes).n;
+}
+
+/** The class of the face spanned by axes `i` and `j`. At six axes this is `pairColor`. */
+export function pairColorOn(i: number, j: number, axes: AxisSet = AXES6): number {
+    return coloring(axes).of(i, j);
+}
+
+/** Color of face `f` of a cell. Faces `2q` and `2q+1` are the opposite pair
+ *  perpendicular to the cell's `q`-th edge, and are spanned by the other two axes —
+ *  which is why they come out the same color. */
+export function faceColor(c: Cell, f: number, axes: AxisSet = AXES6): number {
+    const q = f >> 1;
+    return pairColorOn(c.triple[(q + 1) % 3], c.triple[(q + 2) % 3], axes);
+}
+
+/** The colors a cell wears, sorted. Three of them wherever the solid has three axes to
+ *  spare — one of the ten 3-subsets of five on the triacontahedron. */
+export function cellColors(c: Cell, axes: AxisSet = AXES6): number[] {
+    return [0, 2, 4].map((f) => faceColor(c, f, axes)).sort((a, b) => a - b);
 }
 
 // ── the shell ─────────────────────────────────────────────────────

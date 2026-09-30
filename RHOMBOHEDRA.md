@@ -472,13 +472,36 @@ deliberately, since it is the first thing to ask for it.
    group.~~ **Done** — the table above. One orbit each below six axes.
 3. **A solid selector on the Cage**, defaulting to the triacontahedron so the page opens
    as it does now.
-4. **Let a scheme's class count depend on the solid**, and make `Kowalewski` and
-   `By axis` follow it.
-5. **Labels that count what is actually there** — "all twenty" becomes the solid's own
-   number.
+4. ~~**Let a scheme's class count depend on the solid**, and make `Kowalewski` and
+   `By axis` follow it.~~ **Done**, and it turned out to need nothing from
+   `geometry.ts`. The Cage never used `SCHEMES` — it carries its own Color menu and its
+   own five — so `palettesFor` and `Scheme.classes` were the wrong place to look, and
+   they are untouched. The coloring itself now lives in `dissect.ts` as `classCount` and
+   `pairColorOn`, and the measured finding is that **only four axes needed anything**:
 
-Not in scope unless asked: the rhombohedron as a fourth entry. It is a single cell, the
-page is about dissection, and `polyhedra.html` already draws it.
+   | solid | axes | χ′(K_k) | restricting the six-axis five gives |
+   |---|---|---|---|
+   | triacontahedron | 6 | 5 | 5 — optimal |
+   | golden icosahedron | 5 | 5 | 5 — optimal |
+   | golden dodecahedron | 4 | **3** | **5 — wasteful, on all fifteen 4-subsets** |
+   | hexahedron | 3 | 3 | 3 — optimal |
+
+   At five axes each perfect matching loses the one pair through the dropped axis and
+   keeps the other two, so no class empties; at three, two pairs of a triple always share
+   an axis and so can never share a class. Four axes gets K₄'s own three matchings
+   instead. Where the restriction is used, the surviving classes are renumbered from
+   zero, so a scheme still takes colors from the front of a palette. `By axis` spreads
+   its hues over k rather than six.
+5. ~~**Labels that count what is actually there**~~ **Done** — folded into step 3, since
+   a selector that left "All twenty" showing on a four-cell solid would have been a
+   visible lie the day it shipped.
+
+Since done and asked for: **both hexahedra on the menu**, acute {0,1,3} and oblate
+{0,1,2}. They are the two shapes every larger solid in the family is built from, so the
+page reads from the pieces up. A single cell has nothing to explode and no interior, and
+the Explode and Show controls go quiet on it. Also **orthogonal projection**, as a
+checkbox: the cells are parallelepipeds, and parallel projection is the one that keeps
+that visible.
 
 ## 3. Open questions
 

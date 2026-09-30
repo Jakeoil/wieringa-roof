@@ -23,8 +23,9 @@ import { LineMaterial } from "three/addons/lines/LineMaterial.js";
 import { loadPrefs, savePrefs, resetPrefs } from "./prefs.js";
 import { BUILD_ID } from "./build-id.js";
 import {
-    dissection, faceColor, cageFaces, pairColor,
+    dissection, faceColor, cageFaces,
     SOLIDS, solidCounts, solidVolume, groupOrder, allDissections,
+    classCount, pairColorOn,
 } from "./dissect.js";
 import type { AxisSet, DissectionKind } from "./dissect.js";
 import type { Cell } from "./dissect.js";
@@ -47,17 +48,28 @@ const cageSel = el<HTMLSelectElement>("cagemode");
 const flipChk = el<HTMLInputElement>("flip");
 const flipLabel = el<HTMLLabelElement>("fliplabel");
 const spinChk = el<HTMLInputElement>("spin");
+const orthoChk = el<HTMLInputElement>("ortho");
 const statusEl = el<HTMLElement>("status");
 
 const PREFS_KEY = "wr-rhombohedra";
-const PREF_DEFAULTS = { solid: "rt", explode: 0, color: "five", show: "all", facemode: "solid", edgemode: "edges", cagemode: "cage", flip: false, spin: true };
+const PREF_DEFAULTS = { solid: "rt", ortho: false, explode: 0, color: "five", show: "all", facemode: "solid", edgemode: "edges", cagemode: "cage", flip: false, spin: true };
 const prefs = loadPrefs(PREFS_KEY, PREF_DEFAULTS);
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0xf4f1e8);
-const camera = new THREE.PerspectiveCamera(34, 1, 0.1, 200);
-camera.position.set(3.4, -4.2, 3.0);
-camera.up.set(0, 0, 1);
+// Two cameras rather than one, because a projection cannot be changed on a camera that
+// already has one. The reader picks between them and the view carries over: same eye
+// point, same target, and the orthographic frustum is sized from the distance the
+// perspective camera was at, so the solid does not jump size when the box is ticked.
+const persp = new THREE.PerspectiveCamera(34, 1, 0.1, 200);
+const ortho = new THREE.OrthographicCamera(-2, 2, 2, -2, 0.1, 200);
+for (const c of [persp, ortho]) {
+    c.position.set(3.4, -4.2, 3.0);
+    c.up.set(0, 0, 1);
+}
+let camera: THREE.PerspectiveCamera | THREE.OrthographicCamera = persp;
+/** Half the height of the orthographic frustum, in world units. */
+let orthoHalf = 1.9;
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 view.appendChild(renderer.domElement);
@@ -85,8 +97,18 @@ const ACUTE = new THREE.Color(0xd98d3a);
 const OBTUSE = new THREE.Color(0x4a7fb5);
 // twenty hues, so a cell can be followed as it moves out
 const WHEEL = Array.from({ length: 20 }, (_, i) => new THREE.Color().setHSL(i / 20, 0.52, 0.55));
-// one color per axis-pair the cell's faces use
-const AXIS = Array.from({ length: 6 }, (_, i) => new THREE.Color().setHSL(i / 6, 0.5, 0.55));
+// One color per axis, spread over however many the solid has: on four axes the four
+// hues are a quarter of the circle apart rather than a sixth, so they stay as far from
+// each other as the solid allows. At six axes this is the wheel it always was.
+const AXIS_HUES = new Map<number, THREE.Color[]>();
+function axisColor(pos: number, k: number): THREE.Color {
+    let hues = AXIS_HUES.get(k);
+    if (!hues) {
+        hues = Array.from({ length: k }, (_, i) => new THREE.Color().setHSL(i / k, 0.5, 0.55));
+        AXIS_HUES.set(k, hues);
+    }
+    return hues[pos];
+}
 // The Kowalewski five. A proper edge coloring of K6, so every rosette of the solid
 // shows all five, every hexahedron's opposite faces agree, and each hexahedron wears
 // three of the five — the ten 3-subsets borne once by an acute cell and once by an
@@ -134,6 +156,16 @@ function labelledCount(axes: AxisSet, key: string): number {
     if (NDISS[key] === undefined) NDISS[key] = allDissections(axes).length;
     return NDISS[key];
 }
+
+/** The cells and cage of one solid and kind, worked out once. */
+function cellsOf(solid: { key: string; axes: AxisSet }, kind: DissectionKind): Cell[] {
+    const ck = `${kind}|${solid.key}`;
+    if (!CELLS[ck]) {
+        CELLS[ck] = dissection(kind, solid.axes);
+        CAGES[ck] = cageFaces(kind, solid.axes);
+    }
+    return CELLS[ck];
+}
 let drawn: THREE.Object3D[] = [];
 let edgeMats: LineMaterial[] = [];
 
@@ -151,14 +183,17 @@ function clear(): void {
 }
 
 /** Per face, since the five-coloring is a property of faces and not of cells. */
-const colorOf = (c: Cell, face: number): THREE.Color => {
-    if (colorSel.value === "five") return FIVE[faceColor(c, face)];
+const colorOf = (c: Cell, face: number, axes: AxisSet): THREE.Color => {
+    if (colorSel.value === "five") return FIVE[faceColor(c, face, axes)];
     if (colorSel.value === "cell") return WHEEL[c.id];
-    if (colorSel.value === "axis") return AXIS[c.triple[0]];
+    if (colorSel.value === "axis") return axisColor(axes.indexOf(c.triple[0]), axes.length);
     return c.acute ? ACUTE : OBTUSE;
 };
+// When there is only one cell the filter is meaningless, and asking for "the ten acute"
+// of an oblate hexahedron would empty the view. So a disabled Show means all — which
+// also lets the reader's choice survive a trip through the hexahedra and back.
 const visible = (c: Cell): boolean =>
-    showSel.value === "all" || (showSel.value === "acute") === c.acute;
+    showSel.disabled || showSel.value === "all" || (showSel.value === "acute") === c.acute;
 
 function build(): void {
     clear();
@@ -181,13 +216,8 @@ function build(): void {
     const solid = chosen();
     const hasFlip = solid.axes.length === 6;
     const kind: DissectionKind = hasFlip && flipChk.checked ? "chiral" : "symmetric";
-    const ck = `${kind}|${solid.key}`;
-    if (!CELLS[ck]) {
-        CELLS[ck] = dissection(kind, solid.axes);
-        CAGES[ck] = cageFaces(kind, solid.axes);
-    }
-    const cells = CELLS[ck];
-    const cage = CAGES[ck];
+    const cells = cellsOf(solid, kind);
+    const cage = CAGES[`${kind}|${solid.key}`];
     // Corners and edges of each cell, for the ball-and-stick frame. Taken per cell
     // rather than deduplicated: assembled, neighboring cells share corners and the
     // beads coincide exactly, which looks like one bead — and once exploded they must
@@ -222,7 +252,7 @@ function build(): void {
             }
         }
         c.faces.forEach((f, fi) => {
-            const col = colorOf(c, fi);
+            const col = colorOf(c, fi, solid.axes);
             if (faceMode !== "invisible") {
                 for (const q of [f[0], f[1], f[2], f[0], f[2], f[3]]) {
                     tris.push(q[0] + o[0], q[1] + o[1], q[2] + o[2]);
@@ -344,7 +374,7 @@ function build(): void {
         const cc: number[] = [];
         for (const f of cage) {
             if (cageMode === "inner" && f.outer) continue;
-            const col = colorSel.value === "five" ? FIVE[pairColor(f.i, f.j)] : CAGE;
+            const col = colorSel.value === "five" ? FIVE[pairColorOn(f.i, f.j, solid.axes)] : CAGE;
             const mid: V3 = [0, 0, 0];
             for (const q of f.corners) for (let d = 0; d < 3; d++) mid[d] += q[d] / 4;
             const inner = f.corners.map(
@@ -388,6 +418,27 @@ function build(): void {
     }
 
     const nAcute = cells.filter((c) => visible(c) && c.acute).length;
+    const k = solid.axes.length;
+    const nClass = classCount(solid.axes);
+    // Five is the triacontahedron's number, not the family's: the demand is a proper
+    // edge coloring of K_k, and χ′(K_k) is k−1 for even k and k for odd.
+    const note = colorSel.value !== "five"
+        ? ""
+        : ` · Kowalewski ${WORD[nClass] ?? nClass} on K${SUB[k]}` +
+          (k === 6
+              ? ": every rosette shows all five, opposite faces of each hexahedron agree, each wears three of the five"
+              : k === 4
+                  ? ": three is all K₄ needs, where restricting the six-axis five would have spent all five"
+                  : `: ${WORD[nClass] ?? nClass} is the least K${SUB[k]} admits, and opposite faces still agree`);
+    if (cells.length === 1) {
+        const only = cells[0];
+        statusEl.textContent =
+            `one cell — the ${only.acute ? "acute" : "oblate"} golden rhombic hexahedron, volume ` +
+            `${only.volume.toFixed(6)}${only.acute ? ", which is φ times the oblate one" : ", and the acute one is φ times it"} · ` +
+            `three axes: the two shapes every larger solid in the family is built from, ` +
+            `so there is nothing to explode and no cage within${note}`;
+        return;
+    }
     // Below six axes there is nothing to flip: the labelled dissections are one orbit,
     // and saying so is more use than an inert checkbox.
     const kindNote = !hasFlip
@@ -399,9 +450,6 @@ function build(): void {
     const volNote = hasFlip
         ? `together 4√(5+2√5) = ${vol.toFixed(6)}, the triacontahedron's own volume`
         : `together ${vol.toFixed(6)}, the solid's own volume — the three stand in the ratio 2 : 5 : 10`;
-    const note = colorSel.value === "five"
-        ? " · Kowalewski five: every rosette shows all five, opposite faces of each hexahedron agree, each wears three of the five"
-        : "";
     statusEl.textContent =
         `${shown} of ${cells.length} cells — ${nAcute} acute at 0.760845, ${shown - nAcute} obtuse at 0.470228, ` +
         `in the ratio φ · ${volNote} · ` +
@@ -411,7 +459,9 @@ function build(): void {
 // The wording the flip control carries when there is something to flip. Taken from the
 // page rather than repeated here, so the two cannot drift apart.
 const FLIP_TITLE = flipLabel.title;
-const WORD: Record<number, string> = { 2: "two", 4: "four", 5: "five", 10: "ten", 20: "twenty" };
+const WORD: Record<number, string> = { 1: "one", 2: "two", 3: "three", 4: "four", 5: "five", 10: "ten", 20: "twenty" };
+/** Subscript digits, for naming K₆ and its smaller relatives in the status line. */
+const SUB = "₀₁₂₃₄₅₆";
 
 /**
  * Make the controls say what the chosen solid actually holds. "All twenty" is true of
@@ -420,11 +470,17 @@ const WORD: Record<number, string> = { 2: "two", 4: "four", 5: "five", 10: "ten"
  */
 function relabel(): void {
     const solid = chosen();
-    const { cells } = solidCounts(solid.axes);
-    const half = cells / 2;
-    showSel.options[0].text = `All ${WORD[cells] ?? cells}`;
-    showSel.options[1].text = `The ${WORD[half] ?? half} acute`;
-    showSel.options[2].text = `The ${WORD[half] ?? half} obtuse`;
+    const cells = cellsOf(solid, "symmetric");
+    const nA = cells.filter((c) => c.acute).length;
+    const nO = cells.length - nA;
+    showSel.options[0].text = `All ${WORD[cells.length] ?? cells.length}`;
+    showSel.options[1].text = nA ? `The ${WORD[nA] ?? nA} acute` : "No acute cell";
+    showSel.options[2].text = nO ? `The ${WORD[nO] ?? nO} obtuse` : "No obtuse cell";
+    // A single cell has nothing to filter and nothing to pull apart: its center is the
+    // origin, so the travel it would explode along is zero.
+    const single = cells.length === 1;
+    showSel.disabled = single;
+    explodeInput.disabled = single;
     const hasFlip = solid.axes.length === 6;
     flipChk.disabled = !hasFlip;
     flipLabel.style.opacity = hasFlip ? "" : "0.45";
@@ -450,6 +506,7 @@ for (const [sel, def] of [
 ] as Array<[HTMLSelectElement, string]>) if (!sel.value) sel.value = def;
 flipChk.checked = prefs.flip;
 spinChk.checked = prefs.spin;
+orthoChk.checked = prefs.ortho;
 controls.autoRotate = spinChk.checked;
 
 function rebuild(): void {
@@ -474,6 +531,7 @@ explodeInput.addEventListener(
     { passive: false },
 );
 spinChk.addEventListener("change", () => { controls.autoRotate = spinChk.checked; });
+orthoChk.addEventListener("change", setProjection);
 
 function persist(): void {
     savePrefs(PREFS_KEY, {
@@ -481,7 +539,7 @@ function persist(): void {
         explode: Number(explodeInput.value), color: colorSel.value,
         show: showSel.value, facemode: faceSel.value, edgemode: edgeSel.value,
         cagemode: cageSel.value, flip: flipChk.checked,
-        spin: spinChk.checked,
+        spin: spinChk.checked, ortho: orthoChk.checked,
     });
 }
 window.addEventListener("beforeunload", persist);
@@ -499,8 +557,41 @@ function resize(): void {
     if (!w || !h) return;
     renderer.setSize(w, h, false);
     for (const m of edgeMats) m.resolution.set(w, h);
-    camera.aspect = w / h;
-    camera.updateProjectionMatrix();
+    persp.aspect = w / h;
+    persp.updateProjectionMatrix();
+    // An orthographic frustum has no field of view to stretch, so the aspect has to be
+    // put into its width by hand or the solid comes out squashed.
+    ortho.top = orthoHalf;
+    ortho.bottom = -orthoHalf;
+    ortho.right = (orthoHalf * w) / h;
+    ortho.left = -ortho.right;
+    ortho.updateProjectionMatrix();
+}
+
+/**
+ * Hand the controls whichever camera is wanted, carrying the view across.
+ *
+ * Going orthographic, the frustum is sized to the perspective camera's apparent height
+ * at the target — `distance · tan(fov/2)` — so ticking the box changes the projection
+ * and nothing else. Coming back, the eye point is already where the reader left it.
+ */
+function setProjection(): void {
+    const next = orthoChk.checked ? ortho : persp;
+    if (next === camera) return;
+    if (next === ortho) {
+        const d = persp.position.distanceTo(controls.target);
+        orthoHalf = d * Math.tan((persp.fov / 2) * (Math.PI / 180));
+        ortho.zoom = 1;
+    }
+    next.position.copy(camera.position);
+    next.up.copy(camera.up);
+    camera = next;
+    // The typings give `object` as a perspective camera, but OrbitControls branches on
+    // `isOrthographicCamera` throughout and drives both — so this is the types catching
+    // up, not a shortcut past them.
+    (controls as unknown as { object: THREE.Camera }).object = next;
+    resize();
+    controls.update();
 }
 window.addEventListener("resize", resize);
 
@@ -510,5 +601,12 @@ console.log(`rhombohedra build ${BUILD_ID}`);
     if (tag) tag.textContent = `· build ${BUILD_ID}`;
 }
 resize();
+// The stored projection has to be applied after the first resize, since going
+// orthographic sizes the frustum from where the perspective camera stands.
+if (orthoChk.checked) {
+    orthoChk.checked = false;
+    orthoChk.checked = true;
+    setProjection();
+}
 rebuild();
 renderer.setAnimationLoop(() => { controls.update(); renderer.render(scene, camera); });

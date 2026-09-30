@@ -57,6 +57,8 @@
         <option value="rt">Triacontahedron</option>
         <option value="ico">Golden icosahedron</option>
         <option value="dod">Golden dodecahedron</option>
+        <option value="acute">Acute hexahedron</option>
+        <option value="oblate">Oblate hexahedron</option>
     </select></label>
     <label title="Scroll over the slider to work it; hold shift for fine steps">Explode <span id="explodeOut" class="mono"></span>
         <input type="range" id="explode" min="0" max="1" step="0.005" value="0">
@@ -90,6 +92,7 @@
     <span class="checks">
         <label id="fliplabel" title="The two dissections differ by one flip inside a single Bilinski dodecahedron — four cells, six internal faces. Unflipped keeps a three-fold axis; flipped keeps no symmetry at all."><input type="checkbox" id="flip"> flip</label>
         <label><input type="checkbox" id="spin" checked> turn</label>
+        <label title="Drop the perspective. Parallel edges stay parallel and equal cells stay the same size wherever they sit, which is what makes the dissection legible; the cost is the depth cue."><input type="checkbox" id="ortho"> orthogonal</label>
         <button id="reset" title="Forget saved settings and start again from the defaults">Reset</button>
     </span>
 </div>
@@ -130,6 +133,16 @@
     difference either, all fifteen 4-subsets being congruent and all six 5-subsets too.
 </p>
 <p>
+    Keep <em>three</em> and the zonohedron is a single cell — and there the choice of
+    triple is the whole point. Ten of the twenty triples span the <strong>acute</strong>
+    hexahedron, volume 0.760845, and ten the <strong>oblate</strong> one, 0.470228, in
+    the ratio φ. Both are on the menu because they are the two shapes every larger solid
+    in the family is built from: the triacontahedron is ten of each, the icosahedron five
+    of each, the dodecahedron two. Neither explodes — with one cell the center is the
+    origin and there is nowhere to travel — and neither has a cage within, its six faces
+    all being on the surface.
+</p>
+<p>
     <strong>The dissection is a choice; the cells are not.</strong> A point of the solid
     is <span class="mono">½Σcₘaₘ</span> with every <span class="mono">cₘ</span> in
     <span class="mono">[−1,1]</span>, and a cell fixes <span class="mono">cₘ = ±1</span>
@@ -146,6 +159,15 @@
     spreads. Faces go translucent while the cells are still close, because assembled
     they share every internal face and opaque ones would hide the whole dissection
     behind the solid's own surface.
+</p>
+<p>
+    <strong>Orthogonal</strong> drops the perspective. Parallel edges come out parallel,
+    and two cells of the same kind come out the same size wherever they sit — which is
+    worth having here, because the cells <em>are</em> parallelepipeds and the whole
+    dissection is a statement about parallel directions. The cost is the depth cue: with
+    no convergence to read, near and far stop announcing themselves, so it helps to be
+    turning. Ticking it changes the projection and nothing else — the frustum is sized to
+    the apparent height the perspective camera had, so the solid does not jump.
 </p>
 <p>
     <strong>The triacontahedron has exactly two dissections</strong>, up to rotation
@@ -189,6 +211,25 @@
     sharing an axis must differ, which is a <strong>proper edge coloring of K₆</strong>.
     K₆ needs exactly five colors, and a color class is a perfect matching of three
     pairs.
+</p>
+<p>
+    <strong>Five is this solid's number, not the family's.</strong> On <em>k</em> axes the
+    demand is the same and the graph is smaller: a proper edge coloring of
+    <span class="mono">K<sub>k</sub></span>, whose chromatic index is
+    <span class="mono">k−1</span> for even <em>k</em> and <span class="mono">k</span> for
+    odd. So it is five at six axes, five again at five, and only
+    <strong>three</strong> at four — and three at three. Restricting the six-axis
+    coloring is already the best possible at five axes and at three: at five each perfect
+    matching loses the one pair through the dropped axis and keeps the other two, so no
+    class empties; at three, two pairs of a triple always share an axis and so can never
+    share a class. <strong>Four axes is the one exception.</strong> All fifteen 4-subsets
+    inherit colors from all five classes where three would do, so the golden dodecahedron
+    is given K₄'s own coloring instead — its three perfect matchings,
+    <span class="mono">{01,23}</span>, <span class="mono">{02,13}</span>,
+    <span class="mono">{03,12}</span>. Everything the five gave up survives it: faces
+    sharing an axis still differ, opposite faces of a hexahedron still agree, and a
+    hexahedron still wears three distinct colors — that last for free, since its three
+    axis pairs share an axis pairwise.
 </p>
 <p>
     Three things Jake described then follow without being asked for. Opposite faces of

@@ -10,7 +10,7 @@
 import {
     dissection, RT_VOLUME, disjoint, pairColor, faceColor, cellColors,
     SOLIDS, solidCounts, solidVolume, groupOrder, allDissections, stabilizerOrder,
-    shellFaces, cageFaces,
+    shellFaces, cageFaces, classCount, pairColorOn,
 } from "../dist/dissect.js";
 import { A6, RHO } from "../dist/centers.js";
 
@@ -118,6 +118,32 @@ for (const sol of SOLIDS) {
         const r = Math.max(d1,d2) / Math.min(d1,d2);
         if (Math.abs(r - PHI) > 1e-9) fail(`${sol.key}: diagonal ratio ${r} is not phi`);
     }
+    // the coloring is proper and uses no more colors than K_k needs: chi'(K_k) is
+    // k-1 for even k and k for odd
+    const k = sol.axes.length;
+    const chi = k % 2 === 0 ? k - 1 : k;
+    if (classCount(sol.axes) !== chi) fail(`${sol.key}: coloring uses ${classCount(sol.axes)} colors, chi'(K${k}) = ${chi}`);
+    let clash = 0, gap = 0;
+    for (const a of sol.axes) {
+        const seen = new Set();
+        for (const b of sol.axes) if (a !== b) {
+            const col = pairColorOn(a, b, sol.axes);
+            if (col < 0 || col >= chi) gap++;
+            if (seen.has(col)) clash++;
+            seen.add(col);
+        }
+    }
+    if (clash) fail(`${sol.key}: ${clash} face pairs share an axis and a color`);
+    if (gap) fail(`${sol.key}: ${gap} faces colored outside 0..${chi - 1}`);
+    // opposite faces of a cell still agree, and a cell still wears three distinct colors
+    let opp = 0, tri = 0;
+    for (const c of d) {
+        for (let q = 0; q < 3; q++)
+            if (faceColor(c, 2*q, sol.axes) !== faceColor(c, 2*q+1, sol.axes)) opp++;
+        if (new Set(cellColors(c, sol.axes)).size !== 3) tri++;
+    }
+    if (opp) fail(`${sol.key}: ${opp} opposite face pairs differ in color`);
+    if (tri) fail(`${sol.key}: ${tri} cells do not wear three distinct colors`);
     // acute and obtuse in equal number, except on the lone rhombohedron which is one cell
     const ac = d.filter((c) => c.acute).length;
     if (d.length > 1 && ac * 2 !== d.length) fail(`${sol.key}: ${ac} acute of ${d.length}`);
@@ -133,14 +159,20 @@ for (const sol of SOLIDS) {
         if (n % size) fail(`${sol.key}: ${n} dissections at stabiliser ${st} is not a whole number of orbits of ${size}`);
         orbits += n / size;
     }
-    FAMILY.push({ key: sol.key, label: sol.label, k: sol.axes.length, faces, cells: d.length, ac, vol, all: all.length, G, orbits });
+    FAMILY.push({ key: sol.key, label: sol.label, k, faces, cells: d.length, ac, vol, all: all.length, G, orbits, colors: chi });
 }
 // only the triacontahedron has a choice
 const rt = FAMILY.find((f) => f.k === 6);
 if (rt.orbits !== 2) fail(`triacontahedron: ${rt.orbits} orbits, expected 2`);
 for (const f of FAMILY) if (f.k < 6 && f.orbits !== 1) fail(`${f.key}: ${f.orbits} orbits, expected 1`);
+// the two hexahedra are the two shapes, one each, in the ratio phi
+const hx = FAMILY.filter((f) => f.k === 3);
+if (hx.length !== 2 || hx.filter((f) => f.ac === 1).length !== 1)
+    fail(`three axes: expected one acute hexahedron and one oblate, got ${JSON.stringify(hx.map((f) => [f.key, f.ac]))}`);
+const [vAc, vOb] = [hx.find((f) => f.ac === 1).vol, hx.find((f) => f.ac === 0).vol];
+if (Math.abs(vAc / vOb - PHI) > 1e-9) fail(`hexahedra ${vAc} / ${vOb} is not phi`);
 // volumes in the ratio 2 : 5 : 10
-const [vd, vi, vr] = [4, 5, 6].map((k) => FAMILY.find((f) => f.k === k).vol);
+const [vd, vi, vr] = ["dod", "ico", "rt"].map((key) => FAMILY.find((f) => f.key === key).vol);
 if (Math.abs(vi / vd - 2.5) > 1e-9 || Math.abs(vr / vd - 5) > 1e-9)
     fail(`volumes ${vd} : ${vi} : ${vr} are not in the ratio 2 : 5 : 10`);
 
@@ -152,7 +184,8 @@ for (const f of FAMILY)
     console.log(
         `${f.label.padEnd(21)} k=${f.k}  ${String(f.faces).padStart(2)} faces  ` +
         `${String(f.cells).padStart(2)} cell${f.cells > 1 ? "s" : " "} (${f.ac} acute)  vol ${f.vol.toFixed(6)}  ` +
-        `${String(f.all).padStart(3)} labelled / group ${String(f.G).padStart(3)} = ${f.orbits} orbit${f.orbits > 1 ? "s" : ""}`,
+        `${String(f.all).padStart(3)} labelled / group ${String(f.G).padStart(3)} = ${f.orbits} orbit${f.orbits > 1 ? "s" : ""}` +
+        `  ·  ${f.colors} colors`,
     );
 console.log(bad === 0 ? "all checks passed" : `${bad} FAILURES`);
 process.exit(bad === 0 ? 0 : 1);
