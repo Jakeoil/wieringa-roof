@@ -76,7 +76,7 @@ longer.
 (kite-and-dart) tiling: sun · star · ace · deuce · jack · queen · king. (The ace is
 sometimes the *fool's kite*; naming varies between sources.)
 
-**The three symmetric tilings** — Jeff's, after research, and it corrects an
+**The three symmetric tilings** — Jake's, after research, and it corrects an
 earlier claim of mine that there were two:
 
 - **Sun** and **Star**, each with five mirror axes. They are complementary: there
@@ -374,7 +374,7 @@ the highlights on what are now the low points.
 ## Settled: a composite seed does not spend a generation
 
 `Deca` is not a shape that substitutes — it is an *arrangement* of six shapes that
-already exist: **1× Pe3 (yellow), 2× Pe1 (orange), 2× St1, 1× St3**. (Jeff cited it
+already exist: **1× Pe3 (yellow), 2× Pe1 (orange), 2× St1, 1× St3**. (Jake cited it
 as 2 Pe3 and 1 Pe1; the counts settle it, since gen-1 emission is Pe3 = 4 rhombi and
 Pe1 = 3, so 1×4 + 2×3 = 10 is what Deca emits and 2×4 + 1×3 = 11 is not.)
 
@@ -423,7 +423,7 @@ from the rhomb overlay reaching past the hull.
 are offered on every page: `Pe5`/`Pe3`/`Pe1` pentagons, `St5` star, `St3` boat,
 `St1` diamond, and `Deca`.
 
-Two further facts from Jeff worth keeping: the `St*` tiles emit **no rhombs at
+Two further facts from Jake worth keeping: the `St*` tiles emit **no rhombs at
 generation 1** and first contribute a generation later; and the three `Pe` groups
 constitute three new shapes that tile the plane periodically, a coloring he
 doubts he was first to find. Mapping the full correspondence needs the gen-3 rhombs
@@ -479,7 +479,7 @@ The **side is always the rhombus edge**, never a diagonal. At 1 in the diagonals
 
 The help text on `unfold.html` went on advertising 1.118" long after the code
 changed, which is worse than a stale comment: it is a visible claim about behavior,
-and it fooled me into repeating it in PLAN.md and telling Jeff the default still
+and it fooled me into repeating it in PLAN.md and telling Jake the default still
 needed changing when it had been right all along. Prose that states a default has to
 be checked against the default.
 
@@ -581,7 +581,7 @@ Where a net is too big for the paper, introduce *further* branch cuts to divide 
 That is a separate decision, made later, and it is allowed to be crude — a cut for
 paper is not a cut for geometry.
 
-Jeff's preference at Stage A is **large nets**. A second or third sheet to absorb
+Jake's preference at Stage A is **large nets**. A second or third sheet to absorb
 an overlap is fine; many small pieces are not.
 
 ### What exists to build on
@@ -1050,7 +1050,7 @@ inline in `roof3d.ts`, bit for bit.
 
 ## Generation N sits inside generation N+1 — but the parity depends on the seed
 
-Jeff's conjecture: *the new patch contains the old one, with opposite parity.* The
+Jake's conjecture: *the new patch contains the old one, with opposite parity.* The
 containment half is unconditional; the parity half is not, and which way it goes is a
 property of the seed's own symmetry.
 
@@ -1365,7 +1365,7 @@ them. Two more colors each would finish it.
 
 ## Chapters
 
-Jeff's organization of the project, recorded because the pages had grown past the point
+Jake's organization of the project, recorded because the pages had grown past the point
 where their order was obvious:
 
 1. **Construction** — the roof itself, its lift, and the nets. `index`, `roof3d`,
@@ -1398,7 +1398,7 @@ including that the bucketed neighbor search agrees with a plain O(n²) sweep exa
 
 ### Open: is there a kissing-circle connection?
 
-Jeff's suggestion. Descartes' theorem and the Apollonian gasket need circles of
+Jake's suggestion. Descartes' theorem and the Apollonian gasket need circles of
 *varying* radius, and every ball here has the same one, so the curvature relation
 degenerates rather than applying. The promising direction is the reverse: **slice the
 packing with a plane** and tangent spheres become tangent circles of varying radius,
@@ -1406,7 +1406,7 @@ which is where Descartes would bite. Not tried.
 
 ## Settled: no de Bruijn generator
 
-Proposed for the large-radius work and withdrawn, on Jeff's objection, which is the
+Proposed for the large-radius work and withdrawn, on Jake's objection, which is the
 better argument.
 
 The pentagrid takes five offsets `γⱼ` and is *regular* — no three lines concurrent —

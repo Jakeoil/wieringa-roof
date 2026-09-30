@@ -32,7 +32,7 @@ triple count, and the shapes are forced by the axes.
 
 ### Ten and ten — settled
 
-**Ten obtuse and ten acute golden rhombic hexahedra (parallelepipeds).** Jeff's "5 × 2"
+**Ten obtuse and ten acute golden rhombic hexahedra (parallelepipeds).** Jake's "5 × 2"
 was a slip and is withdrawn; the measurement above stands as the statement.
 
 There is a secondary structure worth noting but not naming anything after: sorting by
@@ -51,7 +51,7 @@ Drop axes one at a time and the dissection is inherited:
 | 4 | Bilinski dodecahedron | 4 | 2.462147 | exactly ¼ |
 | 3 | golden rhombohedron | 1 | 0.470228 | — |
 
-### The intersection result — and it answers Jeff's question directly
+### The intersection result — and it answers Jake's question directly
 
 > *"I am interested in any links between these hexahedra and intersections of RT's."*
 
@@ -83,7 +83,7 @@ the one-axis case suggests they might be.
 
 ## 2. The four parts
 
-Jeff's organization.
+Jake's organization.
 
 ### Part 1 — the cage · **built**
 
@@ -103,7 +103,7 @@ the cells are close, since assembled they share every internal face.
 
 ### The interior has no symmetry at all
 
-Noticed by Jeff, looking at the inner cage: *"a rosette but otherwise very little
+Noticed by Jake, looking at the inner cage: *"a rosette but otherwise very little
 symmetry."* Measured, and it is starker than that.
 
 The triacontahedron's own rotation group has order 60. Applied to the pieces of the
@@ -116,13 +116,13 @@ page's dissection:
 | the 20 cell centers | **1 of 60** |
 
 **The exterior is forced and the interior is chosen**, and this choice keeps none of the
-solid's symmetry whatever. The rosette Jeff can see is local — five cells meeting round
+solid's symmetry whatever. The rosette Jake can see is local — five cells meeting round
 one five-fold axis — and does not extend to a global symmetry, because there is none to
 extend to.
 
 ### Settled: there are exactly two dissections
 
-The open question in Jeff's source file — how many dissections there are, which he
+The open question in Jake's source file — how many dissections there are, which he
 could find no clean published count for — now has an answer, and it is small.
 
 | | |
@@ -133,7 +133,7 @@ could find no clean published count for — now has an answer, and it is small.
 | in the chiral orbit (no symmetry at all) | 120 |
 
 160 = 120 + 40, orbit sizes divide the group order 120, and the set is verifiably
-closed under the group — 120 of 120 images listed. Jeff's recollection of "only one"
+closed under the group — 120 of 120 images listed. Jake's recollection of "only one"
 was very nearly right.
 
 **And the two differ by a single flip.** Their shells are identical, all thirty faces;
@@ -240,7 +240,7 @@ triacontahedron, and every one of the fifteen pairwise dots is ±1/√5. So
 Each cell is therefore a vertical prism: the rhomb on top, the same rhomb translated by
 `−e_z` beneath, and four vertical side faces whose edges run plumb — which is precisely
 the "faces perpendicular to the plane of the roof, also the edges, straight down" of
-Jeff's description.
+Jake's description.
 
 **Thick gives acute, thin gives obtuse — the determination is that simple.** For a thick
 rhomb `E_j · E_k = +1/√5`, so all three pairwise dots of `{E_j, E_k, e_z}` are positive
@@ -259,7 +259,7 @@ statement as chapter 1's, one dimension up.
 vertical prisms under distinct rhombi, and the rhombi project onto a tiling of the
 plane. Disjoint shadows, disjoint prisms, whatever the heights.
 
-**The Kowalewski five carries down, and it is the same five.** Jeff's question was
+**The Kowalewski five carries down, and it is the same five.** Jake's question was
 whether the roof's five-coloring can be extended to the hexahedra under the rule the
 triacontahedron uses — like touches like — and whether it needs new colors. Both answers
 are as good as they could be: it is not an analogue of the RT's coloring but literally
@@ -318,7 +318,7 @@ unit lower. The walls get none, for a reason and not for taste: a wall is plumb,
 height restricted to it depends on nothing but `z` and its level sets are horizontal
 lines on every wall alike — dense, uniform, and asserting only that the wall is vertical,
 which the construction guarantees. What the walls do encode is the √5 above, and that is
-better said in a sentence than drawn. (Jeff raised this; the reasoning is his instinct
+better said in a sentence than drawn. (Jake raised this; the reasoning is his instinct
 plus the arithmetic.)
 
 **Generations are ghosted rather than capped.** `src/patchsize.ts` holds the rhomb count
@@ -362,7 +362,7 @@ available here asks "which third edge vector is chosen for each cell", which rea
 choice among the roof's own five generators. Taken that way it is a packing problem, and
 greedy assignment settles at ~57% coverage, flat from generation 2 to 4 — a clean,
 stable, entirely false answer. The passage that would have settled it, on stacking the
-hexahedra, was in Jeff's original conversation but had not been carried into the file.
+hexahedra, was in Jake's original conversation but had not been carried into the file.
 Either way the sixth axis had been sitting in `centers.ts` since chapter 2, and I should
 have looked there before searching.
 
@@ -412,14 +412,27 @@ is a triple of axes plus a sign vector on the rest — extended over k:
 
 The 160 is the same number the existing probe finds, and the page's "exactly two" is
 those 160 **up to the icosahedral group**: two orbits, of sizes 120 and 40, with
-stabilizers of order 1 and 3. So the honest statement for the new solids is that the
-labelled counts are 2 and 10, and the reduction to orbits still has to be done — the
-machinery is there in `stabilizerOrder`, but the group is not the icosahedral one any
-more. **Dropping axes drops symmetry**, and what each solid's own group is has to be
-computed rather than assumed.
+stabilizers of order 1 and 3.
 
-That is the most interesting question the addition raises, and it should be answered
-before the page claims a number.
+**Answered.** Dropping axes drops symmetry, so each solid had to be reduced under its
+own group — the symmetries of the six axes that carry the solid's subset to itself,
+which `dissect.ts` now computes as `groupOrder`. The reduction:
+
+| solid | axes | own group | labelled | stabilizer | **orbits** |
+|---|---|---|---|---|---|
+| golden rhombohedron | 3 | 12 | 1 | 12 | **1** |
+| golden dodecahedron | 4 | 8 | 2 | 4 | **1** |
+| golden icosahedron | 5 | 20 | 10 | 2 | **1** |
+| triacontahedron | 6 | 120 | 160 | 1 and 3 | **2** |
+
+So **only the triacontahedron has a choice**. On every smaller solid the labelled
+dissections form a single orbit — 10 = 20/2 and 2 = 8/4 — and any two of them are the
+same dissection differently placed. The counts 2 and 10 are entirely accounted for by
+the solid's own symmetry, with nothing left over.
+
+That settles what the Cage's flip control can mean: below six axes there is nothing to
+flip, and the control should go quiet rather than offer a second tiling that is the
+first one turned round.
 
 ### The dropdowns
 
@@ -448,10 +461,15 @@ deliberately, since it is the first thing to ask for it.
 
 ### Order of work
 
-1. **Parameterize `dissect.ts` by the axis set.** No behavior change at six axes; the
-   existing checks in `tools/dissect.mjs` are the regression test.
-2. **Count the orbits** for four and five axes, and find each solid's own symmetry
-   group. This is a probe, not a page.
+1. ~~**Parameterize `dissect.ts` by the axis set.**~~ **Done.** `dissection`,
+   `cageFaces`, `shellFaces`, `stabilizerOrder` and `intersection` all take an
+   `AxisSet` defaulting to all six, and `SOLIDS` names the four. Axis indices stay
+   global — an axis is its index into `A6`, never renumbered — which is what keeps
+   `pairColor` meaning one thing across the family. Verified: at six axes the cells,
+   the cage and the shell come out **bit-identical**, and `tools/dissect.mjs` plus
+   `cutaway`, `solidnet`, `packing`, `hexlayer`, `slab` and `centers` all still pass.
+2. ~~**Count the orbits** for four and five axes, and find each solid's own symmetry
+   group.~~ **Done** — the table above. One orbit each below six axes.
 3. **A solid selector on the Cage**, defaulting to the triacontahedron so the page opens
    as it does now.
 4. **Let a scheme's class count depend on the solid**, and make `Kowalewski` and
@@ -471,7 +489,7 @@ record shows what was asked.*
    3-polytope is a zonotope exactly when all its faces are centrally symmetric, and
    neither manages it: the long diagonal has eight triangular faces, the short has eight
    non-parallelogram quadrilaterals. Which is why neither volume has a closed form.
-2. ~~Which reading is "5 × 2"?~~ **Ten and ten**, settled by Jeff — the acute 5 + 5
+2. ~~Which reading is "5 × 2"?~~ **Ten and ten**, settled by Jake — the acute 5 + 5
    seating split is a secondary observation with nothing named after it.
 3. ~~Is a complete layer of hexahedra possible at all?~~ **Yes, and it is forced** —
    part 4. The third axis is the vertical, not a fourth roof generator; every rhomb
@@ -505,7 +523,7 @@ The mathematics in §1 is classical. This project verified it; it did not discov
   are **Robert Ammann's**.
 - **The Wieringa roof** is **R. M. A. Wieringa's**, by way of de Bruijn.
 
-Both URLs are Jeff's references, cited as given; they have not been fetched or checked
+Both URLs are Jake's references, cited as given; they have not been fetched or checked
 by me.
 
 What is this project's own, so far as I know, is the material in `TRIACONTAHEDRA.md`

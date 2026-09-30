@@ -1,4 +1,4 @@
-// The triacontahedron's dissection into twenty golden rhombic hexahedra.
+// The golden zonohedra and their dissection into golden rhombic hexahedra.
 //
 // A zonohedron on n generators falls into C(n,3) parallelepipeds, one per triple of
 // generators — the cell those three span. Six icosahedral axes therefore give **twenty**
@@ -17,12 +17,53 @@ import { A6 } from "./centers.js";
 import { pairColor } from "./geometry.js";
 import type { V3 } from "./solids.js";
 
+// ── which axes ────────────────────────────────────────────────────
+//
+// Nothing above says *six*. Take any k of the six axes and the same argument runs: the
+// zonohedron on them has k(k−1) faces and C(k,3) cells, and since all fifteen pairs of
+// the six meet at the same angle, every face is the same golden rhombus whichever k you
+// keep. So this module is written for an **axis set**, and six is only its default.
+//
+// Indices stay **global** — an axis is its index into `A6`, never renumbered 0…k−1 —
+// which is what keeps the five-coloring meaning one thing across the family: `pairColor`
+// is defined on pairs of the six, and a smaller solid simply shows fewer of the fifteen.
+
+export type AxisSet = readonly number[];
+
+/** All six: the triacontahedron, and the default throughout this module. */
+export const AXES6: AxisSet = [0, 1, 2, 3, 4, 5];
+
+/**
+ * The golden zonohedra, by how many of the six axes they stand on.
+ *
+ * *Which* subset is taken does not matter for the two middle ones — all six 5-subsets
+ * are congruent, and so are all fifteen 4-subsets, measured in RHOMBOHEDRA.md §2½. The
+ * rhombohedron is the exception: a triple is acute or obtuse depending on which one it
+ * is, ten of each among the twenty, and {0,1,2} is an obtuse one. It is listed for
+ * completeness — it is the base case the dissection has to handle anyway — but the Cage
+ * offers the first three, a single cell having no dissection to show.
+ */
+export const SOLIDS: Array<{ key: string; label: string; axes: AxisSet }> = [
+    { key: "rt", label: "Triacontahedron", axes: AXES6 },
+    { key: "ico", label: "Golden icosahedron", axes: [0, 1, 2, 3, 4] },
+    { key: "dod", label: "Golden dodecahedron", axes: [0, 1, 2, 3] },
+    { key: "rh", label: "Golden rhombohedron", axes: [0, 1, 2] },
+];
+
+/** Faces and cells of the solid on `axes` — k(k−1) and C(k,3). */
+export function solidCounts(axes: AxisSet = AXES6): { faces: number; cells: number } {
+    const k = axes.length;
+    return { faces: k * (k - 1), cells: (k * (k - 1) * (k - 2)) / 6 };
+}
+
 export interface Cell {
     id: number;
     /** which three axes the cell is spanned by */
     triple: [number, number, number];
-    /** ±1 on each of the other three axes — the cell's place in the solid */
-    sign: [number, number, number];
+    /** ±1 on each axis of the set outside the triple — the cell's place in the solid.
+     *  One entry per axis beyond the three, so it is empty on a lone rhombohedron and
+     *  three long on the triacontahedron. */
+    sign: number[];
     center: V3;
     /** half-edge vectors, so a corner is `center ± e0 ± e1 ± e2` */
     e: [V3, V3, V3];
@@ -63,8 +104,8 @@ function disjoint(P: Cell, Q: Cell): boolean {
     return false;
 }
 
-function makeCell(triple: number[], sign: number[], id: number): Cell {
-    const rest = [0, 1, 2, 3, 4, 5].filter((m) => !triple.includes(m));
+function makeCell(triple: number[], sign: number[], id: number, axes: AxisSet): Cell {
+    const rest = axes.filter((m) => !triple.includes(m));
     const center: V3 = [0, 0, 0];
     rest.forEach((m, q) => {
         for (let d = 0; d < 3; d++) center[d] += (sign[q] * A6[m][d]) / 2;
@@ -101,7 +142,7 @@ function makeCell(triple: number[], sign: number[], id: number): Cell {
     return {
         id,
         triple: triple as [number, number, number],
-        sign: sign as [number, number, number],
+        sign,
         center,
         e,
         corners,
@@ -111,43 +152,106 @@ function makeCell(triple: number[], sign: number[], id: number): Cell {
     };
 }
 
-const TRIPLES: number[][] = (() => {
-    const t: number[][] = [];
-    for (let i = 0; i < 6; i++) for (let j = i + 1; j < 6; j++) for (let k = j + 1; k < 6; k++) t.push([i, j, k]);
-    return t;
-})();
-const TRIPLE_INDEX = new Map(TRIPLES.map((T, i) => [T.join(""), i]));
+/**
+ * Everything that depends on the axis set alone, built once per set.
+ *
+ * The cost is in `options` and in the pairwise-disjoint table below it, both quadratic
+ * in the cell count, so a set is worked out on first use and then kept.
+ */
+interface Ctx {
+    axes: AxisSet;
+    /** the C(k,3) triples of the set, in lexicographic order */
+    triples: number[][];
+    index: Map<string, number>;
+    /** all 2^(k−3) placements of the cell on each triple */
+    options: Cell[][];
+    /** the solid's own symmetries, as signed permutations of the six axes */
+    group: Array<{ pi: number[]; ep: number[] }>;
+    /**
+     * Where each placement goes under each symmetry: `act[g][ti][a]` is the triple and
+     * placement that cell lands on. Worked out once, because the alternative is working
+     * it out again for every symmetry of every dissection — the stabiliser of all of
+     * them is wanted before one can be picked, and at six axes that is 160 × 120.
+     */
+    act: Array<Array<Array<[number, number]>>>;
+}
 
-/** All eight placements of the cell on each triple. */
-const OPTIONS: Cell[][] = TRIPLES.map((T, ti) =>
-    [0, 1, 2, 3, 4, 5, 6, 7].map((s) =>
-        makeCell(T, [s & 1 ? 1 : -1, s & 2 ? 1 : -1, s & 4 ? 1 : -1], ti),
-    ),
-);
+const CTX = new Map<string, Ctx>();
 
-/** Every dissection, as a choice of placement per triple. There are 160. */
-function allDissections(): number[][] {
+function ctx(axes: AxisSet = AXES6): Ctx {
+    const key = axes.join("");
+    const hit = CTX.get(key);
+    if (hit) return hit;
+    const triples: number[][] = [];
+    for (let i = 0; i < axes.length; i++)
+        for (let j = i + 1; j < axes.length; j++)
+            for (let k = j + 1; k < axes.length; k++) triples.push([axes[i], axes[j], axes[k]]);
+    const places = 1 << (axes.length - 3);
+    const built: Ctx = {
+        axes,
+        triples,
+        index: new Map(triples.map((T, i) => [T.join(""), i])),
+        options: triples.map((T, ti) =>
+            Array.from({ length: places }, (_, s) =>
+                makeCell(
+                    T,
+                    Array.from({ length: axes.length - 3 }, (_, q) => (s & (1 << q) ? 1 : -1)),
+                    ti,
+                    axes,
+                ),
+            ),
+        ),
+        // A symmetry of the solid is a symmetry of the six axes that keeps this subset
+        // to itself. At six axes that is all 120 of them; at five it is the 20 that fix
+        // the axis left out, and at four the 8 that fix the pair left out.
+        group: ICO_GROUP.filter((g) => axes.every((m) => axes.includes(g.pi[m]))),
+        act: [],
+    };
+    built.act = built.group.map((g) =>
+        triples.map((T, ti) =>
+            built.options[ti].map((c) => {
+                const T2 = T.map((m) => g.pi[m]).sort((x, y) => x - y);
+                const ti2 = built.index.get(T2.join(""))!;
+                const rest = axes.filter((m) => !T.includes(m));
+                const rest2 = axes.filter((m) => !T2.includes(m));
+                let bits = 0;
+                rest.forEach((m, q) => {
+                    if (c.sign[q] * g.ep[m] > 0) bits |= 1 << rest2.indexOf(g.pi[m]);
+                });
+                return [ti2, bits] as [number, number];
+            }),
+        ),
+    );
+    CTX.set(key, built);
+    return built;
+}
+
+/** Every dissection of the solid, as a choice of placement per triple. */
+function allDissections(axes: AxisSet = AXES6): number[][] {
+    const { triples, options } = ctx(axes);
+    const n = triples.length;
+    const places = options[0].length;
     const okAB: boolean[][][][] = [];
-    for (let i = 0; i < 20; i++) {
+    for (let i = 0; i < n; i++) {
         okAB[i] = [];
-        for (let a = 0; a < 8; a++) {
+        for (let a = 0; a < places; a++) {
             okAB[i][a] = [];
-            for (let j = 0; j < 20; j++) {
+            for (let j = 0; j < n; j++) {
                 okAB[i][a][j] = [];
-                for (let b = 0; b < 8; b++) {
-                    okAB[i][a][j][b] = i === j ? a === b : disjoint(OPTIONS[i][a], OPTIONS[j][b]);
+                for (let b = 0; b < places; b++) {
+                    okAB[i][a][j][b] = i === j ? a === b : disjoint(options[i][a], options[j][b]);
                 }
             }
         }
     }
     const out: number[][] = [];
-    const pick = new Array<number>(20);
+    const pick = new Array<number>(n);
     const go = (i: number): void => {
-        if (i === 20) {
+        if (i === n) {
             out.push(pick.slice());
             return;
         }
-        for (let a = 0; a < 8; a++) {
+        for (let a = 0; a < places; a++) {
             let good = true;
             for (let j = 0; j < i && good; j++) if (!okAB[i][a][j][pick[j]]) good = false;
             if (good) {
@@ -161,11 +265,14 @@ function allDissections(): number[][] {
 }
 
 /**
- * The solid's symmetry group, reduced to signed permutations of the six axes — which
- * is what lets a dissection be acted on in integers rather than in floats. Comparing
- * rotated dissections by rounded coordinates is what made an earlier count wrong.
+ * The icosahedral group, reduced to signed permutations of the six axes — which is what
+ * lets a dissection be acted on in integers rather than in floats. Comparing rotated
+ * dissections by rounded coordinates is what made an earlier count wrong.
+ *
+ * There are 120 of them, and a solid on fewer axes keeps the ones that permute its own
+ * subset among itself; `ctx` does that filtering.
  */
-const GROUP: Array<{ pi: number[]; ep: number[] }> = (() => {
+const ICO_GROUP: Array<{ pi: number[]; ep: number[] }> = (() => {
     const signed: Array<{ v: V3; m: number; s: number }> = [];
     for (let i = 0; i < 6; i++) for (const s of [1, -1]) signed.push({ v: A6[i].map((x) => x * s) as V3, m: i, s });
     const seen = new Set<string>();
@@ -210,70 +317,84 @@ const GROUP: Array<{ pi: number[]; ep: number[] }> = (() => {
     return out;
 })();
 
-/** A dissection as a canonical string, for comparison under the group. */
-function canonical(sol: number[]): string {
-    return sol
-        .map((a, ti) => {
-            const c = OPTIONS[ti][a];
-            const rest = [0, 1, 2, 3, 4, 5].filter((m) => !c.triple.includes(m));
-            return `${c.triple.join("")}:${rest.map((m, q) => `${m}${c.sign[q] > 0 ? "+" : "-"}`).join("")}`;
-        })
-        .sort()
-        .join("|");
-}
-
-function actOn(sol: number[], g: { pi: number[]; ep: number[] }): number[] {
-    const out = new Array<number>(20);
-    sol.forEach((a, ti) => {
-        const c = OPTIONS[ti][a];
-        const T2 = c.triple.map((m) => g.pi[m]).sort((x, y) => x - y);
-        const ti2 = TRIPLE_INDEX.get(T2.join(""))!;
-        const rest = [0, 1, 2, 3, 4, 5].filter((m) => !c.triple.includes(m));
-        const rest2 = [0, 1, 2, 3, 4, 5].filter((m) => !T2.includes(m));
-        const s2 = new Array<number>(3);
-        rest.forEach((m, q) => {
-            s2[rest2.indexOf(g.pi[m])] = c.sign[q] * g.ep[m];
-        });
-        let bits = 0;
-        s2.forEach((v, q) => {
-            if (v > 0) bits |= 1 << q;
-        });
-        out[ti2] = bits;
-    });
+/** A dissection moved by the symmetry `gi`. */
+function actOn(sol: number[], gi: number, cx: Ctx): number[] {
+    const tab = cx.act[gi];
+    const out = new Array<number>(cx.triples.length);
+    for (let ti = 0; ti < sol.length; ti++) {
+        const [ti2, a2] = tab[ti][sol[ti]];
+        out[ti2] = a2;
+    }
     return out;
 }
 
-/** How many of the solid's 120 symmetries a dissection keeps. */
-export function stabilizerOrder(sol: number[]): number {
-    const k = canonical(sol);
-    return GROUP.filter((g) => canonical(actOn(sol, g)) === k).length;
+/**
+ * How many of the solid's own symmetries a dissection keeps — out of 120 on the
+ * triacontahedron, 20 on the golden icosahedron, 8 on the golden dodecahedron.
+ *
+ * No canonical form is needed to compare two dissections: the array *is* one, since
+ * position is the triple and the entry is the sign vector on the axes outside it, both
+ * in a fixed order. An earlier version spelled each cell out as `triple:signs`, sorted
+ * the twenty strings and compared those, which says the same thing far more slowly.
+ */
+export function stabilizerOrder(sol: number[], axes: AxisSet = AXES6): number {
+    const cx = ctx(axes);
+    let n = 0;
+    for (let gi = 0; gi < cx.group.length; gi++) {
+        const moved = actOn(sol, gi, cx);
+        let same = true;
+        for (let ti = 0; ti < sol.length && same; ti++) if (moved[ti] !== sol[ti]) same = false;
+        if (same) n++;
+    }
+    return n;
+}
+
+/** How many symmetries the solid has at all. */
+export function groupOrder(axes: AxisSet = AXES6): number {
+    return ctx(axes).group.length;
 }
 
 export type DissectionKind = "chiral" | "symmetric";
 
-const cached = new Map<DissectionKind, Cell[]>();
+const cached = new Map<string, Cell[]>();
 
 /**
- * A dissection of the triacontahedron into its twenty cells.
+ * A dissection of the solid into its C(k,3) cells.
  *
- * **There are exactly two, up to rotation and reflection** — 160 with positions fixed
- * in space, falling into orbits of 120 and 40 under the solid's group of order 120.
- * The large orbit keeps no symmetry at all; the small one keeps a **three-fold axis**.
- * Both are ten acute and ten obtuse.
+ * On the triacontahedron **there are exactly two, up to rotation and reflection** — 160
+ * with positions fixed in space, falling into orbits of 120 and 40 under the solid's
+ * group of order 120. The large orbit keeps no symmetry at all; the small one keeps a
+ * **three-fold axis**. Both are ten acute and ten obtuse.
+ *
+ * The two kinds are asked for by symmetry rather than by number, so they mean something
+ * on the smaller solids too: `chiral` is the least symmetric dissection the solid has
+ * and `symmetric` the most. **Only the triacontahedron has two**; on the golden
+ * icosahedron all ten labelled dissections form a single orbit under its group of 20,
+ * on the golden dodecahedron both form one orbit under its group of 8, and the
+ * rhombohedron is its own cell. Below six axes the two names return the same thing.
  */
-export function dissection(kind: DissectionKind = "chiral"): Cell[] {
-    const hit = cached.get(kind);
+export function dissection(kind: DissectionKind = "chiral", axes: AxisSet = AXES6): Cell[] {
+    const key = `${kind}|${axes.join("")}`;
+    const hit = cached.get(key);
     if (hit) return hit;
-    const all = allDissections();
-    const want = kind === "symmetric" ? 3 : 1;
-    const sol = all.find((s) => stabilizerOrder(s) === want);
-    if (!sol) throw new Error(`no ${kind} dissection found — the search is wrong, not the solid`);
-    const cells = sol.map((a, ti) => ({ ...OPTIONS[ti][a], id: ti }));
-    cached.set(kind, cells);
+    const cx = ctx(axes);
+    const all = allDissections(axes);
+    let sol = all[0];
+    let best = stabilizerOrder(sol, axes);
+    for (let i = 1; i < all.length; i++) {
+        if (kind === "chiral" && best === 1) break; // nothing can beat a trivial stabiliser
+        const st = stabilizerOrder(all[i], axes);
+        if (kind === "symmetric" ? st > best : st < best) {
+            best = st;
+            sol = all[i];
+        }
+    }
+    const cells = sol.map((a, ti) => ({ ...cx.options[ti][a], id: ti }));
+    cached.set(key, cells);
     return cells;
 }
 
-/** All 160, for counting. */
+/** Every dissection of the solid, for counting. */
 export { allDissections };
 
 // ── the five-coloring ────────────────────────────────────────────
@@ -285,7 +406,7 @@ export { allDissections };
 // five colors (χ′(K₂ₙ) = 2n − 1). A color class is then a perfect matching, three
 // pairs each, five classes covering all fifteen.
 //
-// Everything Jeff described follows without being imposed:
+// Everything Jake described follows without being imposed:
 //
 //   * opposite faces of the solid share an axis pair, so they share a color;
 //   * a cell's six faces come in three opposite pairs, one per axis pair of its triple,
@@ -339,21 +460,23 @@ export interface ShellFace {
 }
 
 /**
- * The thirty faces of the triacontahedron itself, each with the axis pair that spans
- * it. Built here rather than taken from `solids.ts` because the pair is the point: it
- * is what the five-coloring keys on, and a bare list of corners has lost it.
+ * The k(k−1) faces of the solid itself, each with the axis pair that spans it — thirty
+ * for the triacontahedron, twenty for the golden icosahedron, twelve for the golden
+ * dodecahedron. Built here rather than taken from `solids.ts` because the pair is the
+ * point: it is what the five-coloring keys on, and a bare list of corners has lost it.
  *
  * Note this is the **shell** only. The cage on the page is a different and larger
  * thing — see `cageFaces`.
  */
-export function shellFaces(): ShellFace[] {
+export function shellFaces(axes: AxisSet = AXES6): ShellFace[] {
     const out: ShellFace[] = [];
-    for (let i = 0; i < 6; i++) {
-        for (let j = i + 1; j < 6; j++) {
+    for (let ii = 0; ii < axes.length; ii++) {
+        for (let jj = ii + 1; jj < axes.length; jj++) {
+            const i = axes[ii], j = axes[jj];
             for (const flip of [1, -1]) {
                 const n = cross(A6[i], A6[j]).map((x) => x * flip) as V3;
                 const base: V3 = [0, 0, 0];
-                for (let m = 0; m < 6; m++) {
+                for (const m of axes) {
                     if (m === i || m === j) continue;
                     const s = Math.sign(dot(n, A6[m]));
                     for (let d = 0; d < 3; d++) base[d] += (s * A6[m][d]) / 2;
@@ -381,17 +504,18 @@ export function shellFaces(): ShellFace[] {
 /**
  * Every distinct face of the assembled dissection — the **cage**.
  *
- * Not the shell. This is all six faces of all twenty cells, at their home positions,
- * which is the whole internal skeleton and not merely the outside. Adjacent cells share
- * their common face, so the 120 cell-faces collapse to **75 distinct** ones: the 30 of
- * the shell, belonging to one cell each, and 45 internal, belonging to two.
+ * Not the shell. This is all six faces of every cell, at their home positions, which is
+ * the whole internal skeleton and not merely the outside. Adjacent cells share their
+ * common face, so on the triacontahedron the 120 cell-faces collapse to **75 distinct**
+ * ones: the 30 of the shell, belonging to one cell each, and 45 internal, belonging to
+ * two.
  *
  * Deduplicating matters rather than being tidy — two coincident copies of an internal
  * face z-fight, which looks like a rendering fault.
  */
-export function cageFaces(kind: DissectionKind = "chiral"): ShellFace[] {
+export function cageFaces(kind: DissectionKind = "chiral", axes: AxisSet = AXES6): ShellFace[] {
     const byKey = new Map<string, { face: ShellFace; n: number }>();
-    for (const c of dissection(kind)) {
+    for (const c of dissection(kind, axes)) {
         c.faces.forEach((f, fi) => {
             const mid = [0, 1, 2].map((d) => f.reduce((s, q) => s + q[d], 0) / 4);
             const key = mid.map((x) => Math.round(x * 1e6)).join(",");
@@ -421,26 +545,51 @@ export function cageFaces(kind: DissectionKind = "chiral"): ShellFace[] {
             const a = face.corners[k];
             const b = face.corners[(k + 1) % 4];
             const mid: V3 = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2, (a[2] + b[2]) / 2];
-            return onSurface(a) && onSurface(b) && onSurface(mid);
+            return onSurface(a, axes) && onSurface(b, axes) && onSurface(mid, axes);
         }) as [boolean, boolean, boolean, boolean];
         return { ...face, outer: n === 1, edgeOuter: eo };
     });
 }
 
 /** Is a point on the solid's surface — that is, extreme in some face direction? */
-function onSurface(p: V3): boolean {
-    for (let i = 0; i < 6; i++) {
-        for (let j = i + 1; j < 6; j++) {
-            const n = cross(A6[i], A6[j]);
-            const L = Math.hypot(n[0], n[1], n[2]);
-            const h = (Math.abs(dot(p, n)) / L);
-            if (Math.abs(h - RT_INRADIUS) < 1e-9) return true;
-        }
+function onSurface(p: V3, axes: AxisSet = AXES6): boolean {
+    const ns = faceNormals(axes);
+    for (let k = 0; k < ns.length; k++) {
+        if (Math.abs(Math.abs(dot(p, ns[k])) - support(ns[k], axes)) < 1e-9) return true;
     }
     return false;
 }
 
-const RT_INRADIUS = Math.sqrt(1 + 2 / Math.sqrt(5));
+/**
+ * How far the solid reaches in direction `u` (a unit vector): half the sum of |aₘ·u|,
+ * which is what a zonohedron's support function is. On the triacontahedron every face
+ * normal gives the same answer, its inradius √(1+2/√5) — that constancy is a fact about
+ * six axes rather than about zonohedra, and the smaller solids do not share it.
+ */
+function support(u: V3, axes: AxisSet = AXES6): number {
+    let h = 0;
+    for (const m of axes) h += Math.abs(dot(A6[m], u)) / 2;
+    return h;
+}
+
+/** The unit normals of the solid's k(k−1)/2 face directions, one per axis pair. */
+function faceNormals(axes: AxisSet = AXES6): V3[] {
+    const key = axes.join("");
+    const hit = NORMALS.get(key);
+    if (hit) return hit;
+    const out: V3[] = [];
+    for (let i = 0; i < axes.length; i++) {
+        for (let j = i + 1; j < axes.length; j++) {
+            const n = cross(A6[axes[i]], A6[axes[j]]);
+            const L = Math.hypot(n[0], n[1], n[2]);
+            out.push([n[0] / L, n[1] / L, n[2] / L]);
+        }
+    }
+    NORMALS.set(key, out);
+    return out;
+}
+
+const NORMALS = new Map<string, V3[]>();
 
 // ── what two triacontahedra share ─────────────────────────────────
 
@@ -454,47 +603,41 @@ export interface Region {
     zonohedron: boolean;
 }
 
-const FACE_NORMALS: V3[] = (() => {
-    const out: V3[] = [];
-    for (let i = 0; i < 6; i++) {
-        for (let j = i + 1; j < 6; j++) {
-            const n = cross(A6[i], A6[j]);
-            const L = Math.hypot(n[0], n[1], n[2]);
-            out.push([n[0] / L, n[1] / L, n[2] / L]);
-        }
-    }
-    return out;
-})();
-
 const RHO_ = Math.sqrt(1 + 2 / Math.sqrt(5));
 
 /**
- * The region shared by the triacontahedron and a copy of it translated by `t`.
+ * The region shared by the solid and a copy of it translated by `t`.
  *
- * Both are intersections of the same fifteen slabs, so the shared region is an
- * intersection of fifteen slabs too — a convex polytope, centrally symmetric about
+ * Both are intersections of the same k(k−1)/2 slabs, so the shared region is an
+ * intersection of those slabs too — a convex polytope, centrally symmetric about
  * `t/2`. Found by solving every triple of bounding planes and keeping the feasible
  * points, which is exact where sampling would not be.
+ *
+ * Each slab is as deep as the solid's support function in that direction; on the
+ * triacontahedron that is the one number `RHO_` for all fifteen, which is why this
+ * used to be written with a constant.
  */
-export function intersection(t: V3): Region {
-    const lo = FACE_NORMALS.map((u) => Math.max(-RHO_, dot(u, t) - RHO_));
-    const hi = FACE_NORMALS.map((u) => Math.min(RHO_, dot(u, t) + RHO_));
-    if (FACE_NORMALS.some((_, k) => lo[k] > hi[k] + 1e-12)) {
+export function intersection(t: V3, axes: AxisSet = AXES6): Region {
+    const normals = faceNormals(axes);
+    const h = normals.map((u) => support(u, axes));
+    const lo = normals.map((u, k) => Math.max(-h[k], dot(u, t) - h[k]));
+    const hi = normals.map((u, k) => Math.min(h[k], dot(u, t) + h[k]));
+    if (normals.some((_, k) => lo[k] > hi[k] + 1e-12)) {
         return { faces: [], volume: 0, vertices: 0, zonohedron: false };
     }
     // Each bounding plane belongs to the parent it came from — or to both, where the
     // two agree, which is what a shared face looks like.
     const planes: Array<{ n: V3; d: number; from: "a" | "b" | "both" }> = [];
-    FACE_NORMALS.forEach((u, k) => {
-        const aHi = RHO_;
-        const bHi = dot(u, t) + RHO_;
+    normals.forEach((u, k) => {
+        const aHi = h[k];
+        const bHi = dot(u, t) + h[k];
         planes.push({
             n: u,
             d: hi[k],
             from: Math.abs(aHi - bHi) < 1e-9 ? "both" : hi[k] === aHi ? "a" : "b",
         });
-        const aLo = -RHO_;
-        const bLo = dot(u, t) - RHO_;
+        const aLo = -h[k];
+        const bLo = dot(u, t) - h[k];
         planes.push({
             n: [-u[0], -u[1], -u[2]],
             d: -lo[k],
@@ -503,7 +646,7 @@ export function intersection(t: V3): Region {
     });
 
     const feasible = (p: V3) =>
-        FACE_NORMALS.every((u, k) => {
+        normals.every((u, k) => {
             const v = dot(u, p);
             return v >= lo[k] - 1e-9 && v <= hi[k] + 1e-9;
         });
@@ -576,4 +719,14 @@ export const OFFSETS: Array<{ key: string; label: string; t: V3 }> = [
 
 /** Total cell volume, which must be the triacontahedron's own. */
 export const RT_VOLUME = 4 * Math.sqrt(5 + 2 * Math.sqrt(5));
+
+/** The volume of any of the family: the cells' volumes added up. Closed forms exist —
+ *  the triacontahedron's is `RT_VOLUME` — but the sum is what the dissection has to
+ *  match, so it is the honest thing to check against. */
+export function solidVolume(axes: AxisSet = AXES6): number {
+    let v = 0;
+    for (const T of ctx(axes).triples)
+        v += Math.abs(dot(A6[T[0]], cross(A6[T[1]], A6[T[2]])));
+    return v;
+}
 export { disjoint };

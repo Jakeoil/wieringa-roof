@@ -36,7 +36,7 @@ its thirty faces. Two consequences follow, and both are needed.
 Put together: if a golden rhombus is a face of a triacontahedron, then that
 triacontahedron's center lies on the line through the rhombus's centroid along its
 normal, at distance exactly ρ. There are two such points, one on each side, and a
-monotone surface can be a cap of either — hence Jeff's "above or below the map".
+monotone surface can be a cap of either — hence Jake's "above or below the map".
 
 For unit edge, measured over all thirty faces:
 
@@ -276,7 +276,7 @@ itself.
 
 ### The nine makeups, and what a patch is entitled to classify
 
-Jeff's objection, and it was right: a solid can be short because the tiling is short
+Jake's objection, and it was right: a solid can be short because the tiling is short
 there, or because the rhombi that would have closed it were cut off, and only the
 first is a class. A solid is **settled** when its whole ten-face footprint lies inside
 the patch — its ten candidate faces are fixed by its integer coordinates, so the
@@ -315,7 +315,7 @@ are nearly rigid too: each makeup has one pattern up to rotation, except `2=2t` 
 
 ### Proper rhombs, and the four classes
 
-Jeff's framing, and it is the right one: **a proper rhomb is a rhomb with all of its
+Jake's framing, and it is the right one: **a proper rhomb is a rhomb with all of its
 normals** — one whose home solid shows the roof a whole configuration rather than a
 scrap. There are exactly four, and they are told apart by *makeup* rather than by
 size, because class 5 comes in two quite different shapes:
@@ -335,12 +335,12 @@ Everything else is **demoted**: class 3 is never anything's home at all, and cla
 and 2 fall away with patch size. Demoted rhombi stay drawn, shaded and contoured, but
 colorless — they are not a class, they are what is left.
 
-*(Recorded because it took a correction: Jeff's note wrote "5a (4 thick)", which reads
+*(Recorded because it took a correction: Jake's note wrote "5a (4 thick)", which reads
 as a slip for 5 thick, since 4 thick is class 4. Implemented as 5a = 5 thick.)*
 
 ### Cup coverage: why there is daylight
 
-Reported by Jeff, with the surface invisible and every class's cups at full size. Not a
+Reported by Jake, with the surface invisible and every class's cups at full size. Not a
 gap in the geometry — measured, **every roof rhomb on a drawn solid lies in that
 solid's own cup, 0 exceptions**, so the ten-face selection is on the right side. A
 rhomb is covered iff *its home solid is drawn*, and two kinds are held back:
@@ -368,7 +368,7 @@ and class-2 homes, and the class-1 count is the constant ten.
 
 ### Nail heads — half the population is the far end of something else
 
-Spotted by Jeff, looking at Sun gen 2: a complete cap's normals converge on one side,
+Spotted by Jake, looking at Sun gen 2: a complete cap's normals converge on one side,
 and on the other side each of those faces has its own separate class-1 center. Those
 are not classes. Every face names **two** centers by construction, so a solid holding
 one face is usually just the far end of a normal whose point is somewhere else — a
@@ -377,7 +377,7 @@ one face is usually just the far end of a normal whose point is somewhere else �
 Define a face's **home** as whichever of its two solids holds more of the roof. A
 solid no face calls home is a nail head.
 
-**Jeff's objection, and he is right about the picture:** a rhomb wears one nail — head
+**Jake's objection, and he is right about the picture:** a rhomb wears one nail — head
 on the far face, shaft running ρ to the center of the solid it belongs to, one
 direction. Both points at ±ρ are centers of triacontahedra having that face, so the
 line does carry two candidates, but only one of them is normally a *proper* class:
@@ -476,7 +476,7 @@ statement about the construction; this one is about the roof.
 
 ### The asymptote, and what the substitution matrix pins exactly
 
-Jeff's point: for large patches the class frequencies should converge, since the
+Jake's point: for large patches the class frequencies should converge, since the
 thick-to-thin ratio does. They do — but the convex hull had been hiding it. A Star or
 a Queen patch is deeply concave, the hull spans the bays, and solids sitting in open
 air were counted as settled with a bias that differed per seed. That is how the fault
@@ -502,7 +502,7 @@ verified against the numerical eigenvector to 6e-17. From those:
 
 - **rhombi per P1 tile = φ² exactly** (`5·Pe5 + 4·Pe3 + 3·Pe1`);
 - **thick : thin = φ exactly** — `(5·Pe5 + 3·Pe3 + Pe1) / (Pe3 + 2·Pe1)`, difference
-  0.0e0, so Jeff's premise is a theorem here and not an observation. Finite patches
+  0.0e0, so Jake's premise is a theorem here and not an observation. Finite patches
   approach it slowly and from both sides: at generation 5, Pe3 is still at 1.76 and
   Deca at 1.54;
 - **class-10 solids per rhomb = φ⁻⁵/√5 = 0.0403252**, exactly, because class 10 is
@@ -560,7 +560,7 @@ whether a canonical one exists is open — see below.
 ## 5A. The agnostic test — ρ not assumed
 
 Everything above computed `centroid ± ρ·n̂` and clustered. That assumes the answer.
-Jeff's framing is stronger and was run separately: intersect the normal **lines**,
+Jake's framing is stronger and was run separately: intersect the normal **lines**,
 with no radius in hand, and track two tolerances independently — how closely the
 lines meet, and whether the two distances agree.
 
@@ -642,7 +642,7 @@ the 72° and 108° creases** — the domain walls are exactly the sharper folds.
 
 ### The triples — and the guess needs correcting
 
-Jeff's "two thick plus a thin" is the natural candidate, being the rhombohedral
+Jake's "two thick plus a thin" is the natural candidate, being the rhombohedral
 corner. It is not the one that works. Over every triple of faces meeting at a
 vertex, the fraction lying on a common triacontahedron:
 
@@ -673,7 +673,7 @@ Take every solid carrying **two or more** faces:
 So the ping-pong balls genuinely intersect, deeply — centers as close as one long
 diagonal, against 2ρ = 2.7528 for mere face contact. The roof is a patchwork of
 tangent planes drawn from a family of **overlapping** equal-radius solids, exactly
-as Jeff pictured it, with the completed ones standing isolated inside that family
+as Jake pictured it, with the completed ones standing isolated inside that family
 like the grains in it.
 
 That reframes §5.4 rather than contradicting it: *completion* is what forces
@@ -779,7 +779,7 @@ question reduces to when that translate is present in the tiling.
 
 ## 5F. The inscribed spheres
 
-Jeff's original picture — "I always think of these as intersecting ping-pong balls" —
+Jake's original picture — "I always think of these as intersecting ping-pong balls" —
 is now an extent option on the page, drawing each solid's insphere instead of its
 polyhedron.
 
@@ -834,7 +834,7 @@ it, and the shared rhombi are the slice's intersection with the contacts.
 
 ## 5G. The larger scales — rosettes, never a second solid
 
-Jeff asked whether the normals go on meeting further out, at some larger scale. They
+Jake asked whether the normals go on meeting further out, at some larger scale. They
 do, at many radii — and **they never build another triacontahedron.** That turns out to
 be a sharp structural statement rather than a limitation of the patch.
 
@@ -886,7 +886,7 @@ So the cap is structural at every radius tested, not merely at the well-sampled 
 and the sparse counts at large R on the small patches were indeed edge starvation and
 nothing more.
 
-**The de Bruijn plan is withdrawn, and Jeff's objection to it is the better reason.**
+**The de Bruijn plan is withdrawn, and Jake's objection to it is the better reason.**
 The pentagrid takes five offsets `γⱼ`, and the construction is regular — no three lines
 concurrent — only for generic offsets. The tilings with exact five-fold symmetry are
 precisely the *singular* pentagrids, where three lines do meet and the tiling is
@@ -949,7 +949,7 @@ zero gaps on Deca. Cluster with a tolerance before quoting these numbers again.*
   a rotation slides faces *along* the rosette the symptom is cracks opening on one side
   of each face rather than solids landing anywhere obviously wrong.
 
-  Jeff found it from the page — Sun gen 2, rhombi invisible, cups on, toggle dales up
+  Jake found it from the page — Sun gen 2, rhombi invisible, cups on, toggle dales up
   and the cracks appear; toggle back and they are gone. Every numerical check in this
   file ran unflipped, so the parity path had no test at all and the fault was invisible
   to all of them. **Check both parities.**
@@ -959,7 +959,7 @@ zero gaps on Deca. Cluster with a tolerance before quoting these numbers again.*
   version of this test should be sanity-checked against the known ρ result before
   its negative answers are believed.
 - **Equal radius is not enough.** A third of the exact concurrences have unequal
-  radii (§5A). Track the two tolerances separately, as Jeff specified.
+  radii (§5A). Track the two tolerances separately, as Jake specified.
 - **A common center does not imply a solid.** Concurrences occur at r/ρ = 1/φ³, √5,
   3, φ³ and beyond, all in `Z[φ]`, and all of them coincidental — their tangency
   sets never exceed five faces. Only r = ρ builds anything.
@@ -1093,10 +1093,10 @@ labeled. A second mode colors by group *size* (1…10) on a single ramp.
 - patch and generation — the same nine seeds, same persistence as `roof3d.html`
 - **group size threshold**: show only centers with ≥ n votes (n = 1…10). Sliding it
   to 10 leaves only the complete solids, which is the picture worth printing.
-- **above / below / both**: hats only, bowls only, or everything. This is Jeff's
+- **above / below / both**: hats only, bowls only, or everything. This is Jake's
   "above or below the map" made into a control.
 - **hills up / dales up** — a two-state flip, **not** the 3D page's continuous
-  vertical slider. Decided with Jeff: scaling the vertical is an affine map, so the
+  vertical slider. Decided with Jake: scaling the vertical is an affine map, so the
   roof stays honest at any setting, but a squashed triacontahedron is not a
   triacontahedron — its normals stop meeting at a point, which is the page's entire
   claim. Rather than gray the solids out between stops, the intermediate settings
@@ -1222,7 +1222,7 @@ Three traps, all visible in the current code:
 
 ### 8.5 Wiring it in
 
-Agreed with Jeff: **the index points at it.** A page reachable only by typing its
+Agreed with Jake: **the index points at it.** A page reachable only by typing its
 URL is not finished, so the wiring lands with the page and not afterwards.
 
 | file | change |
@@ -1276,7 +1276,7 @@ Card copy:
 3. `centers.html` + `src/centers3d.ts`: roof, centers, complete solids, group
    coloring — **and the wiring of §8.5 in the same step**, so the page is reachable
    the first time it exists. That is enough to look at the finding.
-4. ~~Normals layer and the length slider~~ **done**, with the shrink slider — Jeff's
+4. ~~Normals layer and the length slider~~ **done**, with the shrink slider — Jake's
    idea, after looking at stage 3 and seeing the shells crowd. Each face sends a
    segment both ways, colored by the solid at that end, and at exactly ρ every
    endpoint lands on its own marker (verified to 2.7e-15, flipped and not).
@@ -1305,7 +1305,7 @@ Card copy:
    here, which nothing did before.
 
 All six stages are done. The controls were then reorganized into Global / Rhombs /
-Normals / Triacontahedra / per-class, on Jeff's layout.
+Normals / Triacontahedra / per-class, on Jake's layout.
 
 ---
 
@@ -1354,7 +1354,7 @@ Never one, three or four. And a class-4 solid is four of a rosette's five faces 
 missing — of all 55 settled ones, **every one shares exactly the two faces flanking that
 gap**, 55 of 55. The purple side is looser: a 5b shares 0, 1 or 2 of its five, never more.
 
-This is Jeff's conjecture, stated before any of it was measured, and it holds in the
+This is Jake's conjecture, stated before any of it was measured, and it holds in the
 strong form: not "amber usually pairs with purple" but "amber pairs with purple and
 nothing else ever pairs with anything." The `Faces → by class` mode on `centers.html`
 draws each solid wearing only its own footprint, which is what makes the shared rhomb

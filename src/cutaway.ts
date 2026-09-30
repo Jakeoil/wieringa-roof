@@ -1,6 +1,6 @@
 // Chapter 3 — the exposed surface of an overlapping ball packing.
 //
-// The balls on the Packing page overlap, and Jeff's question is what is left of each
+// The balls on the Packing page overlap, and Jake's question is what is left of each
 // one's surface once the parts buried inside its neighbors are taken away. Every
 // neighbor at distance `d < 2r` slices a cap off, bounded by the circle where the two
 // spheres meet, and what survives is a spherical patch with circular-arc edges.
