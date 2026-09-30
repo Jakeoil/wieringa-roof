@@ -48,10 +48,16 @@
 <p class="lede">
     The triacontahedron opened up. It falls into exactly twenty golden rhombic
     hexahedra — ten acute and ten obtuse — and this is them, as a cage you can turn and
-    pull apart. Chapter 4 begins here.
+    pull apart. Drop an axis, or two, and the same cage holds the golden icosahedron and
+    the golden dodecahedron. Chapter 4 begins here.
 </p>
 
 <div class="bar">
+    <label title="The zonohedron on six, five or four of the icosahedral axes. Every pair of those axes meets at the same angle, so all three are built from the same golden rhombus and the same two hexahedra.">Solid <select id="solid">
+        <option value="rt">Triacontahedron</option>
+        <option value="ico">Golden icosahedron</option>
+        <option value="dod">Golden dodecahedron</option>
+    </select></label>
     <label title="Scroll over the slider to work it; hold shift for fine steps">Explode <span id="explodeOut" class="mono"></span>
         <input type="range" id="explode" min="0" max="1" step="0.005" value="0">
     </label>
@@ -82,7 +88,7 @@
         <option value="none">None</option>
     </select></label>
     <span class="checks">
-        <label title="The two dissections differ by one flip inside a single Bilinski dodecahedron — four cells, six internal faces. Unflipped keeps a three-fold axis; flipped keeps no symmetry at all."><input type="checkbox" id="flip"> flip</label>
+        <label id="fliplabel" title="The two dissections differ by one flip inside a single Bilinski dodecahedron — four cells, six internal faces. Unflipped keeps a three-fold axis; flipped keeps no symmetry at all."><input type="checkbox" id="flip"> flip</label>
         <label><input type="checkbox" id="spin" checked> turn</label>
         <button id="reset" title="Forget saved settings and start again from the defaults">Reset</button>
     </span>
@@ -111,6 +117,19 @@
     comes from the triples and the shapes come from the axes.
 </p>
 <p>
+    <strong>And nothing in that says six.</strong> Keep five of the axes and the
+    zonohedron on them is the <strong>golden icosahedron</strong>:
+    <span class="mono">C(5,2)·2 = 20</span> faces and <span class="mono">C(5,3) = 10</span>
+    cells, five acute and five obtuse. Keep four and it is the <strong>golden
+    dodecahedron</strong> — Bilinski's — twelve faces and four cells, two of each.
+    Because all fifteen pairs of the six axes meet at the <em>same</em> angle,
+    <span class="mono">|cos| = 1/√5</span>, every face of all three is the same golden
+    rhombus and every cell one of the same two hexahedra: the solids differ in how many
+    pieces, never in which. Their volumes are 2.462147, 6.155367 and 12.310734 — the
+    ratio <strong>2 : 5 : 10</strong>. Which four or five axes you keep makes no
+    difference either, all fifteen 4-subsets being congruent and all six 5-subsets too.
+</p>
+<p>
     <strong>The dissection is a choice; the cells are not.</strong> A point of the solid
     is <span class="mono">½Σcₘaₘ</span> with every <span class="mono">cₘ</span> in
     <span class="mono">[−1,1]</span>, and a cell fixes <span class="mono">cₘ = ±1</span>
@@ -129,8 +148,9 @@
     behind the solid's own surface.
 </p>
 <p>
-    <strong>There are exactly two dissections</strong>, up to rotation and reflection,
-    which is why the choice is a toggle. They differ by a single <strong>flip</strong>
+    <strong>The triacontahedron has exactly two dissections</strong>, up to rotation
+    and reflection, which is why the choice is a toggle — and it alone has a choice.
+    They differ by a single <strong>flip</strong>
     inside one Bilinski dodecahedron — the zonohedron on four of the six axes, which
     admits exactly two tilings of its own. Four cells and six internal faces change;
     the other sixteen cells, and the whole shell, are identical. That elementary move is
@@ -139,6 +159,19 @@
     of order 120 — one of size 120 and one of size 40. The large orbit keeps
     <strong>no symmetry whatever</strong>; the small one keeps a <strong>three-fold
     axis</strong>. Both are ten acute and ten obtuse, as they must be.
+</p>
+<p>
+    <strong>The smaller solids have no choice at all.</strong> Each has to be reduced
+    under its <em>own</em> symmetries — those carrying its axis set to itself, which is
+    all 120 at six axes but only 20 at five and 8 at four. Do that and the golden
+    icosahedron's ten labelled dissections come to a single orbit,
+    <span class="mono">10 = 20/2</span>, and the dodecahedron's two to one,
+    <span class="mono">2 = 8/4</span>. Nothing is left over, so the flip control goes
+    quiet on both. It also says what the dodecahedron's pair really is: one dissection
+    twice placed, a rotation of the dodecahedron carrying either onto the other. What
+    that rotation is <em>not</em> is a symmetry of the triacontahedron around it — which
+    is exactly why turning that one dodecahedron over changes the larger dissection
+    while leaving the shell untouched.
 </p>
 <p>
     That is worth knowing when looking at the inner cage. The solid's own thirty faces

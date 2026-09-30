@@ -1,11 +1,17 @@
-// Verification for src/dissect.ts — the twenty-cell dissection.
+// Verification for src/dissect.ts — the dissection of the golden zonohedra.
 //
 //   node tools/dissect.mjs
 //
-// Six checks. The last two are the ones that would catch a wrong dissection rather than
-// a wrong count: the cells must not overlap, and together they must fill the solid.
+// Checks 1-9 are the triacontahedron, in detail: the last of them would catch a wrong
+// dissection rather than a wrong count, since the cells must not overlap and together
+// they must fill the solid. Check 10 then sweeps the rest of the family, where the same
+// argument has to hold on four and five axes as well.
 
-import { dissection, RT_VOLUME, disjoint, pairColor, faceColor, cellColors } from "../dist/dissect.js";
+import {
+    dissection, RT_VOLUME, disjoint, pairColor, faceColor, cellColors,
+    SOLIDS, solidCounts, solidVolume, groupOrder, allDissections, stabilizerOrder,
+    shellFaces, cageFaces,
+} from "../dist/dissect.js";
 import { A6, RHO } from "../dist/centers.js";
 
 const dot = (a, b) => a[0]*b[0]+a[1]*b[1]+a[2]*b[2];
@@ -86,9 +92,67 @@ const sigB = new Set(obtuse.map((c) => cellColors(c).join("")));
 if (sigA.size !== 10 || sigB.size !== 10) fail(`color-triples: ${sigA.size} acute, ${sigB.size} obtuse, expected 10 each`);
 if ([...sigA].sort().join("|") !== [...sigB].sort().join("|")) fail("acute and obtuse carry different color-triple sets");
 
+// 10 · the rest of the family — same argument, fewer axes
+const FAMILY = [];
+for (const sol of SOLIDS) {
+    const { faces, cells: want } = solidCounts(sol.axes);
+    const d = dissection("chiral", sol.axes);
+    const sh = shellFaces(sol.axes);
+    const cg = cageFaces("chiral", sol.axes);
+    const outer = cg.filter((f) => f.outer).length;
+    if (d.length !== want) fail(`${sol.key}: ${d.length} cells, expected C(k,3) = ${want}`);
+    if (sh.length !== faces) fail(`${sol.key}: ${sh.length} shell faces, expected k(k-1) = ${faces}`);
+    if (outer !== faces) fail(`${sol.key}: cage has ${outer} faces on the surface, expected ${faces}`);
+    // the cells fill it: volumes sum to the solid's, and no two overlap
+    const vol = d.reduce((a, c) => a + c.volume, 0);
+    if (Math.abs(vol - solidVolume(sol.axes)) > 1e-9) fail(`${sol.key}: cells sum to ${vol}, solid is ${solidVolume(sol.axes)}`);
+    let ov = 0;
+    for (let i = 0; i < d.length; i++) for (let j = i + 1; j < d.length; j++) if (!disjoint(d[i], d[j])) ov++;
+    if (ov) fail(`${sol.key}: ${ov} overlapping cell pairs`);
+    // every face is the same golden rhombus, which is the point of equal pair angles
+    for (const c of d) for (const f of c.faces) {
+        const L = [0,1,2,3].map((k) => Math.hypot(...f[(k+1)%4].map((x,i) => x - f[k][i])));
+        if (Math.max(...L) - Math.min(...L) > 1e-9) fail(`${sol.key}: a face is not a rhombus`);
+        const d1 = Math.hypot(...f[2].map((x,i) => x - f[0][i]));
+        const d2 = Math.hypot(...f[3].map((x,i) => x - f[1][i]));
+        const r = Math.max(d1,d2) / Math.min(d1,d2);
+        if (Math.abs(r - PHI) > 1e-9) fail(`${sol.key}: diagonal ratio ${r} is not phi`);
+    }
+    // acute and obtuse in equal number, except on the lone rhombohedron which is one cell
+    const ac = d.filter((c) => c.acute).length;
+    if (d.length > 1 && ac * 2 !== d.length) fail(`${sol.key}: ${ac} acute of ${d.length}`);
+    // and the labelled dissections account for themselves: orbit sizes must sum to the count
+    const all = allDissections(sol.axes);
+    const G = groupOrder(sol.axes);
+    const stabs = all.map((x) => stabilizerOrder(x, sol.axes));
+    const tally = {};
+    for (const st of stabs) tally[st] = (tally[st] || 0) + 1;
+    let orbits = 0;
+    for (const [st, n] of Object.entries(tally)) {
+        const size = G / Number(st);
+        if (n % size) fail(`${sol.key}: ${n} dissections at stabiliser ${st} is not a whole number of orbits of ${size}`);
+        orbits += n / size;
+    }
+    FAMILY.push({ key: sol.key, label: sol.label, k: sol.axes.length, faces, cells: d.length, ac, vol, all: all.length, G, orbits });
+}
+// only the triacontahedron has a choice
+const rt = FAMILY.find((f) => f.k === 6);
+if (rt.orbits !== 2) fail(`triacontahedron: ${rt.orbits} orbits, expected 2`);
+for (const f of FAMILY) if (f.k < 6 && f.orbits !== 1) fail(`${f.key}: ${f.orbits} orbits, expected 1`);
+// volumes in the ratio 2 : 5 : 10
+const [vd, vi, vr] = [4, 5, 6].map((k) => FAMILY.find((f) => f.k === k).vol);
+if (Math.abs(vi / vd - 2.5) > 1e-9 || Math.abs(vr / vd - 5) > 1e-9)
+    fail(`volumes ${vd} : ${vi} : ${vr} are not in the ratio 2 : 5 : 10`);
+
 console.log(`five-coloring: all 6 rosettes show all 5 · opposite faces agree · ${sigA.size} color-triples on each family, the same ten`);
 console.log(`20 cells: ${acute.length} acute at ${acute[0].volume.toFixed(6)}, ${obtuse.length} obtuse at ${obtuse[0].volume.toFixed(6)}, ratio ${ratio.toFixed(9)}`);
 console.log(`total volume ${total.toFixed(6)} = 4√(5+2√5) = ${RT_VOLUME.toFixed(6)}`);
 console.log(`${tested} interior points sampled: all in exactly one cell` + (none || many ? " — NO" : ""));
+for (const f of FAMILY)
+    console.log(
+        `${f.label.padEnd(21)} k=${f.k}  ${String(f.faces).padStart(2)} faces  ` +
+        `${String(f.cells).padStart(2)} cell${f.cells > 1 ? "s" : " "} (${f.ac} acute)  vol ${f.vol.toFixed(6)}  ` +
+        `${String(f.all).padStart(3)} labelled / group ${String(f.G).padStart(3)} = ${f.orbits} orbit${f.orbits > 1 ? "s" : ""}`,
+    );
 console.log(bad === 0 ? "all checks passed" : `${bad} FAILURES`);
 process.exit(bad === 0 ? 0 : 1);

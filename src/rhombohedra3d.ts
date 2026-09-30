@@ -4,6 +4,12 @@
 // obtuse, shown as a wireframe cage and pulled apart. The dissection itself is in
 // `dissect.ts` and is checked by `tools/dissect.mjs`; everything here is presentation.
 //
+// And not only the triacontahedron. Drop an axis and the zonohedron on the remaining
+// five is the **golden icosahedron**, twenty faces and ten cells; drop another and it
+// is the **golden dodecahedron**, Bilinski's, twelve faces and four. Since every pair
+// of the six axes meets at the same angle, all three are the same rhombus and the same
+// two hexahedra throughout — the family is one parameter, and the page hands it over.
+//
 // Exploding moves each cell along the direction of its own center, so at zero they
 // reassemble into the solid exactly and at full travel they sit in the arrangement they
 // occupy within it, magnified. Nothing rotates and nothing is reordered — the picture
@@ -16,8 +22,11 @@ import { LineSegmentsGeometry } from "three/addons/lines/LineSegmentsGeometry.js
 import { LineMaterial } from "three/addons/lines/LineMaterial.js";
 import { loadPrefs, savePrefs, resetPrefs } from "./prefs.js";
 import { BUILD_ID } from "./build-id.js";
-import { dissection, faceColor, cageFaces, pairColor } from "./dissect.js";
-import type { DissectionKind } from "./dissect.js";
+import {
+    dissection, faceColor, cageFaces, pairColor,
+    SOLIDS, solidCounts, solidVolume, groupOrder, allDissections,
+} from "./dissect.js";
+import type { AxisSet, DissectionKind } from "./dissect.js";
 import type { Cell } from "./dissect.js";
 import type { V3 } from "./solids.js";
 
@@ -27,6 +36,7 @@ const el = <T extends HTMLElement>(id: string): T => {
     return found as T;
 };
 const view = el<HTMLDivElement>("view");
+const solidSel = el<HTMLSelectElement>("solid");
 const explodeInput = el<HTMLInputElement>("explode");
 const explodeOut = el<HTMLElement>("explodeOut");
 const colorSel = el<HTMLSelectElement>("color");
@@ -35,11 +45,12 @@ const faceSel = el<HTMLSelectElement>("facemode");
 const edgeSel = el<HTMLSelectElement>("edgemode");
 const cageSel = el<HTMLSelectElement>("cagemode");
 const flipChk = el<HTMLInputElement>("flip");
+const flipLabel = el<HTMLLabelElement>("fliplabel");
 const spinChk = el<HTMLInputElement>("spin");
 const statusEl = el<HTMLElement>("status");
 
 const PREFS_KEY = "wr-rhombohedra";
-const PREF_DEFAULTS = { explode: 0, color: "five", show: "all", facemode: "solid", edgemode: "edges", cagemode: "cage", flip: false, spin: true };
+const PREF_DEFAULTS = { solid: "rt", explode: 0, color: "five", show: "all", facemode: "solid", edgemode: "edges", cagemode: "cage", flip: false, spin: true };
 const prefs = loadPrefs(PREFS_KEY, PREF_DEFAULTS);
 
 const scene = new THREE.Scene();
@@ -105,14 +116,23 @@ const METAL_ENV = (() => {
     return tex;
 })();
 
-// Both dissections, cached on first use. There are exactly two up to rotation and
-// reflection — see dissect.ts — and the page can show either.
-const KINDS: DissectionKind[] = ["symmetric", "chiral"];
+/** The solid on show, and its axes. `rt` is six axes, which is how the page opens. */
+function chosen(): { key: string; label: string; axes: AxisSet } {
+    return SOLIDS.find((s) => s.key === solidSel.value) ?? SOLIDS[0];
+}
+
+// Cells and cage, worked out on first sight of each solid and kept. Lazily, rather
+// than all at once on load as this used to be: with three solids and two kinds that
+// would be six dissections computed before the first frame, five of which the reader
+// may never ask for.
 const CELLS: Record<string, ReturnType<typeof dissection>> = {};
 const CAGES: Record<string, ReturnType<typeof cageFaces>> = {};
-for (const k of KINDS) {
-    CELLS[k] = dissection(k);
-    CAGES[k] = cageFaces(k);
+const NDISS: Record<string, number> = {};
+
+/** How many dissections the solid has with its position fixed in space. */
+function labelledCount(axes: AxisSet, key: string): number {
+    if (NDISS[key] === undefined) NDISS[key] = allDissections(axes).length;
+    return NDISS[key];
 }
 let drawn: THREE.Object3D[] = [];
 let edgeMats: LineMaterial[] = [];
@@ -153,12 +173,21 @@ function build(): void {
     const t = Math.pow(u, 2.2) * 12;
     const faceMode = faceSel.value;
     const edgeMode = edgeSel.value;
-    // Only two dissections exist up to symmetry, and they differ by a single flip
-    // inside one Bilinski dodecahedron — four cells and six internal faces, everything
-    // else identical. So the choice is a toggle rather than a list.
-    const kind: DissectionKind = flipChk.checked ? "chiral" : "symmetric";
-    const cells = CELLS[kind];
-    const cage = CAGES[kind];
+    // On the triacontahedron only two dissections exist up to symmetry, and they differ
+    // by a single flip inside one Bilinski dodecahedron — four cells and six internal
+    // faces, everything else identical. So the choice is a toggle rather than a list.
+    // On the smaller solids there is no choice at all: their labelled dissections form
+    // a single orbit, so the toggle is disabled rather than offered as a fiction.
+    const solid = chosen();
+    const hasFlip = solid.axes.length === 6;
+    const kind: DissectionKind = hasFlip && flipChk.checked ? "chiral" : "symmetric";
+    const ck = `${kind}|${solid.key}`;
+    if (!CELLS[ck]) {
+        CELLS[ck] = dissection(kind, solid.axes);
+        CAGES[ck] = cageFaces(kind, solid.axes);
+    }
+    const cells = CELLS[ck];
+    const cage = CAGES[ck];
     // Corners and edges of each cell, for the ball-and-stick frame. Taken per cell
     // rather than deduplicated: assembled, neighboring cells share corners and the
     // beads coincide exactly, which looks like one bead — and once exploded they must
@@ -359,18 +388,52 @@ function build(): void {
     }
 
     const nAcute = cells.filter((c) => visible(c) && c.acute).length;
-    const kindNote = kind === "symmetric"
-        ? " · unflipped — the dissection that keeps a three-fold axis"
-        : " · flipped — one Bilinski dodecahedron turned over, and the three-fold axis is gone";
+    // Below six axes there is nothing to flip: the labelled dissections are one orbit,
+    // and saying so is more use than an inert checkbox.
+    const kindNote = !hasFlip
+        ? ` · one dissection only — its ${labelledCount(solid.axes, solid.key)} labelled ones are a single orbit under the solid's group of ${groupOrder(solid.axes)}`
+        : kind === "symmetric"
+            ? " · unflipped — the dissection that keeps a three-fold axis"
+            : " · flipped — one Bilinski dodecahedron turned over, and the three-fold axis is gone";
+    const vol = solidVolume(solid.axes);
+    const volNote = hasFlip
+        ? `together 4√(5+2√5) = ${vol.toFixed(6)}, the triacontahedron's own volume`
+        : `together ${vol.toFixed(6)}, the solid's own volume — the three stand in the ratio 2 : 5 : 10`;
     const note = colorSel.value === "five"
         ? " · Kowalewski five: every rosette shows all five, opposite faces of each hexahedron agree, each wears three of the five"
         : "";
     statusEl.textContent =
-        `${shown} of 20 cells — ${nAcute} acute at 0.760845, ${shown - nAcute} obtuse at 0.470228, ` +
-        `in the ratio φ · together 4√(5+2√5) = 12.310734, the triacontahedron's own volume · ` +
+        `${shown} of ${cells.length} cells — ${nAcute} acute at 0.760845, ${shown - nAcute} obtuse at 0.470228, ` +
+        `in the ratio φ · ${volNote} · ` +
         `explode ${(100 * u).toFixed(0)}%${kindNote}${note}`;
 }
 
+// The wording the flip control carries when there is something to flip. Taken from the
+// page rather than repeated here, so the two cannot drift apart.
+const FLIP_TITLE = flipLabel.title;
+const WORD: Record<number, string> = { 2: "two", 4: "four", 5: "five", 10: "ten", 20: "twenty" };
+
+/**
+ * Make the controls say what the chosen solid actually holds. "All twenty" is true of
+ * the triacontahedron alone; on the golden icosahedron it is ten and on the golden
+ * dodecahedron four, five and two by type.
+ */
+function relabel(): void {
+    const solid = chosen();
+    const { cells } = solidCounts(solid.axes);
+    const half = cells / 2;
+    showSel.options[0].text = `All ${WORD[cells] ?? cells}`;
+    showSel.options[1].text = `The ${WORD[half] ?? half} acute`;
+    showSel.options[2].text = `The ${WORD[half] ?? half} obtuse`;
+    const hasFlip = solid.axes.length === 6;
+    flipChk.disabled = !hasFlip;
+    flipLabel.style.opacity = hasFlip ? "" : "0.45";
+    flipLabel.title = hasFlip
+        ? FLIP_TITLE
+        : "Only the triacontahedron has two dissections. On the smaller solids every labelled dissection is the same one differently placed, so there is nothing to flip.";
+}
+
+solidSel.value = prefs.solid || PREF_DEFAULTS.solid;
 explodeInput.value = String(prefs.explode);
 colorSel.value = prefs.color || PREF_DEFAULTS.color;
 showSel.value = prefs.show || PREF_DEFAULTS.show;
@@ -380,6 +443,7 @@ cageSel.value = prefs.cagemode || PREF_DEFAULTS.cagemode;
 // A select handed a stored value that no option carries reports "" rather than rejecting
 // it, so each falls back explicitly.
 for (const [sel, def] of [
+    [solidSel, PREF_DEFAULTS.solid],
     [colorSel, PREF_DEFAULTS.color], [showSel, PREF_DEFAULTS.show],
     [faceSel, PREF_DEFAULTS.facemode], [edgeSel, PREF_DEFAULTS.edgemode],
     [cageSel, PREF_DEFAULTS.cagemode],
@@ -389,11 +453,12 @@ spinChk.checked = prefs.spin;
 controls.autoRotate = spinChk.checked;
 
 function rebuild(): void {
+    relabel();
     explodeOut.textContent = `${(100 * Number(explodeInput.value)).toFixed(0)}%`;
     build();
 }
 explodeInput.addEventListener("input", rebuild);
-for (const c of [colorSel, showSel, faceSel, edgeSel, cageSel, flipChk]) c.addEventListener("change", rebuild);
+for (const c of [solidSel, colorSel, showSel, faceSel, edgeSel, cageSel, flipChk]) c.addEventListener("change", rebuild);
 
 // Scrolling over the slider works it, which is what a slider under the pointer ought to
 // do. Bound non-passively so the page does not scroll away underneath.
@@ -412,6 +477,7 @@ spinChk.addEventListener("change", () => { controls.autoRotate = spinChk.checked
 
 function persist(): void {
     savePrefs(PREFS_KEY, {
+        solid: solidSel.value,
         explode: Number(explodeInput.value), color: colorSel.value,
         show: showSel.value, facemode: faceSel.value, edgemode: edgeSel.value,
         cagemode: cageSel.value, flip: flipChk.checked,
