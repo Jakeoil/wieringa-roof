@@ -366,6 +366,102 @@ hexahedra, was in Jeff's original conversation but had not been carried into the
 Either way the sixth axis had been sitting in `centers.ts` since chapter 2, and I should
 have looked there before searching.
 
+## 2½. Plan — the rest of the golden family on the Cage page
+
+Jake, 30 September: add the **golden icosahedron** and the **golden dodecahedron** to
+the Cage beside the triacontahedron, adapt the Color and Show dropdowns, and settle what
+the "two tilings" result becomes for them.
+
+### The family is one parameter
+
+Every member is the zonohedron on **k of the six icosahedral axes**, and the page
+already builds the triacontahedron exactly that way. `dissect.ts` opens by saying "a
+zonohedron on n generators falls into C(n,3) parallelepipeds" and then hard-codes `A6`;
+the generalization is to pass the axis set rather than assume it.
+
+| axes | solid | faces | cells | acute | obtuse | volume |
+|---|---|---|---|---|---|---|
+| 3 | golden rhombohedron | 6 | 1 | 0 or 1 | 1 or 0 | 0.470228 / 0.760845 |
+| 4 | **golden dodecahedron** (Bilinski) | 12 | 4 | 2 | 2 | 2.462147 |
+| 5 | **golden icosahedron** | 20 | 10 | 5 | 5 | 6.155367 |
+| 6 | triacontahedron | 30 | 20 | 10 | 10 | 12.310734 |
+
+Faces are `k(k−1)`, cells `C(k,3)`, and every face is the same golden rhombus, because
+**every pair of the six axes meets at the same angle** — |cos| = 1/√5 for all fifteen
+pairs. Two things follow that are worth having before any code is written:
+
+- **Both new solids are unique.** Measured over every subset: all 15 four-axis subsets
+  give 2 acute and 2 obtuse, and all 6 five-axis subsets give 5 and 5. So *which* axis
+  you drop does not matter, and "the golden icosahedron" names one shape. Only at three
+  axes does the choice matter, which is exactly why there are two rhombohedra and not
+  one.
+- **The volumes are 2 : 5 : 10.** Dodecahedron, icosahedron, triacontahedron. Each is
+  half acute and half obtuse by count, so the volumes follow the cell counts exactly.
+
+### The two tilings become 2, 10 and 160
+
+Counted by the same parameterization `tools/probes/count-dissections.mjs` uses — a cell
+is a triple of axes plus a sign vector on the rest — extended over k:
+
+| solid | cells | **labelled dissections** |
+|---|---|---|
+| golden rhombohedron | 1 | 1 |
+| golden dodecahedron | 4 | **2** |
+| golden icosahedron | 10 | **10** |
+| triacontahedron | 20 | **160** |
+
+The 160 is the same number the existing probe finds, and the page's "exactly two" is
+those 160 **up to the icosahedral group**: two orbits, of sizes 120 and 40, with
+stabilizers of order 1 and 3. So the honest statement for the new solids is that the
+labelled counts are 2 and 10, and the reduction to orbits still has to be done — the
+machinery is there in `stabilizerOrder`, but the group is not the icosahedral one any
+more. **Dropping axes drops symmetry**, and what each solid's own group is has to be
+computed rather than assumed.
+
+That is the most interesting question the addition raises, and it should be answered
+before the page claims a number.
+
+### The dropdowns
+
+**Show** is already `all / acute / obtuse` and only needs its labels to stop saying
+twenty — the counts are 4, 10 and 20 depending on the solid, and 2/2, 5/5, 10/10 by
+type.
+
+**Color** is the one that bites. `Kowalewski five` is a proper edge coloring of K₆ on
+the six axes, and on fewer axes it is a proper edge coloring of K_k — whose chromatic
+index is `k−1` for even k and `k` for odd:
+
+| solid | axes | colors the scheme needs |
+|---|---|---|
+| golden dodecahedron | 4 | **3** |
+| golden icosahedron | 5 | **5** |
+| triacontahedron | 6 | **5** |
+
+So the scheme's class count is **not fixed** — and the model we just built assumes it
+is, `Scheme.classes` being a constant that decides which palettes are long enough. The
+cheapest honest fix is to let a scheme report its class count as a function of what is
+being drawn; that is one signature change in `palettesFor` and nothing else. Worth doing
+deliberately, since it is the first thing to ask for it.
+
+`By axis` has the same shape: k colors rather than six. `One hue per cell` and
+`Acute / obtuse` are unaffected.
+
+### Order of work
+
+1. **Parameterize `dissect.ts` by the axis set.** No behavior change at six axes; the
+   existing checks in `tools/dissect.mjs` are the regression test.
+2. **Count the orbits** for four and five axes, and find each solid's own symmetry
+   group. This is a probe, not a page.
+3. **A solid selector on the Cage**, defaulting to the triacontahedron so the page opens
+   as it does now.
+4. **Let a scheme's class count depend on the solid**, and make `Kowalewski` and
+   `By axis` follow it.
+5. **Labels that count what is actually there** — "all twenty" becomes the solid's own
+   number.
+
+Not in scope unless asked: the rhombohedron as a fourth entry. It is a single cell, the
+page is about dissection, and `polyhedra.html` already draws it.
+
 ## 3. Open questions
 
 *Two that stood here have been answered and are struck out rather than deleted, so the

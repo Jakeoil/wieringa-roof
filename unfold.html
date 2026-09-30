@@ -192,25 +192,45 @@ right the same rhombi unfolded flat — the net you cut out and fold back into t
 roof. Every face is the same golden rhombus, so the net is a single shape repeated;
 what changes is where each one lands and which edges stay attached.
 
-<h4>The four lines of controls</h4>
+<h4>The two shared lines</h4>
 
-<strong>Type · Gen · Side</strong> sit above the tabs rather than inside a view. The
-patch is the subject of all three views, so it stays put when you switch, and you can
-step through seeds and generations while looking at whichever view answers your
-question. <strong>Side</strong> belongs there too — it is the rhombus <em>edge</em>
+<strong>The patch line — Patch · Gen · heads/tails · slab · Side</strong> sits above the
+tabs rather than inside a view. It is <em>what a net is made of</em>: the patch is the
+subject of all three views, so it stays put when you switch, and on the Sheets view it
+is ghosted, because by then the net it describes is finished and changing any of it
+means a different net. <strong>heads or tails</strong> is which side of the surface the
+net develops from — the same paper mirrored, with every mountain a valley.
+<strong>slab</strong> unfolds the solid under the patch rather than the surface: the
+same rhombi on top, the same again as a floor one side length down, and a wall on every
+boundary edge. <strong>Side</strong> belongs here too — it is the rhombus <em>edge</em>
 length, and it decides how many sheets the net needs, so the Sheets view reports the
 same field rather than offering a second one that could disagree. At the default
 <strong>1 in</strong> a sheet holds about twenty rhombi, and every generation-2 patch
 fits one Letter sheet.
 
 <br><br>
-<strong>Height · Color · isoglosses</strong> are how the tiling is drawn, and none of
-them touch the net. <strong>Height</strong> is one control doing one job: its sign
-flips the lift — every hill a dale — and its magnitude is how hard height is shaded,
-with the middle of the travel leaving the tiles flat. <strong>Color</strong> offers the
-same schemes as every other page: the three rhomb groups in three strengths, the
-Kowalewski five, height, thick against thin, and plain. <strong>Isoglosses</strong> are contour lines of
-constant height, seven per rhombus on quarter-index steps.
+<strong>The rendering line — Color · palette · thin · Shading · isoglosses</strong> is
+how a net is <em>shown</em>, and unlike the patch line it stays live after the sheets
+exist. It is the same line on the 3D and Hexahedra pages, built from the same code, so
+a word means the same thing wherever you read it.
+
+<br><br>
+<strong>Color</strong> is two controls, because they answer two questions. A
+<strong>scheme</strong> says what class a face is in — none, the three rhomb groups, or
+the Kowalewski five — and a <strong>palette</strong> says what color each class gets. A
+scheme takes the first few colors of a palette, one, three or five, so a palette is
+offered only where it is long enough: the three-color palettes do not appear under
+Kowalewski. The palettes live in <span class="mono">palettes.yaml</span> and are meant
+to be edited. <strong>thin</strong> carries the thin rhombus of each class away from its
+color — darker, and deliberately by a lot — so it applies to whichever palette is
+chosen rather than being a scheme of its own.
+
+<br><br>
+<strong>Shading</strong> is light and nothing else: which of hills and dales is
+brightened, and how strongly, with the middle of the travel leaving the tiles flat. It
+used to flip the lift as well, so asking for a darker relief quietly rebuilt the net;
+that job belongs to heads and tails on the patch line. <strong>Isoglosses</strong> are
+contour lines of constant height, seven per rhombus on quarter-index steps.
 
 <br><br>
 <strong>Kowalewski five</strong> is not a scheme invented for the tiling — it comes down
