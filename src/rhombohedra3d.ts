@@ -25,7 +25,7 @@ import { BUILD_ID } from "./build-id.js";
 import {
     dissection, faceColor, cageFaces,
     SOLIDS, solidCounts, solidVolume, groupOrder, allDissections,
-    classCount, pairColorOn,
+    classCount, pairColorOn, poles,
 } from "./dissect.js";
 import type { AxisSet, DissectionKind } from "./dissect.js";
 import type { Cell } from "./dissect.js";
@@ -266,7 +266,8 @@ const colorOf = (c: Cell, face: number, axes: AxisSet): THREE.Color => {
 // of an oblate hexahedron would empty the view. So a disabled Show means all — which
 // also lets the reader's choice survive a trip through the hexahedra and back.
 const visible = (c: Cell): boolean =>
-    showSel.disabled || showSel.value === "all" || (showSel.value === "acute") === c.acute;
+    showSel.disabled || showSel.value === "all" || showSel.value === "singularity" ||
+    (showSel.value === "acute") === c.acute;
 
 function build(): void {
     clear();
@@ -291,6 +292,15 @@ function build(): void {
     const kind: DissectionKind = hasFlip && flipChk.checked ? "chiral" : "symmetric";
     const cells = cellsOf(solid, kind);
     const cage = CAGES[`${kind}|${solid.key}`];
+    // Deleting the poles: a vertex goes, and with it everything that carries it — the
+    // five faces and five edges on each, three faces from each of the three cells that
+    // reach it. Edges here are drawn as a face's own boundary, and every edge at a pole
+    // lies only in faces at that pole, so dropping the faces takes the edges with them
+    // and the five-and-five follows rather than being arranged. The cage stays whole.
+    const POLE = showSel.value === "singularity" ? poles(solid.axes) : [];
+    const atPole = (q: V3): boolean =>
+        POLE.some((p) => Math.abs(q[0] - p[0]) < 1e-6 && Math.abs(q[1] - p[1]) < 1e-6 && Math.abs(q[2] - p[2]) < 1e-6);
+    let cutFaces = 0;
     if (framedFor !== solid.key) {
         framedFor = solid.key;
         frame(solidRadius(cells));
@@ -313,7 +323,10 @@ function build(): void {
         shown++;
         const o: V3 = [c.center[0] * t, c.center[1] * t, c.center[2] * t];
         if (edgeMode === "ballstick") {
-            for (const q of c.corners) beads.push([q[0] + o[0], q[1] + o[1], q[2] + o[2]]);
+            for (const q of c.corners) {
+                if (atPole(q)) continue;
+                beads.push([q[0] + o[0], q[1] + o[1], q[2] + o[2]]);
+            }
             // the twelve edges: each corner joined to the three that differ in one sign
             for (let b = 0; b < 8; b++) {
                 for (let q = 0; q < 3; q++) {
@@ -321,6 +334,7 @@ function build(): void {
                     if (b2 === b) continue;
                     const p1 = c.corners[b];
                     const p2 = c.corners[b2];
+                    if (atPole(p1) || atPole(p2)) continue;
                     rods.push([
                         [p1[0] + o[0], p1[1] + o[1], p1[2] + o[2]],
                         [p2[0] + o[0], p2[1] + o[1], p2[2] + o[2]],
@@ -329,6 +343,10 @@ function build(): void {
             }
         }
         c.faces.forEach((f, fi) => {
+            if (f.some(atPole)) {
+                cutFaces++;
+                return;
+            }
             const col = colorOf(c, fi, solid.axes);
             if (faceMode !== "invisible") {
                 for (const q of [f[0], f[1], f[2], f[0], f[2], f[3]]) {
@@ -527,10 +545,15 @@ function build(): void {
     const volNote = hasFlip
         ? `together 4√(5+2√5) = ${vol.toFixed(6)}, the triacontahedron's own volume`
         : `together ${vol.toFixed(6)}, the solid's own volume — the three stand in the ratio 2 : 5 : 10`;
+    const singNote = POLE.length === 0
+        ? ""
+        : ` · singularity: both poles deleted — ${cutFaces} of the ${6 * cells.length} cell faces gone, ` +
+          `three from each of the ${cells.filter((c) => c.faces.some((f) => f.some(atPole))).length} cells that reach a pole, ` +
+          `and the rim each leaves is a decagon on ten vertices · the cage is left whole`;
     statusEl.textContent =
         `${shown} of ${cells.length} cells — ${nAcute} acute at 0.760845, ${shown - nAcute} obtuse at 0.470228, ` +
         `in the ratio φ · ${volNote} · ` +
-        `explode ${(100 * u).toFixed(0)}%${kindNote}${note}`;
+        `explode ${(100 * u).toFixed(0)}%${kindNote}${singNote}${note}`;
 }
 
 // The wording the flip control carries when there is something to flip. Taken from the
@@ -553,6 +576,14 @@ function relabel(): void {
     showSel.options[0].text = `All ${WORD[cells.length] ?? cells.length}`;
     showSel.options[1].text = nA ? `The ${WORD[nA] ?? nA} acute` : "No acute cell";
     showSel.options[2].text = nO ? `The ${WORD[nO] ?? nO} obtuse` : "No obtuse cell";
+    // Singularity is offered only where there is a singularity to delete, which is the
+    // golden icosahedron alone. A stored choice that no longer applies falls back rather
+    // than naming a mode the solid cannot show.
+    const singOpt = showSel.options[3];
+    const hasPoles = poles(solid.axes).length > 0;
+    singOpt.hidden = !hasPoles;
+    singOpt.disabled = !hasPoles;
+    if (!hasPoles && showSel.value === "singularity") showSel.value = "all";
     // A single cell has nothing to filter and nothing to pull apart: its center is the
     // origin, so the travel it would explode along is zero.
     const single = cells.length === 1;

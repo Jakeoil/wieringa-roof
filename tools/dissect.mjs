@@ -10,7 +10,7 @@
 import {
     dissection, RT_VOLUME, disjoint, pairColor, faceColor, cellColors,
     SOLIDS, solidCounts, solidVolume, groupOrder, allDissections, stabilizerOrder,
-    shellFaces, cageFaces, classCount, pairColorOn,
+    shellFaces, cageFaces, classCount, pairColorOn, poles,
 } from "../dist/dissect.js";
 import { A6, RHO } from "../dist/centers.js";
 
@@ -176,10 +176,59 @@ const [vd, vi, vr] = ["dod", "ico", "rt"].map((key) => FAMILY.find((f) => f.key 
 if (Math.abs(vi / vd - 2.5) > 1e-9 || Math.abs(vr / vd - 5) > 1e-9)
     fail(`volumes ${vd} : ${vi} : ${vr} are not in the ratio 2 : 5 : 10`);
 
+// 11 · the poles — the two vertices where all five zones meet, and what deleting them takes
+const vkey = (p) => p.map((x) => Math.round(x * 1e6)).join(",");
+let poleLine = "";
+for (const sol of SOLIDS) {
+    const P = poles(sol.axes);
+    if (sol.axes.length !== 5) {
+        if (P.length) fail(`${sol.key}: ${P.length} poles, expected none off five axes`);
+        continue;
+    }
+    if (P.length !== 2) fail(`${sol.key}: ${P.length} poles, expected 2`);
+    // antipodal
+    if (P[0].some((x, i) => Math.abs(x + P[1][i]) > 1e-9)) fail(`${sol.key}: the poles are not antipodal`);
+    const shell = shellFaces(sol.axes);
+    const d = dissection("chiral", sol.axes);
+    let cut = 0;
+    const touched = new Set();
+    for (const p of P) {
+        // five faces and five edges on the pole, and the rim left behind is a decagon
+        const at = shell.filter((f) => f.corners.some((q) => vkey(q) === vkey(p)));
+        if (at.length !== 5) fail(`${sol.key}: ${at.length} shell faces at a pole, expected 5`);
+        const ec = new Map();
+        for (const f of at) for (let e = 0; e < 4; e++) {
+            const k = [vkey(f.corners[e]), vkey(f.corners[(e + 1) % 4])].sort().join("|");
+            ec.set(k, (ec.get(k) || 0) + 1);
+        }
+        const onPole = [...ec.values()].filter((n) => n === 2).length;
+        const rim = [...ec.entries()].filter(([, n]) => n === 1);
+        if (onPole !== 5) fail(`${sol.key}: ${onPole} edges at a pole, expected 5`);
+        const rimV = new Set(rim.flatMap(([k]) => k.split("|")));
+        if (rim.length !== 10 || rimV.size !== 10) fail(`${sol.key}: rim is ${rim.length} edges on ${rimV.size} vertices, expected 10 and 10`);
+        // three cells reach it, two oblate and one acute, each losing three of six faces
+        const cs = d.filter((c) => c.corners.some((q) => vkey(q) === vkey(p)));
+        if (cs.length !== 3) fail(`${sol.key}: ${cs.length} cells at a pole, expected 3`);
+        if (cs.filter((c) => c.acute).length !== 1) fail(`${sol.key}: ${cs.filter((c) => c.acute).length} acute cells at a pole, expected 1`);
+        for (const c of cs) {
+            const n = c.faces.filter((f) => f.some((q) => vkey(q) === vkey(p))).length;
+            if (n !== 3) fail(`${sol.key}: a cell has ${n} faces at a pole, expected 3`);
+            cut += n;
+            touched.add(c.id);
+        }
+    }
+    if (cut !== 18) fail(`${sol.key}: ${cut} cell faces cut, expected 18`);
+    if (touched.size !== 6) fail(`${sol.key}: ${touched.size} cells touched, expected 6`);
+    poleLine =
+        `poles: 2 antipodal five-valent vertices · 5 faces and 5 edges each, rim a decagon on 10 vertices · ` +
+        `3 cells each (2 oblate, 1 acute) · ${cut} of ${6 * d.length} cell faces cut from ${touched.size} of ${d.length} cells`;
+}
+
 console.log(`five-coloring: all 6 rosettes show all 5 · opposite faces agree · ${sigA.size} color-triples on each family, the same ten`);
 console.log(`20 cells: ${acute.length} acute at ${acute[0].volume.toFixed(6)}, ${obtuse.length} obtuse at ${obtuse[0].volume.toFixed(6)}, ratio ${ratio.toFixed(9)}`);
 console.log(`total volume ${total.toFixed(6)} = 4√(5+2√5) = ${RT_VOLUME.toFixed(6)}`);
 console.log(`${tested} interior points sampled: all in exactly one cell` + (none || many ? " — NO" : ""));
+if (poleLine) console.log(poleLine);
 for (const f of FAMILY)
     console.log(
         `${f.label.padEnd(21)} k=${f.k}  ${String(f.faces).padStart(2)} faces  ` +

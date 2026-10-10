@@ -622,6 +622,40 @@ export function cageFaces(kind: DissectionKind = "chiral", axes: AxisSet = AXES6
     });
 }
 
+// ── the poles ─────────────────────────────────────────────────────
+
+/**
+ * The two vertices where **all** the solid's zones meet, when it has such a pair.
+ *
+ * Five axes have one. The five left standing are arranged about the sixth, which is the
+ * solid's own five-fold axis, and the golden icosahedron's extreme vertices along it are
+ * the only two of its twenty-two where five faces meet — the others run ten of four and
+ * ten of three. Each pole carries five faces and five edges, and belongs to three cells:
+ * two oblate and one acute, three of whose six faces reach it.
+ *
+ * Nowhere else in the family. The triacontahedron has no vertex on six faces at all, its
+ * thirty-two running twelve of five and twenty of three. The smaller two have valence-k
+ * vertices in quantity rather than in pairs — six on the golden dodecahedron and all
+ * eight on a hexahedron, every corner of a parallelepiped being one — so the vertex that
+ * is a *singularity* is a five-axis thing, and this returns nothing elsewhere.
+ *
+ * The vertex itself is ½Σ sign(aₘ·u) aₘ over the axes in hand, `u` being the one left
+ * out: the support point of the zonohedron in that direction, which is where every
+ * generator agrees.
+ */
+export function poles(axes: AxisSet = AXES6): V3[] {
+    if (axes.length !== 5) return [];
+    const out = [0, 1, 2, 3, 4, 5].find((m) => !axes.includes(m));
+    if (out === undefined) return [];
+    const u = A6[out];
+    const p: V3 = [0, 0, 0];
+    for (const m of axes) {
+        const sg = Math.sign(dot(A6[m], u));
+        for (let d = 0; d < 3; d++) p[d] += (sg * A6[m][d]) / 2;
+    }
+    return [p, [-p[0], -p[1], -p[2]]];
+}
+
 /** Is a point on the solid's surface — that is, extreme in some face direction? */
 function onSurface(p: V3, axes: AxisSet = AXES6): boolean {
     const ns = faceNormals(axes);
