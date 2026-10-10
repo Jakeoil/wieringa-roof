@@ -10,7 +10,8 @@
 import {
     dissection, RT_VOLUME, disjoint, pairColor, faceColor, cellColors,
     SOLIDS, solidCounts, solidVolume, groupOrder, allDissections, stabilizerOrder,
-    shellFaces, cageFaces, classCount, pairColorOn, poles,
+    shellFaces, cageFaces, classCount, pairColorOn, poles, singularityCut,
+    bandAxes, edgeAxis,
 } from "../dist/dissect.js";
 import { A6, RHO } from "../dist/centers.js";
 
@@ -176,8 +177,30 @@ const [vd, vi, vr] = ["dod", "ico", "rt"].map((key) => FAMILY.find((f) => f.key 
 if (Math.abs(vi / vd - 2.5) > 1e-9 || Math.abs(vr / vd - 5) > 1e-9)
     fail(`volumes ${vd} : ${vi} : ${vr} are not in the ratio 2 : 5 : 10`);
 
+// 10b · the bands: every edge runs along the axis `edgeAxis` names, and a face's two
+// band axes are the pair that colors it
+let edgeBad = 0, bandBad = 0, edgeN = 0;
+for (const sol of SOLIDS) {
+    const d = dissection("chiral", sol.axes);
+    for (const c of d) c.faces.forEach((f, fi) => {
+        const ax = bandAxes(c, fi);
+        // the pair must be the one the coloring keys on
+        if (pairColorOn(ax[0], ax[1], sol.axes) !== faceColor(c, fi, sol.axes)) bandBad++;
+        for (let k = 0; k < 4; k++) {
+            const a = f[k], b = f[(k + 1) % 4];
+            const dir = [b[0]-a[0], b[1]-a[1], b[2]-a[2]];
+            const want = A6[edgeAxis(c, fi, k)];
+            edgeN++;
+            if (Math.hypot(...crs(dir, want)) > 1e-9) edgeBad++;
+        }
+    });
+}
+if (edgeBad) fail(`${edgeBad} of ${edgeN} edges do not run along the axis edgeAxis names`);
+if (bandBad) fail(`${bandBad} faces whose band pair disagrees with their color`);
+
 // 11 · the poles — the two vertices where all five zones meet, and what deleting them takes
 const vkey = (p) => p.map((x) => Math.round(x * 1e6)).join(",");
+
 let poleLine = "";
 for (const sol of SOLIDS) {
     const P = poles(sol.axes);
@@ -219,15 +242,56 @@ for (const sol of SOLIDS) {
     }
     if (cut !== 18) fail(`${sol.key}: ${cut} cell faces cut, expected 18`);
     if (touched.size !== 6) fail(`${sol.key}: ${touched.size} cells touched, expected 6`);
+
+    // and then the pruning: deleting a pole leaves two vertices at each end on only two
+    // edges, and the one face still holding each of those goes with it
+    const sc = singularityCut(d, sol.axes);
+    if (sc.atPoles !== 18) fail(`${sol.key}: cut reports ${sc.atPoles} faces at the poles, expected 18`);
+    if (sc.pruned !== 4) fail(`${sol.key}: cut pruned ${sc.pruned} faces, expected 4`);
+    if (sc.rounds !== 1) fail(`${sol.key}: pruning took ${sc.rounds} rounds, expected 1`);
+    if (sc.faces.size !== 22) fail(`${sol.key}: ${sc.faces.size} faces cut in all, expected 22`);
+    // the four pruned vertices: two at each end, one ring down the five-fold axis
+    const un = nrm(A6[[0,1,2,3,4,5].find((x) => !sol.axes.includes(x))]);
+    const vs = new Map();
+    for (const c of d) for (const q of c.corners) vs.set(vkey(q), q);
+    const dropped = [...vs.values()].filter((q) => sc.deleted(q));
+    if (dropped.length !== 6) fail(`${sol.key}: ${dropped.length} vertices deleted, expected 6 (2 poles + 4)`);
+    const hs = dropped.map((q) => dot(q, un)).sort((a, b) => b - a);
+    const ring = hs.filter((h) => Math.abs(Math.abs(h) - 0.6708204) < 1e-6);
+    if (ring.length !== 4 || ring.filter((h) => h > 0).length !== 2)
+        fail(`${sol.key}: pruned heights ${JSON.stringify(hs)} are not two at +0.670820 and two at -0.670820`);
+    // nothing left on fewer than three edges, and the surface has not come apart
+    const live = new Map();
+    for (const c of d) c.faces.forEach((f, fi) => {
+        if (sc.faces.has(`${c.id}:${fi}`)) return;
+        const mk = vkey([0,1,2].map((dd) => f.reduce((t, q) => t + q[dd], 0) / 4));
+        if (!live.has(mk)) live.set(mk, f);
+    });
+    const deg = new Map();
+    for (const f of live.values()) for (let e = 0; e < 4; e++) {
+        const a = vkey(f[e]), b = vkey(f[(e + 1) % 4]);
+        const ek = a < b ? `${a}|${b}` : `${b}|${a}`;
+        for (const v of [a, b]) {
+            if (!deg.has(v)) deg.set(v, new Set());
+            deg.get(v).add(ek);
+        }
+    }
+    const stillLow = [...deg.values()].filter((e) => e.size <= 2).length;
+    if (stillLow) fail(`${sol.key}: ${stillLow} vertices still on two edges after pruning`);
+    const minDeg = Math.min(...[...deg.values()].map((e) => e.size));
     poleLine =
         `poles: 2 antipodal five-valent vertices · 5 faces and 5 edges each, rim a decagon on 10 vertices · ` +
-        `3 cells each (2 oblate, 1 acute) · ${cut} of ${6 * d.length} cell faces cut from ${touched.size} of ${d.length} cells`;
+        `3 cells each (2 oblate, 1 acute) · ${cut} of ${6 * d.length} cell faces cut from ${touched.size} of ${d.length} cells\n` +
+        `pruning: 4 vertices fell to two edges, two at each end at h = ±0.670820 · ` +
+        `${sc.pruned} faces left hanging went with them · ${sc.faces.size} of ${6 * d.length} cut in ${sc.rounds} round · ` +
+        `${live.size} distinct faces on ${deg.size} vertices, least degree ${minDeg}`;
 }
 
 console.log(`five-coloring: all 6 rosettes show all 5 · opposite faces agree · ${sigA.size} color-triples on each family, the same ten`);
 console.log(`20 cells: ${acute.length} acute at ${acute[0].volume.toFixed(6)}, ${obtuse.length} obtuse at ${obtuse[0].volume.toFixed(6)}, ratio ${ratio.toFixed(9)}`);
 console.log(`total volume ${total.toFixed(6)} = 4√(5+2√5) = ${RT_VOLUME.toFixed(6)}`);
 console.log(`${tested} interior points sampled: all in exactly one cell` + (none || many ? " — NO" : ""));
+console.log(`bands: all ${edgeN} edges run along the axis edgeAxis names, and every band pair matches its face color`);
 if (poleLine) console.log(poleLine);
 for (const f of FAMILY)
     console.log(

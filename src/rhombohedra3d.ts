@@ -25,7 +25,7 @@ import { BUILD_ID } from "./build-id.js";
 import {
     dissection, faceColor, cageFaces,
     SOLIDS, solidCounts, solidVolume, groupOrder, allDissections,
-    classCount, pairColorOn, poles,
+    classCount, pairColorOn, poles, singularityCut, bandAxes,
 } from "./dissect.js";
 import type { AxisSet, DissectionKind } from "./dissect.js";
 import type { Cell } from "./dissect.js";
@@ -42,6 +42,11 @@ const explodeInput = el<HTMLInputElement>("explode");
 const explodeOut = el<HTMLElement>("explodeOut");
 const colorSel = el<HTMLSelectElement>("color");
 const showSel = el<HTMLSelectElement>("show");
+const ribbonInput = el<HTMLInputElement>("ribbon");
+const ribbonOut = el<HTMLElement>("ribbonOut");
+const ribbonLabel = el<HTMLLabelElement>("ribbonlabel");
+const groundChk = el<HTMLInputElement>("clearground");
+const groundLabel = el<HTMLLabelElement>("groundlabel");
 const faceSel = el<HTMLSelectElement>("facemode");
 const edgeSel = el<HTMLSelectElement>("edgemode");
 const cageSel = el<HTMLSelectElement>("cagemode");
@@ -53,7 +58,7 @@ const eyeChk = el<HTMLInputElement>("eyelight");
 const statusEl = el<HTMLElement>("status");
 
 const PREFS_KEY = "wr-rhombohedra";
-const PREF_DEFAULTS = { solid: "rt", ortho: false, eyelight: false, explode: 0, color: "five", show: "all", facemode: "solid", edgemode: "edges", cagemode: "cage", flip: false, spin: true };
+const PREF_DEFAULTS = { solid: "rt", ortho: false, eyelight: false, explode: 0, ribbon: 0.5, clearground: false, color: "five", show: "all", facemode: "solid", edgemode: "edges", cagemode: "cage", flip: false, spin: true };
 const prefs = loadPrefs(PREFS_KEY, PREF_DEFAULTS);
 
 const scene = new THREE.Scene();
@@ -147,6 +152,84 @@ function axisColor(pos: number, k: number): THREE.Color {
 // obtuse one. Chosen well apart in hue since the whole point is telling them apart.
 const FIVE = [0xd94f3d, 0xe8a33d, 0x4f9d4a, 0x3d7fc4, 0x9b59b6].map((h) => new THREE.Color(h));
 const CAGE = new THREE.Color(0x8a8578);
+
+// ── the bands ─────────────────────────────────────────────────────
+//
+// One color per axis, which is one per **ribbon**: the faces sharing an edge direction
+// form a strip, and a face lies in exactly two of them. The first five are the
+// Kowalewski five, since on five axes the bands *are* the pentagrid's five line
+// families — this is the same five colors doing a different job. The sixth is for the
+// triacontahedron, and is a teal picked to sit ΔE 46 from the nearest of the five, where
+// the five sit 41.6 from each other, so six axes crowd the eye no more than five do.
+const BAND = [...FIVE, new THREE.Color(0x2f9e9e)];
+const bandColor = (axis: number, axes: AxisSet): THREE.Color =>
+    BAND[axes.indexOf(axis)] ?? CAGE;
+
+// Where the two ribbons cross, both are genuinely there, and the mixture is the honest
+// answer — the one place in this scheme where mixing says something true. Everywhere
+// else a flat mixture would be a loss: the ten pairwise blends of the five come no
+// closer than ΔE 17 to each other, against 41.6 for the five themselves, so two of them
+// would read as one under the shading. Hence bands rather than blends.
+const CROSS = new Map<string, THREE.Color>();
+function crossColor(a: THREE.Color, b: THREE.Color): THREE.Color {
+    const k = `${a.getHex()},${b.getHex()}`;
+    let hit = CROSS.get(k);
+    if (!hit) CROSS.set(k, (hit = new THREE.Color((a.r + b.r) / 2, (a.g + b.g) / 2, (a.b + b.b) / 2)));
+    return hit;
+}
+/**
+ * The ground a face shows outside its two ribbons: the page's own background, so the
+ * bands read as stripes laid on a tile. `clear ground` drops it, and then the patch is
+ * not drawn at all rather than made transparent — there is simply no surface there, and
+ * the solid shows through the gaps.
+ */
+const BAND_GROUND = new THREE.Color(0xf4f1e8);
+
+/**
+ * A face painted as its two ribbons crossing.
+ *
+ * The face is `center + s·u + t·v` over `s, t ∈ [−1,1]`, with `u` along the first of its
+ * band axes and `v` along the second. The ribbon of the first joins the two edges that
+ * run along it, which sit at `t = ±1`, so it spans `t` entirely and is narrow in `s`;
+ * the other ribbon is the same the other way about. Cut both at width `w` and the
+ * rhombus falls into nine patches: two for each band, one where they cross, and four
+ * corners in neither ribbon. Those four take `ground` — the page's background, so the
+ * bands read as stripes on a tile — or, given `null`, are **not drawn at all**, leaving
+ * the surface as the ribbons and nothing else with the solid showing through the gaps.
+ *
+ * `w` runs 0 to 1 as a fraction of the face. At 1 each ribbon covers the whole rhombus,
+ * the two coincide, and every face is a crossing; at 0 there is nothing left of either
+ * and only the edges remain. A half is the plaid.
+ */
+function emitBands(
+    f: V3[], o: V3, ax: [number, number], axes: AxisSet, w: number,
+    ground: THREE.Color | null, tris: number[], cols: number[],
+): void {
+    const cut = [-1, -w, w, 1];
+    const ctr = [0, 1, 2].map((d) => (f[0][d] + f[1][d] + f[2][d] + f[3][d]) / 4);
+    const u = [0, 1, 2].map((d) => (f[1][d] - f[0][d]) / 2);
+    const v = [0, 1, 2].map((d) => (f[3][d] - f[0][d]) / 2);
+    const cu = bandColor(ax[0], axes);
+    const cv = bandColor(ax[1], axes);
+    const at = (s: number, t: number): V3 =>
+        [0, 1, 2].map((d) => ctr[d] + s * u[d] + t * v[d] + o[d]) as V3;
+    for (let a = 0; a < 3; a++) {
+        for (let b = 0; b < 3; b++) {
+            const onU = a === 1, onV = b === 1;
+            const col = onU && onV ? crossColor(cu, cv) : onU ? cu : onV ? cv : ground;
+            // in neither ribbon and no ground asked for, so nothing is drawn there
+            if (!col) continue;
+            const s0 = cut[a], s1 = cut[a + 1];
+            const t0 = cut[b], t1 = cut[b + 1];
+            if (Math.abs(s1 - s0) < 1e-9 || Math.abs(t1 - t0) < 1e-9) continue;
+            const p00 = at(s0, t0), p10 = at(s1, t0), p11 = at(s1, t1), p01 = at(s0, t1);
+            for (const p of [p00, p10, p11, p00, p11, p01]) {
+                tris.push(p[0], p[1], p[2]);
+                cols.push(col.r, col.g, col.b);
+            }
+        }
+    }
+}
 
 // A metallic surface with nothing to reflect renders black — metalness is a statement
 // about *reflection*, and an empty scene reflects nothing. So the rods and beads get a
@@ -260,6 +343,12 @@ const colorOf = (c: Cell, face: number, axes: AxisSet): THREE.Color => {
     if (colorSel.value === "five") return FIVE[faceColor(c, face, axes)];
     if (colorSel.value === "cell") return WHEEL[c.id];
     if (colorSel.value === "axis") return axisColor(axes.indexOf(c.triple[0]), axes.length);
+    if (colorSel.value === "bands") {
+        // only reached for the cage rim and anything else asking a face for one color;
+        // the faces themselves are painted as bands rather than as a mixture
+        const ax = bandAxes(c, face);
+        return crossColor(bandColor(ax[0], axes), bandColor(ax[1], axes));
+    }
     return c.acute ? ACUTE : OBTUSE;
 };
 // When there is only one cell the filter is meaningless, and asking for "the ten acute"
@@ -292,15 +381,16 @@ function build(): void {
     const kind: DissectionKind = hasFlip && flipChk.checked ? "chiral" : "symmetric";
     const cells = cellsOf(solid, kind);
     const cage = CAGES[`${kind}|${solid.key}`];
-    // Deleting the poles: a vertex goes, and with it everything that carries it — the
-    // five faces and five edges on each, three faces from each of the three cells that
-    // reach it. Edges here are drawn as a face's own boundary, and every edge at a pole
-    // lies only in faces at that pole, so dropping the faces takes the edges with them
-    // and the five-and-five follows rather than being arranged. The cage stays whole.
-    const POLE = showSel.value === "singularity" ? poles(solid.axes) : [];
-    const atPole = (q: V3): boolean =>
-        POLE.some((p) => Math.abs(q[0] - p[0]) < 1e-6 && Math.abs(q[1] - p[1]) < 1e-6 && Math.abs(q[2] - p[2]) < 1e-6);
-    let cutFaces = 0;
+    // Deleting the poles, and then whatever that leaves hanging — see `singularityCut`,
+    // which works out both and is checked in `tools/dissect.mjs`. Edges here are drawn as
+    // a face's own boundary, so dropping a face takes its edges with it; the five edges
+    // at a pole follow rather than being arranged, since every one of them lies only in
+    // faces at that pole. The cage stays whole.
+    const bands = colorSel.value === "bands";
+    const ribbon = Number(ribbonInput.value);
+    const bandGround = groundChk.checked ? null : BAND_GROUND;
+    const cut = showSel.value === "singularity" ? singularityCut(cells, solid.axes) : null;
+    const gone = (q: V3): boolean => cut !== null && cut.deleted(q);
     if (framedFor !== solid.key) {
         framedFor = solid.key;
         frame(solidRadius(cells));
@@ -310,7 +400,8 @@ function build(): void {
     // beads coincide exactly, which looks like one bead — and once exploded they must
     // travel with their own cell anyway.
     const beads: V3[] = [];
-    const rods: Array<[V3, V3]> = [];
+    // each rod with the axis it runs along, so the sticks can wear the band colors
+    const rods: Array<[V3, V3, number]> = [];
 
     const tris: number[] = [];
     const cols: number[] = [];
@@ -324,7 +415,7 @@ function build(): void {
         const o: V3 = [c.center[0] * t, c.center[1] * t, c.center[2] * t];
         if (edgeMode === "ballstick") {
             for (const q of c.corners) {
-                if (atPole(q)) continue;
+                if (gone(q)) continue;
                 beads.push([q[0] + o[0], q[1] + o[1], q[2] + o[2]]);
             }
             // the twelve edges: each corner joined to the three that differ in one sign
@@ -334,22 +425,24 @@ function build(): void {
                     if (b2 === b) continue;
                     const p1 = c.corners[b];
                     const p2 = c.corners[b2];
-                    if (atPole(p1) || atPole(p2)) continue;
+                    if (gone(p1) || gone(p2)) continue;
                     rods.push([
                         [p1[0] + o[0], p1[1] + o[1], p1[2] + o[2]],
                         [p2[0] + o[0], p2[1] + o[1], p2[2] + o[2]],
+                        c.triple[q],
                     ]);
                 }
             }
         }
         c.faces.forEach((f, fi) => {
-            if (f.some(atPole)) {
-                cutFaces++;
-                return;
-            }
+            if (cut?.faces.has(`${c.id}:${fi}`)) return;
             const col = colorOf(c, fi, solid.axes);
+            // the face's two band axes; its even edges run along the first and its odd
+            // edges along the second, which `tools/dissect.mjs` checks on every edge
+            const ax = bandAxes(c, fi);
             if (faceMode !== "invisible") {
-                for (const q of [f[0], f[1], f[2], f[0], f[2], f[3]]) {
+                if (bands) emitBands(f, o, ax, solid.axes, ribbon, bandGround, tris, cols);
+                else for (const q of [f[0], f[1], f[2], f[0], f[2], f[3]]) {
                     tris.push(q[0] + o[0], q[1] + o[1], q[2] + o[2]);
                     cols.push(col.r, col.g, col.b);
                 }
@@ -358,8 +451,15 @@ function build(): void {
                 for (let i = 0; i < 4; i++) {
                     const a = f[i];
                     const b = f[(i + 1) % 4];
+                    // Under bands an edge wears its own axis at full strength, that being
+                    // the point of the scheme; otherwise it is the face darkened, so the
+                    // outline reads as an outline rather than as a second color.
+                    const e = bands ? bandColor(ax[i % 2], solid.axes) : null;
+                    const er = e ? e.r : col.r * 0.35;
+                    const eg = e ? e.g : col.g * 0.35;
+                    const eb = e ? e.b : col.b * 0.35;
                     seg.push(a[0] + o[0], a[1] + o[1], a[2] + o[2], b[0] + o[0], b[1] + o[1], b[2] + o[2]);
-                    segCol.push(col.r * 0.35, col.g * 0.35, col.b * 0.35, col.r * 0.35, col.g * 0.35, col.b * 0.35);
+                    segCol.push(er, eg, eb, er, eg, eb);
                 }
             }
         });
@@ -436,13 +536,27 @@ function build(): void {
         // A cylinder's own axis is +Y, so each rod is a rotation carrying Y onto the
         // edge, scaled to its length and dropped at its midpoint.
         const rg = new THREE.CylinderGeometry(0.026, 0.026, 1, 10, 1);
-        const rm = new THREE.InstancedMesh(rg, mat, rods.length);
+        // Under bands the sticks carry the five colors, and a metal at 0.92 would put
+        // them into the reflection rather than show them — a metal's base color tints
+        // what it reflects. So the rods get their own near-dielectric material, white so
+        // that the per-instance color passes through as itself. The beads stay metal:
+        // they are vertices, and only the edges were asked to carry a band.
+        const rmat = bands
+            ? new THREE.MeshStandardMaterial({
+                  color: 0xffffff,
+                  roughness: 0.42,
+                  metalness: 0.12,
+                  envMap: METAL_ENV,
+                  flatShading: false,
+              })
+            : mat;
+        const rm = new THREE.InstancedMesh(rg, rmat, rods.length);
         const up = new THREE.Vector3(0, 1, 0);
         const dir = new THREE.Vector3();
         const quat = new THREE.Quaternion();
         const pos = new THREE.Vector3();
         const scl = new THREE.Vector3();
-        rods.forEach(([a, b], i) => {
+        rods.forEach(([a, b, axis], i) => {
             dir.set(b[0] - a[0], b[1] - a[1], b[2] - a[2]);
             const len = dir.length();
             quat.setFromUnitVectors(up, dir.clone().normalize());
@@ -451,6 +565,12 @@ function build(): void {
             rm.setMatrixAt(i, m4.compose(pos, quat, scl));
         });
         rm.instanceMatrix.needsUpdate = true;
+        if (bands) {
+            // the sticks are where the five colors belong: one per axis, so a ribbon is
+            // a run of rods all the same color
+            rods.forEach(([, , axis], i) => rm.setColorAt(i, bandColor(axis, solid.axes)));
+            if (rm.instanceColor) rm.instanceColor.needsUpdate = true;
+        }
         scene.add(rm);
         drawn.push(rm);
     }
@@ -517,7 +637,20 @@ function build(): void {
     const nClass = classCount(solid.axes);
     // Five is the triacontahedron's number, not the family's: the demand is a proper
     // edge coloring of K_k, and χ′(K_k) is k−1 for even k and k for odd.
-    const note = colorSel.value !== "five"
+    const note = colorSel.value === "bands"
+        ? ` · bands: ${WORD[k] ?? k} ribbon families, one per axis, carried by the edges · ` +
+          `${WORD[(k * (k - 1)) / 2] ?? (k * (k - 1)) / 2} kinds of face, each lying in two of them and ` +
+          `showing both as bands crossing it rather than mixed — the ten pairwise blends of five come no ` +
+          `closer than ΔE 17 to one another, where the five themselves sit 42 apart · ` +
+          `ribbon ${(100 * ribbon).toFixed(0)}% of the face` +
+          (ribbon >= 0.999
+              ? " — full width, so the two coincide and every face is a crossing"
+              : ribbon <= 0.001
+                  ? " — nothing left of them but the edges"
+                  : bandGround
+                      ? `, on the background as ground — ${(100 * (2 * ribbon - ribbon * ribbon)).toFixed(0)}% of each face is ribbon`
+                      : `, and what is in neither ribbon is not drawn at all — ${(100 * (2 * ribbon - ribbon * ribbon)).toFixed(0)}% of each face is left`)
+        : colorSel.value !== "five"
         ? ""
         : ` · Kowalewski ${WORD[nClass] ?? nClass} on K${SUB[k]}` +
           (k === 6
@@ -545,11 +678,12 @@ function build(): void {
     const volNote = hasFlip
         ? `together 4√(5+2√5) = ${vol.toFixed(6)}, the triacontahedron's own volume`
         : `together ${vol.toFixed(6)}, the solid's own volume — the three stand in the ratio 2 : 5 : 10`;
-    const singNote = POLE.length === 0
+    const singNote = cut === null
         ? ""
-        : ` · singularity: both poles deleted — ${cutFaces} of the ${6 * cells.length} cell faces gone, ` +
-          `three from each of the ${cells.filter((c) => c.faces.some((f) => f.some(atPole))).length} cells that reach a pole, ` +
-          `and the rim each leaves is a decagon on ten vertices · the cage is left whole`;
+        : ` · singularity: both poles deleted, with ${cut.atPoles} cell faces — three from each of the six cells ` +
+          `that reach one — and then ${cut.pruned} more, the faces left hanging on the four vertices that came down ` +
+          `to two edges, two at each end · ${cut.faces.size} of ${6 * cells.length} gone in ${cut.rounds} round, ` +
+          `nothing below three edges left · the cage is left whole`;
     statusEl.textContent =
         `${shown} of ${cells.length} cells — ${nAcute} acute at 0.760845, ${shown - nAcute} obtuse at 0.470228, ` +
         `in the ratio φ · ${volNote} · ` +
@@ -559,7 +693,10 @@ function build(): void {
 // The wording the flip control carries when there is something to flip. Taken from the
 // page rather than repeated here, so the two cannot drift apart.
 const FLIP_TITLE = flipLabel.title;
-const WORD: Record<number, string> = { 1: "one", 2: "two", 3: "three", 4: "four", 5: "five", 10: "ten", 20: "twenty" };
+const WORD: Record<number, string> = {
+    1: "one", 2: "two", 3: "three", 4: "four", 5: "five", 6: "six",
+    10: "ten", 12: "twelve", 15: "fifteen", 20: "twenty",
+};
 /** Subscript digits, for naming K₆ and its smaller relatives in the status line. */
 const SUB = "₀₁₂₃₄₅₆";
 
@@ -589,6 +726,13 @@ function relabel(): void {
     const single = cells.length === 1;
     showSel.disabled = single;
     explodeInput.disabled = single;
+    // The ribbon width is a property of the bands scheme and says nothing under the
+    // others, so it goes quiet with them — as the flip does off six axes.
+    const bandsOn = colorSel.value === "bands";
+    ribbonInput.disabled = !bandsOn;
+    ribbonLabel.style.opacity = bandsOn ? "" : "0.45";
+    groundChk.disabled = !bandsOn;
+    groundLabel.style.opacity = bandsOn ? "" : "0.45";
     const hasFlip = solid.axes.length === 6;
     flipChk.disabled = !hasFlip;
     flipLabel.style.opacity = hasFlip ? "" : "0.45";
@@ -599,6 +743,8 @@ function relabel(): void {
 
 solidSel.value = prefs.solid || PREF_DEFAULTS.solid;
 explodeInput.value = String(prefs.explode);
+ribbonInput.value = String(prefs.ribbon ?? PREF_DEFAULTS.ribbon);
+groundChk.checked = prefs.clearground ?? PREF_DEFAULTS.clearground;
 colorSel.value = prefs.color || PREF_DEFAULTS.color;
 showSel.value = prefs.show || PREF_DEFAULTS.show;
 faceSel.value = prefs.facemode || PREF_DEFAULTS.facemode;
@@ -622,24 +768,29 @@ setLighting();
 function rebuild(): void {
     relabel();
     explodeOut.textContent = `${(100 * Number(explodeInput.value)).toFixed(0)}%`;
+    ribbonOut.textContent = `${(100 * Number(ribbonInput.value)).toFixed(0)}%`;
     build();
 }
 explodeInput.addEventListener("input", rebuild);
-for (const c of [solidSel, colorSel, showSel, faceSel, edgeSel, cageSel, flipChk]) c.addEventListener("change", rebuild);
+ribbonInput.addEventListener("input", rebuild);
+for (const c of [solidSel, colorSel, showSel, faceSel, edgeSel, cageSel, flipChk, groundChk]) c.addEventListener("change", rebuild);
 
 // Scrolling over the slider works it, which is what a slider under the pointer ought to
 // do. Bound non-passively so the page does not scroll away underneath.
-explodeInput.addEventListener(
-    "wheel",
-    (e) => {
-        e.preventDefault();
-        const step = (e.shiftKey ? 0.002 : 0.02) * (e.deltaY > 0 ? -1 : 1);
-        const v = Math.min(1, Math.max(0, Number(explodeInput.value) + step));
-        explodeInput.value = String(v);
-        rebuild();
-    },
-    { passive: false },
-);
+for (const sl of [explodeInput, ribbonInput]) {
+    sl.addEventListener(
+        "wheel",
+        (e) => {
+            if (sl.disabled) return;
+            e.preventDefault();
+            const step = (e.shiftKey ? 0.002 : 0.02) * (e.deltaY > 0 ? -1 : 1);
+            const v = Math.min(1, Math.max(0, Number(sl.value) + step));
+            sl.value = String(v);
+            rebuild();
+        },
+        { passive: false },
+    );
+}
 spinChk.addEventListener("change", () => { controls.autoRotate = spinChk.checked; });
 orthoChk.addEventListener("change", setProjection);
 eyeChk.addEventListener("change", setLighting);
@@ -647,7 +798,9 @@ eyeChk.addEventListener("change", setLighting);
 function persist(): void {
     savePrefs(PREFS_KEY, {
         solid: solidSel.value,
-        explode: Number(explodeInput.value), color: colorSel.value,
+        explode: Number(explodeInput.value), ribbon: Number(ribbonInput.value),
+        clearground: groundChk.checked,
+        color: colorSel.value,
         show: showSel.value, facemode: faceSel.value, edgemode: edgeSel.value,
         cagemode: cageSel.value, flip: flipChk.checked,
         spin: spinChk.checked, ortho: orthoChk.checked, eyelight: eyeChk.checked,

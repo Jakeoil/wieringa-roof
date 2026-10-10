@@ -65,15 +65,10 @@
     </label>
     <label>Color <select id="color">
         <option value="five">Kowalewski five</option>
+        <option value="bands" title="One color per axis, carried by the edges — the five ribbon families of the pentagrid, five on the golden icosahedron. A face lies in two ribbons, so it shows both colors as bands crossing it, and a ribbon can be followed unbroken across the solid.">Bands</option>
         <option value="type">Acute / obtuse</option>
         <option value="cell">One hue per cell</option>
         <option value="axis">By axis</option>
-    </select></label>
-    <label>Show <select id="show">
-        <option value="all">All twenty</option>
-        <option value="acute">The ten acute</option>
-        <option value="obtuse">The ten obtuse</option>
-        <option value="singularity" title="Delete both poles. The golden icosahedron's two five-valent vertices are the only ones where all five zones meet; take each away with the five faces and five edges that carry it, and every cell reaching a pole loses three of its six faces. The cage is left whole.">Singularity</option>
     </select></label>
     <label>Faces <select id="facemode">
         <option value="solid">Solid</option>
@@ -90,7 +85,17 @@
         <option value="inner">Inner cage</option>
         <option value="none">None</option>
     </select></label>
+    <label>Show <select id="show">
+        <option value="all">All twenty</option>
+        <option value="acute">The ten acute</option>
+        <option value="obtuse">The ten obtuse</option>
+        <option value="singularity" title="Delete both poles. The golden icosahedron's two five-valent vertices are the only ones where all five zones meet; take each away with the five faces and five edges that carry it, and every cell reaching a pole loses three of its six faces. The cage is left whole.">Singularity</option>
+    </select></label>
+    <label id="ribbonlabel" title="How wide the ribbons run, as a fraction of the face. At 100% each covers the whole rhombus and the two coincide; at 0% there is nothing left of them. Scroll over the slider to work it; hold shift for fine steps.">Ribbon <span id="ribbonOut" class="mono"></span>
+        <input type="range" id="ribbon" min="0" max="1" step="0.01" value="0.5">
+    </label>
     <span class="checks">
+        <label id="groundlabel" title="Leave the part of each face outside its two ribbons undrawn, so the solid shows through the gaps. Unticked, that ground is painted the page's own background color and the ribbons read as stripes laid on a tile."><input type="checkbox" id="clearground"> clear ground</label>
         <label id="fliplabel" title="The two dissections differ by one flip inside a single Bilinski dodecahedron — four cells, six internal faces. Unflipped keeps a three-fold axis; flipped keeps no symmetry at all."><input type="checkbox" id="flip"> flip</label>
         <label><input type="checkbox" id="spin" checked> turn</label>
         <label title="Carry the lights with the viewpoint instead of leaving them standing in the scene. The lit side then stays where you are, so a turning solid reads as the solid turning rather than the camera walking round a statue — and on a lone hexahedron, whose six faces are the same rhombus, it is most of what says which way is which."><input type="checkbox" id="eyelight"> eye light</label>
@@ -246,6 +251,20 @@
     whole</strong>, so the holes are visible against the sockets the cells came out of.
 </p>
 <p>
+    <strong>And that is not the end of it.</strong> With the poles gone, two vertices at
+    each end are left carrying only <strong>two</strong> edges — one ring down the
+    five-fold axis, at height ±0.670820 — and a vertex with two edges is no longer a
+    corner of anything. The single face still holding it is joined to the rest of the
+    surface along one edge at each side and nothing else, hanging off the rim rather than
+    forming part of it. So it goes too: <strong>four more faces</strong>, two at each end,
+    each the outer face of one of the four oblate cells that reach a pole. Twenty-two of
+    the sixty cell faces in all. <strong>One round settles it</strong> — the lowest degree
+    left is three — which is a result rather than an assumption, the rule being to delete
+    what is left hanging and keep deleting. Degrees are counted on distinct faces, since
+    an internal face belongs to two cells and its edges are one edge, not two; which is
+    also what the eye counts.
+</p>
+<p>
     <strong>The Kowalewski five.</strong> There is a five-coloring of the
     triacontahedron's thirty faces in which <em>every rosette shows all five colors</em>,
     and it is forced rather than designed. A face is spanned by a <strong>pair</strong> of
@@ -254,6 +273,57 @@
     sharing an axis must differ, which is a <strong>proper edge coloring of K₆</strong>.
     K₆ needs exactly five colors, and a color class is a perfect matching of three
     pairs.
+</p>
+<p>
+    <strong>Bands</strong> colors by <em>ribbon</em> rather than by class. The faces
+    sharing an edge direction form a strip — the de Bruijn ribbon, the worm of the
+    pentagrid — and since every face is spanned by two axes, <strong>every face lies in
+    exactly two ribbons</strong>. So there are <em>k</em> bands and
+    <span class="mono">C(k,2)</span> kinds of face: five and ten on the golden
+    icosahedron, which is the pentagrid's own count and where the scheme is most at home.
+    The five colors are the Kowalewski five doing a different job, because on five axes
+    the ribbons <em>are</em> the five line families. The triacontahedron needs a sixth,
+    which is a teal placed ΔE 46 from the nearest of the five, the five sitting 41.6 from
+    each other.
+</p>
+<p>
+    The colors go on the <strong>edges</strong> — and on the sticks, in ball and stick,
+    where a ribbon is a run of rods all one color. A face then has to carry two, and it
+    carries them as <strong>bands</strong> rather than as a mixture. The ribbon of an axis
+    joins the two edges that run along that axis, which sit on opposite sides of the
+    rhombus; cut it to width and do the same for the other axis, and the face falls into
+    nine patches: two for each band, one where they cross, and four corners in neither
+    ribbon. Those four are the <strong>ground</strong>, painted the page's own background
+    so the ribbons read as stripes laid on a tile — and a ribbon runs on across the solid
+    unbroken, which is the whole point of the picture.
+</p>
+<p>
+    <strong>Clear ground</strong> takes the ground away, and takes it away rather than
+    making it see-through: those patches are not drawn at all, so there is no surface
+    there to be transparent. The solid is then the ribbons and nothing else, with its own
+    interior showing through the gaps — the ribbons are double-sided, so you see their
+    backs through the holes.
+</p>
+<p>
+    <strong>Ribbon</strong> sets how wide they run, as a fraction of the face. At
+    <span class="mono">50%</span> it is the plaid. Widen it and the gaps close, until at
+    <span class="mono">100%</span> each ribbon covers its whole rhombus, the two coincide
+    and every face is a single crossing. Narrow it and the ribbons thin to threads and
+    then to nothing, leaving only the edges. The drawn fraction of each face is exactly
+    <span class="mono">2w − w²</span> — two ribbons of width <em>w</em> less the square
+    where they overlap — and the ground makes up the rest, so a face is always covered
+    exactly once. Checked rather than asserted, along with the patches tiling each face
+    and each band reaching both of its own edges.
+</p>
+<p>
+    Mixing was tried and measured. The ten pairwise blends of five saturated hues come no
+    closer than <span class="mono">ΔE 17</span> to one another — the best of
+    twenty-four rules, blending in sRGB, in linear light and in Lab at six weights
+    apiece — against <span class="mono">41.6</span> for the five themselves, and anything
+    under about fifteen reads as the same color. Two of the ten would have been
+    indistinguishable under the shading gradient. <strong>Where the bands cross, though,
+    both really are present</strong>, and there the mixture is the honest answer: it is
+    the one place in the scheme that a blend says something true.
 </p>
 <p>
     <strong>Five is this solid's number, not the family's.</strong> On <em>k</em> axes the

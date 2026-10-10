@@ -502,6 +502,33 @@ export function faceColor(c: Cell, f: number, axes: AxisSet = AXES6): number {
     return pairColorOn(c.triple[(q + 1) % 3], c.triple[(q + 2) % 3], axes);
 }
 
+// ── the bands ─────────────────────────────────────────────────────
+//
+// A face is spanned by two axes, and its four edges run along them two and two. Those
+// are the **ribbons** of the de Bruijn picture: the faces sharing an edge direction form
+// a strip, and every face lies in exactly two strips — one per axis of its pair. So a
+// face belongs to a pair of bands, and with k axes there are k bands and C(k,2) kinds of
+// crossing: five and ten on the golden icosahedron, which is the pentagrid's own count.
+//
+// Which edge runs along which matters for drawing them, and it is not a convention: the
+// face `2q` or `2q+1` is built as `o ± u ± v` with `u` and `v` the cell's half-edges on
+// the two axes of its triple other than `q`, in ascending order. Corner 1 is corner 0
+// plus 2u and corner 3 is corner 0 plus 2v, so **even edges run along the first of the
+// pair and odd edges along the second**. Checked on every edge of every cell in
+// `tools/dissect.mjs` rather than taken on trust.
+
+/** The two axes a face is spanned by: its pair of bands, in ascending position. */
+export function bandAxes(c: Cell, f: number): [number, number] {
+    const q = f >> 1;
+    const pr = [0, 1, 2].filter((x) => x !== q);
+    return [c.triple[pr[0]], c.triple[pr[1]]];
+}
+
+/** Which axis edge `k` of face `f` runs along — `k` from corner `k` to corner `k+1`. */
+export function edgeAxis(c: Cell, f: number, k: number): number {
+    return bandAxes(c, f)[k % 2];
+}
+
 /** The colors a cell wears, sorted. Three of them wherever the solid has three axes to
  *  spare — one of the ten 3-subsets of five on the triacontahedron. */
 export function cellColors(c: Cell, axes: AxisSet = AXES6): number[] {
@@ -654,6 +681,111 @@ export function poles(axes: AxisSet = AXES6): V3[] {
         for (let d = 0; d < 3; d++) p[d] += (sg * A6[m][d]) / 2;
     }
     return [p, [-p[0], -p[1], -p[2]]];
+}
+
+/**
+ * Deleting the poles, and then whatever that deletion leaves hanging.
+ *
+ * Taking a pole away removes the five faces and five edges on it, three faces from each
+ * of the three cells that reach it. That is not the end of it. Two vertices at each end
+ * are left carrying only **two** edges — on the golden icosahedron they sit one ring
+ * down, at height ±0.670820 along the five-fold axis — and a vertex with two edges is no
+ * longer a corner of anything: the single face still holding it is attached to the rest
+ * of the surface along one edge at each side and nothing else. So it goes too, and the
+ * face with it. Four faces, two at each pole, each the outer face of one of the four
+ * oblate cells that reach a pole.
+ *
+ * **One round settles it.** After the pruning the lowest degree left is three, so the
+ * loop below runs twice and stops — but it is written as a loop rather than as two
+ * passes, because "delete what is left hanging" is the rule and the number of rounds is
+ * a result.
+ *
+ * Degrees are counted on **distinct** faces, not on cell faces: an internal face belongs
+ * to two cells and its edges are one edge, not two. That is also what the reader sees.
+ */
+export interface SingularityCut {
+    /** the cell faces deleted, keyed `${cell.id}:${faceIndex}` */
+    faces: Set<string>;
+    /** cell faces lost to the poles themselves */
+    atPoles: number;
+    /** cell faces lost to the pruning that followed */
+    pruned: number;
+    /** how many rounds of pruning it took to settle */
+    rounds: number;
+    /** is this one of the deleted vertices */
+    deleted(p: V3): boolean;
+}
+
+const CUTS = new WeakMap<Cell[], SingularityCut>();
+const vkey = (p: V3): string => p.map((x) => Math.round(x * 1e6)).join(",");
+
+export function singularityCut(cells: Cell[], axes: AxisSet = AXES6): SingularityCut {
+    const hit = CUTS.get(cells);
+    if (hit) return hit;
+    const gone = new Set<string>(poles(axes).map(vkey));
+    const faces = new Set<string>();
+    const drop = (): number => {
+        let n = 0;
+        for (const c of cells) {
+            c.faces.forEach((f, fi) => {
+                const k = `${c.id}:${fi}`;
+                if (faces.has(k)) return;
+                if (f.some((q) => gone.has(vkey(q)))) {
+                    faces.add(k);
+                    n++;
+                }
+            });
+        }
+        return n;
+    };
+    const atPoles = gone.size ? drop() : 0;
+    let pruned = 0;
+    let rounds = 0;
+    while (gone.size) {
+        rounds++;
+        // the surviving surface, one entry per distinct face
+        const seen = new Set<string>();
+        const live: V3[][] = [];
+        for (const c of cells) {
+            c.faces.forEach((f, fi) => {
+                if (faces.has(`${c.id}:${fi}`)) return;
+                const mid = vkey([0, 1, 2].map((d) => f.reduce((t, q) => t + q[d], 0) / 4) as V3);
+                if (seen.has(mid)) return;
+                seen.add(mid);
+                live.push(f);
+            });
+        }
+        const deg = new Map<string, Set<string>>();
+        for (const f of live) {
+            for (let e = 0; e < 4; e++) {
+                const a = vkey(f[e]), b = vkey(f[(e + 1) % 4]);
+                const ek = a < b ? `${a}|${b}` : `${b}|${a}`;
+                for (const v of [a, b]) {
+                    let set = deg.get(v);
+                    if (!set) deg.set(v, (set = new Set()));
+                    set.add(ek);
+                }
+            }
+        }
+        let added = 0;
+        for (const [v, edges] of deg) {
+            if (edges.size <= 2 && !gone.has(v)) {
+                gone.add(v);
+                added++;
+            }
+        }
+        if (!added) break;
+        pruned += drop();
+    }
+    const built: SingularityCut = {
+        faces,
+        atPoles,
+        pruned,
+        rounds: Math.max(0, rounds - 1),
+        deleted: (p: V3) => gone.has(vkey(p)),
+    };
+    CUTS.set(cells, built);
+    return built;
 }
 
 /** Is a point on the solid's surface — that is, extreme in some face direction? */
