@@ -92,6 +92,7 @@
     <span class="checks">
         <label id="fliplabel" title="The two dissections differ by one flip inside a single Bilinski dodecahedron — four cells, six internal faces. Unflipped keeps a three-fold axis; flipped keeps no symmetry at all."><input type="checkbox" id="flip"> flip</label>
         <label><input type="checkbox" id="spin" checked> turn</label>
+        <label title="Carry the lights with the viewpoint instead of leaving them standing in the scene. The lit side then stays where you are, so a turning solid reads as the solid turning rather than the camera walking round a statue — and on a lone hexahedron, whose six faces are the same rhombus, it is most of what says which way is which."><input type="checkbox" id="eyelight"> eye light</label>
         <label title="Drop the perspective. Parallel edges stay parallel and equal cells stay the same size wherever they sit, which is what makes the dissection legible; the cost is the depth cue."><input type="checkbox" id="ortho"> orthogonal</label>
         <button id="reset" title="Forget saved settings and start again from the defaults">Reset</button>
     </span>
@@ -168,6 +169,26 @@
     no convergence to read, near and far stop announcing themselves, so it helps to be
     turning. Ticking it changes the projection and nothing else — the frustum is sized to
     the apparent height the perspective camera had, so the solid does not jump.
+</p>
+<p>
+    <strong>Eye light</strong> decides where the lamps stand. Left in the scene they stay
+    still in the world while the camera walks round, so the lit side of the solid stays
+    put and slides across the screen — which reads as a viewer circling a statue. Carried
+    with the viewpoint they travel with the eye, so the lit side stays where you are and
+    the faces brighten and dim as they turn through it — which reads as the
+    <em>solid</em> turning. Neither is more correct; they are different questions about
+    what is moving.
+</p>
+<p>
+    It earns its keep on the hexahedra. Six faces of one rhombus, no feature to tell any
+    of them apart: this is the Necker cube's own ambiguity, and a lone rhombohedron
+    lit from off in the world can be read inside out. Carried with the eye, the shading
+    says which way is which. The solids are also <strong>framed to their own size</strong>
+    rather than all to the triacontahedron's — circumradii run 1.6180, 1.4644, 1.3764 and
+    0.9867, so a fixed frame left a hexahedron small and distant, which is precisely where
+    perspective had least to say. Fitting brings it from 6.18 back to 3.77 and the
+    foreshortening with it. The angle you are looking from is never touched, only the
+    distance, and only when the solid changes.
 </p>
 <p>
     <strong>The triacontahedron has exactly two dissections</strong>, up to rotation

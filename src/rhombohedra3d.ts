@@ -49,10 +49,11 @@ const flipChk = el<HTMLInputElement>("flip");
 const flipLabel = el<HTMLLabelElement>("fliplabel");
 const spinChk = el<HTMLInputElement>("spin");
 const orthoChk = el<HTMLInputElement>("ortho");
+const eyeChk = el<HTMLInputElement>("eyelight");
 const statusEl = el<HTMLElement>("status");
 
 const PREFS_KEY = "wr-rhombohedra";
-const PREF_DEFAULTS = { solid: "rt", ortho: false, explode: 0, color: "five", show: "all", facemode: "solid", edgemode: "edges", cagemode: "cage", flip: false, spin: true };
+const PREF_DEFAULTS = { solid: "rt", ortho: false, eyelight: false, explode: 0, color: "five", show: "all", facemode: "solid", edgemode: "edges", cagemode: "cage", flip: false, spin: true };
 const prefs = loadPrefs(PREFS_KEY, PREF_DEFAULTS);
 
 const scene = new THREE.Scene();
@@ -86,12 +87,43 @@ controls.addEventListener("start", () => {
 });
 
 scene.add(new THREE.AmbientLight(0xffffff, 0.68));
+
+// The two directional lights live in a group, because where that group hangs decides
+// something the reader can see. Hung in the scene, the lights stand still in the world
+// while the camera walks round: the lit side of the solid stays put in the world and
+// slides across the screen, which reads as a viewer circling a statue. Hung on the
+// camera, they travel with the eye: the lit side stays where the reader is and the
+// faces brighten and dim as they turn through it, which reads as the solid turning.
+//
+// It matters most where there is least else to go on. A lone golden rhombic hexahedron
+// has six faces of the same rhombus and no feature to tell one from another — the
+// Necker-cube case — and with the lights standing off in the world it can be read
+// inside out. Carried with the eye, the shading says which way is which.
+const lamps = new THREE.Group();
 const key = new THREE.DirectionalLight(0xffffff, 1.35);
-key.position.set(4, -6, 8);
-scene.add(key);
 const rim = new THREE.DirectionalLight(0xffffff, 0.32);
-rim.position.set(-6, 4, -2);
-scene.add(rim);
+lamps.add(key, rim);
+// A directional light shines from where it is toward its target, and the target sits at
+// the world origin, which is where the solid is and where the controls point. So the
+// offsets are directions rather than places, and they need to be different in the two
+// modes: in the world they are absolute, on the camera they are right / up / toward the
+// viewer.
+const LAMPS_WORLD: Array<[number, number, number]> = [[4, -6, 8], [-6, 4, -2]];
+const LAMPS_EYE: Array<[number, number, number]> = [[3, 4, 5], [-4, -2, -1]];
+scene.add(lamps);
+// Both cameras join the scene graph so that whichever one is carrying the lights has
+// its children traversed. A camera draws nothing itself, so this costs nothing.
+scene.add(persp, ortho);
+
+/** Hang the lights where the reader asked: on the camera, or out in the world. */
+function setLighting(): void {
+    const eye = eyeChk.checked;
+    const offsets = eye ? LAMPS_EYE : LAMPS_WORLD;
+    key.position.set(...offsets[0]);
+    rim.position.set(...offsets[1]);
+    const host: THREE.Object3D = eye ? camera : scene;
+    if (lamps.parent !== host) host.add(lamps);
+}
 
 const ACUTE = new THREE.Color(0xd98d3a);
 const OBTUSE = new THREE.Color(0x4a7fb5);
@@ -157,6 +189,47 @@ function labelledCount(axes: AxisSet, key: string): number {
     return NDISS[key];
 }
 
+/**
+ * How far back the camera stands, per unit of the solid's circumradius.
+ *
+ * Read off the opening view of the triacontahedron — 6.1806 at a circumradius of φ — so
+ * that view is exactly what it was and the rest of the family is framed to match it. The
+ * family's sizes are not alike: circumradii run 1.6180, 1.4644, 1.3764 and 0.9867, so a
+ * frame built for the triacontahedron leaves a lone hexahedron small and far off, which
+ * is the one place perspective was doing least work. Fitting brings it in to 3.7690.
+ */
+const FIT = Math.hypot(3.4, 4.2, 3.0) / ((1 + Math.sqrt(5)) / 2);
+
+/** The furthest any corner of the solid reaches from its center. */
+function solidRadius(cells: Cell[]): number {
+    let r = 0;
+    for (const c of cells) for (const p of c.corners) r = Math.max(r, Math.hypot(p[0], p[1], p[2]));
+    return r;
+}
+
+/** Which solid the view is currently framed for, so refitting happens on a change
+ *  of solid and never underneath a reader who has just zoomed. */
+let framedFor = "";
+
+/**
+ * Stand the camera back far enough to hold the solid, keeping the direction it is
+ * already looking from. Distance only — the reader's chosen angle is theirs.
+ */
+function frame(radius: number): void {
+    const dir = new THREE.Vector3().subVectors(camera.position, controls.target);
+    if (dir.lengthSq() < 1e-12) dir.set(3.4, -4.2, 3.0);
+    dir.setLength(radius * FIT);
+    camera.position.copy(controls.target).add(dir);
+    if (camera === ortho) {
+        // An orthographic camera cannot frame by standing back, so its frustum is what
+        // has to change: the height the perspective camera would show at that distance.
+        orthoHalf = radius * FIT * Math.tan((persp.fov / 2) * (Math.PI / 180));
+        ortho.zoom = 1;
+        resize();
+    }
+    controls.update();
+}
+
 /** The cells and cage of one solid and kind, worked out once. */
 function cellsOf(solid: { key: string; axes: AxisSet }, kind: DissectionKind): Cell[] {
     const ck = `${kind}|${solid.key}`;
@@ -218,6 +291,10 @@ function build(): void {
     const kind: DissectionKind = hasFlip && flipChk.checked ? "chiral" : "symmetric";
     const cells = cellsOf(solid, kind);
     const cage = CAGES[`${kind}|${solid.key}`];
+    if (framedFor !== solid.key) {
+        framedFor = solid.key;
+        frame(solidRadius(cells));
+    }
     // Corners and edges of each cell, for the ball-and-stick frame. Taken per cell
     // rather than deduplicated: assembled, neighboring cells share corners and the
     // beads coincide exactly, which looks like one bead — and once exploded they must
@@ -507,7 +584,9 @@ for (const [sel, def] of [
 flipChk.checked = prefs.flip;
 spinChk.checked = prefs.spin;
 orthoChk.checked = prefs.ortho;
+eyeChk.checked = prefs.eyelight;
 controls.autoRotate = spinChk.checked;
+setLighting();
 
 function rebuild(): void {
     relabel();
@@ -532,6 +611,7 @@ explodeInput.addEventListener(
 );
 spinChk.addEventListener("change", () => { controls.autoRotate = spinChk.checked; });
 orthoChk.addEventListener("change", setProjection);
+eyeChk.addEventListener("change", setLighting);
 
 function persist(): void {
     savePrefs(PREFS_KEY, {
@@ -539,7 +619,7 @@ function persist(): void {
         explode: Number(explodeInput.value), color: colorSel.value,
         show: showSel.value, facemode: faceSel.value, edgemode: edgeSel.value,
         cagemode: cageSel.value, flip: flipChk.checked,
-        spin: spinChk.checked, ortho: orthoChk.checked,
+        spin: spinChk.checked, ortho: orthoChk.checked, eyelight: eyeChk.checked,
     });
 }
 window.addEventListener("beforeunload", persist);
@@ -586,6 +666,7 @@ function setProjection(): void {
     next.position.copy(camera.position);
     next.up.copy(camera.up);
     camera = next;
+    if (eyeChk.checked) next.add(lamps);
     // The typings give `object` as a perspective camera, but OrbitControls branches on
     // `isOrthographicCamera` throughout and drives both — so this is the types catching
     // up, not a shortcut past them.
