@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Exceptional Singularity — Wieringa Roof</title>
+<link rel="stylesheet" href="./site.css">
+<link rel="icon" href="./favicon.svg">
+<style>
+    .bar { display: flex; gap: 16px; align-items: flex-end; flex-wrap: wrap;
+        background: var(--panel); border: 1px solid var(--rule);
+        border-radius: 8px; padding: 12px 14px; margin: 18px 0 10px; }
+    .bar label { display: flex; flex-direction: column; gap: 3px; font-size: 12px; color: var(--ink-soft); }
+    .bar select { font: inherit; font-size: 13px; padding: 5px 8px; border: 1px solid #ccc; border-radius: 4px; background: #fff; color: var(--ink); }
+    .bar input[type=range] { width: 190px; }
+    .bar .checks { display: flex; gap: 12px; align-items: center; }
+    .bar .checks label { flex-direction: row; align-items: center; gap: 5px; font-size: 13px; color: var(--ink); }
+    #view { width: 100%; height: min(72vh, 640px); border: 1px solid var(--rule);
+        border-radius: 8px; overflow: hidden; background: #f4f1e8; }
+    #view canvas { display: block; width: 100%; height: 100%; cursor: grab; }
+    #view canvas:active { cursor: grabbing; }
+    #status { display: block; margin: 10px 0 0; line-height: 1.5; }
+</style>
+</head>
+<body>
+
+<nav>
+    <span class="brand">Wieringa Roof</span>
+    <a href="./index.html" draggable="false">Home</a>
+    <a href="./roof3d.html" draggable="false">3D</a>
+    <a href="./info.html" draggable="false">Mathematics</a>
+    <a href="./polyhedra.html" draggable="false">Polyhedra</a>
+    <a href="./centers.html" draggable="false">Centers</a>
+    <a href="./packing.html" draggable="false">Packing</a>
+    <a href="./rhombohedra.html" draggable="false">Cage</a>
+    <a href="./intersect.html" draggable="false">Intersection</a>
+    <a href="./nets.html" draggable="false">Solid nets</a>
+    <a href="./hexroof.html" draggable="false">Hexahedra</a>
+    <a href="./exceptional.html" draggable="false" aria-current="page">Exceptional</a>
+    <a href="./unfold.html" draggable="false">Workbench</a>
+    <a href="./tools.html" draggable="false">Tools</a>
+    <a href="./utilities.html" draggable="false">Utilities</a>
+    <a href="./unfold.html#sheets" draggable="false">Sheets</a>
+</nav>
+
+<div class="wrap">
+
+<h1>Exceptional Singularity</h1>
+<p class="lede">
+    The one point in the Penrose plane where the roof stands up. A decagon needs every
+    phase integral, and since only the fractional parts matter that is the single phase
+    vector that is its own class — so this is not a rare configuration, it is
+    <em>one point</em>, and no other Penrose class has one anywhere. Phase 1: the patch
+    it lives in, as a Wieringa roof.
+</p>
+
+<div class="bar">
+    <label title="Kowalewski colors a face by the pair of generators spanning it, so every rosette shows all five. Bands colors by ribbon instead: a face lies in two of them and shows both.">Color <select id="color">
+        <option value="five">Kowalewski five</option>
+        <option value="bands">Bands</option>
+    </select></label>
+    <label>Faces <select id="facemode">
+        <option value="solid">Solid</option>
+        <option value="transparent">Transparent</option>
+        <option value="invisible">Invisible</option>
+    </select></label>
+    <label>Frame <select id="edgemode">
+        <option value="ballstick">Ball and stick</option>
+        <option value="edges">Edges</option>
+        <option value="invisible">Invisible</option>
+    </select></label>
+    <label id="ribbonlabel" title="How wide the ribbons run, as a fraction of the face. At 100% each covers the whole rhombus and the two coincide; at 0% there is nothing left of them. Scroll over the slider to work it; hold shift for fine steps.">Ribbon <span id="ribbonOut" class="mono"></span>
+        <input type="range" id="ribbon" min="0" max="1" step="0.01" value="0.5">
+    </label>
+    <span class="checks">
+        <label id="groundlabel" title="Leave the part of each face outside its two ribbons undrawn, so the roof shows through the gaps."><input type="checkbox" id="clearground"> clear ground</label>
+        <label><input type="checkbox" id="spin" checked> turn</label>
+        <label title="Carry the lights with the viewpoint instead of leaving them standing in the scene, so a turning surface reads as the surface turning."><input type="checkbox" id="eyelight"> eye light</label>
+        <label title="Drop the perspective. Parallel edges stay parallel, which is the plan view the reference drawings are in."><input type="checkbox" id="ortho"> orthogonal</label>
+        <button id="reset" title="Forget saved settings and start again from the defaults">Reset</button>
+    </span>
+</div>
+
+<div id="view"></div>
+<span class="info" id="status"></span>
+
+<details id="help">
+    <summary>How it works <span class="mono" id="buildtag" style="font-weight:400;color:#888"></span></summary>
+    <div class="helpbody">
+
+<p>
+    <strong>Why one point.</strong> A decagon in the pentagrid needs every phase
+    <span class="mono">γⱼ</span> integral, and since only <span class="mono">γⱼ mod 1</span>
+    matters that is <span class="mono">γ ≡ 0</span> — the one phase vector that is its own
+    class. The class invariant <span class="mono">Σ(γⱼ mod 1)</span> is 0 for that vector
+    alone and 1 or 2 for every other Penrose patch, so <strong>no other class has a
+    decagon anywhere</strong>. It is not rare; it is a single point in the whole plane,
+    and that is what makes it exceptional.
+</p>
+<p>
+    <strong>What a singularity is.</strong> Where <em>k</em> grid lines meet, the
+    2<sup>k</sup> regions around the meeting are the corners of a <em>k</em>-cube, and
+    the plane had only ever shown its shadow. Lift each region to its own height and
+    that cube embeds in the roof's three-space as a <strong>zonohedron</strong> — not a
+    picture of one, the solid itself. Three lines give a golden rhombohedron, four
+    Bilinski's dodecahedron, five the golden rhombic icosahedron
+    <span class="mono">F₂₀</span>, which is the same solid the
+    <a href="./rhombohedra.html">Cage</a> builds from five of the six icosahedral axes.
+    Every edge is <span class="mono">√5/2</span> and every face has diagonal ratio φ:
+    the roof's own golden rhombus. <strong>A singularity is not a defect in the roof. It
+    is a piece of the roof's solid geometry that the plane was flattening.</strong>
+</p>
+<p>
+    <strong>This page, so far.</strong> Phase 1 draws the patch and nothing else: the
+    <strong>Queen</strong> composite at generation 3, which is the cartwheel, and the
+    cartwheel is this singularity. Every rhombus is the same golden rhombus at a
+    different tilt and orientation — there is no thick and no thin here, only the one
+    shape seen from different angles, which is what a Wieringa roof is. The decagon at
+    the center is already one of the ten configurations it can take.
+</p>
+<p>
+    <strong>Five generators, not six.</strong> The roof lifts on five of the six
+    icosahedral five-fold axes. The sixth is the vertical, and a pentagrid can never
+    supply it: a zone is a family of parallel lines, and that one would need plane
+    normal <strong>0</strong> — a family whose lines have no direction. Adding it is the
+    step from Penrose's 5→2 to the icosahedral 6→3. So the coloring here runs on five
+    axes, and the Kowalewski five is exactly five:
+    <span class="mono">χ′(K₅) = 5</span>, the least K₅ admits.
+</p>
+<p>
+    <strong>Bands</strong> colors by ribbon instead. The faces sharing an edge direction
+    form a strip, and every face lies in exactly two — so five ribbon families and ten
+    kinds of crossing. A face shows both of its colors as bands rather than mixed,
+    because the ten pairwise blends of five saturated hues come no closer than
+    <span class="mono">ΔE 17</span> to one another where the five themselves sit 42
+    apart. <strong>Ribbon</strong> sets their width and <strong>clear ground</strong>
+    drops everything outside them, leaving the roof as its ribbons alone.
+</p>
+<p>
+    <strong>Still to come.</strong> The skewbs — the A₆ and O₆ rhombohedra, which run in
+    infinite Fibonacci sequences along the grid lines, five sequences in ten directions
+    from the center. Then F₂₀ itself as a solid standing at the origin, with its two
+    poles. Then the resolutions: the ten placements of the one legal reading of the
+    decagon. See <span class="mono">EXCEPTIONAL.md</span>.
+</p>
+
+    </div>
+</details>
+
+</div>
+
+<script type="importmap">
+{
+    "imports": {
+        "three": "./vendor/three.module.js",
+        "three/addons/controls/OrbitControls.js": "./vendor/OrbitControls.js",
+        "three/addons/lines/LineSegments2.js": "./vendor/LineSegments2.js",
+        "three/addons/lines/LineSegmentsGeometry.js": "./vendor/LineSegmentsGeometry.js",
+        "three/addons/lines/LineMaterial.js": "./vendor/LineMaterial.js"
+    }
+}
+</script>
+<script type="module" src="./dist/exceptional.js"></script>
+<script src="./site.js"></script>
+</body>
+</html>

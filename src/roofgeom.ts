@@ -31,6 +31,11 @@ export interface RoofFaceInfo {
      *  vertical — never used, which is what lets the triacontahedron's five-coloring
      *  be read straight off it. */
     pair: [number, number];
+    /** the same two generators **in edge order** rather than ascending: `dirs[0]` is the
+     *  generator the edge `vids[0] → vids[1]` runs along and `dirs[1]` the one
+     *  `vids[0] → vids[3]` runs along. `pair` sorts them and so loses which is which,
+     *  which is all the five-coloring needs but not enough to draw a ribbon. */
+    dirs: [number, number];
 }
 
 export interface RoofData {
@@ -147,6 +152,7 @@ export function buildRoof(vscale: number, flip: boolean): RoofData | null {
             thick: r.thick,
             group: r.group,
             pair: [Math.min(a, b), Math.max(a, b)] as [number, number],
+            dirs: [a, b] as [number, number],
         };
     });
 
