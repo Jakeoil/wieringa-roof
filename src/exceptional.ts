@@ -35,6 +35,7 @@ const el = <T extends HTMLElement>(id: string): T => {
 const view = el<HTMLDivElement>("view");
 const colorSel = el<HTMLSelectElement>("color");
 const faceSel = el<HTMLSelectElement>("facemode");
+const shadeChk = el<HTMLInputElement>("shading");
 const edgeSel = el<HTMLSelectElement>("edgemode");
 const ribbonInput = el<HTMLInputElement>("ribbon");
 const ribbonOut = el<HTMLElement>("ribbonOut");
@@ -53,6 +54,7 @@ const PREF_DEFAULTS = {
     // in a plan view, and that is what it should open on.
     color: "bands",
     facemode: "solid",
+    shading: false,
     // Ball and stick by default, which is not the Cage's default: this surface is a
     // single sheet of rhombi rather than twenty solids, and the rods are what give it
     // depth before any of the coloring does.
@@ -567,6 +569,13 @@ function shadeOf(f: GoldenFace): number {
  * ask whether every star that closes is one of the seven.
  *
  * No γ anywhere, which is the whole point — the cascade is local arithmetic.
+ *
+ * There is a second rule and it bites only at the boundary. **No two adjacent rhombi
+ * may span the same pair of generators** — identical tiles edge to edge, which is a band
+ * running straight between them. Measured across thirty patches: **0 of 22,715 interior
+ * edges** do it. Inside a figure it is vacuous, since a zonogon's tiling uses each pair
+ * once and two of a kind can never meet; between a figure and its neighbors it is real,
+ * and it is one of the things that makes a collapse carry.
  */
 function readingFits(fg: Figure, T: MaskRhomb[], live: GoldenFace[]): boolean {
     const want = readingFaces(gens5, fg.anchor, T);
@@ -593,11 +602,35 @@ function readingFits(fg: Figure, T: MaskRhomb[], live: GoldenFace[]): boolean {
             l.push(deg);
         }
     };
-    for (const f of live) if (!own.has(midKey(f))) add(f);
+    const outside = live.filter((f) => !own.has(midKey(f)));
+    for (const f of outside) add(f);
     for (const f of want) add(f);
     for (const angles of at.values()) {
         const sum = angles.reduce((x, y) => x + y, 0);
         if (Math.abs(sum - 360) <= 2 && !LEGAL_STARS.has(starSig(angles))) return false;
+    }
+
+    // no straight band: an edge shared with a rhombus spanning the same pair
+    const ekey = (p: V3, q: V3) => {
+        const a = key(p), b = key(q);
+        return a < b ? `${a}|${b}` : `${b}|${a}`;
+    };
+    const byEdge = new Map<string, [number, number]>();
+    for (const f of outside) {
+        for (let k = 0; k < 4; k++) {
+            const a = f.corners[k], b = f.corners[(k + 1) % 4];
+            if (!mine.has(key(a)) || !mine.has(key(b))) continue;
+            byEdge.set(ekey(a, b), f.dirs);
+        }
+    }
+    for (const f of want) {
+        for (let k = 0; k < 4; k++) {
+            const hit = byEdge.get(ekey(f.corners[k], f.corners[(k + 1) % 4]));
+            if (!hit) continue;
+            const mineP = [f.dirs[0], f.dirs[1]].sort().join(",");
+            const theirs = [hit[0], hit[1]].sort().join(",");
+            if (mineP === theirs) return false;
+        }
     }
     return true;
 }
@@ -626,6 +659,13 @@ function liveSurface(): GoldenFace[] {
  * Bounded, and the bound is reported rather than hidden. A greedy propagation like this
  * can in principle chase its own tail, and saying so is better than looping.
  */
+function measure(): void {
+    const live = liveSurface();
+    for (const fg of figures) {
+        fg.open = fg.state !== null ? 1 : fg.readings.filter((T) => readingFits(fg, T, live)).length;
+    }
+}
+
 function settle(): { rounds: number; forced: number; stuck: number } {
     let rounds = 0, forced = 0;
     for (; rounds < 12; rounds++) {
@@ -699,7 +739,7 @@ function build(reframe: boolean): void {
         axes: AXES,
         ribbon,
         ground: !groundChk.checked,
-        shadeOf,
+        shadeOf: shadeChk.checked ? shadeOf : undefined,
         // F₂₀ and the skewbs are not patches laid over the tiling — they are made of
         // the same golden rhombi as everything round them, and they take the same
         // scheme, so a ribbon runs across them unbroken and the banding **matches the
@@ -727,34 +767,26 @@ function build(reframe: boolean): void {
         },
         rimColor: DECA_RIM,
     });
-    if (reframe) gv.frame(radius);
+    // Close enough that the patch nearly fills the view, leaving a tile or so at the
+    // corners rather than a wide empty border.
+    if (reframe) gv.frame(radius * 0.86);
 
-    const relief = zHi - zLo;
-    const note = bands
-        ? ` · bands: five ribbon families, one per generator, carried by the edges · ` +
-          `ten kinds of face · ribbon ${(100 * ribbon).toFixed(0)}%` +
-          (groundChk.checked ? ", no ground — the roof shows through the gaps" : ", on the background as ground")
-        : " · Kowalewski five on K₅: every rosette shows all five, and five is the least K₅ admits";
+    // Terse on purpose: what the patch is, what the figures are doing, and the last
+    // thing that happened. Everything else is in How it works, which is where a reader
+    // can go looking rather than have it in the way.
+    const collapsed = figures.filter((f) => f.state !== null).length;
+    const open = figures.filter((f) => f.state === null && f.open > 1).length;
     statusEl.textContent =
-        `Deca generation ${GEN} — ${faces.length} golden rhombi on ${vertexList.length} vertices, ` +
-        `${decaCount} of them the reading F₂₀ superposes at the center` +
-        `${capped ? ", capped away" : ", kept inside it"} · standing √5 tall on its ` +
-        `${figures.filter((f) => f.state !== null).length} of ${figures.length} figures collapsed, ` +
-        `${figures.filter((f) => f.state === null && f.open > 1).length} still superposed · ` +
-        `${lastCascade || "click a figure to collapse it"} · ` +
-        `own two poles · ${skewbAcute + skewbOblate} skewbs outlined on the five ribbons `+
-        `out of it (${skewbAcute} A₆, ${skewbOblate} O₆) · both wear the same scheme as `+
-        `the roof, so the banding runs across them unbroken and only the rims mark them · ` +
-        `every one the same rhombus at a different tilt · relief ${relief.toFixed(3)} ` +
-        `(3/√5 = ${(3 / Math.sqrt(5)).toFixed(3)} side lengths) · ` +
-        `the five generators are five of the six icosahedral axes; the sixth is the ` +
-        `vertical, which no pentagrid can supply${note}`;
+        `Deca gen ${GEN} · ${faces.length} rhombi · F₂₀ and ${figures.length - 1} skewbs · ` +
+        `${collapsed} collapsed, ${open} superposed` +
+        (lastCascade ? ` · ${lastCascade}` : " · click a figure to collapse it");
 }
 
 // ── controls ──────────────────────────────────────────────────────
 
 colorSel.value = prefs.color || PREF_DEFAULTS.color;
 faceSel.value = prefs.facemode || PREF_DEFAULTS.facemode;
+shadeChk.checked = prefs.shading ?? PREF_DEFAULTS.shading;
 edgeSel.value = prefs.edgemode || PREF_DEFAULTS.edgemode;
 for (const [sel, def] of [
     [colorSel, PREF_DEFAULTS.color], [faceSel, PREF_DEFAULTS.facemode],
@@ -775,7 +807,7 @@ function rebuild(reframe: boolean): void {
     build(reframe);
 }
 
-for (const c of [colorSel, faceSel, edgeSel, capChk, groundChk]) {
+for (const c of [colorSel, faceSel, edgeSel, capChk, groundChk, shadeChk]) {
     c.addEventListener("change", () => rebuild(false));
 }
 ribbonInput.addEventListener("input", () => rebuild(false));
@@ -797,6 +829,7 @@ orthoChk.addEventListener("change", () => gv.setProjection(orthoChk.checked));
 function persist(): void {
     savePrefs(PREFS_KEY, {
         color: colorSel.value, facemode: faceSel.value, edgemode: edgeSel.value,
+        shading: shadeChk.checked,
         ribbon: Number(ribbonInput.value), cap: capChk.checked,
         clearground: groundChk.checked,
         spin: spinChk.checked, eyelight: eyeChk.checked, ortho: orthoChk.checked,
@@ -873,8 +906,10 @@ view.addEventListener("pointerleave", () => {
 // view and the colors away too, which is far too much to pay for another go.
 el<HTMLButtonElement>("release").addEventListener("click", () => {
     for (const fg of figures) fg.state = null;
-    settle();
-    lastCascade = "released — every singularity superposed again";
+    // **Measure, do not settle.** Settling here immediately re-forced whatever the
+    // tiling still determines, so Release looked like it did nothing at all.
+    measure();
+    lastCascade = "released";
     rebuild(false);
 });
 

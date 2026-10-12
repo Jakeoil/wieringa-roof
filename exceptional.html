@@ -60,20 +60,21 @@
         <option value="bands">Bands</option>
         <option value="five">Kowalewski five</option>
     </select></label>
-    <label>Faces <select id="facemode">
-        <option value="solid">Solid</option>
-        <option value="transparent">Transparent</option>
-        <option value="invisible">Invisible</option>
-    </select></label>
     <label>Frame <select id="edgemode">
         <option value="ballstick">Ball and stick</option>
         <option value="edges">Edges</option>
+        <option value="invisible">Invisible</option>
+    </select></label>
+    <label>Faces <select id="facemode">
+        <option value="solid">Solid</option>
+        <option value="transparent">Transparent</option>
         <option value="invisible">Invisible</option>
     </select></label>
     <label id="ribbonlabel" title="How wide the ribbons run, as a fraction of the face. At 100% each covers the whole rhombus and the two coincide; at 0% there is nothing left of them. Scroll over the slider to work it; hold shift for fine steps.">Ribbon <span id="ribbonOut" class="mono"></span>
         <input type="range" id="ribbon" min="0" max="1" step="0.01" value="0.5">
     </label>
     <span class="checks">
+        <label title="Shade each rhombus by its height, so the relief reads before any color does. Off, the colors stand alone."><input type="checkbox" id="shading"> shading</label>
         <label id="caplabel" title="Cap the decagon: hide the ten rhombi of the reading the patch happens to take, leaving F₂₀'s own surface. Unticked they stay, inside the solid — set the faces transparent and you see the one path through the superposition of all of them. Seven of the ten are genuinely interior to F₂₀ and only three lie on its boundary."><input type="checkbox" id="cap"> cap</label>
         <label id="groundlabel" title="Leave the part of each face outside its two ribbons undrawn, so the roof shows through the gaps."><input type="checkbox" id="clearground"> clear ground</label>
         <label><input type="checkbox" id="spin"> turn</label>
@@ -114,12 +115,21 @@
     a 2-state flip, the flip being the roof turned over.
 </p>
 <p>
-    <strong>The cascade.</strong> A collapse leaves the figure's rim alone, so nothing
-    travels through the boundary; what it changes is the <strong>vertex star</strong> at
-    each corner it touches. A Penrose tiling admits only <strong>seven</strong> stars, so
-    after each collapse every figure is asked how many of its readings survive, and any
-    down to one collapses too. That is all the cascade is — no phases, no grid, only the
-    arrows. <strong>Release</strong> puts everything back.
+    <strong>A vertex star</strong> is simply the set of rhombi meeting at one corner,
+    named by the angles they bring: five thick rhombi round a point is
+    <span class="mono">72+72+72+72+72</span>, the sun. Sum to 360° and the corner closes.
+    Only <strong>seven</strong> stars ever occur in a Penrose tiling — measured here from
+    10,639 real ones — and two of them are our own figures:
+    <span class="mono">108+108+144</span> is the oblate skewb and
+    <span class="mono">72+144+144</span> the acute. Others add to 360° perfectly well and
+    still never appear; <span class="mono">36+108+108+108</span> is one.
+</p>
+<p>
+    <strong>That is the whole cascade.</strong> A collapse leaves the figure's rim alone,
+    so nothing travels through the boundary — what it changes is the star at each corner
+    it touches. So after a collapse every figure is asked how many of its readings still
+    leave every star among the seven, and any down to one collapses too. No phases, no
+    grid, only the arrows. <strong>Release</strong> puts everything back.
 </p>
 <p>
     <strong>Why ten.</strong> The decagon has 62 rhombic tilings. Requiring every vertex

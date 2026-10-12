@@ -241,7 +241,9 @@ export function createGoldenView(
 
     let drawn: THREE.Object3D[] = [];
     let edgeMats: LineMaterial[] = [];
-    let tris = 0;
+    /** vertices pushed, which is **three per triangle** — the picking map is per
+     *  triangle, so it is filled against `tris / 3` and not against this. */
+    let verts = 0;
     /** the face each emitted triangle belongs to, parallel to the position buffer */
     let triFace: number[] = [];
     let faceMesh: THREE.Mesh | null = null;
@@ -358,7 +360,7 @@ export function createGoldenView(
                 for (const p of [p00, p10, p11, p00, p11, p01]) {
                     out.push(p[0], p[1], p[2]);
                     cols.push(q.r, q.g, q.b);
-                    tris++;
+                    verts++;
                 }
             }
         }
@@ -386,7 +388,7 @@ export function createGoldenView(
 
     function draw(faces: GoldenFace[], o: DrawOptions): void {
         clear();
-        tris = 0;
+        verts = 0;
         triFace = [];
         const bands = o.scheme === "bands";
         const ground = o.ground ? BAND_GROUND : null;
@@ -412,7 +414,7 @@ export function createGoldenView(
         // one push missed would mis-identify a click without ever looking wrong.
         let prev = -1;
         faces.forEach((f, i) => {
-            while (triFace.length < tris) triFace.push(prev);
+            while (triFace.length < verts / 3) triFace.push(prev);
             prev = i;
             const shade = o.shadeOf ? o.shadeOf(f, i) : 0;
             const cap = o.capOf ? o.capOf(f, i) : null;
@@ -445,7 +447,7 @@ export function createGoldenView(
                             for (const pt of [c[0], c[1], c[2], c[0], c[2], c[3]]) {
                                 pos.push(pt[0], pt[1], pt[2]);
                                 cols.push(fl.r, fl.g, fl.b);
-                                tris++;
+                                verts++;
                             }
                         }
                     }
@@ -475,14 +477,14 @@ export function createGoldenView(
                             for (const pt of [at(s0, t0), at(s1, t0), at(s1, t1), at(s0, t0), at(s1, t1), at(s0, t1)]) {
                                 pos.push(pt[0], pt[1], pt[2]);
                                 cols.push(col2.r, col2.g, col2.b);
-                                tris++;
+                                verts++;
                             }
                         }
                     } else {
                         for (const pt of [c[0], c[1], c[2], c[0], c[2], c[3]]) {
                             pos.push(pt[0], pt[1], pt[2]);
                             cols.push(q.r, q.g, q.b);
-                            tris++;
+                            verts++;
                         }
                     }
                 }
@@ -502,7 +504,7 @@ export function createGoldenView(
                     for (const p of [c[0], c[1], c[2], c[0], c[2], c[3]]) {
                         pos.push(p[0], p[1], p[2]);
                         cols.push(flat.r, flat.g, flat.b);
-                        tris++;
+                        verts++;
                     }
                 }
             }
@@ -522,7 +524,7 @@ export function createGoldenView(
             if (o.edgeMode === "ballstick") addSticks(f, beads, rods, seen, vkey);
         });
 
-        while (triFace.length < tris) triFace.push(prev);
+        while (triFace.length < verts / 3) triFace.push(prev);
 
         if (pos.length) {
             const g = new THREE.BufferGeometry();
@@ -658,7 +660,7 @@ export function createGoldenView(
             controls.update();
             renderer.render(scene, cam);
         }),
-        triangles: () => tris,
+        triangles: () => verts / 3,
         pick: (ev) => {
             if (!faceMesh) return null;
             const r = renderer.domElement.getBoundingClientRect();
