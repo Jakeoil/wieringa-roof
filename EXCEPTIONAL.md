@@ -427,6 +427,37 @@ scrambles Elnitsky's ordering and yields 0 legal tilings instead of 40. And the 
 must be matched **in the plane**, since a 36° turn sends `E` to `−v + ẑ/√5`, which is
 neither plus nor minus any `E`.
 
+### The right objects are ribbons, not hexagons (Jake, 2026-10-12)
+
+> Singularities are rare and simple in LI(0) aka pure penrose. There are only two kinds.
+> One musical ribbon in one of the 5 directions. the other is 5 musical ribbons
+> intersecting at the exceptional singularity.
+
+That is the cartwheel on the cover of *Scientific American*, January 1977 — the issue
+that announced Penrose tiles, with the bow-ties.
+
+**This is a different unit of account from what the demo was built on.** It treated each
+hexagon as a figure with two readings and asked which fit. The measurement that followed
+says that cannot be right: with the stars and the no-straight-band rule in force, 300 of
+the patch's 310 hexagons are already determined, and the ten that are not lie on a circle
+of radius 11.37 in a patch of radius 12.26 — the cut edge, nothing more. A Penrose tiling
+is **rigid**, so no single hexagon is ever free, and there is nothing for a click on one
+to do.
+
+The singularity is the **whole ribbon**, and the operation is the **gridline nudge**: it
+resolves every singularity along the line except the one infinite musical spoke. Which
+also explains what was seen earlier from the other end — *"the musical path of collapsing
+skewbs resolves onto a musical path of hexagon shaped triple rhombs… mostly it leaves two
+of the skewb spokes at a right angle to the propagation."* The path is the object.
+
+Jake is working on a second combinatorial path to this: simulating the movement of
+gridlines **without gridlines**. Until that exists the demo stays as it is.
+
+Not done, and recorded so it is not rebuilt by accident: a *force superposition* mode was
+written and reverted. It made a figure indefinite and let the indefiniteness spread by
+judging stars only where every rhombus meeting a vertex was definite. The mechanism
+worked; it was the wrong unit, for the same reason.
+
 ### The cascade (Jake, 2026-10-11)
 
 The readings are **not independent**, and that is the whole of phase 2.
