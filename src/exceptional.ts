@@ -5,9 +5,9 @@
 // γⱼ mod 1 matters that is γ ≡ 0 — the one phase vector that is its own class. It is not
 // rare, it is **one point**, and no LI 1 or LI 2 tiling has one anywhere.
 //
-// This is phase 1, and phase 1 is deliberately modest: reproduce the Queen patch as a
+// This is phase 1, and phase 1 is deliberately modest: reproduce the Deca patch as a
 // Wieringa roof in the Cage's visual language, and stop. `Deca` — the composite the site
-// calls **Queen** — is the cartwheel, and the cartwheel is this singularity, so the
+// the cartwheel — is this singularity, so the
 // patch needs no new generator. The skewbs and the F₂₀ at the center come next, once
 // Jake has looked at this.
 //
@@ -20,7 +20,7 @@ import { BUILD_ID } from "./build-id.js";
 import { seedTypes, generatePatch, allRhombs, vertexList, computeLift } from "./geometry.js";
 import { buildRoof } from "./roofgeom.js";
 import * as THREE from "three";
-import { createGoldenView } from "./goldenview.js";
+import { createGoldenView, PLAN_VIEW } from "./goldenview.js";
 import type { GoldenFace, FaceMode, EdgeMode, Scheme, Cap } from "./goldenview.js";
 import { readingsOf, starsOf, starSig, LEGAL_STARS } from "./readings.js";
 import type { MaskRhomb } from "./readings.js";
@@ -49,45 +49,52 @@ const statusEl = el<HTMLElement>("status");
 
 const PREFS_KEY = "wr-exceptional";
 const PREF_DEFAULTS = {
-    color: "five",
+    // Bands, straight down, still, lit from the eye. The page is about ribbons crossing
+    // in a plan view, and that is what it should open on.
+    color: "bands",
     facemode: "solid",
     // Ball and stick by default, which is not the Cage's default: this surface is a
     // single sheet of rhombi rather than twenty solids, and the rods are what give it
-    // depth before any of the colouring does.
+    // depth before any of the coloring does.
     edgemode: "ballstick",
     ribbon: 0.5,
     // Off: the cap hides the inner rhombi, and those are the paths.
     cap: false,
     clearground: false,
-    spin: true,
-    eyelight: false,
+    spin: false,
+    eyelight: true,
     ortho: false,
 };
 const prefs = loadPrefs(PREFS_KEY, PREF_DEFAULTS);
 
-const gv = createGoldenView(view);
+const gv = createGoldenView(view, 0xf4f1e8, PLAN_VIEW);
 
 // The roof lifts on **five** of the six icosahedral axes — the sixth, the vertical, is
 // the one a pentagrid can never supply, since a zone is a family of parallel lines and
-// that one would need plane normal 0. So the colouring runs on five axes, the same five
+// that one would need plane normal 0. So the coloring runs on five axes, the same five
 // the Cage calls the golden icosahedron, and `pairColorOn` is already minimal there:
 // χ′(K₅) = 5, so the Kowalewski five is exactly five here too.
 const AXES = [0, 1, 2, 3, 4] as const;
 
-/** Queen generation 3 — `Deca`, the composite, which is the cartwheel. */
+/** Deca generation 3 — the cartwheel. */
 const PATCH = "Deca";
 const GEN = 3;
 
 /**
- * Light purple for F₂₀, in the reference drawing's own colours. The decagon is covered
+ * Light purple for F₂₀, in the reference drawing's own colors. The decagon is covered
  * by the solid rather than showing the ten rhombs that resolve it, which is what the
  * drawing does and what the singularity *is*: the resolution is one of ten readings and
  * the solid is the thing all ten are readings of.
  */
-const DECA_PURPLE = 0x9b93c9;
-const DECA_RIM = 0x55507a;
-/** The skewbs, in the reference drawing's pink. */
-const SKEWB_PINK = 0xdaa8d4;
+// Strong enough to see. The first pass took the reference drawing's tints literally,
+// but those sit on white paper; against a shaded roof under its own banding they
+// disappeared, which is no use at all for the thing the page is about.
+const DECA_PURPLE = 0x7b63c8;
+const DECA_RIM = 0x3b3270;
+/** The skewbs, in the reference drawing's pink, taken up to where it reads. */
+const SKEWB_PINK = 0xd45fc4;
+/** What the figure under the pointer wears, so a click has something to aim at. */
+const HOVER_RIM = 0xfff07a;
 
 /** what is drawn: the roof, less the decagon's ten, plus F₂₀ standing on it */
 let faces: GoldenFace[] = [];
@@ -161,7 +168,7 @@ const crs3 = (a: V3, b: V3): V3 => [
  *
  * Two things fall out and are worth knowing. **ΣE is purely vertical** — the planar
  * parts cancel because Σvⱼ = 0 — so mask 0 and mask 31 sit one above the other, √5
- * apart: the two poles, and the ghost of §5.0, the vertex the plane could never realise
+ * apart: the two poles, and the ghost of §5.0, the vertex the plane could never realize
  * because it was looking at the shadow. And the volume comes out **6.155367**, which is
  * the Cage's golden icosahedron exactly. The two derivations meet.
  *
@@ -205,7 +212,7 @@ function zonohedron(E: V3[], gens: number[], anchor: V3): GoldenFace[] {
  *
  * No pruning follows, unlike the Cage's. There the cut runs over sixty **cell** faces
  * and leaves four hanging; here the twenty are the shell itself, and every one of the
- * survivors touches a vertex that lost a neighbour, so pruning would take the lot.
+ * survivors touches a vertex that lost a neighbor, so pruning would take the lot.
  */
 function cutPoles(faces: GoldenFace[], poles: V3[]): GoldenFace[] {
     const at = (q: V3) => poles.some((p) =>
@@ -221,23 +228,23 @@ function cutPoles(faces: GoldenFace[], poles: V3[]): GoldenFace[] {
  * lies in {0,1}^k — integer arithmetic, no coordinate matching, no tolerance.
  *
  * **The base is not a vertex.** This is §5.0's trap and it cost a day: at k = 5 mask 0
- * is not a corner of the decagon at all but its *centre*, sharing its shadow with mask
+ * is not a corner of the decagon at all but its *center*, sharing its shadow with mask
  * 31 — the ghost. So a search that only tries bases which are themselves vertices
  * cannot find a singular decagon; it finds only the non-singular ones, where mask 0
- * happens to be realised. Trying `n(v) − mask` over every mask is what finds them: the
+ * happens to be realized. Trying `n(v) − mask` over every mask is what finds them: the
  * patch then shows **68** decagons, of which **55** have the ghost.
  *
  * Which is wanted is settled by Jake: *"It is in the center of the patch. That is why
  * the patch is called deca."* And the patch has exact vertical mirror symmetry — all
  * 666 vertices map onto a vertex under x ↦ −x — so the central one sits on that line.
- * It is at (0, −0.52), **0.13** from the patch centre, where the next nearest decagon
+ * It is at (0, −0.52), **0.13** from the patch center, where the next nearest decagon
  * is at 23.32. Nothing ambiguous about the choice once the search is right.
  */
 function findDecagon(d: ReturnType<typeof buildRoof>): { faces: Set<number>; anchor: V3 | null } {
     const empty = { faces: new Set<number>(), anchor: null };
     if (!d) return empty;
     const lift = computeLift();
-    // the patch's own centre, from the bounding box of the lifted surface
+    // the patch's own center, from the bounding box of the lifted surface
     let xl = Infinity, xh = -Infinity, yl = Infinity, yh = -Infinity;
     for (const f of d.faces) for (const v of f.vids) {
         const q = d.point(v);
@@ -247,7 +254,7 @@ function findDecagon(d: ReturnType<typeof buildRoof>): { faces: Set<number>; anc
         if (q[1] > yh) yh = q[1];
     }
     const cx = (xl + xh) / 2, cy = (yl + yh) / 2;
-    // only the vertices near that centre can belong to the central decagon, which keeps
+    // only the vertices near that center can belong to the central decagon, which keeps
     // the mask sweep to a few hundred bases instead of twenty thousand
     const near = [...vertexList]
         .filter((v) => lift.n[v.id])
@@ -280,7 +287,7 @@ function findDecagon(d: ReturnType<typeof buildRoof>): { faces: Set<number>; anc
             const pairs = new Set<string>();
             for (const i2 of fs) pairs.add(d.faces[i2].pair.join(""));
             if (pairs.size !== 10) continue;
-            // its centre, and how far that is from the patch's
+            // its center, and how far that is from the patch's
             let sx = 0, sy = 0, n4 = 0;
             for (const i2 of fs) for (const w of d.faces[i2].vids) {
                 const q = d.point(w);
@@ -526,14 +533,14 @@ function makeFaces(): void {
     figures.forEach((fg, n) => { for (const i of fg.roof) ownerOf.set(i, n); });
     roofMids = new Set(out.slice(0, capFrom).map(midKey));
 
-    // Frame on the patch's own extent, which `point` has already centred.
+    // Frame on the patch's own extent, which `point` has already centered.
     let r = 0;
     for (const f of out) for (const p of f.corners) r = Math.max(r, Math.hypot(p[0], p[1], p[2]));
     radius = r;
 }
 
 /**
- * Shading by height, so the relief reads before any colour does.
+ * Shading by height, so the relief reads before any color does.
  *
  * Taken off the face's own mean height against the patch's full range rather than its
  * own, since a rhombus rising through the middle of the roof must not draw like one
@@ -541,6 +548,9 @@ function makeFaces(): void {
  */
 const DECA_CAP = new THREE.Color(DECA_PURPLE);
 const SKEWB_CAP = new THREE.Color(SKEWB_PINK);
+const HOVER_CAP = new THREE.Color(HOVER_RIM);
+/** the figure under the pointer, outlined so a valid click point is visible */
+let hoverFig: number | null = null;
 let zLo = 0, zHi = 1;
 function shadeOf(f: GoldenFace): number {
     const z = (f.corners[0][2] + f.corners[1][2] + f.corners[2][2] + f.corners[3][2]) / 4;
@@ -560,6 +570,10 @@ function shadeOf(f: GoldenFace): number {
  */
 function readingFits(fg: Figure, T: MaskRhomb[], live: GoldenFace[]): boolean {
     const want = readingFaces(gens5, fg.anchor, T);
+    // **Without this the figure is judged against itself.** `live` is the surface as it
+    // stands, which for a superposed figure still holds its own rhombi; counting those
+    // as well as the reading's doubles every star it touches and nothing is ever legal.
+    const own = new Set(fg.roof.map((i) => midKey(faces[i])));
     const key = (p: V3) => `${Math.round(p[0] * 1e4)},${Math.round(p[1] * 1e4)}`;
     const mine = new Set<string>();
     for (const f of want) for (const p of f.corners) mine.add(key(p));
@@ -579,7 +593,7 @@ function readingFits(fg: Figure, T: MaskRhomb[], live: GoldenFace[]): boolean {
             l.push(deg);
         }
     };
-    for (const f of live) add(f);
+    for (const f of live) if (!own.has(midKey(f))) add(f);
     for (const f of want) add(f);
     for (const angles of at.values()) {
         const sum = angles.reduce((x, y) => x + y, 0);
@@ -607,7 +621,7 @@ function liveSurface(): GoldenFace[] {
 /**
  * Count, for every figure, how many of its readings the rest of the tiling still
  * allows, and collapse any that are down to one. Repeat while anything moves — that is
- * the cascade: a collapse narrows a neighbour, which narrows its neighbour.
+ * the cascade: a collapse narrows a neighbor, which narrows its neighbor.
  *
  * Bounded, and the bound is reported rather than hidden. A greedy propagation like this
  * can in principle chase its own tail, and saying so is better than looping.
@@ -697,11 +711,12 @@ function build(reframe: boolean): void {
             const fg = figures[n];
             const col = fg.kind === "deca" ? DECA_CAP : SKEWB_CAP;
             // `clear ground` means no ground anywhere, the figures included — their
-            // own colour is a ground, so leaving it in place made the control look
+            // own color is a ground, so leaving it in place made the control look
             // broken on exactly the faces it was most wanted on.
             return {
                 color: col,
                 ground: groundChk.checked ? undefined : col,
+                rim: n === hoverFig ? HOVER_CAP : undefined,
                 group: n + 1,
                 // a superposed figure is a closed solid and has no boundary, so every
                 // edge of it is wanted; a collapsed one is a patch of the surface and
@@ -721,7 +736,7 @@ function build(reframe: boolean): void {
           (groundChk.checked ? ", no ground — the roof shows through the gaps" : ", on the background as ground")
         : " · Kowalewski five on K₅: every rosette shows all five, and five is the least K₅ admits";
     statusEl.textContent =
-        `Queen generation ${GEN} — ${faces.length} golden rhombi on ${vertexList.length} vertices, ` +
+        `Deca generation ${GEN} — ${faces.length} golden rhombi on ${vertexList.length} vertices, ` +
         `${decaCount} of them the reading F₂₀ superposes at the center` +
         `${capped ? ", capped away" : ", kept inside it"} · standing √5 tall on its ` +
         `${figures.filter((f) => f.state !== null).length} of ${figures.length} figures collapsed, ` +
@@ -827,10 +842,41 @@ view.addEventListener("click", (ev) => {
           `${s.rounds === 1 ? "" : "s"}` + (s.stuck ? `, and left ${s.stuck} with no reading at all` : "");
     rebuild(false);
 });
-// a drag that ends over the canvas must not read as a click
+// A drag that ends over the canvas must not read as a click — but **any** movement at
+// all is the wrong test, and was the bug: a real click almost always jitters a pixel or
+// two with the button down, so every click after the first was swallowed. Measure the
+// distance instead and allow a few pixels of hand tremor.
 let dragged = false;
-view.addEventListener("pointerdown", () => { dragged = false; });
-view.addEventListener("pointermove", (e) => { if (e.buttons) dragged = true; });
+let downAt: [number, number] | null = null;
+const SLOP = 5;
+view.addEventListener("pointerdown", (e) => { dragged = false; downAt = [e.clientX, e.clientY]; });
+view.addEventListener("pointermove", (e) => {
+    if (e.buttons && downAt) {
+        if (Math.hypot(e.clientX - downAt[0], e.clientY - downAt[1]) > SLOP) dragged = true;
+        return;
+    }
+    // nothing held: light up whatever is under the pointer, so a valid click point can
+    // be seen before it is clicked
+    const i = gv.pick(e);
+    const n = i === null ? null : role[i] ?? null;
+    if (n === hoverFig) return;
+    hoverFig = n;
+    rebuild(false);
+});
+view.addEventListener("pointerleave", () => {
+    if (hoverFig === null) return;
+    hoverFig = null;
+    rebuild(false);
+});
+
+// The soft reset: superposition back, and nothing else touched. Hard Reset throws the
+// view and the colors away too, which is far too much to pay for another go.
+el<HTMLButtonElement>("release").addEventListener("click", () => {
+    for (const fg of figures) fg.state = null;
+    settle();
+    lastCascade = "released — every singularity superposed again";
+    rebuild(false);
+});
 
 window.addEventListener("resize", () => gv.resize());
 

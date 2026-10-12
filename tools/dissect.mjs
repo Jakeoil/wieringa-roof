@@ -148,7 +148,7 @@ for (const sol of SOLIDS) {
     // acute and obtuse in equal number, except on the lone rhombohedron which is one cell
     const ac = d.filter((c) => c.acute).length;
     if (d.length > 1 && ac * 2 !== d.length) fail(`${sol.key}: ${ac} acute of ${d.length}`);
-    // and the labelled dissections account for themselves: orbit sizes must sum to the count
+    // and the labeled dissections account for themselves: orbit sizes must sum to the count
     const all = allDissections(sol.axes);
     const G = groupOrder(sol.axes);
     const stabs = all.map((x) => stabilizerOrder(x, sol.axes));
@@ -157,7 +157,7 @@ for (const sol of SOLIDS) {
     let orbits = 0;
     for (const [st, n] of Object.entries(tally)) {
         const size = G / Number(st);
-        if (n % size) fail(`${sol.key}: ${n} dissections at stabiliser ${st} is not a whole number of orbits of ${size}`);
+        if (n % size) fail(`${sol.key}: ${n} dissections at stabilizer ${st} is not a whole number of orbits of ${size}`);
         orbits += n / size;
     }
     FAMILY.push({ key: sol.key, label: sol.label, k, faces, cells: d.length, ac, vol, all: all.length, G, orbits, colors: chi });
@@ -297,7 +297,7 @@ for (const f of FAMILY)
     console.log(
         `${f.label.padEnd(21)} k=${f.k}  ${String(f.faces).padStart(2)} faces  ` +
         `${String(f.cells).padStart(2)} cell${f.cells > 1 ? "s" : " "} (${f.ac} acute)  vol ${f.vol.toFixed(6)}  ` +
-        `${String(f.all).padStart(3)} labelled / group ${String(f.G).padStart(3)} = ${f.orbits} orbit${f.orbits > 1 ? "s" : ""}` +
+        `${String(f.all).padStart(3)} labeled / group ${String(f.G).padStart(3)} = ${f.orbits} orbit${f.orbits > 1 ? "s" : ""}` +
         `  ·  ${f.colors} colors`,
     );
 console.log(bad === 0 ? "all checks passed" : `${bad} FAILURES`);

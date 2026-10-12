@@ -92,9 +92,9 @@ const relief = zHi - zLo;
 // 6 · the central decagon, the one F20 covers
 //
 // The base of a singularity's cube need NOT be a vertex: at k = 5 mask 0 is the
-// decagon's centre, not a corner, sharing its shadow with mask 31. A search over bases
+// decagon's center, not a corner, sharing its shadow with mask 31. A search over bases
 // that are themselves vertices therefore finds only the non-singular decagons. Sweeping
-// `n(v) - mask` finds them all, and the patch's own centre picks the one wanted.
+// `n(v) - mask` finds them all, and the patch's own center picks the one wanted.
 const lift = computeLift();
 let xl = Infinity, xh = -Infinity, yl = Infinity, yh = -Infinity;
 for (const f of d.faces) for (const v of f.vids) {
@@ -154,9 +154,9 @@ if (new Set(deca.map((f) => f.pair.join(""))).size !== 10) fail("the ten do not 
 const dThick = deca.filter((f) => f.thick).length;
 if (dThick !== 5) fail(`${dThick} thick of the ten, expected 5 and 5`);
 if (best.ids.size !== 16) fail(`${best.ids.size} vertices in the cube, expected 16 for one reading`);
-// it is at the centre, and it is genuinely singular
-if (best.dist > 0.05) fail(`the chosen decagon is ${best.dist} from the patch centre`);
-if (!best.ghost) fail("the central decagon realises mask 0, so it is not singular");
+// it is at the center, and it is genuinely singular
+if (best.dist > 0.05) fail(`the chosen decagon is ${best.dist} from the patch center`);
+if (!best.ghost) fail("the central decagon realizes mask 0, so it is not singular");
 // the patch's vertical mirror. Tested on the distinct vertices in tiling coordinates,
 // where the mirror line is x = 0 exactly: rounding a roof coordinate and its negation
 // can disagree on an exact half, which is a bug in the test and not in the patch.
@@ -176,7 +176,7 @@ for (const f of deca) for (let k = 0; k < 4; k++) {
 const rim = [...rimC.entries()].filter(([, n]) => n === 1);
 const rimV = new Set(rim.flatMap(([k]) => k.split("|")));
 if (rim.length !== 10 || rimV.size !== 10) fail(`rim is ${rim.length} edges on ${rimV.size} vertices, expected 10 and 10`);
-console.log(`decagon: at the patch centre, ${best.dist.toFixed(4)} off · base [${best.b.join(",")}] is not a vertex, ` +
+console.log(`decagon: at the patch center, ${best.dist.toFixed(4)} off · base [${best.b.join(",")}] is not a vertex, ` +
     `so mask 0 is the ghost · ${deca.length} rhombi one per pair, ${dThick} thick and ${deca.length-dThick} thin · ` +
     `rim ${rim.length} edges on ${rimV.size} vertices · ${best.ids.size} of the 5-cube's 32 corners, one reading`);
 console.log(`patch: ${vertexList.length} vertices, every one mirrored in the vertical line — ${allDeca} decagons in all, ${ghosts} with the ghost`);
@@ -198,7 +198,7 @@ for (const [vid, fs] of at) {
         if (k < 0) continue;
         nb.add(v4[(k+1) % 4]); nb.add(v4[(k+3) % 4]);
     }
-    if (nb.size !== 3) fail(`a hexagon centre has ${nb.size} neighbours, expected 3`);
+    if (nb.size !== 3) fail(`a hexagon center has ${nb.size} neighbors, expected 3`);
     const z = d.point(vid)[2];
     let up = 0;
     for (const n of nb) if (d.point(n)[2] > z) up++;

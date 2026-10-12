@@ -332,7 +332,7 @@ function build(reframe: boolean): void {
 for (const [code, nick] of [
     ["Pe5", "Pe5 pentagon"], ["Pe3", "Pe3 pentagon"], ["Pe1", "Pe1 pentagon"],
     ["St5", "St5 star"], ["St3", "St3 boat"], ["St1", "St1 diamond"],
-    ["Deca", "Queen (composite)"], ["Sun", "Sun (composite)"], ["Star", "Star (composite)"],
+    ["Deca", "Deca (composite)"], ["Sun", "Sun (composite)"], ["Star", "Star (composite)"],
 ] as Array<[string, string]>) {
     const o = document.createElement("option");
     o.value = code; o.textContent = nick; patchSel.appendChild(o);

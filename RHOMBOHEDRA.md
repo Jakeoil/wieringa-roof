@@ -223,7 +223,7 @@ within a piece.
 
 The Kowalewski coloring makes the twenty a **puzzle** rather than a set of models: the
 ten 3-subsets of five colors, each borne once by an acute cell and once by an obtuse
-one, which is the classical labelling Hart counts 320 assemblies for.
+one, which is the classical labeling Hart counts 320 assemblies for.
 
 ### Part 4 — the roof from hexahedra · **built, and it closes exactly**
 
@@ -403,7 +403,7 @@ pairs. Two things follow that are worth having before any code is written:
 Counted by the same parameterization `tools/probes/count-dissections.mjs` uses — a cell
 is a triple of axes plus a sign vector on the rest — extended over k:
 
-| solid | cells | **labelled dissections** |
+| solid | cells | **labeled dissections** |
 |---|---|---|
 | golden rhombohedron | 1 | 1 |
 | golden dodecahedron | 4 | **2** |
@@ -418,14 +418,14 @@ stabilizers of order 1 and 3.
 own group — the symmetries of the six axes that carry the solid's subset to itself,
 which `dissect.ts` now computes as `groupOrder`. The reduction:
 
-| solid | axes | own group | labelled | stabilizer | **orbits** |
+| solid | axes | own group | labeled | stabilizer | **orbits** |
 |---|---|---|---|---|---|
 | golden rhombohedron | 3 | 12 | 1 | 12 | **1** |
 | golden dodecahedron | 4 | 8 | 2 | 4 | **1** |
 | golden icosahedron | 5 | 20 | 10 | 2 | **1** |
 | triacontahedron | 6 | 120 | 160 | 1 and 3 | **2** |
 
-So **only the triacontahedron has a choice**. On every smaller solid the labelled
+So **only the triacontahedron has a choice**. On every smaller solid the labeled
 dissections form a single orbit — 10 = 20/2 and 2 = 8/4 — and any two of them are the
 same dissection differently placed. The counts 2 and 10 are entirely accounted for by
 the solid's own symmetry, with nothing left over.

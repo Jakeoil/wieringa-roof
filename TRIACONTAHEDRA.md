@@ -1364,14 +1364,14 @@ visible as one spherical rhomb worn by two balls in two colors.
 
 At the midsphere with `Faces → By class`, every ball wears only the rhombs it owns —
 4/30, 5/30 or 10/30 of its surface — so there is a seam of bare sphere between every
-pair of neighbours. The question was how much of that could be closed by broadening
-each ball's territory until it met its neighbour on a curve, and which pairs could
+pair of neighbors. The question was how much of that could be closed by broadening
+each ball's territory until it met its neighbor on a curve, and which pairs could
 never be made to meet at all.
 
 **The rule.** Every ball is drawn at the same radius, so the plane two of them meet in
-is the perpendicular bisector of their centres, and the curve they meet on is that
+is the perpendicular bisector of their centers, and the curve they meet on is that
 plane cut by either sphere. Give each ball the part of its surface **nearer to its own
-centre than to any other drawn centre** and the seams close by construction: neighbours
+center than to any other drawn center** and the seams close by construction: neighbors
 meet exactly, nothing is drawn twice, and no pair needs a decision of its own. (Under
 the size sliders two balls can differ in radius; the meeting plane is then the radical
 plane, the same construction with the radii put back, which collapses to the bisector
@@ -1381,12 +1381,12 @@ the moment the two agree.)
 different partition, and a clip that can remove the footprint is not that. It fails
 worst on the case it most needs to get right: the central blue of Sun gen 2 is a
 complete hat with five purple bowls resting on it, and their balls cover its dome so
-thoroughly that a pure nearest-centre rule keeps **3.8%** of it — the dome simply
+thoroughly that a pure nearest-center rule keeps **3.8%** of it — the dome simply
 disappears. So the footprint is laid down whole and the clips apply only outside it.
 What grows is the skirt between the footprint's rim and the equator, and that growth
 stops on the meeting circles, which is what closes the seam. A complete solid keeps its
-dome and adds a skirt; a class-5 grows the little it takes to reach its neighbour, and
-its new rim lands exactly on the neighbour's surface.
+dome and adds a skirt; a class-5 grows the little it takes to reach its neighbor, and
+its new rim lands exactly on the neighbor's surface.
 
 **Where nothing bounds the growth, it runs to the ball's equator and is cut off there.**
 That drop-dead is not a bound in the same sense as the others: two balls meeting settle
@@ -1400,7 +1400,7 @@ from 4/30 of its surface to 69%.
 owns. It is not a rare corner: on Sun gen 2 **every single proper solid** has some, and
 for the complete class it is the entire skirt. A class-10 ball keeps its dome, and then
 a separate ring floats near its equator with a band of daylight between the two, because
-the band lies inside a neighbour's ball and the ring beyond it does not. Drawn, that
+the band lies inside a neighbor's ball and the ring beyond it does not. Drawn, that
 reads as what it is — a discontinuity. Stranded share of the cell, Sun gen 2: amber 13.3
 of 30.8 points, green 6.5 of 24.6, purple 5.3 of 22.3, blue 8.5 of 41.9.
 
@@ -1410,7 +1410,7 @@ length — both are clipped by the same planes, so the kept part of a shared edg
 same seen from either side, and a clipped triangle is convex and therefore in one piece.
 Sampling that edge can only ever *miss* a thin attachment, never invent one, so the
 error runs towards pruning. The meeting curves are then read off the drawn region rather
-than sampled from the circles — a polygon edge with both ends on one neighbour's plane
+than sampled from the circles — a polygon edge with both ends on one neighbor's plane
 *is* an arc of that meeting circle — so a curve can only appear where there is surface
 under it, and the contours are sliced out of the same triangles.
 
@@ -1418,7 +1418,7 @@ under it, and the contours are sliced out of the same triangles.
 blue and purple — a genuine triple point of the packing, where the gap does close — and
 then carry on past it, leaving surface that looks unnecessary because it is. Two circles
 crossing bound a lune on one side and nothing on the other; closing it would take a
-third neighbour, and in those directions there is no ball at all. Tightening the
+third neighbor, and in those directions there is no ball at all. Tightening the
 drop-dead to the cup rim was tried and only made the spur shorter (green 21.0% against
 24.6%, amber 23.9% against 30.8%), so the equator stands as the honest answer: it says
 *no bound found* rather than pretending to one. Class 4 is the worst of it and cannot be
@@ -1426,11 +1426,11 @@ helped — four rhombs of a ten-rhomb cup, and the least to fence it in.
 
 **Every eligible solid clips, drawn or not.** The partition is a property of the
 packing, not of the view: class unchecked, RT unchecked, size at zero, its side of the
-roof hidden — a solid still clips, and neighbours are taken at full radius. Otherwise
+roof hidden — a solid still clips, and neighbors are taken at full radius. Otherwise
 unchecking blue and purple lets green swell to fill everything, and the curve two balls
 meet on becomes a fact about the checkboxes rather than about the solids.
 
-**The distances are quantized, and 2R lands in a wide gap.** Centre distances between
+**The distances are quantized, and 2R lands in a wide gap.** Center distances between
 proper solids, over Sun g2/g3, Star g2/g3, Pe5 g3/g4 and Queen g3:
 
 | distance | pairs | vs 2·midradius = 2.928773 |
@@ -1464,7 +1464,7 @@ of them stands at 1.7013, 2.3840 or 2.7528:
 φ³ = 4.236068 (§5C), green–green sits at 6.7–7.2, and amber–green at 3.641564 — none
 of the three can reach even in principle. amber–amber is the odd one: on Star gen 2 two
 ambers stand at exactly 2ρ, so those spheres do overlap, but their footprints are still
-not neighbours, and the clip draws a meeting curve between two balls that share no
+not neighbors, and the clip draws a meeting curve between two balls that share no
 border on the roof.
 
 **What the cells cost and pay.** Cell area as a share of the ball, against the 4/30,
@@ -1478,13 +1478,13 @@ border on the roof.
 | 10 blue | 33.3% | 33.3% | 33.3% | +0.0 | 41.9% |
 
 This is the size the move was always supposed to be: a short enlargement that reaches a
-neighbour and stops. The complete class does not move at all — every part of its skirt
+neighbor and stops. The complete class does not move at all — every part of its skirt
 was stranded. Amber moves most because it owns the least and has the most room before it
 meets anything. Every class only grows, and the cell is always a superset of the
 footprint.
 
 **The map does not close, and no plausible radius closes it.** Measured on Sun gen 3
-over interior solids only, as the share of a ball's rim with no neighbour to stop it:
+over interior solids only, as the share of a ball's rim with no neighbor to stop it:
 
 | radius | | 2R | open rim |
 |---|---|---|---|
@@ -1497,7 +1497,7 @@ over interior solids only, as the share of a ball's rim with no neighbour to sto
 
 The limit is the **contact graph**, not the depth of the overlap. 2φ = 3.236068 is still
 short of the next distance shell at 3.641564, so midsphere, 20V and φ all touch exactly
-the same pairs and differ only in how wide each overlap is. The first new neighbour
+the same pairs and differ only in how wide each overlap is. The first new neighbor
 needs R > 1.820782, and even that buys only 32.6% → 27.0%. Nothing closes until about
 R = 2.9, twice the insphere, where the balls have stopped meaning anything about the
 triacontahedron. 20V is 0.6% larger than the midsphere and worth 0.3 points — not a
@@ -1518,7 +1518,7 @@ is at most the last 11°.
 **Verification.** `tools/probes/voronoi.mjs` — the clipped cell area agrees with a
 40,000-point Monte Carlo to 0.03% on all 51 Sun and 41 Star proper solids; the footprint
 is kept at 100.00% on every one of them; every one of 6,000 sampled
-meeting-circle points lies on the neighbouring ball to 1e-9; worst arc/plane crossing
+meeting-circle points lies on the neighboring ball to 1e-9; worst arc/plane crossing
 residual 9.75e-10 over 52,502 crossings. The crossing is solved as a quadratic on the
 projected chord with a bisection fallback, because an interpolated boundary is off by
 O(θ²) on each side independently — a hairline of daylight between two surfaces whose

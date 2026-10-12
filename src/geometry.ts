@@ -520,7 +520,7 @@ const CLASSIC_COLORS: Record<string, string> = {
     Pe1: "#e46c0a", // diamond, ORANGE
 };
 
-// Sampled from the penrose-mosaic plate (deca-shape-expansion.png, Queen gen 2).
+// Sampled from the penrose-mosaic plate (deca-shape-expansion.png, Deca gen 2).
 // These are *mid-tone* values, not medians of the whole tile: each tile on the plate
 // is a wide light-to-dark ramp, so a median is dragged toward the dark stripes and
 // comes out duller than the color the eye reads. Taking the median hue and saturation

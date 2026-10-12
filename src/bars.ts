@@ -31,7 +31,7 @@ const NICKNAME: Record<string, string> = {
     St5: "St5 star",
     St3: "St3 boat",
     St1: "St1 diamond",
-    Deca: "Queen (composite)",
+    Deca: "Deca (composite)",
     Sun: "Sun (composite)",
     Star: "Star (composite)",
 };
@@ -278,7 +278,7 @@ export function buildRenderLine(o: RenderLineOpts): { values: RenderValues; sync
 
     // Scheme first, then the palette it wears: what you are looking at, then what it
     // is painted in. Held together by `bindColorPair`, so a page that builds its own
-    // two selects gets the same behaviour rather than half of it.
+    // two selects gets the same behavior rather than half of it.
     const schemeSel = document.createElement("select");
     schemeSel.style.cssText = "padding:4px;font-size:13px;";
     const paletteSel = document.createElement("select");

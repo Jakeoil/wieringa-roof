@@ -172,7 +172,7 @@ interface Ctx {
     /**
      * Where each placement goes under each symmetry: `act[g][ti][a]` is the triple and
      * placement that cell lands on. Worked out once, because the alternative is working
-     * it out again for every symmetry of every dissection — the stabiliser of all of
+     * it out again for every symmetry of every dissection — the stabilizer of all of
      * them is wanted before one can be picked, and at six axes that is 160 × 120.
      */
     act: Array<Array<Array<[number, number]>>>;
@@ -371,7 +371,7 @@ const cached = new Map<string, Cell[]>();
  * The two kinds are asked for by symmetry rather than by number, so they mean something
  * on the smaller solids too: `chiral` is the least symmetric dissection the solid has
  * and `symmetric` the most. **Only the triacontahedron has two**; on the golden
- * icosahedron all ten labelled dissections form a single orbit under its group of 20,
+ * icosahedron all ten labeled dissections form a single orbit under its group of 20,
  * on the golden dodecahedron both form one orbit under its group of 8, and the
  * rhombohedron is its own cell. Below six axes the two names return the same thing.
  */
@@ -384,7 +384,7 @@ export function dissection(kind: DissectionKind = "chiral", axes: AxisSet = AXES
     let sol = all[0];
     let best = stabilizerOrder(sol, axes);
     for (let i = 1; i < all.length; i++) {
-        if (kind === "chiral" && best === 1) break; // nothing can beat a trivial stabiliser
+        if (kind === "chiral" && best === 1) break; // nothing can beat a trivial stabilizer
         const st = stabilizerOrder(all[i], axes);
         if (kind === "symmetric" ? st > best : st < best) {
             best = st;
@@ -417,7 +417,7 @@ export { allDissections };
 //   * the three pairs of a triple share an axis pairwise, so a cell shows exactly
 //     **three distinct colors**;
 //   * and there are C(5,3) = 10 such triples, borne once by an acute cell and once by
-//     an obtuse one. That is the labelling of the classical Kowalewski puzzle, whose
+//     an obtuse one. That is the labeling of the classical Kowalewski puzzle, whose
 //     color-matching assemblies George Hart counts at 320.
 //
 // Construction: the pentagon 0–4 with axis 5 at the center. Color k matches 5 with k

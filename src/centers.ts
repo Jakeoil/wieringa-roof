@@ -118,7 +118,7 @@ export function cupIndices(s: Solid): number[] {
  *
  * `cupIndices` gives the ten a solid could ever show; this gives the four, five or ten it
  * really does. A face is matched by direction: a rhomb lying on the solid has its centroid
- * at `ρ` from the center along one of the thirty face normals, so normalising
+ * at `ρ` from the center along one of the thirty face normals, so normalizing
  * `face.c − s.c` picks the index out with no ambiguity.
  */
 export function ownedFaceIndices(cen: Centers, s: Solid): number[] {

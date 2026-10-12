@@ -17,8 +17,9 @@
     .bar .checks label { flex-direction: row; align-items: center; gap: 5px; font-size: 13px; color: var(--ink); }
     #view { width: 100%; height: min(72vh, 640px); border: 1px solid var(--rule);
         border-radius: 8px; overflow: hidden; background: #f4f1e8; }
-    #view canvas { display: block; width: 100%; height: 100%; cursor: grab; }
-    #view canvas:active { cursor: grabbing; }
+    /* the pointer is set in goldenview.ts — an arrow at rest, since the surface is
+       there to be clicked, and a closed hand only while actually dragging */
+    #view canvas { display: block; width: 100%; height: 100%; }
     #status { display: block; margin: 10px 0 0; line-height: 1.5; }
 </style>
 </head>
@@ -56,8 +57,8 @@
 
 <div class="bar">
     <label title="Kowalewski colors a face by the pair of generators spanning it, so every rosette shows all five. Bands colors by ribbon instead: a face lies in two of them and shows both.">Color <select id="color">
-        <option value="five">Kowalewski five</option>
         <option value="bands">Bands</option>
+        <option value="five">Kowalewski five</option>
     </select></label>
     <label>Faces <select id="facemode">
         <option value="solid">Solid</option>
@@ -75,9 +76,10 @@
     <span class="checks">
         <label id="caplabel" title="Cap the decagon: hide the ten rhombi of the reading the patch happens to take, leaving F₂₀'s own surface. Unticked they stay, inside the solid — set the faces transparent and you see the one path through the superposition of all of them. Seven of the ten are genuinely interior to F₂₀ and only three lie on its boundary."><input type="checkbox" id="cap"> cap</label>
         <label id="groundlabel" title="Leave the part of each face outside its two ribbons undrawn, so the roof shows through the gaps."><input type="checkbox" id="clearground"> clear ground</label>
-        <label><input type="checkbox" id="spin" checked> turn</label>
-        <label title="Carry the lights with the viewpoint instead of leaving them standing in the scene, so a turning surface reads as the surface turning."><input type="checkbox" id="eyelight"> eye light</label>
+        <label><input type="checkbox" id="spin"> turn</label>
+        <label title="Carry the lights with the viewpoint instead of leaving them standing in the scene, so a turning surface reads as the surface turning."><input type="checkbox" id="eyelight" checked> eye light</label>
         <label title="Drop the perspective. Parallel edges stay parallel, which is the plan view the reference drawings are in."><input type="checkbox" id="ortho"> orthogonal</label>
+        <button id="release" title="Put every singularity back into superposition, leaving the view and the colors as they are">Release</button>
         <button id="reset" title="Forget saved settings and start again from the defaults">Reset</button>
     </span>
 </div>
@@ -90,59 +92,42 @@
     <div class="helpbody">
 
 <p>
-    <strong>Why one point.</strong> A decagon in the pentagrid needs every phase
-    <span class="mono">γⱼ</span> integral, and since only <span class="mono">γⱼ mod 1</span>
-    matters that is <span class="mono">γ ≡ 0</span> — the one phase vector that is its own
-    class. The class invariant <span class="mono">Σ(γⱼ mod 1)</span> is 0 for that vector
-    alone and 1 or 2 for every other Penrose patch, so <strong>no other class has a
-    decagon anywhere</strong>. It is not rare; it is a single point in the whole plane,
-    and that is what makes it exceptional.
+    <strong>One point.</strong> A decagon needs every grid phase integral, and only the
+    fractional parts matter, so that is the single phase vector that is its own class. No
+    other Penrose class has one anywhere. This is the patch it lives in — the
+    <strong>Deca</strong> composite at generation 3, the cartwheel — drawn as a Wieringa
+    roof. Every rhombus is the same golden rhombus at a different tilt.
 </p>
 <p>
-    <strong>What a singularity is.</strong> Where <em>k</em> grid lines meet, the
-    2<sup>k</sup> regions around the meeting are the corners of a <em>k</em>-cube, and
-    the plane had only ever shown its shadow. Lift each region to its own height and
-    that cube embeds in the roof's three-space as a <strong>zonohedron</strong> — not a
-    picture of one, the solid itself. Three lines give a golden rhombohedron, four
-    Bilinski's dodecahedron, five the golden rhombic icosahedron
-    <span class="mono">F₂₀</span>, which is the same solid the
-    <a href="./rhombohedra.html">Cage</a> builds from five of the six icosahedral axes.
-    Every edge is <span class="mono">√5/2</span> and every face has diagonal ratio φ:
-    the roof's own golden rhombus. <strong>A singularity is not a defect in the roof. It
-    is a piece of the roof's solid geometry that the plane was flattening.</strong>
+    <strong>A singularity is a solid.</strong> Where <em>k</em> grid lines meet, the
+    2<sup>k</sup> regions around them are the corners of a <em>k</em>-cube; lift each to
+    its own height and that cube becomes a zonohedron in the roof's own space. Three
+    lines give a rhombohedron — a <strong>skewb</strong>, A₆ or O₆ — and five give
+    <strong>F₂₀</strong>, the same solid the <a href="./rhombohedra.html">Cage</a> builds
+    from five of the six icosahedral axes. F₂₀ is drawn with its two poles removed, which
+    is what makes it the singularity rather than the solid.
 </p>
 <p>
-    <strong>This page, so far.</strong> Phase 1 draws the patch and nothing else: the
-    <strong>Queen</strong> composite at generation 3, which is the cartwheel, and the
-    cartwheel is this singularity. Every rhombus is the same golden rhombus at a
-    different tilt and orientation — there is no thick and no thin here, only the one
-    shape seen from different angles, which is what a Wieringa roof is. The decagon at
-    the center is already one of the ten configurations it can take.
+    <strong>Click one.</strong> Superposed it is the solid, all its readings at once;
+    click and it collapses to one — ten for F₂₀, two for a skewb — and clicking on
+    advances, then returns to superposition. F₂₀'s ten factor as a 5-state rotation times
+    a 2-state flip, the flip being the roof turned over.
 </p>
 <p>
-    <strong>Five generators, not six.</strong> The roof lifts on five of the six
-    icosahedral five-fold axes. The sixth is the vertical, and a pentagrid can never
-    supply it: a zone is a family of parallel lines, and that one would need plane
-    normal <strong>0</strong> — a family whose lines have no direction. Adding it is the
-    step from Penrose's 5→2 to the icosahedral 6→3. So the coloring here runs on five
-    axes, and the Kowalewski five is exactly five:
-    <span class="mono">χ′(K₅) = 5</span>, the least K₅ admits.
+    <strong>The cascade.</strong> A collapse leaves the figure's rim alone, so nothing
+    travels through the boundary; what it changes is the <strong>vertex star</strong> at
+    each corner it touches. A Penrose tiling admits only <strong>seven</strong> stars, so
+    after each collapse every figure is asked how many of its readings survive, and any
+    down to one collapses too. That is all the cascade is — no phases, no grid, only the
+    arrows. <strong>Release</strong> puts everything back.
 </p>
 <p>
-    <strong>Bands</strong> colors by ribbon instead. The faces sharing an edge direction
-    form a strip, and every face lies in exactly two — so five ribbon families and ten
-    kinds of crossing. A face shows both of its colors as bands rather than mixed,
-    because the ten pairwise blends of five saturated hues come no closer than
-    <span class="mono">ΔE 17</span> to one another where the five themselves sit 42
-    apart. <strong>Ribbon</strong> sets their width and <strong>clear ground</strong>
-    drops everything outside them, leaving the roof as its ribbons alone.
-</p>
-<p>
-    <strong>Still to come.</strong> The skewbs — the A₆ and O₆ rhombohedra, which run in
-    infinite Fibonacci sequences along the grid lines, five sequences in ten directions
-    from the center. Then F₂₀ itself as a solid standing at the origin, with its two
-    poles. Then the resolutions: the ten placements of the one legal reading of the
-    decagon. See <span class="mono">EXCEPTIONAL.md</span>.
+    <strong>Why ten.</strong> The decagon has 62 rhombic tilings. Requiring every vertex
+    index in 1…4 — no path through an extreme — leaves 40. Requiring legal stars leaves
+    <strong>10</strong>, and a sweep of 760 singular decagons across thirty patches finds
+    that same ten every time and the other thirty never. Details in
+    <span class="mono">EXCEPTIONAL.md</span>; the counts are asserted in
+    <span class="mono">tools/readings.mjs</span>.
 </p>
 
     </div>

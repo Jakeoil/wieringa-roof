@@ -87,7 +87,7 @@ The reference is a plan view. On this page it will be the roof seen from above, 
 §5.0's best detail, and the page should make it visible. The decagon's center is the one
 point with index both 0 and 5, because Σvⱼ = 0 makes f(∅) = f(𝟙). **On the roof those
 are the icosahedron's two opposite poles, 5·½ apart in z** — 32 corners in space against
-31 points in the plane. The vertex that can never be realised in the plane is the
+31 points in the plane. The vertex that can never be realized in the plane is the
 solid's far pole, and it looked degenerate only because we were looking at the shadow.
 
 Those two poles are exactly what the Cage's `Singularity` mode deletes. The page inherits
@@ -249,7 +249,7 @@ the lift vector not being the grid offset.
 
 ### Finding the decagon — and the trap, walked into (2026-10-11)
 
-§5.0 warns that at k = 5 **mask 0 is not a corner of the decagon but its centre**,
+§5.0 warns that at k = 5 **mask 0 is not a corner of the decagon but its center**,
 sharing its shadow with mask 31. This plan quoted that warning in §3.1 and the first
 implementation then walked straight into it.
 
@@ -257,7 +257,7 @@ The cube test is: a vertex belongs to a singularity when its lift vector, less a
 lies in {0,1}⁵. The first search only tried bases **that were themselves vertices** — so
 it could not find a singular decagon at all, since the singular ones are exactly those
 whose mask 0 is the ghost and no vertex. It found the non-singular ones instead, and
-settled on one 60 units off centre, which threw the ribbons, the skewbs and F₂₀'s anchor
+settled on one 60 units off center, which threw the ribbons, the skewbs and F₂₀'s anchor
 with it.
 
 Sweeping `n(v) − mask` over all 32 masks finds them properly. Queen generation 3 holds
@@ -266,19 +266,19 @@ Sweeping `n(v) − mask` over all 32 masks finds them properly. Queen generation
 | | |
 |---|---|
 | base | `[-1, -3, -1, 2, 2]` — not a vertex |
-| from the patch centre | **0.0130**, the next nearest being 23.32 |
+| from the patch center | **0.0130**, the next nearest being 23.32 |
 | rhombi | 10, one per pair, 5 thick and 5 thin, rim 10 edges on 10 vertices |
 | poles | **(0, 0, ±1.118034)** — on the vertical axis, √5 apart |
 
 Jake: *"It is in the center of the patch. That is why the patch is called deca. Notice
 the vertical mirror symmetry?"* Both now assertions in `tools/exceptional.mjs`: the
-chosen decagon within 0.05 of the patch centre and carrying the ghost, and all 666
+chosen decagon within 0.05 of the patch center and carrying the ghost, and all 666
 vertices mirrored under x ↦ −x exactly.
 
 Two further lessons, cheap to state and expensive to learn again:
 
 - **Two coordinate systems.** `allRhombs[].verts` is in tiling coordinates and
-  `RoofData.point` in recentred roof coordinates. Mixing them is what let a centre of
+  `RoofData.point` in recentred roof coordinates. Mixing them is what let a center of
   "(0, 60.407)" look plausible.
 - **A symmetric test must be symmetric.** The first mirror check failed on 147 of 2440
   because `round(x·1e4)` and `round(−x·1e4)` disagree on an exact half — a bug in the
@@ -301,7 +301,7 @@ a rhombus on the pair that crosses, so every tiling arises and none has to be gu
 | under the turn *and* the inverse | **4 orbits of 10** |
 
 The extremes are the only two masks whose points coincide — `01010` and `10101` in the
-half-plane labelling, at the decagon's own centre, which is §5.0's ghost. Avoiding them
+half-plane labeling, at the decagon's own center, which is §5.0's ghost. Avoiding them
 is **necessary but not sufficient**: it cuts 62 to 40, not to ten.
 
 The inverse is the roof turned over, hills for dales, which on the lift is complementing
@@ -321,7 +321,7 @@ Four candidates is a small enough field to settle by comparison against a legal 
 Two wrong turns, recorded so they are not repeated: a flip-graph enumeration stalled at
 one tiling because the starting tiling was invalid — its areas summed correctly while its
 rhombi overlapped, so area is no test of a tiling; and a first attempt at the turn
-relabelled `m → m+1`, which in the half-plane convention is a 36° turn with a reflection
+relabeled `m → m+1`, which in the half-plane convention is a 36° turn with a reflection
 in it, not a 72° one. It reported that no tiling survived, which was the tell.
 
 ### The ten readings, settled (2026-10-11)
@@ -338,7 +338,7 @@ height is the index at **1/√5 per step**, measured. (One wrinkle worth knowing
 
 de Bruijn's condition for a rhombic tiling to be Penrose is that **every vertex index
 lies in 1…4**. Indices 0 and 5 are exactly the two masks that collide at the decagon's
-centre. So **the arrowed-rhomb matching rule and Jake's "none of the paths hit the
+center. So **the arrowed-rhomb matching rule and Jake's "none of the paths hit the
 extremes" are the same condition** — which is why applying the arrows did not move the
 count.
 
@@ -356,7 +356,7 @@ and a rhombus is blind to sign. With that, and then realizability:
 The last line is a sweep, not an argument: every seed and generation the site can
 build — 30 patches — searched for decagons and each classified by its index histogram.
 
-    471 decagons with a vertex at their own centre (not singular)
+    471 decagons with a vertex at their own center (not singular)
     760 genuinely singular
        orbit 1: 0 · orbit 2: 0 · orbit 3: 760
 
@@ -367,8 +367,8 @@ the ten placements of the one reading"*, with the ten now exhibited as a genuine
 and the other thirty ruled out by measurement.
 
 **A correction the sweep forced.** A decagon is singular only when **neither** pole is
-realised. Testing mask 0 alone, as an earlier pass did, lets through the 471 that realise
-mask 31: those have a vertex at their own centre, so the five lines are not concurrent
+realized. Testing mask 0 alone, as an earlier pass did, lets through the 471 that realize
+mask 31: those have a vertex at their own center, so the five lines are not concurrent
 there and they are no singularity at all. They are also exactly what the arrow condition
 rejects, which is the two tests agreeing.
 
@@ -402,7 +402,7 @@ purely local. The gap between 40 and 10 was the stars all along.
 
 **What this buys.** The cascade is implementable without γ: collapse a figure, recompute
 the stars at the corners it touches, and any corner landing outside the seven forces a
-neighbour to change; propagate until it settles. And *superposable* becomes testable
+neighbor to change; propagate until it settles. And *superposable* becomes testable
 rather than assumed — a figure is a valid singularity exactly when more than one of its
 states leaves every star legal.
 

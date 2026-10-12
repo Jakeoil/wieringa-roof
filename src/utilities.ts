@@ -33,8 +33,8 @@ const padIn = el<HTMLInputElement>("pad");
 const rotIn = el<HTMLInputElement>("rot");
 const strokeColSel = el<HTMLSelectElement>("strokeColor");
 
-// Queen reads better than "Deca" everywhere else on the site, so match that here.
-const nameOf = (label: string) => (label === "Deca" ? "Queen" : label);
+// Deca throughout: "Queen" was an obsolete name for this composite and is retired.
+const nameOf = (label: string) => label;
 for (const s of seedTypes) {
     const o = document.createElement("option");
     o.value = s.label;

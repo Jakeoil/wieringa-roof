@@ -267,7 +267,7 @@ const CAGES: Record<string, ReturnType<typeof cageFaces>> = {};
 const NDISS: Record<string, number> = {};
 
 /** How many dissections the solid has with its position fixed in space. */
-function labelledCount(axes: AxisSet, key: string): number {
+function labeledCount(axes: AxisSet, key: string): number {
     if (NDISS[key] === undefined) NDISS[key] = allDissections(axes).length;
     return NDISS[key];
 }
@@ -374,7 +374,7 @@ function build(): void {
     // On the triacontahedron only two dissections exist up to symmetry, and they differ
     // by a single flip inside one Bilinski dodecahedron — four cells and six internal
     // faces, everything else identical. So the choice is a toggle rather than a list.
-    // On the smaller solids there is no choice at all: their labelled dissections form
+    // On the smaller solids there is no choice at all: their labeled dissections form
     // a single orbit, so the toggle is disabled rather than offered as a fiction.
     const solid = chosen();
     const hasFlip = solid.axes.length === 6;
@@ -667,10 +667,10 @@ function build(): void {
             `so there is nothing to explode and no cage within${note}`;
         return;
     }
-    // Below six axes there is nothing to flip: the labelled dissections are one orbit,
+    // Below six axes there is nothing to flip: the labeled dissections are one orbit,
     // and saying so is more use than an inert checkbox.
     const kindNote = !hasFlip
-        ? ` · one dissection only — its ${labelledCount(solid.axes, solid.key)} labelled ones are a single orbit under the solid's group of ${groupOrder(solid.axes)}`
+        ? ` · one dissection only — its ${labeledCount(solid.axes, solid.key)} labeled ones are a single orbit under the solid's group of ${groupOrder(solid.axes)}`
         : kind === "symmetric"
             ? " · unflipped — the dissection that keeps a three-fold axis"
             : " · flipped — one Bilinski dodecahedron turned over, and the three-fold axis is gone";
@@ -738,7 +738,7 @@ function relabel(): void {
     flipLabel.style.opacity = hasFlip ? "" : "0.45";
     flipLabel.title = hasFlip
         ? FLIP_TITLE
-        : "Only the triacontahedron has two dissections. On the smaller solids every labelled dissection is the same one differently placed, so there is nothing to flip.";
+        : "Only the triacontahedron has two dissections. On the smaller solids every labeled dissection is the same one differently placed, so there is nothing to flip.";
 }
 
 solidSel.value = prefs.solid || PREF_DEFAULTS.solid;

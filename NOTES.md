@@ -19,11 +19,11 @@ is the cheaper mistake.
 
 ## House style
 
-**American spellings, everywhere.** `color` not colour, `center` not centre, `gray`
-not grey, `neighbor` not neighbour, `labeled` not labelled, `minimize` /
+**American spellings, everywhere.** `color` not color, `center` not center, `gray`
+not gray, `neighbor` not neighbor, `labeled` not labeled, `minimize` /
 `normalize` not `-ise`. This is not only about what the reader sees: it applies to
 **code identifiers and comments** as well, so the vocabulary stays consistent
-whether you are reading the page or the source. `colour` is the one that keeps
+whether you are reading the page or the source. `color` is the one that keeps
 creeping back in, because it turns up naturally when writing about palettes.
 
 Also: **"Mathematics"**, never "The Maths".
@@ -605,7 +605,7 @@ that will not fit.
 
 ### Notes toward Stage A
 
-- Minimising components subject to overlap-freeness is a global problem and the
+- Minimizing components subject to overlap-freeness is a global problem and the
   current greedy is only a baseline. Worth trying, roughly in order of effort:
   seed search (already there for BFS, capped at 150 faces); a merge pass that
   attempts to join two components across a cut edge and keeps the join if it stays
@@ -1349,7 +1349,7 @@ everything, the first three are what rhomb groups wears, and all five serve Kowa
 So the leading trio is chosen as a trio rather than taken as three-fifths of a set —
 neither runs round the hue circle in order.
 
-`Slate` opens on the grey that was the plain color, so none keeps the look it had.
+`Slate` opens on the gray that was the plain color, so none keeps the look it had.
 `Paper` opens on white: a rhombus painted white on a white page is its edges and nothing
 else, which is a drawing rather than a failure and is the point of it.
 
@@ -1357,7 +1357,7 @@ Kowalewski can wear three palettes now instead of one, and the old `neutral` —
 of one color, useful to one scheme — is gone, `Slate` covering it and three schemes more.
 
 The trios are spread in **luminance** as well as hue, since two colors differing only in
-hue print as the same grey and the plate palette exists because these get printed. The
+hue print as the same gray and the plate palette exists because these get printed. The
 closest pair in each: Paper 0.24, Slate 0.13, Five 0.11, Screen 0.10, Plate 0.09.
 
 Still open: `screen`, `classic` and `plate` stop at three, so Kowalewski cannot wear

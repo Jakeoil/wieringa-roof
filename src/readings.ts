@@ -8,7 +8,7 @@
 // **Legality is local, and it is two conditions.** See EXCEPTIONAL.md:
 //
 //   * every vertex **index** — the popcount of its mask — lies in 1…4. Indices 0 and 5
-//     are the two masks that collide at the zonogon's centre, de Bruijn's condition, and
+//     are the two masks that collide at the zonogon's center, de Bruijn's condition, and
 //     the same thing as Jake's "none of the paths hit the extremes";
 //   * every complete **vertex star** is one of seven. Read off 10,639 real stars across
 //     thirty patches, there are only seven, and they finish the job: of the forty
@@ -17,7 +17,7 @@
 //
 // Neither condition needs γ, which is what makes a cascade computable: collapse a
 // figure, recompute the stars at the corners it touches, and any corner landing outside
-// the seven forces a neighbour.
+// the seven forces a neighbor.
 
 /** A rhombus of a reading: the two generators it spans, and the mask it is based at. */
 export interface MaskRhomb {
@@ -73,7 +73,7 @@ export function tilingsOf(gens: number[], angleOf: (g: number) => number): MaskR
     const rev = [...ord].reverse().join(",");
 
     // A folded generator has its zone reversed, so "crossed" in the sweep means the bit
-    // is **off** in the caller's own labelling. Undo that on the way out.
+    // is **off** in the caller's own labeling. Undo that on the way out.
     const unfold = (S: number): number => {
         let K = 0;
         for (const g of gens) {
@@ -130,7 +130,7 @@ const popcount = (K: number): number => {
  * Does every vertex of this reading have an index in 1…`total − 1`?
  *
  * The extremes — index 0 and index `total` — are the two masks that land on the
- * zonogon's own centre, because the generators sum to zero. A reading through either is
+ * zonogon's own center, because the generators sum to zero. A reading through either is
  * not Penrose.
  *
  * **`lo` is not optional for a sub-figure.** A hexagon's vertices carry the generators
@@ -142,7 +142,7 @@ const popcount = (K: number): number => {
  * Which corner that is depends on the figure, not only on its generators: folding a
  * direction into the half plane swaps the ends of its zone, so the two local-index
  * extremes need not be the shadow's own outermost corners. Measured rather than
- * assumed — in Queen generation 3 the oblate hexagons span three index levels and the
+ * assumed — in Deca generation 3 the oblate hexagons span three index levels and the
  * acute ones two.
  */
 export function indexLegal(T: MaskRhomb[], total: number, lo = 0): boolean {
@@ -201,7 +201,7 @@ export function starLegal(T: MaskRhomb[], pointOf: (K: number) => [number, numbe
  * Legal *on their own account* is not the whole story and is not meant to be. A
  * hexagon's two both pass here — its one interior star is K122 or K113, and both are
  * among the seven — and which of them a patch can actually use depends on the rim,
- * which is to say on its neighbours. That dependence is the cascade.
+ * which is to say on its neighbors. That dependence is the cascade.
  */
 export function readingsOf(
     gens: number[],

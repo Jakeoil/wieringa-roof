@@ -6,7 +6,7 @@
 //
 // At sixteen pixels almost nothing survives except silhouette and color, so the
 // defaults drop strokes and lean on the group palette. The unfolding of a small
-// patch is a good subject precisely because it is *sparse*: Queen generation 1 fills
+// patch is a good subject precisely because it is *sparse*: Deca generation 1 fills
 // only 47% of its own bounding box, and that spidery outline still reads when the
 // individual rhombs no longer do.
 

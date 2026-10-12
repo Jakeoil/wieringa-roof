@@ -338,7 +338,7 @@ function netFor(faces: number[]): Float32Array {
 // contact so half the pairs meet at a point rather than on a curve.
 //
 // Measured before it was built, over Sun and Star gen 2 (and confirmed on Pe5 gen 3-4
-// and Queen gen 3): every *adjacent* pair of proper solids stands at 1.7013, 2.3840 or
+// and Deca gen 3): every *adjacent* pair of proper solids stands at 1.7013, 2.3840 or
 // 2.7528 — all inside 2·midradius = 2.9288 — so every seam that is actually visible
 // does close, in 0 exceptions out of 2,615 adjacent pairs. The pairs that can never
 // reach each other are 10+10 at φ³ = 4.2361, 5a+5a, and 4+5a at 3.6416, and none of
@@ -536,7 +536,7 @@ const VORONOI_TOPO: MeshTopo = (() => {
  * touches nothing the solid owns. It is not a rare corner: on Sun gen 2 every single
  * proper solid has some, and for the complete class it is the *entire* skirt. A class-10
  * ball keeps its dome, and then a separate ring of surface floats near its equator with
- * a band of daylight between the two, because the band is inside a neighbour's ball and
+ * a band of daylight between the two, because the band is inside a neighbor's ball and
  * the ring beyond it is not. Drawn, that reads as exactly what it is: a discontinuity.
  *
  * So the territory is the connected component of the clipped region that contains the
@@ -548,7 +548,7 @@ const VORONOI_TOPO: MeshTopo = (() => {
  *
  * With this, a complete solid comes out at exactly its footprint — 33.3%, what
  * `by class` draws — and the other classes gain the short enlargement that reaches
- * their neighbours and nothing beyond it.
+ * their neighbors and nothing beyond it.
  */
 function reachable(clips: Clip[], owned: Set<number>): Uint8Array {
     const { vert, tri, face, edges } = VORONOI_TOPO;
@@ -620,7 +620,7 @@ function reachable(clips: Clip[], owned: Set<number>): Uint8Array {
  * That leaves a spur, and the spur is real rather than an artifact: a class-5 cell can
  * come to a point against blue and purple — a triple point of the packing, where the
  * gap genuinely closes — and then carry on past it, because two circles crossing bound
- * a lune on one side and nothing on the other. Closing it would take a third neighbour,
+ * a lune on one side and nothing on the other. Closing it would take a third neighbor,
  * and in those directions there is no ball at all. Bounding the growth at the cup rim
  * instead was tried and only made the spur shorter, so the honest drop-dead is the
  * equator: it says "no bound found" rather than pretending to one. Class 4 is the worst
@@ -655,7 +655,7 @@ function voronoiCell(
         }
         for (let i = 1; i + 1 < poly.length; i++) out.push([poly[0], poly[i], poly[i + 1]]);
         // The meeting curves are read off the drawn region rather than sampled from the
-        // circles: a polygon edge whose two ends both sit on one neighbour's plane IS an
+        // circles: a polygon edge whose two ends both sit on one neighbor's plane IS an
         // arc of that meeting circle, and taking it this way it can only ever appear
         // where there is surface under it. Clip 0 is the drop-dead, which is a rim and
         // not a meeting, so it is passed over.
@@ -770,7 +770,7 @@ function reliefFor(faces: number[], spherical: boolean): CupRelief {
  * The ramp parameter for one vertex: −1 at the bottom of the cup, +1 at the top.
  *
  * `zUnit` is unit-space and `z` is the parity, so the product is the world-space
- * height and the ramp follows the model over rather than travelling with it. Turning
+ * height and the ramp follows the model over rather than traveling with it. Turning
  * a hat into a bowl therefore turns the shading over too, which is the whole point of
  * having it.
  */
@@ -1204,9 +1204,9 @@ function build(reframe: boolean): void {
                 // currently drawn — class unchecked, RT unchecked, size at zero, its
                 // side of the roof hidden, it still clips. Otherwise unchecking blue and
                 // purple lets green swell to fill its whole hemisphere, and the curve a
-                // ball meets its neighbour on moves every time something is toggled,
+                // ball meets its neighbor on moves every time something is toggled,
                 // which makes it a fact about the checkboxes rather than about the
-                // solids. Neighbours are taken at full radius for the same reason.
+                // solids. Neighbors are taken at full radius for the same reason.
                 const partners = cen.solids.filter(eligible)
                     .map((s) => ({ c: place(s.c), r: sphereR, id: s.id }));
                 const cells = balls.map((s) => ({ c: place(s.c), r: sphereR * sizeOf(s), s }));
@@ -1597,7 +1597,7 @@ for (const [code, nick, full] of [
     ["St5", "St5 star", "St5 star"],
     ["St3", "St3 boat", "St3 boat"],
     ["St1", "St1 diamond", "St1 diamond"],
-    ["Deca", "Queen", "Queen — a composite of pentagons and stars"],
+    ["Deca", "Deca", "Deca — the cartwheel, a composite of pentagons and stars"],
     ["Sun", "Sun", "Sun — a composite of pentagons and stars"],
     ["Star", "Star", "Star — a composite of pentagons and stars"],
 ] as Array<[string, string, string]>) {
@@ -1620,7 +1620,7 @@ if (!patchSel.value) patchSel.value = PREF_DEFAULTS.patch;
 function fillGenerations(prefer?: number): void {
     const code = patchSel.value || PREF_DEFAULTS.patch;
     const keep = prefer ?? Number(genSel.value);
-    // Voronoi clips a whole-sphere mesh per ball against every neighbour that reaches
+    // Voronoi clips a whole-sphere mesh per ball against every neighbor that reaches
     // it, and caps at 400 cells. Proper solids run about 0.14 of the rhomb count, so
     // that ceiling is about 3,000 rhombi — far below anything else here.
     const vor = rtFacesSel.value === "voronoi" && rtExtentSel.value === "midsphere"
@@ -1710,7 +1710,7 @@ rtExtentSel.value = savedExtent || PREF_DEFAULTS.rtextent;
 if (!rtExtentSel.value) rtExtentSel.value = PREF_DEFAULTS.rtextent;
 rtEdgesChk.checked = prefs.rtedges;
 // Migrated twice over now: "cup" was once an extent, then a checkbox, and is now one
-// value of this dropdown. Both older shapes are honoured rather than silently dropped.
+// value of this dropdown. Both older shapes are honored rather than silently dropped.
 rtFacesSel.value = prefs.rtfaces
     || (prefs.rtextent === "cup" || (prefs as { rtcups?: boolean }).rtcups ? "cups" : PREF_DEFAULTS.rtfaces);
 if (!rtFacesSel.value) rtFacesSel.value = PREF_DEFAULTS.rtfaces;
@@ -1862,7 +1862,7 @@ patchSel.addEventListener("change", () => { fillGenerations(); rebuild(true); })
 genSel.addEventListener("change", () => rebuild(true));
 // These three set the ceiling, so the list is rebuilt when they move. A generation that
 // was reachable on spheres may not be on the full solid, and it is better for the option
-// to go grey than for the page to try it.
+// to go gray than for the page to try it.
 // Registered first, so a selection that has just become illegal is corrected before
 // anything downstream reads it.
 for (const c of [rtFacesSel, rtSel, rtExtentSel]) {

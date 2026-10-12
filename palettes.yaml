@@ -7,7 +7,7 @@
 # is long enough for, so a three-color palette never appears under Kowalewski.
 #
 # Worth knowing when you add one: spread the leading trio in **luminance** as well as
-# hue. Two colors that differ only in hue print as the same grey, and these get printed.
+# hue. Two colors that differ only in hue print as the same gray, and these get printed.
 #
 # Edit this file and run `npm run build`. It generates `src/palettes.ts`, which is what
 # the pages import; nothing reads this file at runtime, so there is no parser in the
@@ -41,7 +41,7 @@ five:
 
 slate:
   label: Slate
-  # Opens on the grey that used to be the plain color, so the none scheme keeps the
+  # Opens on the gray that used to be the plain color, so the none scheme keeps the
   # look it had before palettes existed.
   colors: ["#c9cbd4", "#5f83b8", "#dda078", "#7fae76", "#a685c4"]
 

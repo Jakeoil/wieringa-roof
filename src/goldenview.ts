@@ -5,11 +5,11 @@
 // and stick, two cameras for the two projections, and lights that hang either in the
 // world or on the eye. The Cage still carries its own copy; this module exists because
 // the Exceptional page wants the same language for a different subject, and copying a
-// renderer is how two pages come to disagree about what a colour means.
+// renderer is how two pages come to disagree about what a color means.
 //
 // The subject is a bag of **golden rhombi**, each with the two axes it is spanned by.
-// That is all the schemes need: `Kowalewski five` colours a face by its axis pair, and
-// `bands` colours it by the two ribbons crossing it. Where the rhombi come from — the
+// That is all the schemes need: `Kowalewski five` colors a face by its axis pair, and
+// `bands` colors it by the two ribbons crossing it. Where the rhombi come from — the
 // cells of a zonohedron, or a Wieringa roof lifted out of the plane — is not this
 // module's business.
 
@@ -55,7 +55,7 @@ export interface Cap {
      * Paint the face flat in `color` instead of letting the scheme have it. Left false —
      * which is the default — the face is drawn exactly as the rest of the surface is,
      * and the cap contributes **only its rim**. That is how a singularity shows on this
-     * page: not as a coloured patch laid over the tiling, but as the same golden rhombi
+     * page: not as a colored patch laid over the tiling, but as the same golden rhombi
      * everything else is made of, outlined.
      */
     fill?: boolean;
@@ -69,12 +69,14 @@ export interface Cap {
      * stays bare — which is the figure itself, a ribbon with a third rhomb added.
      */
     band?: number;
-    /** colour the rim by the generator each edge runs along, rather than one colour */
+    /** color the rim by the generator each edge runs along, rather than one color */
     rimByBand?: boolean;
+    /** one color for this cap's whole rim, overriding `rimByBand` — the hover mark */
+    rim?: THREE.Color;
     /**
      * The ground this face shows outside its ribbons, in place of the page's own. It is
      * how a figure is marked without breaking the banding: the ribbons run across it
-     * unchanged and in their own colours, and only the part belonging to neither of them
+     * unchanged and in their own colors, and only the part belonging to neither of them
      * says which figure this is.
      */
     ground?: THREE.Color;
@@ -84,7 +86,7 @@ export interface DrawOptions {
     scheme: Scheme;
     faceMode: FaceMode;
     edgeMode: EdgeMode;
-    /** which axes the solid stands on, so the colouring can be minimal on it */
+    /** which axes the solid stands on, so the coloring can be minimal on it */
     axes: AxisSet;
     /** ribbon width as a fraction of the face, `bands` only */
     ribbon: number;
@@ -94,7 +96,7 @@ export interface DrawOptions {
      *  anything else. One number per face, or omitted for none. */
     shadeOf?: (f: GoldenFace, i: number) => number;
     /**
-     * Cover a face rather than draw it: return a colour and the rhombus is painted flat
+     * Cover a face rather than draw it: return a color and the rhombus is painted flat
      * in it with **no edges of its own**, so a run of capped faces reads as one surface
      * and not as the tiling underneath. The boundary of the capped region is then drawn
      * as a `rim` — the edges belonging to exactly one capped face — which is how a
@@ -173,20 +175,29 @@ export interface GoldenView {
 const FOV = 34;
 /** The opening eye point, and the distance the fit factor is read off. */
 const EYE: V3 = [3.4, -4.2, 3.0];
+/**
+ * Straight down, near enough. Two degrees off the vertical rather than none: with `up`
+ * along z a camera exactly on the axis has no horizon to orbit about, and OrbitControls
+ * degenerates. Two degrees is invisible and keeps the controls sane.
+ */
+export const PLAN_VIEW: V3 = [0, -0.035, 1];
 const LAMPS_WORLD: V3[] = [[4, -6, 8], [-6, 4, -2]];
 const LAMPS_EYE: V3[] = [[3, 4, 5], [-4, -2, -1]];
 /** Where a face is cut for its ribbons, in half-edge coordinates. */
 const cutsAt = (w: number) => [-1, -w, w, 1];
 
-export function createGoldenView(host: HTMLElement, background = 0xf4f1e8): GoldenView {
+export function createGoldenView(
+    host: HTMLElement, background = 0xf4f1e8, eye: V3 = EYE,
+): GoldenView {
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(background);
 
     // Two cameras, because a projection cannot be changed on a camera that has one.
     const persp = new THREE.PerspectiveCamera(FOV, 1, 0.1, 400);
     const ortho = new THREE.OrthographicCamera(-2, 2, 2, -2, 0.1, 400);
+    const eye0 = Math.hypot(...eye) < 1e-9 ? EYE : eye;
     for (const c of [persp, ortho]) {
-        c.position.set(EYE[0], EYE[1], EYE[2]);
+        c.position.set(eye0[0], eye0[1], eye0[2]);
         c.up.set(0, 0, 1);
     }
     let cam: THREE.PerspectiveCamera | THREE.OrthographicCamera = persp;
@@ -208,6 +219,15 @@ export function createGoldenView(host: HTMLElement, background = 0xf4f1e8): Gold
     controls.screenSpacePanning = true;
     controls.autoRotateSpeed = 1.0;
     controls.addEventListener("start", () => { controls.autoRotate = false; });
+    // A hand only while the pointer is down and moving. The canvas used to show `grab`
+    // at rest, which says "this is for dragging" on a surface whose whole point is that
+    // you can click it.
+    const el = renderer.domElement;
+    el.style.cursor = "default";
+    el.addEventListener("pointerdown", () => { el.style.cursor = "grabbing"; });
+    for (const ev of ["pointerup", "pointercancel", "pointerleave"]) {
+        el.addEventListener(ev, () => { el.style.cursor = "default"; });
+    }
 
     scene.add(new THREE.AmbientLight(0xffffff, 0.68));
     const lamps = new THREE.Group();
@@ -292,7 +312,7 @@ export function createGoldenView(host: HTMLElement, background = 0xf4f1e8): Gold
 
     function frame(radius: number): void {
         const dir = new THREE.Vector3().subVectors(cam.position, controls.target);
-        if (dir.lengthSq() < 1e-12) dir.set(EYE[0], EYE[1], EYE[2]);
+        if (dir.lengthSq() < 1e-12) dir.set(eye0[0], eye0[1], eye0[2]);
         dir.setLength(Math.max(radius, 1e-6) * FIT);
         cam.position.copy(controls.target).add(dir);
         if (cam === ortho) {
@@ -411,7 +431,7 @@ export function createGoldenView(host: HTMLElement, background = 0xf4f1e8): Gold
                     // continuous with the ribbons passing it in the field
                     else capEdge.set(key, {
                         a, b, n: 1, all: cap.edges === "all",
-                        col: cap.rimByBand ? bandColor(f.dirs[k % 2], o.axes) : null,
+                        col: cap.rim ?? (cap.rimByBand ? bandColor(f.dirs[k % 2], o.axes) : null),
                     });
                 }
                 if (!cap.fill) {
@@ -585,15 +605,15 @@ export function createGoldenView(host: HTMLElement, background = 0xf4f1e8): Gold
             scene.add(bm);
             drawn.push(bm);
 
-            // Under bands the sticks carry the colours, and a metal at 0.92 would put
+            // Under bands the sticks carry the colors, and a metal at 0.92 would put
             // them into the reflection rather than show them. So they get their own
-            // near-dielectric material, white, for the per-instance colour to pass
+            // near-dielectric material, white, for the per-instance color to pass
             // through as itself.
             // The sticks carry the generator under **either** scheme. A stick is an
             // edge, an edge runs along one generator, and that is true whether the faces
             // are wearing the Kowalewski five or their ribbons — so the frame says the
             // same thing in both. Their own near-dielectric material, white, since a
-            // metal at 0.92 tints what it reflects rather than showing a colour as
+            // metal at 0.92 tints what it reflects rather than showing a color as
             // diffuse. The beads stay metal, being vertices and not edges.
             const rmat = new THREE.MeshStandardMaterial({
                 color: 0xffffff, roughness: 0.42, metalness: 0.12,

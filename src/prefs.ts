@@ -14,9 +14,9 @@
 //
 // Beyond that, **a new build starts from the defaults.** The stored build id is
 // checked first, and settings saved by any other build are dropped whole. While the
-// pages are still changing shape this is the honest behaviour: field-by-field
+// pages are still changing shape this is the honest behavior: field-by-field
 // validation catches a value that changed type, but not one whose *meaning* moved —
-// a mode that no longer exists, a key renamed from colour to color, a generation
+// a mode that no longer exists, a key renamed from color to color, a generation
 // that now means one more than it did. Those restore silently and wrongly, and the
 // symptom is a page that behaves oddly for one person and nobody else. Losing a few
 // dial positions on deploy is much the cheaper mistake.
