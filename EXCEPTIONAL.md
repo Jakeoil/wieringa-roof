@@ -372,6 +372,61 @@ mask 31: those have a vertex at their own centre, so the five lines are not conc
 there and they are no singularity at all. They are also exactly what the arrow condition
 rejects, which is the two tests agreeing.
 
+### The local legality test — the cascade needs no γ (2026-10-11)
+
+Jake: *"once a collapse occurs, the neighbors can be tested for compatability (arrows?),
+thus forcing it to change. without gammas."* That is right, and the test is now in hand.
+
+A flip does not alter the figure's rim, so nothing propagates through the boundary. What
+it alters is the **vertex star** at each of the six corners it touches — the set of
+rhombi meeting there — and Penrose legality is a condition on vertex stars. Read off
+**10,639 complete stars** across thirty patches, there are only **seven**:
+
+| star | |
+|---|---|
+| `108+108+144` | the oblate hexagon, K122 |
+| `72+144+144` | the acute hexagon, K113 |
+| `72+72+72+72+72` | the sun |
+| `36+36+72+108+108` · `72+72+72+144` · `36+36+72+72+72+72` · `36+36+36+36+72+72+72` | the rest |
+
+**And the seven finish the filter.** Of the 40 decagon readings meeting the index
+condition, exactly **10** have only legal stars — and they are precisely the patch's own
+orbit of ten. The thirty rejected ones lean on two stars that sum to 360° and never
+occur in any patch:
+
+    36+108+108+108    used 40 times
+    36+72+108+144     used 20 times
+
+So the full filter is **index in 1…4, and every complete star one of the seven**, both
+purely local. The gap between 40 and 10 was the stars all along.
+
+**What this buys.** The cascade is implementable without γ: collapse a figure, recompute
+the stars at the corners it touches, and any corner landing outside the seven forces a
+neighbour to change; propagate until it settles. And *superposable* becomes testable
+rather than assumed — a figure is a valid singularity exactly when more than one of its
+states leaves every star legal.
+
+### The ten readings as geometry, and their two operations
+
+The ten are now drawable in the patch's own coordinates, with the patch's own reading
+confirmed among them. Jake: *"the large may have more operations, operations with 2 state
+and rotation operations with 5."* Confirmed:
+
+    the 36° turn cycles the orbit: back to the start after 10 steps
+    (36°)² equals the 72° turn:                       true
+    (36°)⁵ equals the inverse roof, hills for dales:  true
+    the 72° turn alone reaches 5; the flip takes those to the other 5
+
+So F₂₀'s ten factor as **a 5-state rotation times a 2-state flip**, and a skewb has only
+the flip. The single 36° turn generates both, which is why it is the right step even
+though it is not a symmetry of the lift on its own: a 36° turn is a 72° turn plus a
+parity flip, and the flip is what repairs the lift.
+
+Two fixes it took. Folding a direction into the half plane **adds** π — subtracting it
+scrambles Elnitsky's ordering and yields 0 legal tilings instead of 40. And the orbit
+must be matched **in the plane**, since a 36° turn sends `E` to `−v + ẑ/√5`, which is
+neither plus nor minus any `E`.
+
 ### The cascade (Jake, 2026-10-11)
 
 The readings are **not independent**, and that is the whole of phase 2.
