@@ -542,11 +542,15 @@ function makeFaces(): void {
 }
 
 /**
- * Shading by height, so the relief reads before any color does.
+ * Height shading, **the 3D page's**, so one surface drawn two ways does not disagree
+ * about which way is up: a signed parameter, −1 at the lowest point of the patch and +1
+ * at the highest, lerped toward white above the middle and black below.
  *
- * Taken off the face's own mean height against the patch's full range rather than its
- * own, since a rhombus rising through the middle of the roof must not draw like one
- * rising at the top. The same absolute-range rule `roofgeom` uses for the flat pages.
+ * Measured against the whole patch rather than each face, since a rhombus rising through
+ * the middle of the roof must not draw like one rising at the top — and per **vertex**,
+ * so a rhombus carries a gradient. That also means the hidden faces of a superposed
+ * skewb are shaded by their own depth like everything else, which is what makes the
+ * Necker reading behind the surface read as being behind it.
  */
 const DECA_CAP = new THREE.Color(DECA_PURPLE);
 const SKEWB_CAP = new THREE.Color(SKEWB_PINK);
@@ -554,9 +558,8 @@ const HOVER_CAP = new THREE.Color(HOVER_RIM);
 /** the figure under the pointer, outlined so a valid click point is visible */
 let hoverFig: number | null = null;
 let zLo = 0, zHi = 1;
-function shadeOf(f: GoldenFace): number {
-    const z = (f.corners[0][2] + f.corners[1][2] + f.corners[2][2] + f.corners[3][2]) / 4;
-    return zHi > zLo ? 0.85 * (1 - (z - zLo) / (zHi - zLo)) : 0;
+function shadeAt(p: V3): number {
+    return zHi > zLo ? ((p[2] - zLo) / (zHi - zLo) - 0.5) * 2 : 0;
 }
 
 /**
@@ -690,8 +693,13 @@ function build(reframe: boolean): void {
     if (built !== `${PATCH}|${GEN}`) {
         makeFaces();
         built = `${PATCH}|${GEN}`;
+        // The **roof's** own range, not the whole scene's. F₂₀ stands √5 tall and the
+        // skewbs hang below, so taking the extremes over everything would compress the
+        // surface into the middle of the ramp and flatten exactly what the shading is
+        // for. Anything outside the range clamps, which is what puts a deep back face
+        // at full dark.
         zLo = Infinity; zHi = -Infinity;
-        for (const f of faces) for (const p of f.corners) {
+        for (let i = 0; i < capFrom; i++) for (const p of faces[i].corners) {
             if (p[2] < zLo) zLo = p[2];
             if (p[2] > zHi) zHi = p[2];
         }
@@ -739,7 +747,8 @@ function build(reframe: boolean): void {
         axes: AXES,
         ribbon,
         ground: !groundChk.checked,
-        shadeOf: shadeChk.checked ? shadeOf : undefined,
+        shadeAt,
+        shadeAmount: shadeChk.checked ? 1 : 0,
         // F₂₀ and the skewbs are not patches laid over the tiling — they are made of
         // the same golden rhombi as everything round them, and they take the same
         // scheme, so a ribbon runs across them unbroken and the banding **matches the

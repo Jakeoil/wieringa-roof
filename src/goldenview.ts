@@ -92,9 +92,19 @@ export interface DrawOptions {
     ribbon: number;
     /** paint the part of a face outside its ribbons, `bands` only */
     ground: boolean;
-    /** darken a face by this much, 0 to 1 — the caller's own shading, by height or
-     *  anything else. One number per face, or omitted for none. */
-    shadeOf?: (f: GoldenFace, i: number) => number;
+    /**
+     * Height shading, the same as the 3D page's and for the same reason — one surface
+     * drawn two ways should not disagree about which way is up.
+     *
+     * `shadeAt` gives a **signed** parameter at a point, −1 at the lowest part of the
+     * surface and +1 at the highest, and the color is lerped toward white above the
+     * middle and toward black below by `amount · |t| · 0.55`. Two differences from what
+     * this module did before, both of which matter: it is **per vertex**, so a rhombus
+     * carries a gradient rather than one flat tone, and it lightens as well as darkens.
+     */
+    shadeAt?: (p: V3) => number;
+    /** how strongly, 0 to 1 */
+    shadeAmount?: number;
     /**
      * Cover a face rather than draw it: return a color and the rhombus is painted flat
      * in it with **no edges of its own**, so a run of capped faces reads as one surface
@@ -129,16 +139,18 @@ function crossColor(a: THREE.Color, b: THREE.Color): THREE.Color {
     return hit;
 }
 
-const DARK = new Map<string, THREE.Color>();
-function darken(c: THREE.Color, t: number): THREE.Color {
-    if (t <= 0.001) return c;
-    const k = `${c.getHex()},${Math.round(t * 64)}`;
-    let hit = DARK.get(k);
-    if (!hit) {
-        const f = 1 - 0.55 * t;
-        DARK.set(k, (hit = new THREE.Color(c.r * f, c.g * f, c.b * f)));
-    }
-    return hit;
+/**
+ * The color of `c` at the point `p`, shaded by height. Lerped toward white above the
+ * middle of the surface and toward black below it, which is `shadeColor` in
+ * `roofview.ts` written out — the 3D page and this one then agree.
+ */
+function shadeRGB(c: THREE.Color, p: V3, o: DrawOptions): [number, number, number] {
+    const amt = o.shadeAmount ?? 0;
+    if (amt <= 0 || !o.shadeAt) return [c.r, c.g, c.b];
+    const t = o.shadeAt(p);
+    const k = amt * Math.min(1, Math.abs(t)) * 0.55;
+    const to = t >= 0 ? 1 : 0;
+    return [c.r + (to - c.r) * k, c.g + (to - c.g) * k, c.b + (to - c.b) * k];
 }
 
 // ── the view ──────────────────────────────────────────────────────
@@ -336,8 +348,8 @@ export function createGoldenView(
      * no ground is wanted, four that are not drawn at all.
      */
     function emitBands(
-        f: GoldenFace, w: number, ground: THREE.Color | null, shade: number,
-        axes: AxisSet, out: number[], cols: number[],
+        f: GoldenFace, w: number, ground: THREE.Color | null,
+        axes: AxisSet, emit: (p: V3, c: THREE.Color) => void,
     ): void {
         const cut = cutsAt(w);
         const c = f.corners;
@@ -355,13 +367,8 @@ export function createGoldenView(
                 if (!col) continue;
                 const s0 = cut[a], s1 = cut[a + 1], t0 = cut[b], t1 = cut[b + 1];
                 if (Math.abs(s1 - s0) < 1e-9 || Math.abs(t1 - t0) < 1e-9) continue;
-                const q = darken(col, shade);
                 const p00 = at(s0, t0), p10 = at(s1, t0), p11 = at(s1, t1), p01 = at(s0, t1);
-                for (const p of [p00, p10, p11, p00, p11, p01]) {
-                    out.push(p[0], p[1], p[2]);
-                    cols.push(q.r, q.g, q.b);
-                    verts++;
-                }
+                for (const p of [p00, p10, p11, p00, p11, p01]) emit(p, col);
             }
         }
     }
@@ -412,15 +419,20 @@ export function createGoldenView(
         // Which face each triangle belongs to, filled by watching the count rather than
         // at every emission: the body has three branches and several early returns, and
         // one push missed would mis-identify a click without ever looking wrong.
+        /** every drawn vertex goes through here, so shading is per vertex everywhere */
+        const emit = (p: V3, c: THREE.Color): void => {
+            pos.push(p[0], p[1], p[2]);
+            const [r, g, b] = shadeRGB(c, p, o);
+            cols.push(r, g, b);
+            verts++;
+        };
         let prev = -1;
         faces.forEach((f, i) => {
             while (triFace.length < verts / 3) triFace.push(prev);
             prev = i;
-            const shade = o.shadeOf ? o.shadeOf(f, i) : 0;
             const cap = o.capOf ? o.capOf(f, i) : null;
             if (cap?.hidden) return;
             if (cap) {
-                const q = darken(cap.color, shade);
                 const c = f.corners;
                 // record the rim whether or not the fill is taken over
                 for (let k = 0; k < 4; k++) {
@@ -441,14 +453,10 @@ export function createGoldenView(
                     // still want it, so fall through rather than return.
                     if (o.faceMode !== "invisible") {
                         const gnd = cap.ground ?? ground;
-                        if (bands) emitBands(f, o.ribbon, gnd, shade, o.axes, pos, cols);
+                        if (bands) emitBands(f, o.ribbon, gnd, o.axes, emit);
                         else {
-                            const fl = darken(FIVE[pairColorOn(f.dirs[0], f.dirs[1], o.axes)] ?? FIVE[0], shade);
-                            for (const pt of [c[0], c[1], c[2], c[0], c[2], c[3]]) {
-                                pos.push(pt[0], pt[1], pt[2]);
-                                cols.push(fl.r, fl.g, fl.b);
-                                verts++;
-                            }
+                            const fl = FIVE[pairColorOn(f.dirs[0], f.dirs[1], o.axes)] ?? FIVE[0];
+                            for (const pt of [c[0], c[1], c[2], c[0], c[2], c[3]]) emit(pt, fl);
                         }
                     }
                     if (o.edgeMode === "ballstick") addSticks(f, beads, rods, seen, vkey);
@@ -465,47 +473,32 @@ export function createGoldenView(
                         const ctr = [0, 1, 2].map((dd) => (c[0][dd] + c[1][dd] + c[2][dd] + c[3][dd]) / 4);
                         const at = (a: number, b: number): V3 =>
                             [0, 1, 2].map((dd) => ctr[dd] + a * u[dd] + b * v[dd]) as V3;
-                        const bc = darken(bandColor(cap.band, o.axes), shade);
+                        const bc = bandColor(cap.band, o.axes);
                         const cut = cutsAt(o.ribbon);
                         for (let a = 0; a < 3; a++) {
                             const onBand = which === 0 ? a === 1 : a === 1;
-                            const col2 = onBand ? bc : q;
+                            const col2 = onBand ? bc : cap.color;
                             // the band of dirs[0] is narrow in s; of dirs[1], narrow in t
                             const s0 = which === 0 ? cut[a] : -1, s1 = which === 0 ? cut[a + 1] : 1;
                             const t0 = which === 0 ? -1 : cut[a], t1 = which === 0 ? 1 : cut[a + 1];
                             if (Math.abs(s1 - s0) < 1e-9 || Math.abs(t1 - t0) < 1e-9) continue;
-                            for (const pt of [at(s0, t0), at(s1, t0), at(s1, t1), at(s0, t0), at(s1, t1), at(s0, t1)]) {
-                                pos.push(pt[0], pt[1], pt[2]);
-                                cols.push(col2.r, col2.g, col2.b);
-                                verts++;
-                            }
+                            for (const pt of [at(s0, t0), at(s1, t0), at(s1, t1), at(s0, t0), at(s1, t1), at(s0, t1)]) emit(pt, col2);
                         }
                     } else {
-                        for (const pt of [c[0], c[1], c[2], c[0], c[2], c[3]]) {
-                            pos.push(pt[0], pt[1], pt[2]);
-                            cols.push(q.r, q.g, q.b);
-                            verts++;
-                        }
+                        for (const pt of [c[0], c[1], c[2], c[0], c[2], c[3]]) emit(pt, cap.color);
                     }
                 }
                 if (o.edgeMode === "ballstick") addSticks(f, beads, rods, seen, vkey);
                 return;
             }
-            const flat = darken(
-                bands
-                    ? crossColor(bandColor(f.dirs[0], o.axes), bandColor(f.dirs[1], o.axes))
-                    : FIVE[pairColorOn(f.dirs[0], f.dirs[1], o.axes)] ?? FIVE[0],
-                shade,
-            );
+            const flat = bands
+                ? crossColor(bandColor(f.dirs[0], o.axes), bandColor(f.dirs[1], o.axes))
+                : FIVE[pairColorOn(f.dirs[0], f.dirs[1], o.axes)] ?? FIVE[0];
             if (o.faceMode !== "invisible") {
-                if (bands) emitBands(f, o.ribbon, ground, shade, o.axes, pos, cols);
+                if (bands) emitBands(f, o.ribbon, ground, o.axes, emit);
                 else {
                     const c = f.corners;
-                    for (const p of [c[0], c[1], c[2], c[0], c[2], c[3]]) {
-                        pos.push(p[0], p[1], p[2]);
-                        cols.push(flat.r, flat.g, flat.b);
-                        verts++;
-                    }
+                    for (const p of [c[0], c[1], c[2], c[0], c[2], c[3]]) emit(p, flat);
                 }
             }
             if (o.edgeMode === "edges") {
