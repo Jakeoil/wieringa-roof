@@ -324,6 +324,54 @@ rhombi overlapped, so area is no test of a tiling; and a first attempt at the tu
 relabelled `m → m+1`, which in the half-plane convention is a 36° turn with a reflection
 in it, not a 72° one. It reported that no tiling survived, which was the tell.
 
+### The ten readings, settled (2026-10-11)
+
+Jake: *"Arrowed rhombs. Used to calculate indexes. Gives penrose rhomb a direction.
+indexes are used to calculate wieringa heights among other things."*
+
+**The arrows are already in the lift.** An arrow is an edge's direction, and every edge
+of the patch steps one generator by exactly one — 1275 distinct edges, none otherwise,
+255 per generator — so the arrow is the step: which generator, and which way. Its
+*type* is the index pair it joins, the index is the popcount of the lift vector, and the
+height is the index at **1/√5 per step**, measured. (One wrinkle worth knowing:
+`vertexList[].index` is Σn **+ 1**, a constant offset, consistent on all 666 vertices.)
+
+de Bruijn's condition for a rhombic tiling to be Penrose is that **every vertex index
+lies in 1…4**. Indices 0 and 5 are exactly the two masks that collide at the decagon's
+centre. So **the arrowed-rhomb matching rule and Jake's "none of the paths hit the
+extremes" are the same condition** — which is why applying the arrows did not move the
+count.
+
+What did move it was the symmetry group. The decagon's own rotation is **36°**, not 72°:
+the direction set is closed under it, since 36° sends each vⱼ to the negative of another
+and a rhombus is blind to sign. With that, and then realizability:
+
+| | |
+|---|---|
+| rhombic tilings of the decagon | **62** |
+| arrow condition — every index in 1…4 | **40** |
+| orbits under the decagon's own D₁₀ | **3** — two of ten, one of twenty |
+| **realizable in a Penrose patch** | **1 — an orbit of ten** |
+
+The last line is a sweep, not an argument: every seed and generation the site can
+build — 30 patches — searched for decagons and each classified by its index histogram.
+
+    471 decagons with a vertex at their own centre (not singular)
+    760 genuinely singular
+       orbit 1: 0 · orbit 2: 0 · orbit 3: 760
+
+Seven hundred and sixty singular decagons across nine seed types, and **every one is the
+same orbit** — the one Queen generation 3 sits in, histogram `{1:1, 2:7, 3:6, 4:2}`. The
+other two orbits, thirty tilings, never occur. That is §5.2's *"the ten orientations are
+the ten placements of the one reading"*, with the ten now exhibited as a genuine orbit
+and the other thirty ruled out by measurement.
+
+**A correction the sweep forced.** A decagon is singular only when **neither** pole is
+realised. Testing mask 0 alone, as an earlier pass did, lets through the 471 that realise
+mask 31: those have a vertex at their own centre, so the five lines are not concurrent
+there and they are no singularity at all. They are also exactly what the arrow condition
+rejects, which is the two tests agreeing.
+
 ### The cascade (Jake, 2026-10-11)
 
 The readings are **not independent**, and that is the whole of phase 2.
