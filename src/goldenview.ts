@@ -160,6 +160,14 @@ export interface GoldenView {
     start(): void;
     /** how many triangles the last draw emitted, for the readout */
     triangles(): number;
+    /**
+     * Which face is under the pointer, as an index into the array last drawn, or null.
+     *
+     * Works by keeping, per triangle, the face it came from — the faces are merged into
+     * one buffer for speed, so three.js can only report a triangle and the mapping has
+     * to be carried alongside.
+     */
+    pick(ev: { clientX: number; clientY: number }): number | null;
 }
 
 const FOV = 34;
@@ -214,6 +222,10 @@ export function createGoldenView(host: HTMLElement, background = 0xf4f1e8): Gold
     let drawn: THREE.Object3D[] = [];
     let edgeMats: LineMaterial[] = [];
     let tris = 0;
+    /** the face each emitted triangle belongs to, parallel to the position buffer */
+    let triFace: number[] = [];
+    let faceMesh: THREE.Mesh | null = null;
+    const raycaster = new THREE.Raycaster();
 
     function clear(): void {
         for (const o of drawn) {
@@ -226,6 +238,7 @@ export function createGoldenView(host: HTMLElement, background = 0xf4f1e8): Gold
         }
         drawn = [];
         edgeMats = [];
+        faceMesh = null;
     }
 
     function resize(): void {
@@ -354,6 +367,7 @@ export function createGoldenView(host: HTMLElement, background = 0xf4f1e8): Gold
     function draw(faces: GoldenFace[], o: DrawOptions): void {
         clear();
         tris = 0;
+        triFace = [];
         const bands = o.scheme === "bands";
         const ground = o.ground ? BAND_GROUND : null;
 
@@ -373,7 +387,13 @@ export function createGoldenView(host: HTMLElement, background = 0xf4f1e8): Gold
             a: V3; b: V3; n: number; all: boolean; col: THREE.Color | null;
         }>();
 
+        // Which face each triangle belongs to, filled by watching the count rather than
+        // at every emission: the body has three branches and several early returns, and
+        // one push missed would mis-identify a click without ever looking wrong.
+        let prev = -1;
         faces.forEach((f, i) => {
+            while (triFace.length < tris) triFace.push(prev);
+            prev = i;
             const shade = o.shadeOf ? o.shadeOf(f, i) : 0;
             const cap = o.capOf ? o.capOf(f, i) : null;
             if (cap?.hidden) return;
@@ -413,6 +433,7 @@ export function createGoldenView(host: HTMLElement, background = 0xf4f1e8): Gold
                     return;
                 }
                 if (o.faceMode !== "invisible") {
+                    const mine = i;
                     if (cap.band !== undefined && f.dirs.includes(cap.band)) {
                         // one band only: the face is cut across the generator the
                         // ribbon runs on, the rest left as ground
@@ -481,6 +502,8 @@ export function createGoldenView(host: HTMLElement, background = 0xf4f1e8): Gold
             if (o.edgeMode === "ballstick") addSticks(f, beads, rods, seen, vkey);
         });
 
+        while (triFace.length < tris) triFace.push(prev);
+
         if (pos.length) {
             const g = new THREE.BufferGeometry();
             g.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
@@ -501,6 +524,7 @@ export function createGoldenView(host: HTMLElement, background = 0xf4f1e8): Gold
             }));
             scene.add(mesh);
             drawn.push(mesh);
+            faceMesh = mesh;
         }
 
         // The rim: the boundary of the capped region, and nothing inside it.
@@ -615,5 +639,22 @@ export function createGoldenView(host: HTMLElement, background = 0xf4f1e8): Gold
             renderer.render(scene, cam);
         }),
         triangles: () => tris,
+        pick: (ev) => {
+            if (!faceMesh) return null;
+            const r = renderer.domElement.getBoundingClientRect();
+            if (!r.width || !r.height) return null;
+            raycaster.setFromCamera(
+                new THREE.Vector2(
+                    ((ev.clientX - r.left) / r.width) * 2 - 1,
+                    -((ev.clientY - r.top) / r.height) * 2 + 1,
+                ),
+                cam,
+            );
+            const hit = raycaster.intersectObject(faceMesh, false)[0];
+            // `faceIndex` is typed as possibly null as well as possibly absent
+            if (!hit || hit.faceIndex === undefined || hit.faceIndex === null) return null;
+            const n = triFace[hit.faceIndex];
+            return n === undefined || n < 0 ? null : n;
+        },
     };
 }

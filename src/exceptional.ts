@@ -22,6 +22,8 @@ import { buildRoof } from "./roofgeom.js";
 import * as THREE from "three";
 import { createGoldenView } from "./goldenview.js";
 import type { GoldenFace, FaceMode, EdgeMode, Scheme, Cap } from "./goldenview.js";
+import { readingsOf, starsOf, starSig, LEGAL_STARS } from "./readings.js";
+import type { MaskRhomb } from "./readings.js";
 import type { V3 } from "./solids.js";
 
 const el = <T extends HTMLElement>(id: string): T => {
@@ -93,6 +95,36 @@ let faces: GoldenFace[] = [];
 let capFrom = Infinity;
 /** the ten rhombi of the reading F₂₀ stands on, which `cap` hides */
 let decaFaces = new Set<number>();
+
+/**
+ * A singularity the reader can collapse.
+ *
+ * `state` is **null** while it is superposed — drawn as the solid, all its readings at
+ * once — and otherwise the reading it has collapsed to. Clicking advances it and wraps
+ * back to null, which is the ambiguity returning.
+ */
+interface Figure {
+    kind: "deca" | "skewb";
+    gens: number[];
+    /** position of the corner where all its own generators are off */
+    anchor: V3;
+    /** global index of that corner, which is what decides its readings */
+    lo: number;
+    readings: MaskRhomb[][];
+    /** the roof faces it occupies, as indices into `faces` */
+    roof: number[];
+    state: number | null;
+    /** how many of its readings the rest of the tiling still allows */
+    open: number;
+}
+let figures: Figure[] = [];
+/** face index → the figure that owns it, for picking */
+let ownerOf = new Map<number, number>();
+let gens5: V3[] = [];
+/** the roof's own rhombi, by position, so a figure's solid can drop the three it shares */
+let roofMids = new Set<string>();
+/** what each drawn face belongs to, parallel to the list handed to the view */
+let role: Array<number | null> = [];
 let decaCount = 0;
 /** face index → which skewb it belongs to, numbered from 1 */
 let skewbOf = new Map<number, number>();
@@ -280,6 +312,18 @@ function liftedGenerators(d: NonNullable<ReturnType<typeof buildRoof>>): V3[] {
     return E;
 }
 
+    /** A reading, as rhombi to draw: mask `S` places the corner, `a` and `b` span it. */
+function readingFaces(E: V3[], anchor: V3, T: MaskRhomb[]): GoldenFace[] {
+    return T.map((r) => {
+        let base: V3 = [...anchor] as V3;
+        for (let k = 0; k < 5; k++) if ((r.S >> k) & 1) base = add3(base, E[k]);
+        return {
+            corners: [base, add3(base, E[r.a]), add3(base, add3(E[r.a], E[r.b])), add3(base, E[r.b])],
+            dirs: [r.a, r.b] as [number, number],
+        };
+    });
+}
+
 interface Skewb {
     gens: number[];
     anchor: V3;
@@ -449,6 +493,39 @@ function makeFaces(): void {
     }
     faces = out;
 
+    // ── the figures, and the readings each can collapse to ──
+    gens5 = E;
+    const angleOf = (g: number) => Math.atan2(E[g][1], E[g][0]);
+    const pointOf = (K: number): [number, number] => {
+        const p: [number, number] = [0, 0];
+        for (let k = 0; k < 5; k++) if ((K >> k) & 1) { p[0] += E[k][0]; p[1] += E[k][1]; }
+        return p;
+    };
+    const lift2 = computeLift();
+    const idxAt = (vid: number) => (lift2.n[vid] ?? []).reduce((x, y) => x + y, 0) + 1;
+    figures = [];
+    ownerOf = new Map();
+    if (found.anchor) {
+        // F₂₀: its least corner is the lower pole, index 0, so its own five bits carry
+        // the whole of the index and the readings come out ten
+        figures.push({
+            kind: "deca", gens: [0, 1, 2, 3, 4], anchor: found.anchor, lo: 0,
+            readings: readingsOf([0, 1, 2, 3, 4], angleOf, pointOf, 0),
+            roof: [...decaFaces], state: null, open: 0,
+        });
+    }
+    for (const sk of skewbs) {
+        const lo = Math.min(...sk.roof.flatMap((i) => d.faces[i].vids.map(idxAt)));
+        figures.push({
+            kind: "skewb", gens: sk.gens, anchor: sk.anchor, lo,
+            readings: readingsOf(sk.gens, angleOf, pointOf, lo),
+            roof: sk.roof.map((i) => remap.get(i)!).filter((x) => x !== undefined),
+            state: null, open: 0,
+        });
+    }
+    figures.forEach((fg, n) => { for (const i of fg.roof) ownerOf.set(i, n); });
+    roofMids = new Set(out.slice(0, capFrom).map(midKey));
+
     // Frame on the patch's own extent, which `point` has already centred.
     let r = 0;
     for (const f of out) for (const p of f.corners) r = Math.max(r, Math.hypot(p[0], p[1], p[2]));
@@ -470,6 +547,91 @@ function shadeOf(f: GoldenFace): number {
     return zHi > zLo ? 0.85 * (1 - (z - zLo) / (zHi - zLo)) : 0;
 }
 
+/**
+ * **Is this reading still open to the figure, given everything round it?**
+ *
+ * A collapse does not move the figure's rim, so nothing propagates through the
+ * boundary — what it changes is the **vertex star** at each corner the figure touches,
+ * and Penrose legality is a condition on stars. So: lay the reading in, gather every
+ * rhombus meeting any of its corners from the rest of the tiling as it now stands, and
+ * ask whether every star that closes is one of the seven.
+ *
+ * No γ anywhere, which is the whole point — the cascade is local arithmetic.
+ */
+function readingFits(fg: Figure, T: MaskRhomb[], live: GoldenFace[]): boolean {
+    const want = readingFaces(gens5, fg.anchor, T);
+    const key = (p: V3) => `${Math.round(p[0] * 1e4)},${Math.round(p[1] * 1e4)}`;
+    const mine = new Set<string>();
+    for (const f of want) for (const p of f.corners) mine.add(key(p));
+    const at = new Map<string, number[]>();
+    const add = (f: GoldenFace) => {
+        for (let i = 0; i < 4; i++) {
+            const o = f.corners[i];
+            const k = key(o);
+            if (!mine.has(k)) continue;
+            const u = f.corners[(i + 3) % 4], v = f.corners[(i + 1) % 4];
+            const a = [u[0] - o[0], u[1] - o[1]];
+            const b = [v[0] - o[0], v[1] - o[1]];
+            const cos = (a[0] * b[0] + a[1] * b[1]) / (Math.hypot(a[0], a[1]) * Math.hypot(b[0], b[1]));
+            const deg = Math.round((Math.acos(Math.max(-1, Math.min(1, cos))) * 180) / Math.PI);
+            let l = at.get(k);
+            if (!l) at.set(k, (l = []));
+            l.push(deg);
+        }
+    };
+    for (const f of live) add(f);
+    for (const f of want) add(f);
+    for (const angles of at.values()) {
+        const sum = angles.reduce((x, y) => x + y, 0);
+        if (Math.abs(sum - 360) <= 2 && !LEGAL_STARS.has(starSig(angles))) return false;
+    }
+    return true;
+}
+
+/**
+ * The surface as it now stands: every roof rhombus except those belonging to a figure
+ * that has collapsed, plus the rhombi of each collapsed reading.
+ */
+function liveSurface(): GoldenFace[] {
+    const hidden = new Set<number>();
+    for (const fg of figures) if (fg.state !== null) for (const i of fg.roof) hidden.add(i);
+    const out: GoldenFace[] = [];
+    for (let i = 0; i < capFrom; i++) if (!hidden.has(i)) out.push(faces[i]);
+    for (const fg of figures) {
+        if (fg.state === null) continue;
+        out.push(...readingFaces(gens5, fg.anchor, fg.readings[fg.state]));
+    }
+    return out;
+}
+
+/**
+ * Count, for every figure, how many of its readings the rest of the tiling still
+ * allows, and collapse any that are down to one. Repeat while anything moves — that is
+ * the cascade: a collapse narrows a neighbour, which narrows its neighbour.
+ *
+ * Bounded, and the bound is reported rather than hidden. A greedy propagation like this
+ * can in principle chase its own tail, and saying so is better than looping.
+ */
+function settle(): { rounds: number; forced: number; stuck: number } {
+    let rounds = 0, forced = 0;
+    for (; rounds < 12; rounds++) {
+        const live = liveSurface();
+        let moved = 0;
+        for (const fg of figures) {
+            const open = fg.state !== null ? 1 : fg.readings.filter((T) => readingFits(fg, T, live)).length;
+            fg.open = open;
+            if (fg.state === null && open === 1) {
+                fg.state = fg.readings.findIndex((T) => readingFits(fg, T, live));
+                forced++;
+                moved++;
+            }
+        }
+        if (!moved) break;
+    }
+    const stuck = figures.filter((f) => f.open === 0).length;
+    return { rounds, forced, stuck };
+}
+
 function build(reframe: boolean): void {
     if (built !== `${PATCH}|${GEN}`) {
         makeFaces();
@@ -481,6 +643,34 @@ function build(reframe: boolean): void {
         }
     }
 
+    // ── compose the surface from the figures' states ──
+    const capped = capChk.checked;
+    const hidden = new Set<number>();
+    for (const fg of figures) if (fg.state !== null) for (const i of fg.roof) hidden.add(i);
+    const drawList: GoldenFace[] = [];
+    role = [];
+    for (let i = 0; i < capFrom; i++) {
+        if (hidden.has(i)) continue;
+        if (capped && decaFaces.has(i)) continue;
+        drawList.push(faces[i]);
+        role.push(ownerOf.get(i) ?? null);
+    }
+    figures.forEach((fg, n) => {
+        const add = (fs: GoldenFace[]) => { for (const f of fs) { drawList.push(f); role.push(n); } };
+        if (fg.state !== null) {
+            add(readingFaces(gens5, fg.anchor, fg.readings[fg.state]));
+            return;
+        }
+        // superposed: the solid, all its readings at once
+        const whole = zonohedron(gens5, fg.gens, fg.anchor);
+        if (fg.kind === "deca") {
+            const top = fg.gens.reduce((p, g) => add3(p, gens5[g]), fg.anchor);
+            add(cutPoles(whole, [fg.anchor, top]));
+        } else {
+            add(whole.filter((f) => !roofMids.has(midKey(f))));
+        }
+    });
+
     const bands = colorSel.value === "bands";
     ribbonInput.disabled = !bands;
     ribbonLabel.style.opacity = bands ? "" : "0.45";
@@ -488,8 +678,7 @@ function build(reframe: boolean): void {
     groundLabel.style.opacity = bands ? "" : "0.45";
 
     const ribbon = Number(ribbonInput.value);
-    const capped = capChk.checked;
-    gv.draw(faces, {
+    gv.draw(drawList, {
         scheme: colorSel.value as Scheme,
         faceMode: faceSel.value as FaceMode,
         edgeMode: edgeSel.value as EdgeMode,
@@ -503,26 +692,23 @@ function build(reframe: boolean): void {
         // surrounding**. What marks them is the rim, which takes the generator each of
         // its edges runs along and so matches too.
         capOf: (_f, i): Cap | null => {
-            if (capped && decaFaces.has(i)) return { hidden: true, color: DECA_CAP, group: -1 };
+            const n = role[i];
+            if (n === null || n === undefined) return null;
+            const fg = figures[n];
+            const col = fg.kind === "deca" ? DECA_CAP : SKEWB_CAP;
             // `clear ground` means no ground anywhere, the figures included — their
             // own colour is a ground, so leaving it in place made the control look
             // broken on exactly the faces it was most wanted on.
-            const pink = groundChk.checked ? undefined : SKEWB_CAP;
-            const mauve = groundChk.checked ? undefined : DECA_CAP;
-            // a skewb's own hidden three, behind the roof
-            if (i >= skewbFrom) {
-                return {
-                    color: SKEWB_CAP, ground: pink, rimByBand: true, edges: "all",
-                    group: skewbBack[i - skewbFrom] ?? 0,
-                };
-            }
-            // F₂₀, with its poles gone. A solid has no boundary, so every edge is wanted
-            if (i >= capFrom) {
-                return { color: DECA_CAP, ground: mauve, group: 0, edges: "all", rimByBand: true };
-            }
-            const sk = skewbOf.get(i);
-            if (sk === undefined) return null;
-            return { color: SKEWB_CAP, ground: pink, group: sk >> 3, edges: "all", rimByBand: true };
+            return {
+                color: col,
+                ground: groundChk.checked ? undefined : col,
+                group: n + 1,
+                // a superposed figure is a closed solid and has no boundary, so every
+                // edge of it is wanted; a collapsed one is a patch of the surface and
+                // only its outline is
+                edges: fg.state === null ? "all" : "rim",
+                rimByBand: true,
+            };
         },
         rimColor: DECA_RIM,
     });
@@ -538,6 +724,9 @@ function build(reframe: boolean): void {
         `Queen generation ${GEN} — ${faces.length} golden rhombi on ${vertexList.length} vertices, ` +
         `${decaCount} of them the reading F₂₀ superposes at the center` +
         `${capped ? ", capped away" : ", kept inside it"} · standing √5 tall on its ` +
+        `${figures.filter((f) => f.state !== null).length} of ${figures.length} figures collapsed, ` +
+        `${figures.filter((f) => f.state === null && f.open > 1).length} still superposed · ` +
+        `${lastCascade || "click a figure to collapse it"} · ` +
         `own two poles · ${skewbAcute + skewbOblate} skewbs outlined on the five ribbons `+
         `out of it (${skewbAcute} A₆, ${skewbOblate} O₆) · both wear the same scheme as `+
         `the roof, so the banding runs across them unbroken and only the rims mark them · ` +
@@ -608,6 +797,40 @@ el<HTMLButtonElement>("reset").addEventListener("click", () => {
         resetPrefs(PREFS_KEY);
     }
 });
+
+/**
+ * Click a singularity to collapse it.
+ *
+ * Superposed → its first reading → the next → … → superposed again, which is the
+ * ambiguity coming back. Each collapse is followed by a settle: every figure is asked
+ * how many of its readings the rest of the tiling still allows, and any down to one is
+ * collapsed too. That is the cascade, and it runs on vertex stars alone.
+ */
+let lastCascade = "";
+view.addEventListener("click", (ev) => {
+    if (dragged) { dragged = false; return; }
+    const i = gv.pick(ev);
+    if (i === null) return;
+    const n = role[i];
+    if (n === null || n === undefined) return;
+    const fg = figures[n];
+    // advance, wrapping back to superposed past the last reading
+    fg.state = fg.state === null ? 0 : fg.state + 1 >= fg.readings.length ? null : fg.state + 1;
+    // a collapse elsewhere may have been forced only by this one, so let everything go
+    // back to superposed before settling again — otherwise the cascade is one-way
+    if (fg.state === null) for (const o of figures) if (o !== fg) o.state = null;
+    const s = settle();
+    lastCascade = fg.state === null
+        ? "released — every figure superposed again"
+        : `collapsed ${fg.kind === "deca" ? "F₂₀" : "a skewb"} to reading ${fg.state + 1} of ` +
+          `${fg.readings.length}; the cascade forced ${s.forced} more in ${s.rounds} round` +
+          `${s.rounds === 1 ? "" : "s"}` + (s.stuck ? `, and left ${s.stuck} with no reading at all` : "");
+    rebuild(false);
+});
+// a drag that ends over the canvas must not read as a click
+let dragged = false;
+view.addEventListener("pointerdown", () => { dragged = false; });
+view.addEventListener("pointermove", (e) => { if (e.buttons) dragged = true; });
 
 window.addEventListener("resize", () => gv.resize());
 
