@@ -22,6 +22,7 @@ import { buildRoof } from "./roofgeom.js";
 import * as THREE from "three";
 import { createGoldenView, PLAN_VIEW } from "./goldenview.js";
 import type { GoldenFace, FaceMode, EdgeMode, Scheme, Cap } from "./goldenview.js";
+import { dissection } from "./dissect.js";
 import { readingsOf, starsOf, starSig, LEGAL_STARS } from "./readings.js";
 import type { MaskRhomb } from "./readings.js";
 import type { V3 } from "./solids.js";
@@ -34,6 +35,7 @@ const el = <T extends HTMLElement>(id: string): T => {
 
 const view = el<HTMLDivElement>("view");
 const colorSel = el<HTMLSelectElement>("color");
+const cellSel = el<HTMLSelectElement>("cellmode");
 const faceSel = el<HTMLSelectElement>("facemode");
 const shadeChk = el<HTMLInputElement>("shading");
 const edgeSel = el<HTMLSelectElement>("edgemode");
@@ -53,6 +55,7 @@ const PREF_DEFAULTS = {
     // Bands, straight down, still, lit from the eye. The page is about ribbons crossing
     // in a plan view, and that is what it should open on.
     color: "bands",
+    cellmode: "shell",
     facemode: "solid",
     shading: false,
     // Ball and stick by default, which is not the Cage's default: this surface is a
@@ -106,6 +109,64 @@ let capFrom = Infinity;
 let decaFaces = new Set<number>();
 
 /**
+ * **F₂₀ is ten skewbs.** Jake: *"two skewbs in each of 5 directions, an A₆ and an O₆
+ * connecting the musical sequence of either side."* Measured, and tidier than that: every
+ * **acute** cell leaves out a pair of generators that are **non-adjacent** — gap 2 — and
+ * every **oblate** one leaves out an **adjacent** pair, gap 1, with no exceptions either
+ * way. So the ten fall into five pairs, one A₆ and one O₆ apiece, indexed by direction.
+ *
+ * They do not overlap. Of the forty-five pairs none intersect, their volumes sum to
+ * F₂₀'s own 6.155367, and of the sixty cell faces twenty are its shell while twenty are
+ * interior walls each shared by two cells. They pack it solid. What crosses in the
+ * five-fold is the ribbons, not these — every rhombus lies in two ribbons.
+ *
+ * Taken from the Cage's own dissection, so there is one answer to what the cells are.
+ * Only the combinatorics travel, the Cage building on the icosahedral axes and the roof
+ * on the lifted ones, so each cell is carried across as its triple and the mask it is
+ * based at and rebuilt here on `E`.
+ */
+interface Cell5 { triple: number[]; acute: boolean; S: number; pair: number }
+const F20_CELLS: Cell5[] = (() => {
+    const cells = dissection("chiral", [0, 1, 2, 3, 4]);
+    const out: Cell5[] = cells.map((c) => {
+        const rest = [0, 1, 2, 3, 4].filter((g) => !c.triple.includes(g));
+        let S = 0;
+        rest.forEach((g, q) => { if (c.sign[q] > 0) S |= 1 << g; });
+        return { triple: [...c.triple], acute: c.acute, S, pair: -1 };
+    });
+    // Two cells are chained when they share a **face** — a parallel pair of rhombi — so
+    // adjacency is read off the dissection's own faces and not guessed from the triples.
+    const mid = (f: V3[]) =>
+        [0, 1, 2].map((d) => Math.round((f.reduce((s, q) => s + q[d], 0) / 4) * 1e6)).join(",");
+    const byFace = new Map<string, number[]>();
+    cells.forEach((c, i) => {
+        for (const f of c.faces) {
+            const k = mid(f);
+            let l = byFace.get(k);
+            if (!l) byFace.set(k, (l = []));
+            l.push(i);
+        }
+    });
+    const adj: Array<[number, number]> = [];
+    for (const l of byFace.values()) {
+        if (l.length === 2 && cells[l[0]].acute !== cells[l[1]].acute) adj.push([l[0], l[1]]);
+    }
+    // Chain them into five A₆/O₆ couples, each sharing a face. **The choice is not
+    // canonical**: there are eight such matchings and none survives the 36° turn,
+    // because the dissection itself keeps only 2 of F₂₀'s 20 symmetries and a five-fold
+    // pairing would need a stabilizer divisible by 5. So these are numbered couples, not
+    // directions, and the first matching found is as good as any of the eight.
+    const used = new Set<number>();
+    let n = 0;
+    for (const [i, j] of adj) {
+        if (used.has(i) || used.has(j)) continue;
+        used.add(i); used.add(j);
+        out[i].pair = n; out[j].pair = n; n++;
+    }
+    return out;
+})();
+
+/**
  * A singularity the reader can collapse.
  *
  * `state` is **null** while it is superposed — drawn as the solid, all its readings at
@@ -134,6 +195,8 @@ let gens5: V3[] = [];
 let roofMids = new Set<string>();
 /** what each drawn face belongs to, parallel to the list handed to the view */
 let role: Array<number | null> = [];
+/** and, for F₂₀ drawn as its dissection, which of its cells — so each outlines alone */
+let cellOf = new Map<number, number>();
 let decaCount = 0;
 /** face index → which skewb it belongs to, numbered from 1 */
 let skewbOf = new Map<number, number>();
@@ -711,6 +774,7 @@ function build(reframe: boolean): void {
     for (const fg of figures) if (fg.state !== null) for (const i of fg.roof) hidden.add(i);
     const drawList: GoldenFace[] = [];
     role = [];
+    cellOf = new Map();
     for (let i = 0; i < capFrom; i++) {
         if (hidden.has(i)) continue;
         if (capped && decaFaces.has(i)) continue;
@@ -725,6 +789,24 @@ function build(reframe: boolean): void {
         }
         // superposed: the solid, all its readings at once
         const whole = zonohedron(gens5, fg.gens, fg.anchor);
+        if (fg.kind === "deca" && cellSel.value !== "shell") {
+            // the dissection instead of the shell: each cell gets its own rim group, so
+            // the five pairs read as solids seated round the axis rather than as a mess
+            // of twenty faces and the edges between them
+            const want = cellSel.value === "all"
+                ? F20_CELLS
+                : F20_CELLS.filter((c) => c.pair === Number(cellSel.value));
+            want.forEach((c, k) => {
+                let base: V3 = [...fg.anchor] as V3;
+                for (let g = 0; g < 5; g++) if ((c.S >> g) & 1) base = add3(base, gens5[g]);
+                for (const f of zonohedron(gens5, c.triple, base)) {
+                    drawList.push(f);
+                    role.push(n);
+                    cellOf.set(drawList.length - 1, k);
+                }
+            });
+            return;
+        }
         if (fg.kind === "deca") {
             const top = fg.gens.reduce((p, g) => add3(p, gens5[g]), fg.anchor);
             add(cutPoles(whole, [fg.anchor, top]));
@@ -766,7 +848,7 @@ function build(reframe: boolean): void {
                 color: col,
                 ground: groundChk.checked ? undefined : col,
                 rim: n === hoverFig ? HOVER_CAP : undefined,
-                group: n + 1,
+                group: (n + 1) * 16 + (cellOf.get(i) ?? 0),
                 // a superposed figure is a closed solid and has no boundary, so every
                 // edge of it is wanted; a collapsed one is a patch of the surface and
                 // only its outline is
@@ -794,11 +876,13 @@ function build(reframe: boolean): void {
 // ── controls ──────────────────────────────────────────────────────
 
 colorSel.value = prefs.color || PREF_DEFAULTS.color;
+cellSel.value = prefs.cellmode || PREF_DEFAULTS.cellmode;
 faceSel.value = prefs.facemode || PREF_DEFAULTS.facemode;
 shadeChk.checked = prefs.shading ?? PREF_DEFAULTS.shading;
 edgeSel.value = prefs.edgemode || PREF_DEFAULTS.edgemode;
 for (const [sel, def] of [
     [colorSel, PREF_DEFAULTS.color], [faceSel, PREF_DEFAULTS.facemode],
+    [cellSel, PREF_DEFAULTS.cellmode],
     [edgeSel, PREF_DEFAULTS.edgemode],
 ] as Array<[HTMLSelectElement, string]>) if (!sel.value) sel.value = def;
 ribbonInput.value = String(prefs.ribbon ?? PREF_DEFAULTS.ribbon);
@@ -816,7 +900,7 @@ function rebuild(reframe: boolean): void {
     build(reframe);
 }
 
-for (const c of [colorSel, faceSel, edgeSel, capChk, groundChk, shadeChk]) {
+for (const c of [colorSel, faceSel, edgeSel, capChk, groundChk, shadeChk, cellSel]) {
     c.addEventListener("change", () => rebuild(false));
 }
 ribbonInput.addEventListener("input", () => rebuild(false));
@@ -838,6 +922,7 @@ orthoChk.addEventListener("change", () => gv.setProjection(orthoChk.checked));
 function persist(): void {
     savePrefs(PREFS_KEY, {
         color: colorSel.value, facemode: faceSel.value, edgemode: edgeSel.value,
+        cellmode: cellSel.value,
         shading: shadeChk.checked,
         ribbon: Number(ribbonInput.value), cap: capChk.checked,
         clearground: groundChk.checked,
