@@ -49,6 +49,16 @@ export type Scheme = "five" | "bands";
  * two of its faces, so a rim there would come out empty.
  */
 export interface Cap {
+    /** Draw nothing at all for this face — no fill, no edge, no bead, no rim. */
+    hidden?: boolean;
+    /**
+     * Paint the face flat in `color` instead of letting the scheme have it. Left false —
+     * which is the default — the face is drawn exactly as the rest of the surface is,
+     * and the cap contributes **only its rim**. That is how a singularity shows on this
+     * page: not as a coloured patch laid over the tiling, but as the same golden rhombi
+     * everything else is made of, outlined.
+     */
+    fill?: boolean;
     color: THREE.Color;
     group: number;
     edges?: "rim" | "all";
@@ -61,6 +71,13 @@ export interface Cap {
     band?: number;
     /** colour the rim by the generator each edge runs along, rather than one colour */
     rimByBand?: boolean;
+    /**
+     * The ground this face shows outside its ribbons, in place of the page's own. It is
+     * how a figure is marked without breaking the banding: the ribbons run across it
+     * unchanged and in their own colours, and only the part belonging to neither of them
+     * says which figure this is.
+     */
+    ground?: THREE.Color;
 }
 
 export interface DrawOptions {
@@ -174,7 +191,13 @@ export function createGoldenView(host: HTMLElement, background = 0xf4f1e8): Gold
     const controls = new OrbitControls(persp, renderer.domElement);
     controls.enableDamping = true;
     controls.dampingFactor = 0.08;
-    controls.enablePan = false;
+    // Pan with the right button, as the 3D page has it — that page simply leaves
+    // OrbitControls at its defaults, and the Cage turns panning off because a single
+    // solid at the origin never needs it. A patch of six hundred rhombi does: without
+    // it the only way to look at a skewb out near the rim is to zoom the whole thing.
+    // Left drags to orbit, right drags to pan, wheel dollies.
+    controls.enablePan = true;
+    controls.screenSpacePanning = true;
     controls.autoRotateSpeed = 1.0;
     controls.addEventListener("start", () => { controls.autoRotate = false; });
 
@@ -308,6 +331,26 @@ export function createGoldenView(host: HTMLElement, background = 0xf4f1e8): Gold
         }
     }
 
+    /**
+     * Beads and sticks for one face, deduplicated — unlike the Cage's, where the cells
+     * come apart and each must carry its own. A roof is one surface, so coincident beads
+     * at a shared corner are the same bead drawn five times.
+     */
+    function addSticks(
+        f: GoldenFace, beads: V3[], rods: Array<[V3, V3, number]>,
+        seen: Set<string>, vkey: (p: V3) => string,
+    ): void {
+        for (let k = 0; k < 4; k++) {
+            const a = f.corners[k], b = f.corners[(k + 1) % 4];
+            const ka = vkey(a), kb = vkey(b);
+            if (!seen.has(ka)) { seen.add(ka); beads.push(a); }
+            const ke = ka < kb ? `${ka}|${kb}` : `${kb}|${ka}`;
+            if (seen.has(ke)) continue;
+            seen.add(ke);
+            rods.push([a, b, f.dirs[k % 2]]);
+        }
+    }
+
     function draw(faces: GoldenFace[], o: DrawOptions): void {
         clear();
         tris = 0;
@@ -333,9 +376,42 @@ export function createGoldenView(host: HTMLElement, background = 0xf4f1e8): Gold
         faces.forEach((f, i) => {
             const shade = o.shadeOf ? o.shadeOf(f, i) : 0;
             const cap = o.capOf ? o.capOf(f, i) : null;
+            if (cap?.hidden) return;
             if (cap) {
                 const q = darken(cap.color, shade);
                 const c = f.corners;
+                // record the rim whether or not the fill is taken over
+                for (let k = 0; k < 4; k++) {
+                    const a = c[k], b = c[(k + 1) % 4];
+                    const ka = vkey(a), kb = vkey(b);
+                    const key = `${cap.group}:${ka < kb ? `${ka}|${kb}` : `${kb}|${ka}`}`;
+                    const hit = capEdge.get(key);
+                    if (hit) hit.n++;
+                    // a rim edge takes the generator it runs along, so it reads
+                    // continuous with the ribbons passing it in the field
+                    else capEdge.set(key, {
+                        a, b, n: 1, all: cap.edges === "all",
+                        col: cap.rimByBand ? bandColor(f.dirs[k % 2], o.axes) : null,
+                    });
+                }
+                if (!cap.fill) {
+                    // the scheme paints it; only the outline is ours. Beads and sticks
+                    // still want it, so fall through rather than return.
+                    if (o.faceMode !== "invisible") {
+                        const gnd = cap.ground ?? ground;
+                        if (bands) emitBands(f, o.ribbon, gnd, shade, o.axes, pos, cols);
+                        else {
+                            const fl = darken(FIVE[pairColorOn(f.dirs[0], f.dirs[1], o.axes)] ?? FIVE[0], shade);
+                            for (const pt of [c[0], c[1], c[2], c[0], c[2], c[3]]) {
+                                pos.push(pt[0], pt[1], pt[2]);
+                                cols.push(fl.r, fl.g, fl.b);
+                                tris++;
+                            }
+                        }
+                    }
+                    if (o.edgeMode === "ballstick") addSticks(f, beads, rods, seen, vkey);
+                    return;
+                }
                 if (o.faceMode !== "invisible") {
                     if (cap.band !== undefined && f.dirs.includes(cap.band)) {
                         // one band only: the face is cut across the generator the
@@ -369,19 +445,7 @@ export function createGoldenView(host: HTMLElement, background = 0xf4f1e8): Gold
                         }
                     }
                 }
-                for (let k = 0; k < 4; k++) {
-                    const a = c[k], b = c[(k + 1) % 4];
-                    const ka = vkey(a), kb = vkey(b);
-                    const key = `${cap.group}:${ka < kb ? `${ka}|${kb}` : `${kb}|${ka}`}`;
-                    const hit = capEdge.get(key);
-                    if (hit) hit.n++;
-                    // a rim edge takes the generator it runs along, so it reads
-                    // continuous with the ribbons passing it in the field
-                    else capEdge.set(key, {
-                        a, b, n: 1, all: cap.edges === "all",
-                        col: cap.rimByBand ? bandColor(f.dirs[k % 2], o.axes) : null,
-                    });
-                }
+                if (o.edgeMode === "ballstick") addSticks(f, beads, rods, seen, vkey);
                 return;
             }
             const flat = darken(
@@ -414,20 +478,7 @@ export function createGoldenView(host: HTMLElement, background = 0xf4f1e8): Gold
                     segCol.push(r, g, bl, r, g, bl);
                 }
             }
-            if (o.edgeMode === "ballstick") {
-                // Deduplicated, unlike the Cage's: there the cells come apart and each
-                // must carry its own beads, but a roof is one surface and coincident
-                // beads at a shared corner are simply the same bead drawn five times.
-                for (let k = 0; k < 4; k++) {
-                    const a = f.corners[k], b = f.corners[(k + 1) % 4];
-                    const ka = vkey(a);
-                    if (!seen.has(ka)) { seen.add(ka); beads.push(a); }
-                    const ke = ka < vkey(b) ? `${ka}|${vkey(b)}` : `${vkey(b)}|${ka}`;
-                    if (seen.has(ke)) continue;
-                    seen.add(ke);
-                    rods.push([a, b, f.dirs[k % 2]]);
-                }
-            }
+            if (o.edgeMode === "ballstick") addSticks(f, beads, rods, seen, vkey);
         });
 
         if (pos.length) {
@@ -514,9 +565,15 @@ export function createGoldenView(host: HTMLElement, background = 0xf4f1e8): Gold
             // them into the reflection rather than show them. So they get their own
             // near-dielectric material, white, for the per-instance colour to pass
             // through as itself.
-            const rmat = bands
-                ? new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.42, metalness: 0.12 })
-                : mat;
+            // The sticks carry the generator under **either** scheme. A stick is an
+            // edge, an edge runs along one generator, and that is true whether the faces
+            // are wearing the Kowalewski five or their ribbons — so the frame says the
+            // same thing in both. Their own near-dielectric material, white, since a
+            // metal at 0.92 tints what it reflects rather than showing a colour as
+            // diffuse. The beads stay metal, being vertices and not edges.
+            const rmat = new THREE.MeshStandardMaterial({
+                color: 0xffffff, roughness: 0.42, metalness: 0.12,
+            });
             const rg = new THREE.CylinderGeometry(0.022, 0.022, 1, 10, 1);
             const rm = new THREE.InstancedMesh(rg, rmat, rods.length);
             const up = new THREE.Vector3(0, 1, 0);
@@ -533,10 +590,8 @@ export function createGoldenView(host: HTMLElement, background = 0xf4f1e8): Gold
                 rm.setMatrixAt(i, m4.compose(pos3, quat, scl));
             });
             rm.instanceMatrix.needsUpdate = true;
-            if (bands) {
-                rods.forEach(([, , axis], i) => rm.setColorAt(i, bandColor(axis, o.axes)));
-                if (rm.instanceColor) rm.instanceColor.needsUpdate = true;
-            }
+            rods.forEach(([, , axis], i) => rm.setColorAt(i, bandColor(axis, o.axes)));
+            if (rm.instanceColor) rm.instanceColor.needsUpdate = true;
             scene.add(rm);
             drawn.push(rm);
         }

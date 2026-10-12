@@ -37,6 +37,7 @@ const edgeSel = el<HTMLSelectElement>("edgemode");
 const ribbonInput = el<HTMLInputElement>("ribbon");
 const ribbonOut = el<HTMLElement>("ribbonOut");
 const ribbonLabel = el<HTMLLabelElement>("ribbonlabel");
+const capChk = el<HTMLInputElement>("cap");
 const groundChk = el<HTMLInputElement>("clearground");
 const groundLabel = el<HTMLLabelElement>("groundlabel");
 const spinChk = el<HTMLInputElement>("spin");
@@ -53,6 +54,8 @@ const PREF_DEFAULTS = {
     // depth before any of the colouring does.
     edgemode: "ballstick",
     ribbon: 0.5,
+    // Off: the cap hides the inner rhombi, and those are the paths.
+    cap: false,
     clearground: false,
     spin: true,
     eyelight: false,
@@ -88,15 +91,26 @@ const SKEWB_PINK = 0xdaa8d4;
 let faces: GoldenFace[] = [];
 /** index in `faces` where F₂₀'s own twenty begin */
 let capFrom = Infinity;
+/** the ten rhombi of the reading F₂₀ stands on, which `cap` hides */
+let decaFaces = new Set<number>();
 let decaCount = 0;
-/** face index → which skewb covers it, numbered from 1 */
+/** face index → which skewb it belongs to, numbered from 1 */
 let skewbOf = new Map<number, number>();
+/** index in `faces` where the skewbs' own hidden faces begin */
+let skewbFrom = Infinity;
+/** which skewb each of those belongs to */
+let skewbBack: number[] = [];
 let skewbAcute = 0;
 let skewbOblate = 0;
 let radius = 1;
 let built = "";
 
 const sub3 = (a: V3, b: V3): V3 => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
+/** a face by where its middle is, for telling two copies of one rhombus apart */
+const midKey = (f: GoldenFace): string =>
+    [0, 1, 2].map((d) => Math.round(
+        ((f.corners[0][d] + f.corners[1][d] + f.corners[2][d] + f.corners[3][d]) / 4) * 1e4,
+    )).join(",");
 const add3 = (a: V3, b: V3): V3 => [a[0] + b[0], a[1] + b[1], a[2] + b[2]];
 const dot3 = (a: V3, b: V3) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
 const crs3 = (a: V3, b: V3): V3 => [
@@ -123,16 +137,17 @@ const crs3 = (a: V3, b: V3): V3 => [
  * that at k = 5 mask 0 is not a corner of the decagon at all but its center, and
  * anchoring on the outline corner of least index puts the solid half a decagon out.
  */
-function buildF20(E: V3[], anchor: V3): GoldenFace[] {
+function zonohedron(E: V3[], gens: number[], anchor: V3): GoldenFace[] {
     const out: GoldenFace[] = [];
-    for (let i = 0; i < 5; i++) {
-        for (let j = i + 1; j < 5; j++) {
+    for (let a = 0; a < gens.length; a++) {
+        for (let b = a + 1; b < gens.length; b++) {
+            const i = gens[a], j = gens[b];
             const nv = crs3(E[i], E[j]);
             for (const flip of [1, -1]) {
                 // fix every other generator at whichever end of its zone is extreme in
                 // this direction, and let the two of the pair run
                 let base: V3 = [...anchor] as V3;
-                for (let m = 0; m < 5; m++) {
+                for (const m of gens) {
                     if (m === i || m === j) continue;
                     if (dot3(nv, E[m]) * flip > 0) base = add3(base, E[m]);
                 }
@@ -144,6 +159,26 @@ function buildF20(E: V3[], anchor: V3): GoldenFace[] {
         }
     }
     return out;
+}
+
+/**
+ * The **singularity** of a zonohedron: its two extreme vertices along `u` taken away,
+ * with every face carrying one.
+ *
+ * On F₂₀ those are the poles, mask 0 and mask 31, which share a shadow — the one point
+ * with index both 0 and 5, because Σvⱼ = 0. Five faces meet at each, so ten of the
+ * twenty go and the ten that remain are a band round the equator. This is the Cage's
+ * `Show: Singularity` reached from the other side, and it is what the figure actually
+ * is: not the whole solid, but the solid with its extremes missing.
+ *
+ * No pruning follows, unlike the Cage's. There the cut runs over sixty **cell** faces
+ * and leaves four hanging; here the twenty are the shell itself, and every one of the
+ * survivors touches a vertex that lost a neighbour, so pruning would take the lot.
+ */
+function cutPoles(faces: GoldenFace[], poles: V3[]): GoldenFace[] {
+    const at = (q: V3) => poles.some((p) =>
+        Math.abs(q[0] - p[0]) < 1e-6 && Math.abs(q[1] - p[1]) < 1e-6 && Math.abs(q[2] - p[2]) < 1e-6);
+    return faces.filter((f) => !f.corners.some(at));
 }
 
 /**
@@ -245,11 +280,22 @@ function liftedGenerators(d: NonNullable<ReturnType<typeof buildRoof>>): V3[] {
     return E;
 }
 
-function findSkewbs(d: ReturnType<typeof buildRoof>, deca: Set<number>): void {
+interface Skewb {
+    gens: number[];
+    anchor: V3;
+    /** the roof faces it shows: three of its six */
+    roof: number[];
+    acute: boolean;
+}
+
+function findSkewbs(d: ReturnType<typeof buildRoof>, deca: Set<number>): Skewb[] {
     skewbOf = new Map();
     skewbAcute = 0;
     skewbOblate = 0;
-    if (!d) return;
+    const found: Skewb[] = [];
+    if (!d) return found;
+    const lift = computeLift();
+    const E = liftedGenerators(d);
     const F = d.faces;
     const ekey = (a: number, b: number) => (a < b ? `${a}|${b}` : `${b}|${a}`);
     const eF = new Map<string, number[]>();
@@ -304,13 +350,31 @@ function findSkewbs(d: ReturnType<typeof buildRoof>, deca: Set<number>): void {
                     if (fs.some((x) => skewbOf.has(x) || deca.has(x))) continue;
                     const tri = [...new Set(fs.flatMap((x) => F[x].dirs))].sort((a, b) => a - b);
                     if (tri.length !== 3) continue;
+                    // The whole rhombohedron, not only the three rhombi on show: its
+                    // eight corners are the hexagon's seven plus the one the Necker
+                    // reading did not take. Anchor at the componentwise least of the
+                    // three generators' coordinates — the same rule F₂₀ needs, and for
+                    // the same reason.
+                    const vs = [...new Set(fs.flatMap((x) => F[x].vids))];
+                    const ns = vs.map((w) => lift.n[w]).filter(Boolean) as number[][];
+                    if (ns.length !== vs.length) continue;
+                    const base = ns[0].slice();
+                    for (const k of tri) base[k] = Math.min(...ns.map((n) => n[k]));
+                    let anchor = d.point(vs[0]);
+                    const n0 = lift.n[vs[0]]!;
+                    for (const k of tri) {
+                        for (let t = 0; t < n0[k] - base[k]; t++) anchor = sub3(anchor, E[k]);
+                    }
                     group++;
-                    if (ACUTE.has(tri.join(""))) skewbAcute++; else skewbOblate++;
+                    const acute = ACUTE.has(tri.join(""));
+                    if (acute) skewbAcute++; else skewbOblate++;
                     for (const x of fs) skewbOf.set(x, group * 8 + gen);
+                    found.push({ gens: tri, anchor, roof: fs, acute });
                 }
             }
         }
     }
+    return found;
 }
 
 function makeFaces(): void {
@@ -329,18 +393,27 @@ function makeFaces(): void {
 
     const found = findDecagon(d);
     decaCount = found.faces.size;
-    findSkewbs(d, found.faces);
+    const skewbs = findSkewbs(d, found.faces);
 
     const E = liftedGenerators(d);
 
-    // The roof, less the ten rhombi the decagon resolves into — the solid stands in
-    // their place, which is what "covered, without the rhombs" means: the resolution is
-    // one of ten readings and the solid is the thing all ten are readings of.
+    // **The roof keeps its ten.** F₂₀ is a superposition of the alternative paths, and
+    // the ten rhombi are the one path this patch took — so they belong inside the solid
+    // rather than under it. Set the faces transparent and you see the reading through
+    // the superposition, which is the whole picture.
+    //
+    // And the reading is not merely half of the solid's surface. Of the penteract's 32
+    // masks only **22** are corners of F₂₀; **ten fall strictly inside** it, five of
+    // index 2 and five of index 3 — §5.0's "a region can be interior to its own
+    // singularity". So a reading dips through the interior, and only 3 of these ten
+    // rhombi are boundary faces of the solid at all. The other seven are genuinely
+    // within it, which is why hiding them lost something.
     const out: GoldenFace[] = [];
     const remap = new Map<number, number>();
+    decaFaces = new Set();
     d.faces.forEach((f, i) => {
-        if (found.faces.has(i)) return;
         remap.set(i, out.length);
+        if (found.faces.has(i)) decaFaces.add(out.length);
         out.push({ corners: f.vids.map((v) => d.point(v)) as [V3, V3, V3, V3], dirs: f.dirs });
     });
     // dropping the decagon's ten renumbers everything after them, so the skewb map has
@@ -352,7 +425,28 @@ function makeFaces(): void {
     }
     skewbOf = moved;
     capFrom = out.length;
-    if (found.anchor && E.every(Boolean)) out.push(...buildF20(E, found.anchor));
+    if (found.anchor && E.every(Boolean)) {
+        const whole = zonohedron(E, [0, 1, 2, 3, 4], found.anchor);
+        // the two poles: mask 0 at the anchor, mask 31 at anchor + ΣE
+        const top = E.reduce((p, e) => add3(p, e), found.anchor);
+        out.push(...cutPoles(whole, [found.anchor, top]));
+    }
+
+    // Each skewb's **hidden** three. The other three are the roof's own rhombi, already
+    // drawn, so only what the surface does not show is added — the back of the solid,
+    // which is what makes it a solid rather than a cap.
+    skewbFrom = out.length;
+    const roofMid = new Set<string>();
+    for (const f of out.slice(0, capFrom)) roofMid.add(midKey(f));
+    skewbBack = [];
+    for (const sk of skewbs) {
+        const grp = (skewbOf.get(sk.roof[0]) ?? 0) >> 3;
+        for (const f of zonohedron(E, sk.gens, sk.anchor)) {
+            if (roofMid.has(midKey(f))) continue;
+            skewbBack.push(grp);
+            out.push(f);
+        }
+    }
     faces = out;
 
     // Frame on the patch's own extent, which `point` has already centred.
@@ -394,6 +488,7 @@ function build(reframe: boolean): void {
     groundLabel.style.opacity = bands ? "" : "0.45";
 
     const ribbon = Number(ribbonInput.value);
+    const capped = capChk.checked;
     gv.draw(faces, {
         scheme: colorSel.value as Scheme,
         faceMode: faceSel.value as FaceMode,
@@ -402,13 +497,32 @@ function build(reframe: boolean): void {
         ribbon,
         ground: !groundChk.checked,
         shadeOf,
+        // F₂₀ and the skewbs are not patches laid over the tiling — they are made of
+        // the same golden rhombi as everything round them, and they take the same
+        // scheme, so a ribbon runs across them unbroken and the banding **matches the
+        // surrounding**. What marks them is the rim, which takes the generator each of
+        // its edges runs along and so matches too.
         capOf: (_f, i): Cap | null => {
-            // F₂₀ is a closed solid, so it has no boundary: every edge of it is wanted
-            if (i >= capFrom) return { color: DECA_CAP, group: 0, edges: "all", rimByBand: true };
+            if (capped && decaFaces.has(i)) return { hidden: true, color: DECA_CAP, group: -1 };
+            // `clear ground` means no ground anywhere, the figures included — their
+            // own colour is a ground, so leaving it in place made the control look
+            // broken on exactly the faces it was most wanted on.
+            const pink = groundChk.checked ? undefined : SKEWB_CAP;
+            const mauve = groundChk.checked ? undefined : DECA_CAP;
+            // a skewb's own hidden three, behind the roof
+            if (i >= skewbFrom) {
+                return {
+                    color: SKEWB_CAP, ground: pink, rimByBand: true, edges: "all",
+                    group: skewbBack[i - skewbFrom] ?? 0,
+                };
+            }
+            // F₂₀, with its poles gone. A solid has no boundary, so every edge is wanted
+            if (i >= capFrom) {
+                return { color: DECA_CAP, ground: mauve, group: 0, edges: "all", rimByBand: true };
+            }
             const sk = skewbOf.get(i);
             if (sk === undefined) return null;
-            // pink ground, the outline by band, and the one ribbon that carries it
-            return { color: SKEWB_CAP, group: sk >> 3, band: sk & 7, rimByBand: true };
+            return { color: SKEWB_CAP, ground: pink, group: sk >> 3, edges: "all", rimByBand: true };
         },
         rimColor: DECA_RIM,
     });
@@ -422,10 +536,11 @@ function build(reframe: boolean): void {
         : " · Kowalewski five on K₅: every rosette shows all five, and five is the least K₅ admits";
     statusEl.textContent =
         `Queen generation ${GEN} — ${faces.length} golden rhombi on ${vertexList.length} vertices, ` +
-        `${decaCount} of them covered by F₂₀ at the center, which stands √5 tall on its ` +
-        `own two poles · ${skewbAcute + skewbOblate} skewbs in pink on the five ribbons `+
-        `out of it (${skewbAcute} A₆, ${skewbOblate} O₆), each carrying the one band `+
-        `its ribbon runs on · ` +
+        `${decaCount} of them the reading F₂₀ superposes at the center` +
+        `${capped ? ", capped away" : ", kept inside it"} · standing √5 tall on its ` +
+        `own two poles · ${skewbAcute + skewbOblate} skewbs outlined on the five ribbons `+
+        `out of it (${skewbAcute} A₆, ${skewbOblate} O₆) · both wear the same scheme as `+
+        `the roof, so the banding runs across them unbroken and only the rims mark them · ` +
         `every one the same rhombus at a different tilt · relief ${relief.toFixed(3)} ` +
         `(3/√5 = ${(3 / Math.sqrt(5)).toFixed(3)} side lengths) · ` +
         `the five generators are five of the six icosahedral axes; the sixth is the ` +
@@ -442,6 +557,7 @@ for (const [sel, def] of [
     [edgeSel, PREF_DEFAULTS.edgemode],
 ] as Array<[HTMLSelectElement, string]>) if (!sel.value) sel.value = def;
 ribbonInput.value = String(prefs.ribbon ?? PREF_DEFAULTS.ribbon);
+capChk.checked = prefs.cap ?? PREF_DEFAULTS.cap;
 groundChk.checked = prefs.clearground ?? PREF_DEFAULTS.clearground;
 spinChk.checked = prefs.spin ?? PREF_DEFAULTS.spin;
 eyeChk.checked = prefs.eyelight ?? PREF_DEFAULTS.eyelight;
@@ -455,7 +571,7 @@ function rebuild(reframe: boolean): void {
     build(reframe);
 }
 
-for (const c of [colorSel, faceSel, edgeSel, groundChk]) {
+for (const c of [colorSel, faceSel, edgeSel, capChk, groundChk]) {
     c.addEventListener("change", () => rebuild(false));
 }
 ribbonInput.addEventListener("input", () => rebuild(false));
@@ -477,7 +593,8 @@ orthoChk.addEventListener("change", () => gv.setProjection(orthoChk.checked));
 function persist(): void {
     savePrefs(PREFS_KEY, {
         color: colorSel.value, facemode: faceSel.value, edgemode: edgeSel.value,
-        ribbon: Number(ribbonInput.value), clearground: groundChk.checked,
+        ribbon: Number(ribbonInput.value), cap: capChk.checked,
+        clearground: groundChk.checked,
         spin: spinChk.checked, eyelight: eyeChk.checked, ortho: orthoChk.checked,
     });
 }

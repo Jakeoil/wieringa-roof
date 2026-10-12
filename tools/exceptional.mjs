@@ -268,6 +268,19 @@ for (const c of f20) for (const t of [[0,1,2],[0,2,3]]) {
 }
 const want = solidVolume([0,1,2,3,4]);
 if (Math.abs(vol - want) > 1e-9) fail(`F20 volume ${vol} against the Cage's golden icosahedron ${want}`);
+// the singularity: both poles away, with the five faces that carry each
+const topPole = E.reduce((a, e) => a.map((x, i) => x + e[i]), anchor);
+const atPole = (q) => [anchor, topPole].some((p) =>
+    Math.abs(q[0]-p[0]) < 1e-6 && Math.abs(q[1]-p[1]) < 1e-6 && Math.abs(q[2]-p[2]) < 1e-6);
+const band = f20.filter((c) => !c.some(atPole));
+if (band.length !== 10) fail(`F20 keeps ${band.length} faces with its poles cut, expected 10`);
+const bz = band.map((c) => c.reduce((s2, p) => s2 + p[2], 0) / 4);
+if (Math.max(...bz) > 0.5 || Math.min(...bz) < -0.5)
+    fail(`the surviving faces run ${Math.min(...bz)} .. ${Math.max(...bz)}; they should be an equatorial band`);
+console.log(`F20 singularity: 20 faces less 5 at each pole = ${band.length}, a band at ` +
+    `${Math.min(...bz).toFixed(3)} .. ${Math.max(...bz).toFixed(3)} against poles at ` +
+    `${anchor[2].toFixed(3)} and ${topPole[2].toFixed(3)}`);
+
 console.log(`F20: 20 golden rhombi on the five lifted generators · ΣE purely vertical, ` +
     `the two poles √5 = ${sumE[2].toFixed(6)} apart · volume ${vol.toFixed(6)} = the Cage's golden icosahedron`);
 

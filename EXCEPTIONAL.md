@@ -284,6 +284,46 @@ Two further lessons, cheap to state and expensive to learn again:
   because `round(x·1e4)` and `round(−x·1e4)` disagree on an exact half — a bug in the
   test, not the patch.
 
+### Counting the readings — done (2026-10-11)
+
+Jake: *"I do know that none of the paths hit the extremes. That might be the only
+criteria to filter."* And: *"Every wieringa roof has an inverse… that would make 20."*
+
+Both hold, and together they nearly close it. Counted with **Elnitsky's bijection** —
+sweep the decagon's boundary from `01234` to `43210` by adjacent swaps, each swap laying
+a rhombus on the pair that crosses, so every tiling arises and none has to be guessed:
+
+| | |
+|---|---|
+| rhombic tilings of the decagon | **62** (the known count, so the enumeration is sound) |
+| never put a vertex on an **extreme** | **40** |
+| up to the **inverse roof** | **20** |
+| under the turn *and* the inverse | **4 orbits of 10** |
+
+The extremes are the only two masks whose points coincide — `01010` and `10101` in the
+half-plane labelling, at the decagon's own centre, which is §5.0's ghost. Avoiding them
+is **necessary but not sufficient**: it cuts 62 to 40, not to ten.
+
+The inverse is the roof turned over, hills for dales, which on the lift is complementing
+every vertex and so exchanges the two extremes. It carries all 62 to tilings and all 40
+survivors to survivors, and **no tiling is its own inverse** — zero fixed points — so the
+40 pair off exactly into 20.
+
+The turn has order 5 and the inverse order 2, so together they act as a group of order
+10 and the survivors fall into **four orbits of ten**. That ten is §5.2's own number:
+*"the ten orientations are the ten placements of the one reading."* One orbit is one
+reading, in its five turns and two parities.
+
+**What is left.** §5.2 says *the* one reading, and there are four orbits. So something
+beyond the extremes picks one orbit out of four, and that is the condition Phase 2 wants.
+Four candidates is a small enough field to settle by comparison against a legal patch.
+
+Two wrong turns, recorded so they are not repeated: a flip-graph enumeration stalled at
+one tiling because the starting tiling was invalid — its areas summed correctly while its
+rhombi overlapped, so area is no test of a tiling; and a first attempt at the turn
+relabelled `m → m+1`, which in the half-plane convention is a 36° turn with a reflection
+in it, not a 72° one. It reported that no tiling survived, which was the tell.
+
 ### The cascade (Jake, 2026-10-11)
 
 The readings are **not independent**, and that is the whole of phase 2.
