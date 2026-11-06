@@ -22,8 +22,7 @@ import { buildRoof } from "./roofgeom.js";
 import * as THREE from "three";
 import { createGoldenView, PLAN_VIEW } from "./goldenview.js";
 import type { GoldenFace, FaceMode, EdgeMode, Scheme, Cap } from "./goldenview.js";
-import { dissection } from "./dissect.js";
-import { readingsOf, starsOf, starSig, LEGAL_STARS } from "./readings.js";
+import { readingsOf, starsOf, starSig, LEGAL_STARS, maskCorners } from "./readings.js";
 import type { MaskRhomb } from "./readings.js";
 import type { V3 } from "./solids.js";
 
@@ -109,62 +108,69 @@ let capFrom = Infinity;
 let decaFaces = new Set<number>();
 
 /**
- * **F₂₀ is ten skewbs.** Jake: *"two skewbs in each of 5 directions, an A₆ and an O₆
- * connecting the musical sequence of either side."* Measured, and tidier than that: every
- * **acute** cell leaves out a pair of generators that are **non-adjacent** — gap 2 — and
- * every **oblate** one leaves out an **adjacent** pair, gap 1, with no exceptions either
- * way. So the ten fall into five pairs, one A₆ and one O₆ apiece, indexed by direction.
+ * **The two skewbs in the decagon.**
  *
- * They do not overlap. Of the forty-five pairs none intersect, their volumes sum to
- * F₂₀'s own 6.155367, and of the sixty cell faces twenty are its shell while twenty are
- * interior walls each shared by two cells. They pack it solid. What crosses in the
- * five-fold is the ribbons, not these — every rhombus lies in two ribbons.
+ * Not the dissection's ten cells — that was the wrong object, and drawing it was the
+ * wrong picture. Jake means the hexagons of the decagon's **own reading**: three rhombi
+ * round a three-valent vertex, which is a rhombohedron seen from above.
  *
- * Taken from the Cage's own dissection, so there is one answer to what the cells are.
- * Only the combinatorics travel, the Cage building on the icosahedral axes and the roof
- * on the lifted ones, so each cell is carried across as its triple and the mask it is
- * based at and rebuilt here on `E`.
+ * Measured on the reading the patch holds: there are **four** proper hexagons, two long
+ * A₆ and two short O₆, and exactly **two** ways to pick a long and a short that do not
+ * share a rhombus. Each such couple uses six of the decagon's ten, leaving **four** —
+ * two above and two below, as Jake has it. The couples' own ribbons run out left and
+ * right, joining the musical spokes either side.
+ *
+ * Four hexagons but only two couples, because the four overlap: taken together they use
+ * nine of the ten rhombi, so most pairings of them collide.
  */
-interface Cell5 { triple: number[]; acute: boolean; S: number; pair: number }
-const F20_CELLS: Cell5[] = (() => {
-    const cells = dissection("chiral", [0, 1, 2, 3, 4]);
-    const out: Cell5[] = cells.map((c) => {
-        const rest = [0, 1, 2, 3, 4].filter((g) => !c.triple.includes(g));
-        let S = 0;
-        rest.forEach((g, q) => { if (c.sign[q] > 0) S |= 1 << g; });
-        return { triple: [...c.triple], acute: c.acute, S, pair: -1 };
-    });
-    // Two cells are chained when they share a **face** — a parallel pair of rhombi — so
-    // adjacency is read off the dissection's own faces and not guessed from the triples.
-    const mid = (f: V3[]) =>
-        [0, 1, 2].map((d) => Math.round((f.reduce((s, q) => s + q[d], 0) / 4) * 1e6)).join(",");
-    const byFace = new Map<string, number[]>();
-    cells.forEach((c, i) => {
-        for (const f of c.faces) {
-            const k = mid(f);
-            let l = byFace.get(k);
-            if (!l) byFace.set(k, (l = []));
-            l.push(i);
-        }
-    });
-    const adj: Array<[number, number]> = [];
-    for (const l of byFace.values()) {
-        if (l.length === 2 && cells[l[0]].acute !== cells[l[1]].acute) adj.push([l[0], l[1]]);
-    }
-    // Chain them into five A₆/O₆ couples, each sharing a face. **The choice is not
-    // canonical**: there are eight such matchings and none survives the 36° turn,
-    // because the dissection itself keeps only 2 of F₂₀'s 20 symmetries and a five-fold
-    // pairing would need a stabilizer divisible by 5. So these are numbered couples, not
-    // directions, and the first matching found is as good as any of the eight.
-    const used = new Set<number>();
-    let n = 0;
-    for (const [i, j] of adj) {
-        if (used.has(i) || used.has(j)) continue;
-        used.add(i); used.add(j);
-        out[i].pair = n; out[j].pair = n; n++;
-    }
-    return out;
-})();
+/**
+ * Is a triple of generators the long rhombohedron or the short one?
+ *
+ * **Oblate exactly when the three are cyclically consecutive**, acute otherwise, with no
+ * exceptions over all ten triples — measured from the volumes themselves, 0.470228
+ * against 0.760845, rather than taken on trust. It was written out as a list of five
+ * strings in two separate places before, which is two chances to mistype the same fact.
+ */
+const consecutive = (T: number[]): boolean =>
+    [0, 1, 2, 3, 4].some((s) => [s, (s + 1) % 5, (s + 2) % 5].every((g) => T.includes(g)));
+const isAcute = (T: number[]): boolean => !consecutive(T);
+
+interface Hex2 { tri: number[]; anchor: V3; long: boolean }
+
+/**
+ * **The ten views of the decagon.** Measured, and every count is Jake's:
+ *
+ *   * a reading's hexagons pair into **long + short couples that share no rhombus**, and
+ *     each couple's two triples **cover all five generators and meet in exactly one** —
+ *     that one is the **direction**, so there are five couples, one apiece;
+ *   * each couple occurs in **two arrangements**, at angles 180° apart in pairs, so
+ *     five directions give **ten views** — "5 times thick/thin and 5 times thin/thick";
+ *   * a couple uses six of the decagon's ten rhombi and leaves **four**, two above and
+ *     two below; two couples in one reading share **three** and hold three apiece, with
+ *     one rhombus in neither.
+ *
+ * A single reading realizes only **two** of the five, which is why looking at one
+ * reading finds two couples and not ten: the ten views live across the ten readings, so
+ * choosing a view chooses a reading too.
+ */
+interface DecaView {
+    dir: number;
+    /**
+     * Which comes first along the direction — the **order**, long-then-short or
+     * short-then-long, read off the sign of the couple's displacement projected on its
+     * own generator.
+     *
+     * Keying on the axis modulo 180° instead was wrong and looked nearly right: it folds
+     * the two *senses* together, so a direction could come out with two placements of
+     * the same order and none of the other. Every direction has two placements each way,
+     * so the sign is what separates them.
+     */
+    longFirst: boolean;
+    reading: number;
+    long: Hex2;
+    short: Hex2;
+}
+let DECA_VIEWS: DecaView[] = [];
 
 /**
  * A singularity the reader can collapse.
@@ -429,7 +435,6 @@ function findSkewbs(d: ReturnType<typeof buildRoof>, deca: Set<number>): Skewb[]
             l.push(i);
         }
     });
-    const ACUTE = new Set(["013", "023", "024", "124", "134"]);
     let group = 0;
     for (let gen = 0; gen < 5; gen++) {
         // the ribbon of `gen`, flooded out from the pieces of it inside the decagon
@@ -482,7 +487,7 @@ function findSkewbs(d: ReturnType<typeof buildRoof>, deca: Set<number>): Skewb[]
                         for (let t = 0; t < n0[k] - base[k]; t++) anchor = sub3(anchor, E[k]);
                     }
                     group++;
-                    const acute = ACUTE.has(tri.join(""));
+                    const acute = isAcute(tri);
                     if (acute) skewbAcute++; else skewbOblate++;
                     for (const x of fs) skewbOf.set(x, group * 8 + gen);
                     found.push({ gens: tri, anchor, roof: fs, acute });
@@ -597,6 +602,63 @@ function makeFaces(): void {
     }
     figures.forEach((fg, n) => { for (const i of fg.roof) ownerOf.set(i, n); });
     roofMids = new Set(out.slice(0, capFrom).map(midKey));
+
+    // the ten views: for each reading, its long/short couples, keyed by direction and
+    // arrangement so each (direction, arrangement) is listed once
+    DECA_VIEWS = [];
+    if (figures.length && found.anchor) {
+        const anchor0 = found.anchor;
+        const plane = (K: number): string => {
+            let x = 0, y = 0;
+            for (let k = 0; k < 5; k++) if ((K >> k) & 1) { x += E[k][0]; y += E[k][1]; }
+            return `${Math.round(x * 1e4)},${Math.round(y * 1e4)}`;
+        };
+        const place = (K: number): V3 => {
+            let p: V3 = [...anchor0] as V3;
+            for (let k = 0; k < 5; k++) if ((K >> k) & 1) p = add3(p, E[k]);
+            return p;
+        };
+        const seenView = new Set<string>();
+        figures[0].readings.forEach((T, rn) => {
+            const at2 = new Map<string, number[]>();
+            T.forEach((r, i) => {
+                for (const K of maskCorners(r)) {
+                    const k = plane(K);
+                    let l = at2.get(k);
+                    if (!l) at2.set(k, (l = []));
+                    l.push(i);
+                }
+            });
+            const hexes: Array<Hex2 & { rh: number[]; at: string }> = [];
+            for (const [k, l] of at2) {
+                if (l.length !== 3) continue;
+                const tri = [...new Set(l.flatMap((i) => [T[i].a, T[i].b]))].sort((a, b) => a - b);
+                if (tri.length !== 3) continue;
+                // the least corner is the AND of the corners: a bit that varies is off
+                // somewhere, and the rest are fixed across the figure
+                let least = ~0;
+                for (const i of l) for (const K of maskCorners(T[i])) least &= K;
+                hexes.push({
+                    tri, anchor: place(least & 31), long: isAcute(tri), rh: l, at: k,
+                });
+            }
+            for (const a of hexes) for (const b of hexes) {
+                if (!a.long || b.long) continue;
+                if (a.rh.some((i) => b.rh.includes(i))) continue;
+                const S = new Set(b.tri);
+                const dir = a.tri.find((g) => S.has(g));
+                if (dir === undefined) continue;
+                const ca = a.at.split(",").map(Number), cb = b.at.split(",").map(Number);
+                const proj = (cb[0] - ca[0]) * E[dir][0] + (cb[1] - ca[1]) * E[dir][1];
+                const longFirst = proj > 0;
+                const key = `${dir}|${longFirst ? 1 : 0}`;
+                if (seenView.has(key)) continue;
+                seenView.add(key);
+                DECA_VIEWS.push({ dir, longFirst, reading: rn, long: a, short: b });
+            }
+        });
+        DECA_VIEWS.sort((x, y) => x.dir - y.dir || Number(y.longFirst) - Number(x.longFirst));
+    }
 
     // Frame on the patch's own extent, which `point` has already centered.
     let r = 0;
@@ -752,8 +814,17 @@ function settle(): { rounds: number; forced: number; stuck: number } {
     return { rounds, forced, stuck };
 }
 
-function build(reframe: boolean): void {
-    if (built !== `${PATCH}|${GEN}`) {
+/**
+ * Build the patch once, before anything asks about it.
+ *
+ * Called from `build`, and **also before the controls are wired** — the F₂₀ menu lists
+ * the ten views, and those are not known until the geometry exists. Filling it from the
+ * list before this had run left it empty, which looked like a forgotten dropdown rather
+ * than an ordering mistake.
+ */
+function prepare(): void {
+    if (built === `${PATCH}|${GEN}`) return;
+    {
         makeFaces();
         built = `${PATCH}|${GEN}`;
         // The **roof's** own range, not the whole scene's. F₂₀ stands √5 tall and the
@@ -767,6 +838,10 @@ function build(reframe: boolean): void {
             if (p[2] > zHi) zHi = p[2];
         }
     }
+}
+
+function build(reframe: boolean): void {
+    prepare();
 
     // ── compose the surface from the figures' states ──
     const capped = capChk.checked;
@@ -775,9 +850,11 @@ function build(reframe: boolean): void {
     const drawList: GoldenFace[] = [];
     role = [];
     cellOf = new Map();
+    // a view lays its own reading over the decagon, so the patch's ten step aside
+    const showingView = cellSel.value !== "shell";
     for (let i = 0; i < capFrom; i++) {
         if (hidden.has(i)) continue;
-        if (capped && decaFaces.has(i)) continue;
+        if ((capped || showingView) && decaFaces.has(i)) continue;
         drawList.push(faces[i]);
         role.push(ownerOf.get(i) ?? null);
     }
@@ -789,17 +866,26 @@ function build(reframe: boolean): void {
         }
         // superposed: the solid, all its readings at once
         const whole = zonohedron(gens5, fg.gens, fg.anchor);
-        if (fg.kind === "deca" && cellSel.value !== "shell") {
-            // the dissection instead of the shell: each cell gets its own rim group, so
-            // the five pairs read as solids seated round the axis rather than as a mess
-            // of twenty faces and the edges between them
-            const want = cellSel.value === "all"
-                ? F20_CELLS
-                : F20_CELLS.filter((c) => c.pair === Number(cellSel.value));
-            want.forEach((c, k) => {
-                let base: V3 = [...fg.anchor] as V3;
-                for (let g = 0; g < 5; g++) if ((c.S >> g) & 1) base = add3(base, gens5[g]);
-                for (const f of zonohedron(gens5, c.triple, base)) {
+        if (fg.kind === "deca" && showingView) {
+            // one of the ten views: the reading it lives in, and the long/short couple
+            // that direction admits, each skewb outlined on its own
+            // A saved `cellmode` naming no view — the old "all", or an index from a
+            // shorter list — must not leave a hole. The patch's own ten are already
+            // suppressed by `showingView`, so returning here drew no decagon at all.
+            const view = DECA_VIEWS[Number(cellSel.value)];
+            if (!view) {
+                const top = fg.gens.reduce((p, g) => add3(p, gens5[g]), fg.anchor);
+                add(cutPoles(whole, [fg.anchor, top]));
+                return;
+            }
+            // the reading this view lives in, laid in place of the patch's own ten
+            for (const f of readingFaces(gens5, fg.anchor, fg.readings[view.reading])) {
+                drawList.push(f);
+                role.push(null);
+            }
+            // and its two skewbs, each outlined on its own
+            [view.long, view.short].forEach((h, k) => {
+                for (const f of zonohedron(gens5, h.tri, h.anchor)) {
                     drawList.push(f);
                     role.push(n);
                     cellOf.set(drawList.length - 1, k);
@@ -876,6 +962,18 @@ function build(reframe: boolean): void {
 // ── controls ──────────────────────────────────────────────────────
 
 colorSel.value = prefs.color || PREF_DEFAULTS.color;
+// Listed from the reading itself rather than written into the markup, so a label
+// cannot drift from what is drawn. It needs the geometry, which is why `prepare`
+// runs first.
+prepare();
+DECA_VIEWS.forEach((v, n) => {
+    const opt = document.createElement("option");
+    opt.value = String(n);
+    opt.textContent = v.longFirst
+        ? `dir ${v.dir} · long ${v.long.tri.join("")} then short ${v.short.tri.join("")}`
+        : `dir ${v.dir} · short ${v.short.tri.join("")} then long ${v.long.tri.join("")}`;
+    cellSel.appendChild(opt);
+});
 cellSel.value = prefs.cellmode || PREF_DEFAULTS.cellmode;
 faceSel.value = prefs.facemode || PREF_DEFAULTS.facemode;
 shadeChk.checked = prefs.shading ?? PREF_DEFAULTS.shading;

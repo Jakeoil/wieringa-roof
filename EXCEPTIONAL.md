@@ -458,6 +458,42 @@ written and reverted. It made a figure indefinite and let the indefiniteness spr
 judging stars only where every rhombus meeting a vertex was definite. The mechanism
 worked; it was the wrong unit, for the same reason.
 
+### The ten views are the decagon's own, not the dissection's (2026-10-12)
+
+`a592e51` drew F₂₀ as the dissection's ten cells — five acute, five oblate, packing it
+solid — and chained them into couples. **That was the wrong object.** The dissection is
+a fact about the solid; it is not a fact about the decagon's readings, and the couples
+it offers are not canonical anyway: of F₂₀'s twenty shared faces fourteen join an A₆ to
+an O₆, admitting eight perfect matchings, and none survives the 36° turn, since the
+dissection keeps only 2 of F₂₀'s 20 symmetries and a five-fold pairing would need a
+stabilizer divisible by five.
+
+The ten the page wants are the decagon's **own views**: the hexagons of a reading —
+three rhombi round a three-valent vertex, which is a rhombohedron seen from above.
+Measured from the readings alone, and asserted in `tools/exceptional.mjs`:
+
+| | |
+|---|---|
+| hexagons in a reading | **4** — two long A₆, two short O₆ |
+| rhombi the four use between them | **9** of 10, so they overlap |
+| long/short pairs sharing no rhombus | **2** per reading |
+| a couple's two triples | cover **all five** generators, meeting in **exactly one** |
+| that one | is the couple's **direction** |
+| rhombi a couple uses / leaves | 6 / **4** — two above and two below |
+| distinct (direction, order) views | **10** — two per direction over all five |
+
+A single reading realizes only **two** of the five directions, which is why looking at
+one reading finds two couples rather than ten: **the ten views live across the ten
+readings**, so choosing a view chooses a reading too.
+
+Two things it took. *Long or short* is read as **oblate exactly when the three
+generators are cyclically consecutive** — measured from the volumes, 0.470228 against
+0.760845, over all ten triples, rather than written out as a list of strings in two
+places. And the *order* within a couple is the **sign** of its displacement projected on
+its own generator; keying on the axis modulo 180° folds the two senses together, so a
+direction comes out with two of one order and none of the other, which looks nearly
+right.
+
 ### The cascade (Jake, 2026-10-11)
 
 The readings are **not independent**, and that is the whole of phase 2.

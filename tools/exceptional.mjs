@@ -10,6 +10,7 @@ import { seedTypes, generatePatch, allRhombs, vertexList, computeLift } from "..
 import { buildRoof } from "../dist/roofgeom.js";
 import { pairColorOn, solidVolume } from "../dist/dissect.js";
 import { A6 } from "../dist/centers.js";
+import { readingsOf, maskCorners } from "../dist/readings.js";
 
 const PHI = (1 + Math.sqrt(5)) / 2;
 const AXES = [0, 1, 2, 3, 4];
@@ -283,6 +284,102 @@ console.log(`F20 singularity: 20 faces less 5 at each pole = ${band.length}, a b
 
 console.log(`F20: 20 golden rhombi on the five lifted generators · ΣE purely vertical, ` +
     `the two poles √5 = ${sumE[2].toFixed(6)} apart · volume ${vol.toFixed(6)} = the Cage's golden icosahedron`);
+
+// ── the decagon's ten views ───────────────────────────────────────
+//
+// The F₂₀ menu offers ten views, and every count behind them was Jake's, written into
+// a comment and nowhere asserted. They are asserted here, from the readings alone:
+//
+//   * four proper hexagons in a reading, two long and two short;
+//   * the four overlap — together they use nine of the decagon's ten rhombi, which is
+//     why only **two** of the four pairings are couples at all;
+//   * a couple's two triples **cover all five generators and meet in exactly one** —
+//     that one is its direction;
+//   * a couple uses six of the ten and leaves four;
+//   * ten distinct (direction, order) views, two per direction over all five.
+//
+// Keying a view on the couple's axis modulo 180° instead of the sign of its
+// displacement was wrong and looked nearly right: it folds the two senses together, so
+// a direction could come out with two of one order and none of the other.
+{
+    const E5 = new Array(5);
+    for (const f of d.faces) {
+        const c = f.vids.map((v) => d.point(v));
+        if (!E5[f.dirs[0]]) E5[f.dirs[0]] = sub(c[1], c[0]);
+        if (!E5[f.dirs[1]]) E5[f.dirs[1]] = sub(c[3], c[0]);
+    }
+    const angleOf = (g) => Math.atan2(E5[g][1], E5[g][0]);
+    const pointOf = (K) => {
+        const q = [0, 0];
+        for (let k = 0; k < 5; k++) if ((K >> k) & 1) { q[0] += E5[k][0]; q[1] += E5[k][1]; }
+        return q;
+    };
+    // Oblate exactly when the three generators are cyclically consecutive — measured
+    // from the volumes, 0.470228 against 0.760845, over all ten triples.
+    const consecutive = (T) => AXES.some((x) => [x, (x + 1) % 5, (x + 2) % 5].every((g) => T.includes(g)));
+
+    const readings = readingsOf(AXES, angleOf, pointOf, 0);
+    if (readings.length !== 10) fail(`${readings.length} legal readings of the decagon, expected 10`);
+
+    const views = new Set();
+    let hexes = 0, couples = 0;
+    readings.forEach((T, rn) => {
+        const at = new Map();
+        T.forEach((r, i) => {
+            for (const K of maskCorners(r)) {
+                const k = pointOf(K).map((v) => Math.round(v * 1e4)).join(",");
+                let l = at.get(k);
+                if (!l) at.set(k, (l = []));
+                l.push(i);
+            }
+        });
+        const hex = [];
+        for (const [k, l] of at) {
+            if (l.length !== 3) continue;
+            const tri = [...new Set(l.flatMap((i) => [T[i].a, T[i].b]))].sort((a, b) => a - b);
+            if (tri.length !== 3) continue;
+            hex.push({ tri, rh: l, long: !consecutive(tri), at: k });
+        }
+        hexes += hex.length;
+        const L = hex.filter((h) => h.long).length;
+        if (hex.length !== 4 || L !== 2)
+            fail(`reading ${rn}: ${hex.length} hexagons, ${L} long — expected 4, two of each`);
+        const used = new Set(hex.flatMap((h) => h.rh)).size;
+        if (used !== 9) fail(`reading ${rn}: the four hexagons use ${used} rhombi, expected 9`);
+
+        let n = 0;
+        for (const a of hex) for (const b of hex) {
+            if (!a.long || b.long) continue;
+            if (a.rh.some((i) => b.rh.includes(i))) continue;
+            n++;
+            const shared = a.tri.filter((g) => b.tri.includes(g));
+            const cover = new Set([...a.tri, ...b.tri]).size;
+            if (cover !== 5 || shared.length !== 1)
+                fail(`reading ${rn}: a couple covers ${cover} generators and meets in ${shared.length}`);
+            const left = 10 - new Set([...a.rh, ...b.rh]).size;
+            if (left !== 4) fail(`reading ${rn}: a couple leaves ${left} rhombi, expected 4`);
+            const ca = a.at.split(",").map(Number), cb = b.at.split(",").map(Number);
+            const dir = shared[0];
+            const proj = (cb[0] - ca[0]) * E5[dir][0] + (cb[1] - ca[1]) * E5[dir][1];
+            views.add(`${dir}|${proj > 0 ? 1 : 0}`);
+        }
+        if (n !== 2) fail(`reading ${rn}: ${n} long/short couples sharing no rhombus, expected 2`);
+        couples += n;
+    });
+
+    if (views.size !== 10) fail(`${views.size} distinct (direction, order) views, expected 10`);
+    const perDir = new Map();
+    for (const v of views) {
+        const dir = v.split("|")[0];
+        perDir.set(dir, (perDir.get(dir) ?? 0) + 1);
+    }
+    if (perDir.size !== 5 || [...perDir.values()].some((n) => n !== 2))
+        fail(`views per direction ${[...perDir.values()].join(",")} over ${perDir.size} directions, expected 2 over 5`);
+
+    console.log(`the decagon's views: ${readings.length} readings · ${hexes} hexagons, four per reading ` +
+        `(two long, two short) using 9 of 10 rhombi · ${couples} couples, two per reading, ` +
+        `each covering all five generators and meeting in one · ${views.size} views, two per direction`);
+}
 
 console.log(bad === 0 ? "all checks passed" : `${bad} FAILURES`);
 process.exit(bad === 0 ? 0 : 1);
