@@ -572,6 +572,78 @@ decagon at once.
 3. Then F₂₀ at the center as a solid, with `Show` cutting its poles as the Cage does.
 4. Then Phase 2's readings.
 
+## 6. Where this stands, 2026-11-07
+
+Written before a refactor, so the ground is recorded rather than re-derived.
+
+### Built and asserted
+
+| | |
+|---|---|
+| the patch | Queen/Deca gen 3 as a Wieringa roof — 666 vertices, all mirrored, 11 decagons, 9 with the ghost |
+| the skewbs | 105 caps on the five acute triples, 205 saddles on the five oblate; caps use 315 rhombi, none twice |
+| F₂₀ | 20 golden rhombi on the five lifted generators, poles √5 apart, volume 6.155367 — **congruent to the Cage's golden icosahedron**, which ties the two derivations together |
+| the readings | 62 tilings of the decagon → 40 by index → **10** by legal stars; one orbit, confirmed over 760 singular decagons in thirty patches |
+| their structure | a 5-state rotation × a 2-state flip; the 36° turn generates both, being a 72° turn plus the parity flip that repairs the lift |
+| the cascade | seven legal vertex stars are enough — no phases, no grid, only the arrows. Click collapses, collapses propagate, **Release** restores |
+| the ten views | the decagon's own hexagon couples — four hexagons per reading using 9 of 10 rhombi, two couples, each covering all five generators and meeting in one; ten views, two per direction, living across the ten readings |
+
+All of it is in `tools/exceptional.mjs` and `tools/readings.mjs`, both passing.
+
+### The live question, and it is not a coding one
+
+**The unit of account is the ribbon, not the hexagon** (§4, Jake 2026-10-12). The
+measurement is in: with stars and the no-straight-band rule, 300 of the patch's 310
+hexagons are already determined and the ten that are not lie on the cut edge. A Penrose
+tiling is rigid, so no hexagon is ever free and a click on one has nothing to do.
+
+The singularity is the whole **ribbon** and the operation is the **gridline nudge**. The
+demo cannot follow until there is a way to simulate the movement of gridlines *without
+gridlines* — Jake's second combinatorial path, and his to find. **Everything below the
+cascade waits on that**, which is why the page has sat since 12 October rather than
+being pushed further.
+
+### Twice now the object has been wrong, and the pattern is worth naming
+
+- A *force superposition* mode was built, worked, and was reverted: right mechanism,
+  wrong unit (the hexagon).
+- `a592e51` drew F₂₀ as the dissection's ten cells and chained them into couples;
+  the working tree that followed replaced it with the decagon's own views. Right
+  mechanism, wrong object again — the dissection is a fact about the solid, not about
+  the decagon's readings.
+
+Both times the code was fine and the thing it was about was not. For a refactor that is
+the thing to settle first: **name the object before building the view of it.**
+
+### Loose ends a refactor should know about
+
+1. §3.5's last check is still *"the singularity count matches the catalog — pending the
+   §2 recount."* Nothing has recounted it.
+2. The dissection's couples are **not canonical** — eight perfect matchings, none
+   surviving the 36° turn, because the dissection keeps only 2 of F₂₀'s 20 symmetries.
+   Any future pairing of cells has to confront that or avoid it.
+3. `exceptional.html`'s F₂₀ menu is filled from the geometry at load, which is why
+   `prepare()` runs before the controls are wired. A refactor that moves the build will
+   empty the menu and it will look like a forgotten dropdown.
+4. The page shares `goldenview.ts` with the Cage. §"Match the height shading to the 3D
+   page" put the shading right; the range is the **roof's own**, not the scene's, and
+   anything outside it clamps — which is what makes a superposed skewb's hidden faces
+   read as behind the surface.
+
+### What pentagrid holds, and why it is not here
+
+pentagrid PLAN §8.1: *"wieringa-roof has the solids but not the grid."* Its §8.2 spine
+is `π(C^k)` at every rung, and **`F20 = π(C⁵)`** — this page's singularity is that
+object reached from the roof instead of from the grid. Since 2026-11-06 pentagrid also
+carries the **icosahedral hexagrid**, de Bruijn one dimension up, with
+`Σ vⱼvⱼᵀ = (n/d)I` measured at `2I`.
+
+The two projects' lifts **agree exactly** once this project's `E5` is scaled by `√5/2`
+— index for index, to `0.000e+0`. See [pentagrid-lib.md](pentagrid-lib.md) for what is
+importable today, what it costs, and the one convention between them.
+
+---
+
 ## 6. Sources
 
 - `pentagrid/PLAN.md` §5.0 — singularities are golden zonohedra standing on the roof;
