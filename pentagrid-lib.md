@@ -33,39 +33,43 @@ The sixteen names: `RISE`, `ROOF_EDGE`, `collectRhombs`, `crossingLerp`, `faceNo
 
 ---
 
-## 2. The lift: what "already agreed" actually means
+## 2. The lift: agreed exactly, once the scale is applied
 
 `LIBRARY.md` §3 calls the Wieringa lift *"independently derived and already agreed
-numerically — the safest possible first merge."* Measured across the two repos, that is
-true of the mathematics and **not true of the numbers as they stand**. They differ by
-two conventions, both exact:
+numerically — the safest possible first merge."* Measured across the two repos, from
+the published library against this project's own `dist`:
+
+> **Scale this project's `E5` by `√5/2` and the two agree index for index, to
+> `0.000e+0` over all five lifted generators.** Not nearly; exactly.
+
+So there is one convention between them, and it is a scale:
 
 | | pentagrid (`lib/grow.js`) | wieringa (`geometry.ts`) |
 |---|---|---|
 | edge length | `ROOF_EDGE = √5/2 = 1.118034` | **1**, with the scale applied at use |
 | rise per edge | `RISE = 0.5` | `1/√5 = 0.447214` |
-| direction fan | **18°** + 72k | **0°** + 72k |
 
-Scale wieringa's `E5` by `√5/2` and the rise lands on `0.500000000000` exactly. The
-planar fan then still disagrees — by **exactly 18°, the same for all five**, so it is
-one rotation of the same fan and not a different construction.
+`0.447214 × √5/2 = 0.500000000000` exactly. Both projects already name that factor —
+`ROOF_EDGE` here, `GOLDEN_SIDE` there, equal to the last bit at `1.118033988749895`.
+§3 lists them as "same number, two names, two meanings documented", and the second
+meaning is exactly this: one of them is the edge, the other is a scale applied to a
+unit edge.
 
-Both of those matter to a merge and neither is visible from either side alone:
+### The phase is a parameter, not a disagreement
 
-- **√5/2 is the scale, and both projects already name that number** — `ROOF_EDGE` here,
-  `GOLDEN_SIDE` there, equal to the last bit (`1.118033988749895`). §3 lists them as
-  "same number, two names, two meanings documented"; the second meaning is that one of
-  them is the edge and the other is a scale factor applied to a unit edge.
-- **18° is half of 36°**, which is the half-step this project keeps meeting from the
-  other side: a 36° turn is a 72° turn plus a lift inversion, and the mirror axes of the
-  five-fold patches sit at 18°. Whoever does the merge should expect the phase to be the
-  interesting half of it, not the scale.
+The first version of this section reported the fans as differing by 18°, and called
+that the interesting half of the merge. **That was wrong, and it was my own miscall.**
+`makeDirections(verticalSymmetry, n)` takes a *boolean* first and I passed `5`, which
+is truthy, so pentagrid obligingly returned its vertical-symmetry fan:
 
-> **Do not merge the lift until the fan phase is decided.** A rotation of 18° is
-> invisible in any quantity that is rotation-invariant — volumes, fold angles, ratios —
-> so every check either project already runs would pass with the fan wrong.
+    verticalSymmetry = true   ->   18   90  162  234  306
+    verticalSymmetry = false  ->    0   72  144  216  288
+    wieringa E5               ->    0   72  144  216  288
 
----
+Still worth knowing, as an integration note rather than a conflict: **pentagrid's fan
+phase is a switch and this project's is not.** `E5` is fixed at 0° + 72k. A consumer
+here must pass `verticalSymmetry = false`, and nothing in the type signature will say
+so — see §4.
 
 ## 3. What wieringa-roof would actually use
 
@@ -92,14 +96,20 @@ serving question — sibling checkout or Pages URL — is still undecided in pra
    wieringa-roof would notice if a published name vanished — there is no check here
    that fetches the library and imports it. That is the cheapest thing to add and it
    belongs here, not there.
-2. **The entry point's contract is not legible from outside.** `generator(pg, j)` takes
-   a pentagrid object first; reading the `.d.ts` does not say so, because it only
-   re-exports names. A first call written from the published surface alone got the
-   arguments backwards. The header comment documents the *tile* contract thoroughly —
-   `{j, k, x0, y0, vertices, kTuples}` — and not the function signatures.
-3. **The scale and phase of §2 are undocumented on both sides.** Each repo's numbers are
-   internally consistent and each header explains itself; neither says what the other
-   is.
+2. **The entry point's contract is not legible from outside, and this is the sharpest
+   finding here.** Two calls written from the published surface alone, two wrong:
+   `generator(pg, j)` takes a pentagrid object first, and `makeDirections(verticalSymmetry, n)`
+   takes a boolean first. The second did not throw — `5` is truthy, so it returned a
+   perfectly good fan, the wrong one — and it produced a plausible 18° result that got
+   as far as a committed document before the source was read. **A silently wrong answer
+   from a library whose types are published is worse than a missing one.** The `.d.ts`
+   only re-exports names, so a consumer never sees a signature; the header documents the
+   *tile* contract thoroughly — `{j, k, x0, y0, vertices, kTuples}` — and no function's
+   arguments. A one-line usage example per exported function would have caught both.
+3. **The scale of §2 is undocumented on both sides.** Each repo's numbers are internally
+   consistent and each header explains itself; neither says that the other is the same
+   lift at `√5/2`. Nor does either mention that pentagrid's fan phase is a switch and
+   this project's is fixed.
 4. **Three of the four entries are unbuilt**, and the one that exists is the one with no
    duplicate to retire. Every merge in Stage 2 is still ahead.
 
