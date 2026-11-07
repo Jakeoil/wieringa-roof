@@ -644,7 +644,162 @@ importable today, what it costs, and the one convention between them.
 
 ---
 
-## 6. Sources
+## 7. The refactor — Jake's plan, 2026-11-07
+
+> *"We had trouble predicting the angles of the singularity and spokes."*
+
+Measured before anything is written, because the first item decides the shape of all the
+others.
+
+### 7.1 Two presets, not a patch hunt — and the angles become inputs
+
+pentagrid already names both states this page is about, in `geometry/hunt.ts`:
+
+| preset | γ | what it is |
+|---|---|---|
+| **`decagon`** | `[0,0,0,0,0]` | *"Every phase integral: all five couples at once, ten hexagons, and the unique 5-fold at the origin."* **The singularity.** |
+| **`deca`** | `[0,1,−1,−1,1]/1000` | *"The queen, a thousandth off Γ = 0 — the asterisk… mirror-symmetric about the vertical axis, which is exactly what the 5-fold singularity holds. It is what Γ = 0 resolves into under a mirror-symmetric nudge."* **A jiggle**, in Jake's word. |
+
+Measured from the published library, at unit edge:
+
+    decagon   1222 rhombi · 10 at the origin · radii 0, 0.6180, 1.0000, 1.6180
+    deca       1222 rhombi ·  0 at the origin · radii    0.6180, 1.0000
+
+**That is the whole of the page's subject as two numbers.** Unresolved and resolved are
+two γ from one generator, where today one is a deflation patch and the other does not
+exist. A slight offset is a jiggle; `decagon` is the point they all surround.
+
+And the angles stop being measured:
+
+1. **Generators at 0° + 72k.** A gridline of family *j* is the locus `x·vⱼ = const`, so
+   it runs **perpendicular** to `vⱼ` — and the ribbon, which is the spoke, runs with it.
+   The five spokes are at **18° + 36k**: 18, 54, 90, 126, 162. An argument, not a fit.
+2. **This 18° is not the one that produced a wrong commit** in `pentagrid-lib.md`. That
+   was `verticalSymmetry = true` putting the *generators* at 18°. This is the *spokes*,
+   perpendicular to generators at 0°. Two different objects at the same angle.
+3. **The singularity is at the origin by construction**, so `findDecagon` retires — and
+   with it the reason the orientation was ever in doubt.
+
+**What this costs.** The patch changes, so everything in §6 that is a property of *the
+Queen patch* — 666 vertices, 11 decagons, 9 with the ghost, 105 caps, 205 saddles — is
+re-derived. Everything that is a property of *the singularity* — F₂₀, the ten readings,
+their factoring, the cascade, the ten views — survives untouched, none of it having
+ever depended on which patch the decagon sat in.
+
+> An earlier draft of this section compared radii from the origin and concluded the two
+> patches were unrelated tilings. **That was not a fair test**: wieringa's Deca patch is
+> not centered on its singularity, so distances from the origin there are distances from
+> an arbitrary point and cannot be compared with distances from a five-fold vertex.
+> Whether the two are the same tiling up to a rigid motion is unsettled and, since the
+> generator is being replaced, does not need settling.
+
+`NOTES.md` "Settled: no de Bruijn generator" does not forbid any of this. It says a
+*generic* γ cannot produce Sun or Star. These are the singular and near-singular cases,
+which are the ones de Bruijn gives exactly.
+
+### 7.2 What else comes free from the library
+
+`lib/grow.js` already exports the whole roof lift — `generator`, `liftLocal`,
+`vertexIndex`, `vertexHeight`, `faceNormal`, `flatLocal` — and `tileCorner`, which
+takes **grow** and **fold** together. So the last item on Jake's list is not a port at
+the end; it is the entry point the refactor is built on from the first commit. One
+convention to apply: pentagrid's edge is `ROOF_EDGE = √5/2` where this project's `E5`
+is a unit edge — see [pentagrid-lib.md](pentagrid-lib.md) §2.
+
+### 7.3 The rendering wish list — answered 2026-11-07
+
+| | |
+|---|---|
+| **Bands and Kowalewski five become independent** and co-exist. Kowalewski is the **tint**, the background; bands overprint it |
+| the tint's strength is **a transparency** — Jake: *"Sorry I re-used gamma ambiguously, in regard to tint, it's transparency"* |
+| a **white base**, which **replaces the clear-ground checkbox** rather than joining it |
+| **Balls** becomes its own field; **sticks** selects colored-perpendicular, colored-parallel or black |
+| **Faces** becomes a **0 → 100% range**, with today's *transparent* sitting at 50%. Three named states become one number with the old middle still reachable |
+| **Folding**: under Color, fold away bands and its width, Kowalewski and its settings, and faces |
+
+`hexroof.html`'s `<details class="fold">` is the model for the folded group — its
+header carries the current setting, so a shut group still says what it is set to.
+
+### 7.4 The F₂₀ control, replaced
+
+Out: one dropdown listing ten views. In: **Singularity (all) or one of five axes**, a
+**direction** checkbox, and **both / high / low**.
+
+The first two are the factoring §4 already proved:
+
+> F₂₀'s ten readings factor as a **5-state rotation × a 2-state flip**.
+
+So **axis × direction = the ten views**, named by what they are rather than numbered
+1…10 — which is the gain, since a numbered list cannot say that view 7 is view 2 turned
+over.
+
+**Direction is the order of the couple along its axis.** Jake: *"There are 5 axes. The
+figures joining the two ends either consist of a long and a short skewb, or a short and
+a long. The rest of the decagon becomes determined. This is direction."*
+
+That is exactly the bit the current code already computes and calls `longFirst`, read
+off the sign of the couple's displacement projected on its own generator — and the
+working-tree comment records the trap, that keying on the axis modulo 180° folds the two
+senses together and gives a direction two of one order and none of the other. So the
+control is naming something already measured, not asking for new geometry.
+
+**And the rest follows from the choice**: a couple determines the whole reading, which
+is why axis × direction is ten views and not ten unrelated pictures.
+
+**`both` is not a cut; it is what is drawn.** Jake: *"Both will show as skewbs, one or
+two will show only the path, one of the complete resolutions."*
+
+- **both** — the two skewbs of the couple, drawn as **real hexahedra**. The page's
+  founding claim made visible: *a singularity is a solid*.
+- **one** / **two** — only the **path**: one of the complete resolutions, drawn as the
+  tiling rather than as solids.
+
+So the third control is solid-against-path, not a third factor. It also means `both` is
+the state `Release` leaves behind, so the two controls are describing the same thing and
+should agree rather than fight.
+
+### 7.5 Order of work
+
+1. **Swap the generator.** `collectRhombs` at γ = 0 in place of `generatePatch`; retire
+   `findDecagon`; re-anchor everything on the origin. Re-run `tools/exceptional.mjs` and
+   expect the patch-shaped counts to change and the singularity-shaped ones not to.
+2. **Re-assert.** The checker is what says the swap preserved the objects. Any count
+   that moves and should not have is a real finding.
+3. **The F₂₀ control**, on the factoring above.
+4. **The rendering list** — independent of 1–3, and could go first if the page needs to
+   stay usable throughout.
+5. **Grow**, from `tileCorner`, presented as the Cage's `explode`.
+
+### 7.6 Patch size
+
+Jake: *"patch size could be controlled by a number, compute gridlines where all |k| less
+than x."* So the extent is a **line-number window**, not a view rect and not a
+generation — which suits the generator, since `collectRhombs` already works in line
+numbers and takes a `maxNCap`. One number, the same in every family, and the patch is
+whatever those lines cut out.
+
+Worth noting it is a better control than a generation for this page specifically: the
+singularity sits at the origin and the interest falls off with radius, so |k| < x is
+"how much of the cartwheel", which is the question actually being asked.
+
+### 7.7 Still open
+
+1. **`one` and `two` — which two?** Direction already picks long-short against
+   short-long at a given axis, so if `one`/`two` were the same bit it would be chosen
+   twice. The likely reading is that they are the couple's two members — the path
+   through the long skewb or through the short — but that is a guess and the two
+   controls have to be told apart before either is built.
+2. **What does direction mean under `Singularity (all)`?** It is a property of a chosen
+   axis. With all five there are ten views and one bit cannot pick among them, so it
+   presumably applies to every axis at once or is disabled there.
+3. **Does `both` stay clickable?** The cascade works by clicking a figure to collapse
+   it. If the selector sets the state globally, a click presumably still overrides
+   locally — but then the control is showing a default rather than a state, and ought to
+   say so once something has been clicked away from it.
+
+---
+
+## 8. Sources
 
 - `pentagrid/PLAN.md` §5.0 — singularities are golden zonohedra standing on the roof;
   the k-table, the two rhombohedra and the K122/K113 split, the ghost pole, and why the
