@@ -758,17 +758,87 @@ So the third control is solid-against-path, not a third factor. It also means `b
 the state `Release` leaves behind, so the two controls are describing the same thing and
 should agree rather than fight.
 
-### 7.5 Order of work
+### 7.4a The re-aim — what the pentagrid is actually for (2026-11-07)
 
-1. **Swap the generator.** `collectRhombs` at γ = 0 in place of `generatePatch`; retire
-   `findDecagon`; re-anchor everything on the origin. Re-run `tools/exceptional.mjs` and
-   expect the patch-shaped counts to change and the singularity-shaped ones not to.
-2. **Re-assert.** The checker is what says the swap preserved the objects. Any count
-   that moves and should not have is a real finding.
-3. **The F₂₀ control**, on the factoring above.
-4. **The rendering list** — independent of 1–3, and could go first if the page needs to
-   stay usable throughout.
-5. **Grow**, from `tileCorner`, presented as the Cage's `explode`.
+**I asked the wrong thing of it.** The first attempt tried to get a drawable *surface*
+out of the γ = 0 dual, and spent a long time failing to. The measurement says why it
+could never have worked:
+
+| | V | E | F | V−E+F | edges with >2 faces |
+|---|---|---|---|---|---|
+| **γ = 0** | 839 | 1606 | 724 | **−43** | **90** |
+| a jiggle | 788 | 1511 | 724 | **1**, a disc | 0 |
+
+Same 724 faces and the same total area, but fifty-one extra vertices and ninety edges
+carrying three faces or more. **At γ = 0 the dual is not a surface at all** — it is all
+the readings at once, which is the thing the page resolves, not the thing it draws.
+
+Jake's rule settles what a surface has to be: **a Penrose vertex index runs 1 to 4
+inclusive, and the pole is not part of the tiling.** A jiggle satisfies that with
+nothing done to it. γ = 0 cannot satisfy it at all, and dropping the pole's own rhombi
+does not rescue it — it leaves a five-fold star of gap out to r = 3.11, because the
+degeneracy was never confined to the origin.
+
+So the three jobs split, and each goes to what already does it:
+
+| | |
+|---|---|
+| **γ = 0** | the **structure** — where the singularities are, which axes meet at each, the spokes at 18° + 36k. Combinatorics, not a tiling |
+| **a jiggle** | the **drawable tiling** — 724 rhombi, indices 1…4, Euler 1, legal by construction |
+| **the Cage** | the **solid** — F₂₀ with its caps cut, which this project already builds and already checks |
+
+That last one is Jake's: *"the golden icosahedron with the caps removed is very close to
+what the necker center of an axis should look like."* Measured against
+`dissect.ts`, it is exactly the object:
+
+    cells 10 · acute 5 oblate 5 · shell faces 20
+    band faces with the caps removed: 10
+    of those, with an antipodal partner: 10 of 10  ->  5 pairs
+
+**5 pairs**, as Jake has it, and the Cage's own note carries the rest: *"every cell
+reaching a pole loses three of its six faces"* — the 3-face, five at each pole, made
+out of hexahedra. A singularity solution is a representation of the penteract, and the
+penteract is already dissected here.
+
+None of this needs the pole-filtering the first attempt built. `pentapatch.ts` and its
+checker stay; what changes is what is asked of them.
+
+### 7.4b An axis is a sequence, not a couple
+
+Recorded because the code has it wrong twice over. Jake: *"the axes are made up of
+golden hexahedra, alternating between oblate and acute in the so called Conway musical
+sequence."*
+
+§2 already says it — *"the five sequences in ten directions, each a Fibonacci word of A
+and O along a grid line"* — and §4's cascade is built on it: setting one skewb cascades
+**along its line**, and the line is the unit. But the drawing has twice represented an
+axis as a **pair**: `a592e51` as one A₆ and one O₆ from the dissection, and the working
+tree after it as a long-and-short hexagon couple. A couple is two cells of something
+that does not stop at two.
+
+So the axis control of §7.4 selects a **spoke** — a whole alternating chain of
+hexahedra running out from the singularity — and *direction* says which way along it,
+not which of a pair comes first. The couple at the centre is where that chain begins,
+which is why it looked like the whole object from close up. This is the same mistake as
+the hexagon-versus-ribbon one in §4, in a third place: **the unit is the line.**
+
+### 7.5 Order of work — revised after §7.4a
+
+1. **Draw from a jiggle.** It is a legal tiling with indices 1…4 and nothing has to be
+   filtered out of it. `pentapatch.ts` already produces it; the page needs pointing at
+   it rather than at γ = 0.
+2. **Find the singularities from γ = 0**, as structure: their positions, the axes that
+   meet at each, and the spoke directions. Not as faces to draw.
+3. **Stand the Cage's capped F₂₀ at each one**, which is the object the page is about
+   and the one already built and checked.
+4. **The axis control on spokes**, per §7.4b — a chain, with direction saying which way
+   along it.
+5. **The rendering list** (§7.3), independent of all of the above.
+6. **Grow**, from `tileCorner`, presented as the Cage's `explode`.
+
+**Done when** the page draws a legal tiling at every index, the singularities stand on
+it as solids, and `tools/exceptional.mjs` asserts the singularity facts — which it can,
+since none of them ever depended on the patch.
 
 ### 7.6 Patch size
 
