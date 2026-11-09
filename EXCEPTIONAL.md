@@ -894,6 +894,48 @@ that produces each. The concave/convex route along each axis — the alternating
 §7.4b read one way or the other — is the next layer, and §7.4c's prediction (one axis
 ambiguous, four forced) is the test to run on it.
 
+### 7.4e Starting gently: the couple, and what an axis measures like
+
+Jake, 2026-11-09: *"We should have gone more gently into the exceptional singularity.
+We should have concentrated on the more common singularity we call, in our preset,
+couple."* Taken, and the couple is a better first object in a way the numbers show at
+once — the same degeneracy, an order of magnitude smaller:
+
+| preset | V − E + F | edges carrying >2 faces |
+|---|---|---|
+| a jiggle | **1**, a disc | 0 |
+| **couple** | −8 | **19** |
+| decagon | −43 | 90 |
+
+**The degeneracy is a line, not a point.** Jake: *"Not just those three, but other sets
+of three going in two directions all along the line of parallel duals. The axis."*
+Measured on `couple`, every one of the overloaded edges lies on a single straight line
+at **162°**, worst departure `1.1e-14` — across the whole patch, from r = 0.66 to the
+rim. There are no overloaded *vertices* at all: the fold is in the overlap, not in the
+valence.
+
+**And the axis is not either of the nudged families.** γ moves 3 and 4; the line at
+162° is family **1**, whose direction at 72° bisects the pair 3–4 at 216° and 288°.
+So which axis a phase flip runs along is decided by which pair is nudged, and it is
+the perpendicular family — worth knowing, since §7.4d's control picks an axis by
+leaving a γ index alone.
+
+**The spacing along it has exactly two lengths**, stable across every window measured:
+
+    S = 0.951057  = sin 72°
+    L = 2.126627  = √5 · S          L/S = 2.236069 against √5 = 2.236068
+
+with a non-periodic word, e.g. `SLSSSLSLSSSLSLSSSLSSSLSLSSSLSSSLSLSSSLSLS`.
+
+**Not settled, and recorded as not settled:** whether that word is the Conway musical
+sequence. The two lengths are exact, but the S:L counts have not converged on φ over
+the windows measured — 28 to 13 at the widest. The sequence Jake means is of
+**skewbs**, alternating acute and oblate, and that wants reading off the hexahedra
+rather than off the gridline crossings. Reading it from the grid was the nearest thing
+to hand, which is exactly the habit §7.4b warns about.
+
+`tools/probes/couple.mjs`.
+
 ### 7.5 Order of work — revised after §7.4a
 
 1. **Draw from a jiggle.** It is a legal tiling with indices 1…4 and nothing has to be
