@@ -822,6 +822,78 @@ not which of a pair comes first. The couple at the centre is where that chain be
 which is why it looked like the whole object from close up. This is the same mistake as
 the hexagon-versus-ribbon one in §4, in a third place: **the unit is the line.**
 
+### 7.4c What a view actually shows: one ambiguous axis, four forced
+
+Jake, 2026-11-07: *"the jiggle affects the whole tiling. So when you're showing one of
+the 10 combinations, only one ambiguous axis of hexagons should show. The other 4 would
+be resolved/forced by the resolved rhombs in the decagon."*
+
+This is the piece that was missing, and it says what a view *is* rather than how it is
+labelled. Choosing an axis and a direction does not merely pick a picture of the
+decagon — **it resolves the decagon, and that resolution propagates**. The ten rhombi
+sit across all five spokes, so fixing them forces four of the five chains outright and
+leaves exactly one still free. The view is named for the axis that stays ambiguous.
+
+Which also squares the counts in Jake's earlier note — *"10 combos where everything is
+resolved, maybe 10 combos where a single axis of hexes aren't resolved, and one where
+the whole decagon as well as the axes are not resolved"* — into one picture:
+
+| what is shown | the decagon | the five axes |
+|---|---|---|
+| **Singularity (all)** | superposed | all five ambiguous — the whole mess |
+| **a view** (axis × direction) | resolved | **one ambiguous, four forced** |
+| a jiggle | resolved | all five resolved, and the whole tiling with them |
+
+**And the machinery for it already exists.** §4's cascade is exactly this propagation,
+run from the other end: *"setting one skewb cascades along its line… and the cascade
+reaches the decagon itself"*. Here the decagon is set and the cascade runs outward. The
+legality test is the same seven vertex stars, needing no phases and no grid.
+
+**Worth measuring before the control is built**, because it is a sharp claim and the
+code can answer it: take each of the ten readings of the decagon, lay it in, run
+`settle()`, and count how many of the five spokes come out determined. The prediction
+is four every time, and the one left over should be a different axis for each of the
+five axis choices. If it is not four, the control's whole meaning is different.
+
+### 7.4d The ten states, computed from jiggles — `tools/probes/jiggles.mjs`
+
+Jake asked for the exceptional states to be computed by jiggling, and they come out
+clean. A jiggle keeps `Σγ = 0`; the question is how many components it moves.
+
+- **One pair** (`+ε` here, `−ε` there) is the **simple phase flip** — a three-line
+  crossing resolving, which is the `couple` preset. All twenty such nudges leave ten
+  rhombi where the decagon was and **not one matches a legal reading**. A single pair
+  cannot resolve the five-fold.
+- **Two pairs** do. Jake: *"deca moves two pairs of intersection away from the center to
+  form a resolution."* One index left alone, the other four split `+ + − −`: thirty
+  such nudges exist, **ten land on a reading, one reading apiece**, and all ten readings
+  are reached.
+
+And they organise themselves into the control:
+
+| axis (γ index left alone) | up-pair | reading | | up-pair | reading |
+|---|---|---|---|---|---|
+| 0 | {1,4} | 0 | | {2,3} | 7 |
+| 1 | {0,2} | 8 | | {3,4} | 3 |
+| 2 | {0,4} | 9 | | {1,3} | 4 |
+| 3 | {0,1} | 5 | | {2,4} | 2 |
+| 4 | {0,3} | 6 | | {1,2} | 1 |
+
+> **The axis is the γ index left alone, and the direction is which of its four
+> neighbours goes up.** Every axis gives exactly two, so the 5 × 2 of §7.4 arrives a
+> second time — from the grid, not from F₂₀'s symmetry — and the two agree.
+
+Two things fall out of the table. The two up-pairs of an axis are the two ways of
+splitting its four neighbours into **mirror pairs** about it — `{1,4}` and `{2,3}` about
+axis 0 — which is what makes *direction* a single bit and matches Jake's reading of it,
+long-then-short against short-then-long. And `deca` is `fix 0, up {1,4}`, so the Queen
+is **reading 0**, one of the ten and not a special case.
+
+**Not yet computed: the routes themselves.** This gives the ten states and the jiggle
+that produces each. The concave/convex route along each axis — the alternating chain of
+§7.4b read one way or the other — is the next layer, and §7.4c's prediction (one axis
+ambiguous, four forced) is the test to run on it.
+
 ### 7.5 Order of work — revised after §7.4a
 
 1. **Draw from a jiggle.** It is a legal tiling with indices 1…4 and nothing has to be
@@ -831,10 +903,13 @@ the hexagon-versus-ribbon one in §4, in a third place: **the unit is the line.*
    meet at each, and the spoke directions. Not as faces to draw.
 3. **Stand the Cage's capped F₂₀ at each one**, which is the object the page is about
    and the one already built and checked.
-4. **The axis control on spokes**, per §7.4b — a chain, with direction saying which way
-   along it.
-5. **The rendering list** (§7.3), independent of all of the above.
-6. **Grow**, from `tileCorner`, presented as the Cage's `explode`.
+4. **Measure the forcing** (§7.4c): resolve the decagon each of ten ways, cascade, and
+   count the spokes left ambiguous. Four is the prediction and the control's meaning
+   depends on it.
+5. **The axis control on spokes**, per §7.4b — a chain, with direction saying which way
+   along it, naming the axis that stays ambiguous.
+6. **The rendering list** (§7.3), independent of all of the above.
+7. **Grow**, from `tileCorner`, presented as the Cage's `explode`.
 
 **Done when** the page draws a legal tiling at every index, the singularities stand on
 it as solids, and `tools/exceptional.mjs` asserts the singularity facts — which it can,
