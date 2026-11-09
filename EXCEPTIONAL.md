@@ -936,6 +936,62 @@ to hand, which is exactly the habit §7.4b warns about.
 
 `tools/probes/couple.mjs`.
 
+### 7.4f The skewbs along the axis, and a symmetric example to demo with
+
+**Read off the hexahedra, the musical sequence appears at once.** Each rhomb carries
+the crossing that made it, so three lines meeting is three rhombi sharing one `(x0,y0)`
+— a skewb, with no searching. Along the couple's axis there are exactly **two** family
+triples, and both contain family 1, the axis family:
+
+| triple | cyclically consecutive | skewb |
+|---|---|---|
+| **{0,1,2}** | yes | **oblate** |
+| **{1,3,4}** | no | **acute** |
+
+The sequence of them along the axis, at `|k| ≤ 20`:
+
+    O A O A O O A O A O O A O O A O A O O A O O A O A O O A O A O O A O
+    O 21, A 13 — consecutive Fibonacci numbers, ratio 1.615 against φ = 1.618
+
+and at **every** window measured, 23 skewbs to 78, **never `AA` and never `OOO`** —
+which is the Fibonacci word's defining local property. So it is the musical sequence,
+and §7.4b's warning was exactly right: reading it off the gridline crossings gave
+28 : 13 and no φ, because the crossings are not the object. **The skewbs are.**
+
+**pentagrid decides it exactly, and agrees.** `regularity.ts` carries the rule — a
+triple `(L, {P,Q})` is singular when `γ_L` is an integer and `γ_P + γ_Q` is — and for
+the couple it predicts `{012, 134}`, oblate and acute. Measured: `{012, 134}`. No
+tolerance anywhere in that, on either side.
+
+**One spoke, not five.** All of the couple's crossings lie on one line. That is the
+answer to "can you figure out the other spokes": a simple phase flip **has** one axis.
+The five-fold has five, which is what makes it exceptional and what made it the wrong
+place to start.
+
+### A bilaterally symmetric couple, for the demo
+
+Jake wants a symmetric example, drawn right side up. Constructing one from the rule
+rather than hunting for it: a mirror fixing family 0 swaps 1↔4 and 2↔3, so a symmetric
+γ is `[γ₀, a, b, b, a]`, and the rule wants an integral lead and an integral pair.
+
+> **γ = [0, ½, −½, −½, ½]** — sum 0, so Penrose. Triples **{0,1,4} oblate** and
+> **{0,2,3} acute**, both containing family 0. Verified: **1536 of 1536** interior
+> vertices carried by the mirror, against 1336 of 1532 for the stock `couple`.
+
+And the orientation is a choice of fan, which also rehabilitates a flag this project
+briefly dismissed:
+
+| `makeDirections` | generators | mirror | the axis runs |
+|---|---|---|---|
+| `verticalSymmetry = false` | 0, 72, 144, 216, 288 | up–down, 1536/1536 | vertically, 90° |
+| **`verticalSymmetry = true`** | 90, 162, 234, 306, 18 | **left–right, 1536/1536** | **horizontally, 0°** |
+
+So the demo example is **γ = [0, ½, −½, −½, ½] with `verticalSymmetry = true`**:
+bilaterally symmetric left to right, its spoke lying horizontally across the picture,
+one oblate family of skewbs and one acute. `verticalSymmetry` was written off in
+pentagrid-lib.md §2 as the cause of a wrong commit; it is in fact the setting that
+makes a figure stand up straight, and the page should offer it.
+
 ### 7.5 Order of work — revised after §7.4a
 
 1. **Draw from a jiggle.** It is a legal tiling with indices 1…4 and nothing has to be
