@@ -720,6 +720,38 @@ is a unit edge — see [pentagrid-lib.md](pentagrid-lib.md) §2.
 `hexroof.html`'s `<details class="fold">` is the model for the folded group — its
 header carries the current setting, so a shut group still says what it is set to.
 
+#### 7.3a The stack, as built — 2026-11-09
+
+Jake settled the thing the list left open: these are not six controls, they are **four
+layers in order**, each with its own strength, and the panel reads bottom to top the way
+the paint goes on.
+
+| layer | what it is | strength | default |
+|---|---|---|---|
+| **base** | white, or the page's own background, or nothing at all | `opacity` — the faces themselves, invisible to solid | 100% |
+| **tint** | the Kowalewski five, a face per generator pair | `opacity` — a wash over the base | 55% |
+| **bands** | the ribbons, one color per axis | `width`, and `opacity` over the tint | 50% wide at 100% |
+| **shell** | the singularity: **purple** on the 2k-gon, **pink** on the hexagons | `shell` — over everything | 55% |
+
+Two of these were corrections rather than additions.
+
+**The shell is the top layer, not the ground.** It was `Cap.ground`, painted only where
+the ribbons were *not*, which made the figure a layer *underneath* the thing it was
+meant to mark. It is now `Cap.shell`, an **overprint**: at 100% it covers the banding
+flat and the figure reads as a solid pink or purple hexahedron, at 0 it is gone and only
+the rim says a figure is there, and the slider is the whole range between. The old
+behavior is not a point on that range — it never was a layer at all.
+
+**The bands are laid, not substituted.** `emitBands` put the band color in place of the
+ground; it now lerps the backdrop toward it by `bandAlpha`. Where nothing is painted
+beneath, the page's own background stands in as the backdrop, since that is what the eye
+has there anyway — which is also how a shell shows with the base and the tint both off.
+
+A **2k-gon** is the name the stack needs: a k-fold singularity is a 2k-gon in the plane
+with a zonohedron standing on it, so the hexagon and the decagon are the same word at
+k = 3 and k = 5, and the swatch beside the slider is drawn from `DECA_PURPLE` and
+`SKEWB_PINK` themselves rather than written into the markup twice.
+
 ### 7.4 The F₂₀ control, replaced
 
 Out: one dropdown listing ten views. In: **Singularity (all) or one of five axes**, a

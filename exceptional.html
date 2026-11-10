@@ -21,6 +21,23 @@
        there to be clicked, and a closed hand only while actually dragging */
     #view canvas { display: block; width: 100%; height: 100%; }
     #status { display: block; margin: 10px 0 0; line-height: 1.5; }
+    /* The folded Color group, the same shape hexroof.html uses for its roof panel:
+       the summary carries the current state so a shut group is still legible. */
+    .fold { border: 1px solid var(--rule); border-radius: 6px; background: #fff; }
+    .fold > summary { list-style: none; cursor: pointer; padding: 5px 9px; font-size: 12px;
+        text-transform: uppercase; letter-spacing: .06em; color: var(--ink-faint);
+        display: flex; align-items: center; gap: 8px; }
+    .fold > summary::-webkit-details-marker { display: none; }
+    .fold > summary::before { content: "\25B8"; font-size: 10px; transition: transform .15s; }
+    .fold[open] > summary::before { transform: rotate(90deg); }
+    .fold > summary .state { text-transform: none; letter-spacing: 0; font-size: 12px; color: var(--ink-soft); }
+    .foldbody { display: flex; flex-direction: column; gap: 5px; padding: 2px 10px 9px; }
+    .foldbody .checks { gap: 14px; }
+    .foldbody input[type=range] { width: 120px; }
+    .foldbody .swatch { display: flex; align-items: center; gap: 4px; font-size: 12px; color: var(--ink-soft); }
+    .foldbody .sw { display: inline-block; width: 11px; height: 11px; border-radius: 2px;
+        border: 1px solid rgba(0,0,0,.25); }
+    .foldbody .sw + .sw { margin-left: 8px; }
 </style>
 </head>
 <body>
@@ -56,30 +73,55 @@
 </p>
 
 <div class="bar">
-    <label title="Kowalewski colors a face by the pair of generators spanning it, so every rosette shows all five. Bands colors by ribbon instead: a face lies in two of them and shows both.">Color <select id="color">
-        <option value="bands">Bands</option>
-        <option value="five">Kowalewski five</option>
+    <!-- Color is a folded group now: the two schemes stack rather than exclude one
+         another, so each needs its own settings beside it and the bar would otherwise
+         be a mile long. The summary carries the state, so a shut group still says what
+         it is set to. -->
+    <details class="fold" id="colorfold">
+        <summary>Color <span class="state" id="colorstate"></span></summary>
+        <div class="foldbody">
+            <!-- The stack, bottom first: base, tint, bands, shell. Each row is a layer
+                 and its own strength, and the panel is in the order the paint goes on. -->
+            <span class="checks">
+                <label title="Lay white under everything, in place of the page's own background. Off, and with the tint off too, nothing is painted at all and the scene shows through the faces."><input type="checkbox" id="whitebase"> white base</label>
+                <label title="The faces themselves, from invisible to solid. This is the bottom of the stack, so it carries everything printed on it.">opacity <span id="faceOut" class="mono"></span>
+                    <input type="range" id="faceopacity" min="0" max="1" step="0.01" value="1"></label>
+            </span>
+            <span class="checks">
+                <label title="The Kowalewski five as a wash over the base — a face takes the color of the pair of generators spanning it. The bands print over this."><input type="checkbox" id="tint" checked> tint</label>
+                <label title="How strongly the tint shows against the base. At 0 it is the bare base, at 1 the full five-coloring.">opacity <span id="tintOut" class="mono"></span>
+                    <input type="range" id="tintalpha" min="0" max="1" step="0.01" value="0.55"></label>
+            </span>
+            <span class="checks">
+                <label title="One color per axis, carried by the ribbons. A face lies in two of them and shows both, so a ribbon can be followed unbroken across the figure."><input type="checkbox" id="bands" checked> bands</label>
+                <label title="How wide the ribbons run, as a fraction of the face. At 100% each covers the whole rhombus and the two coincide; at 0% there is nothing left of them.">width <span id="ribbonOut" class="mono"></span>
+                    <input type="range" id="ribbon" min="0" max="1" step="0.01" value="0.5"></label>
+                <label title="How strongly the ribbons print on the tint beneath them. At 100% they are their own colors flat; below it the tint shows through.">opacity <span id="bandOut" class="mono"></span>
+                    <input type="range" id="bandalpha" min="0" max="1" step="0.01" value="1"></label>
+            </span>
+            <span class="checks">
+                <label title="The singularities, washed over the banding: purple on the decagon, pink on the hexagons. A k-fold singularity is a 2k-gon in the plane and a zonohedron standing on it, and this is that shell.">shell <span id="shellOut" class="mono"></span>
+                    <input type="range" id="shellalpha" min="0" max="1" step="0.01" value="0.55"></label>
+                <span class="swatch"><i class="sw" id="swdeca"></i>2k-gon<i class="sw" id="swskewb"></i>hexagon</span>
+            </span>
+        </div>
+    </details>
+    <label title="Beads at every corner of the frame.">Balls <select id="balls">
+        <option value="off">Off</option>
+        <option value="on">On</option>
     </select></label>
-    <label>Frame <select id="edgemode">
-        <option value="ballstick">Ball and stick</option>
-        <option value="edges">Edges</option>
-        <option value="invisible">Invisible</option>
+    <label title="An edge runs along one of the two generators spanning its face; the ribbon crossing it is the other. Black is neither, for a frame that says nothing and leaves the color to the faces.">Sticks <select id="sticks">
+        <option value="parallel">Colored, parallel</option>
+        <option value="perpendicular">Colored, perpendicular</option>
+        <option value="black">Black</option>
+        <option value="none">None</option>
     </select></label>
     <label id="celllabel" title="The ten views of the decagon. A long and a short skewb sharing no rhombus make a couple, and a couple's two triples cover all five generators while meeting in exactly one — that one is its direction. Five directions, two arrangements apiece, ten views. One reading realizes only two of the five, so choosing a view chooses a reading.">F₂₀ <select id="cellmode">
         <option value="shell">Singularity</option>
     </select></label>
-    <label>Faces <select id="facemode">
-        <option value="solid">Solid</option>
-        <option value="transparent">Transparent</option>
-        <option value="invisible">Invisible</option>
-    </select></label>
-    <label id="ribbonlabel" title="How wide the ribbons run, as a fraction of the face. At 100% each covers the whole rhombus and the two coincide; at 0% there is nothing left of them. Scroll over the slider to work it; hold shift for fine steps.">Ribbon <span id="ribbonOut" class="mono"></span>
-        <input type="range" id="ribbon" min="0" max="1" step="0.01" value="0.5">
-    </label>
     <span class="checks">
         <label title="Shade each rhombus by its height, so the relief reads before any color does. Off, the colors stand alone."><input type="checkbox" id="shading"> shading</label>
         <label id="caplabel" title="Cap the decagon: hide the ten rhombi of the reading the patch happens to take, leaving F₂₀'s own surface. Unticked they stay, inside the solid — set the faces transparent and you see the one path through the superposition of all of them. Seven of the ten are genuinely interior to F₂₀ and only three lie on its boundary."><input type="checkbox" id="cap"> cap</label>
-        <label id="groundlabel" title="Leave the part of each face outside its two ribbons undrawn, so the roof shows through the gaps."><input type="checkbox" id="clearground"> clear ground</label>
         <label><input type="checkbox" id="spin"> turn</label>
         <label title="Carry the lights with the viewpoint instead of leaving them standing in the scene, so a turning surface reads as the surface turning."><input type="checkbox" id="eyelight" checked> eye light</label>
         <label title="Drop the perspective. Parallel edges stay parallel, which is the plan view the reference drawings are in."><input type="checkbox" id="ortho"> orthogonal</label>

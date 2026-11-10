@@ -21,7 +21,7 @@ import { seedTypes, generatePatch, allRhombs, vertexList, computeLift } from "./
 import { buildRoof } from "./roofgeom.js";
 import * as THREE from "three";
 import { createGoldenView, PLAN_VIEW } from "./goldenview.js";
-import type { GoldenFace, FaceMode, EdgeMode, Scheme, Cap } from "./goldenview.js";
+import type { GoldenFace, Sticks, Cap } from "./goldenview.js";
 import { readingsOf, starsOf, starSig, LEGAL_STARS, maskCorners } from "./readings.js";
 import type { MaskRhomb } from "./readings.js";
 import type { V3 } from "./solids.js";
@@ -33,17 +33,27 @@ const el = <T extends HTMLElement>(id: string): T => {
 };
 
 const view = el<HTMLDivElement>("view");
-const colorSel = el<HTMLSelectElement>("color");
 const cellSel = el<HTMLSelectElement>("cellmode");
-const faceSel = el<HTMLSelectElement>("facemode");
 const shadeChk = el<HTMLInputElement>("shading");
-const edgeSel = el<HTMLSelectElement>("edgemode");
+const tintChk = el<HTMLInputElement>("tint");
+const tintInput = el<HTMLInputElement>("tintalpha");
+const tintOut = el<HTMLElement>("tintOut");
+const bandsChk = el<HTMLInputElement>("bands");
 const ribbonInput = el<HTMLInputElement>("ribbon");
 const ribbonOut = el<HTMLElement>("ribbonOut");
-const ribbonLabel = el<HTMLLabelElement>("ribbonlabel");
+const bandInput = el<HTMLInputElement>("bandalpha");
+const bandOut = el<HTMLElement>("bandOut");
+const shellInput = el<HTMLInputElement>("shellalpha");
+const shellOut = el<HTMLElement>("shellOut");
+const swDeca = el<HTMLElement>("swdeca");
+const swSkewb = el<HTMLElement>("swskewb");
+const whiteChk = el<HTMLInputElement>("whitebase");
+const faceInput = el<HTMLInputElement>("faceopacity");
+const faceOut = el<HTMLElement>("faceOut");
+const ballsSel = el<HTMLSelectElement>("balls");
+const sticksSel = el<HTMLSelectElement>("sticks");
+const colorState = el<HTMLElement>("colorstate");
 const capChk = el<HTMLInputElement>("cap");
-const groundChk = el<HTMLInputElement>("clearground");
-const groundLabel = el<HTMLLabelElement>("groundlabel");
 const spinChk = el<HTMLInputElement>("spin");
 const eyeChk = el<HTMLInputElement>("eyelight");
 const orthoChk = el<HTMLInputElement>("ortho");
@@ -53,18 +63,25 @@ const PREFS_KEY = "wr-exceptional";
 const PREF_DEFAULTS = {
     // Bands, straight down, still, lit from the eye. The page is about ribbons crossing
     // in a plan view, and that is what it should open on.
-    color: "bands",
+    tint: true,
+    tintalpha: 0.55,
+    bands: true,
+    // The layers print at full strength over the base; it is the *tint* that is a wash,
+    // and the shell that wants to be seen through. Those two carry the fractions.
+    bandalpha: 1,
+    whitebase: false,
+    faceopacity: 1,
+    shellalpha: 0.55,
     cellmode: "shell",
-    facemode: "solid",
     shading: false,
     // Ball and stick by default, which is not the Cage's default: this surface is a
     // single sheet of rhombi rather than twenty solids, and the rods are what give it
     // depth before any of the coloring does.
-    edgemode: "ballstick",
+    balls: "on",
+    sticks: "parallel",
     ribbon: 0.5,
     // Off: the cap hides the inner rhombi, and those are the paths.
     cap: false,
-    clearground: false,
     spin: false,
     eyelight: true,
     ortho: false,
@@ -901,27 +918,35 @@ function build(reframe: boolean): void {
         }
     });
 
-    const bands = colorSel.value === "bands";
+    const bands = bandsChk.checked;
+    // Each slider belongs to the box beside it, so it greys with it rather than staying
+    // live on a layer that is off.
     ribbonInput.disabled = !bands;
-    ribbonLabel.style.opacity = bands ? "" : "0.45";
-    groundChk.disabled = !bands;
-    groundLabel.style.opacity = bands ? "" : "0.45";
+    bandInput.disabled = !bands;
+    tintInput.disabled = !tintChk.checked;
 
     const ribbon = Number(ribbonInput.value);
     gv.draw(drawList, {
-        scheme: colorSel.value as Scheme,
-        faceMode: faceSel.value as FaceMode,
-        edgeMode: edgeSel.value as EdgeMode,
+        tint: tintChk.checked,
+        tintAlpha: Number(tintInput.value),
+        bands,
+        whiteBase: whiteChk.checked,
+        faceOpacity: Number(faceInput.value),
+        bandAlpha: Number(bandInput.value),
+        shellAlpha: Number(shellInput.value),
+        balls: ballsSel.value === "on",
+        sticks: sticksSel.value as Sticks,
         axes: AXES,
         ribbon,
-        ground: !groundChk.checked,
         shadeAt,
         shadeAmount: shadeChk.checked ? 1 : 0,
-        // F₂₀ and the skewbs are not patches laid over the tiling — they are made of
-        // the same golden rhombi as everything round them, and they take the same
-        // scheme, so a ribbon runs across them unbroken and the banding **matches the
-        // surrounding**. What marks them is the rim, which takes the generator each of
-        // its edges runs along and so matches too.
+        // F₂₀ and the skewbs are made of the same golden rhombi as everything round
+        // them, so they take the same scheme and a ribbon runs across them unbroken.
+        // What marks them is their **shell** — purple on the decagon, pink on the
+        // hexagons — laid over the banding at whatever strength the slider says, plus
+        // the rim, which takes the generator each of its edges runs along and so
+        // matches the field. At 100% the shell is flat color and the figure reads as a
+        // solid; at 0 it is gone and only the outline is left.
         capOf: (_f, i): Cap | null => {
             const n = role[i];
             if (n === null || n === undefined) return null;
@@ -932,7 +957,9 @@ function build(reframe: boolean): void {
             // broken on exactly the faces it was most wanted on.
             return {
                 color: col,
-                ground: groundChk.checked ? undefined : col,
+                // No longer conditional on anything being painted beneath: a shell is
+                // its own layer and brings its own backdrop when there is none.
+                shell: col,
                 rim: n === hoverFig ? HOVER_CAP : undefined,
                 group: (n + 1) * 16 + (cellOf.get(i) ?? 0),
                 // a superposed figure is a closed solid and has no boundary, so every
@@ -961,7 +988,18 @@ function build(reframe: boolean): void {
 
 // ── controls ──────────────────────────────────────────────────────
 
-colorSel.value = prefs.color || PREF_DEFAULTS.color;
+tintChk.checked = prefs.tint ?? PREF_DEFAULTS.tint;
+tintInput.value = String(prefs.tintalpha ?? PREF_DEFAULTS.tintalpha);
+bandsChk.checked = prefs.bands ?? PREF_DEFAULTS.bands;
+whiteChk.checked = prefs.whitebase ?? PREF_DEFAULTS.whitebase;
+faceInput.value = String(prefs.faceopacity ?? PREF_DEFAULTS.faceopacity);
+bandInput.value = String(prefs.bandalpha ?? PREF_DEFAULTS.bandalpha);
+shellInput.value = String(prefs.shellalpha ?? PREF_DEFAULTS.shellalpha);
+// The key is drawn from the colors themselves, so the swatch cannot drift from the shell.
+swDeca.style.background = `#${DECA_PURPLE.toString(16).padStart(6, "0")}`;
+swSkewb.style.background = `#${SKEWB_PINK.toString(16).padStart(6, "0")}`;
+ballsSel.value = prefs.balls || PREF_DEFAULTS.balls;
+sticksSel.value = prefs.sticks || PREF_DEFAULTS.sticks;
 // Listed from the reading itself rather than written into the markup, so a label
 // cannot drift from what is drawn. It needs the geometry, which is why `prepare`
 // runs first.
@@ -975,17 +1013,14 @@ DECA_VIEWS.forEach((v, n) => {
     cellSel.appendChild(opt);
 });
 cellSel.value = prefs.cellmode || PREF_DEFAULTS.cellmode;
-faceSel.value = prefs.facemode || PREF_DEFAULTS.facemode;
 shadeChk.checked = prefs.shading ?? PREF_DEFAULTS.shading;
-edgeSel.value = prefs.edgemode || PREF_DEFAULTS.edgemode;
 for (const [sel, def] of [
-    [colorSel, PREF_DEFAULTS.color], [faceSel, PREF_DEFAULTS.facemode],
     [cellSel, PREF_DEFAULTS.cellmode],
-    [edgeSel, PREF_DEFAULTS.edgemode],
+    [ballsSel, PREF_DEFAULTS.balls],
+    [sticksSel, PREF_DEFAULTS.sticks],
 ] as Array<[HTMLSelectElement, string]>) if (!sel.value) sel.value = def;
 ribbonInput.value = String(prefs.ribbon ?? PREF_DEFAULTS.ribbon);
 capChk.checked = prefs.cap ?? PREF_DEFAULTS.cap;
-groundChk.checked = prefs.clearground ?? PREF_DEFAULTS.clearground;
 spinChk.checked = prefs.spin ?? PREF_DEFAULTS.spin;
 eyeChk.checked = prefs.eyelight ?? PREF_DEFAULTS.eyelight;
 orthoChk.checked = prefs.ortho ?? PREF_DEFAULTS.ortho;
@@ -994,14 +1029,32 @@ gv.setSpin(spinChk.checked);
 gv.setLighting(eyeChk.checked);
 
 function rebuild(reframe: boolean): void {
-    ribbonOut.textContent = `${(100 * Number(ribbonInput.value)).toFixed(0)}%`;
+    const pct = (x: HTMLInputElement): string => `${(100 * Number(x.value)).toFixed(0)}%`;
+    ribbonOut.textContent = pct(ribbonInput);
+    tintOut.textContent = pct(tintInput);
+    faceOut.textContent = pct(faceInput);
+    bandOut.textContent = pct(bandInput);
+    shellOut.textContent = pct(shellInput);
+    // With the group shut its summary has to carry the setting, or a folded control is
+    // a control you cannot read.
+    // bottom of the stack first, the same order as the rows
+    const bits: string[] = [];
+    const fo = Number(faceInput.value);
+    bits.push((whiteChk.checked ? "white base " : "base ")
+        + (fo === 0 ? "off" : fo >= 1 ? "solid" : pct(faceInput)));
+    if (tintChk.checked) bits.push(`tint ${pct(tintInput)}`);
+    if (bandsChk.checked) bits.push(`bands ${pct(ribbonInput)} at ${pct(bandInput)}`);
+    bits.push(`shell ${pct(shellInput)}`);
+    colorState.textContent = `· ${bits.join(" · ")}`;
     build(reframe);
 }
 
-for (const c of [colorSel, faceSel, edgeSel, capChk, groundChk, shadeChk, cellSel]) {
+for (const c of [tintChk, bandsChk, whiteChk, ballsSel, sticksSel, capChk, shadeChk, cellSel]) {
     c.addEventListener("change", () => rebuild(false));
 }
-ribbonInput.addEventListener("input", () => rebuild(false));
+for (const r of [ribbonInput, tintInput, faceInput, bandInput, shellInput]) {
+    r.addEventListener("input", () => rebuild(false));
+}
 ribbonInput.addEventListener(
     "wheel",
     (e) => {
@@ -1019,11 +1072,14 @@ orthoChk.addEventListener("change", () => gv.setProjection(orthoChk.checked));
 
 function persist(): void {
     savePrefs(PREFS_KEY, {
-        color: colorSel.value, facemode: faceSel.value, edgemode: edgeSel.value,
+        tint: tintChk.checked, tintalpha: Number(tintInput.value),
+        bands: bandsChk.checked, whitebase: whiteChk.checked,
+        faceopacity: Number(faceInput.value),
+        bandalpha: Number(bandInput.value), shellalpha: Number(shellInput.value),
+        balls: ballsSel.value, sticks: sticksSel.value,
         cellmode: cellSel.value,
         shading: shadeChk.checked,
         ribbon: Number(ribbonInput.value), cap: capChk.checked,
-        clearground: groundChk.checked,
         spin: spinChk.checked, eyelight: eyeChk.checked, ortho: orthoChk.checked,
     });
 }
