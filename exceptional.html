@@ -34,6 +34,7 @@
     .foldbody { display: flex; flex-direction: column; gap: 5px; padding: 2px 10px 9px; }
     .foldbody .checks { gap: 14px; }
     .foldbody input[type=range] { width: 120px; }
+    .foldbody .layer { font-size: 13px; color: var(--ink); font-weight: 600; min-width: 62px; }
     .foldbody .swatch { display: flex; align-items: center; gap: 4px; font-size: 12px; color: var(--ink-soft); }
     .foldbody .sw { display: inline-block; width: 11px; height: 11px; border-radius: 2px;
         border: 1px solid rgba(0,0,0,.25); }
@@ -73,35 +74,35 @@
 </p>
 
 <div class="bar">
-    <!-- Color is a folded group now: the two schemes stack rather than exclude one
-         another, so each needs its own settings beside it and the bar would otherwise
-         be a mile long. The summary carries the state, so a shut group still says what
-         it is set to. -->
+    <!-- Color is a folded group: the coloring is a stack of layers — base, bands,
+         shell — each with its own strength beside it, and the bar would otherwise be a
+         mile long. The summary carries the state, so a shut group still says what it is
+         set to. -->
     <details class="fold" id="colorfold">
         <summary>Color <span class="state" id="colorstate"></span></summary>
         <div class="foldbody">
-            <!-- The stack, bottom first: base, tint, bands, shell. Each row is a layer
-                 and its own strength, and the panel is in the order the paint goes on. -->
+            <!-- The stack, bottom first: base, bands, shell. Each row is a layer and
+                 its own strength, and the panel is in the order the paint goes on.
+                 The base has no checkbox: a tick was the saturation answered at one end
+                 of its own range, and the range says it better. -->
             <span class="checks">
-                <label title="Lay white under everything, in place of the page's own background. Off, and with the tint off too, nothing is painted at all and the scene shows through the faces."><input type="checkbox" id="whitebase"> white base</label>
-                <label title="The faces themselves, from invisible to solid. This is the bottom of the stack, so it carries everything printed on it.">opacity <span id="faceOut" class="mono"></span>
+                <b class="layer">white base</b>
+                <label title="How much of the Kowalewski five is in the white. At 0 the base is solid white; at 100% it is the full five-coloring, a face per pair of generators spanning it.">saturation <span id="baseOut" class="mono"></span>
+                    <input type="range" id="basesat" min="0" max="1" step="0.01" value="1"></label>
+                <label title="The faces themselves, from invisible to solid. This is the bottom of the stack, so it carries everything printed on it — at 0 nothing is painted and the scene shows through.">opacity <span id="faceOut" class="mono"></span>
                     <input type="range" id="faceopacity" min="0" max="1" step="0.01" value="1"></label>
-            </span>
-            <span class="checks">
-                <label title="The Kowalewski five as a wash over the base — a face takes the color of the pair of generators spanning it. The bands print over this."><input type="checkbox" id="tint" checked> tint</label>
-                <label title="How strongly the tint shows against the base. At 0 it is the bare base, at 1 the full five-coloring.">opacity <span id="tintOut" class="mono"></span>
-                    <input type="range" id="tintalpha" min="0" max="1" step="0.01" value="0.55"></label>
             </span>
             <span class="checks">
                 <label title="One color per axis, carried by the ribbons. A face lies in two of them and shows both, so a ribbon can be followed unbroken across the figure."><input type="checkbox" id="bands" checked> bands</label>
                 <label title="How wide the ribbons run, as a fraction of the face. At 100% each covers the whole rhombus and the two coincide; at 0% there is nothing left of them.">width <span id="ribbonOut" class="mono"></span>
-                    <input type="range" id="ribbon" min="0" max="1" step="0.01" value="0.5"></label>
-                <label title="How strongly the ribbons print on the tint beneath them. At 100% they are their own colors flat; below it the tint shows through.">opacity <span id="bandOut" class="mono"></span>
+                    <input type="range" id="ribbon" min="0" max="1" step="0.01" value="0.15"></label>
+                <label title="How strongly the ribbons print on the base beneath them. At 100% they are their own full colors, never washed by the base; below it the base shows through.">opacity <span id="bandOut" class="mono"></span>
                     <input type="range" id="bandalpha" min="0" max="1" step="0.01" value="1"></label>
             </span>
             <span class="checks">
-                <label title="The singularities, washed over the banding: purple on the decagon, pink on the hexagons. A k-fold singularity is a 2k-gon in the plane and a zonohedron standing on it, and this is that shell.">shell <span id="shellOut" class="mono"></span>
-                    <input type="range" id="shellalpha" min="0" max="1" step="0.01" value="0.55"></label>
+                <b class="layer">shells</b>
+                <label title="The singularities, washed over the banding: purple on the decagon, pink on the hexagons. A k-fold singularity is a 2k-gon in the plane with a zonohedron standing on it, and this is that shell. At 100% it covers the banding flat; at 0 only the rim is left.">opacity <span id="shellOut" class="mono"></span>
+                    <input type="range" id="shellalpha" min="0" max="1" step="0.01" value="0.4"></label>
                 <span class="swatch"><i class="sw" id="swdeca"></i>2k-gon<i class="sw" id="swskewb"></i>hexagon</span>
             </span>
         </div>

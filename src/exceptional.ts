@@ -35,9 +35,8 @@ const el = <T extends HTMLElement>(id: string): T => {
 const view = el<HTMLDivElement>("view");
 const cellSel = el<HTMLSelectElement>("cellmode");
 const shadeChk = el<HTMLInputElement>("shading");
-const tintChk = el<HTMLInputElement>("tint");
-const tintInput = el<HTMLInputElement>("tintalpha");
-const tintOut = el<HTMLElement>("tintOut");
+const baseInput = el<HTMLInputElement>("basesat");
+const baseOut = el<HTMLElement>("baseOut");
 const bandsChk = el<HTMLInputElement>("bands");
 const ribbonInput = el<HTMLInputElement>("ribbon");
 const ribbonOut = el<HTMLElement>("ribbonOut");
@@ -47,7 +46,6 @@ const shellInput = el<HTMLInputElement>("shellalpha");
 const shellOut = el<HTMLElement>("shellOut");
 const swDeca = el<HTMLElement>("swdeca");
 const swSkewb = el<HTMLElement>("swskewb");
-const whiteChk = el<HTMLInputElement>("whitebase");
 const faceInput = el<HTMLInputElement>("faceopacity");
 const faceOut = el<HTMLElement>("faceOut");
 const ballsSel = el<HTMLSelectElement>("balls");
@@ -63,15 +61,16 @@ const PREFS_KEY = "wr-exceptional";
 const PREF_DEFAULTS = {
     // Bands, straight down, still, lit from the eye. The page is about ribbons crossing
     // in a plan view, and that is what it should open on.
-    tint: true,
-    tintalpha: 0.55,
-    bands: true,
-    // The layers print at full strength over the base; it is the *tint* that is a wash,
-    // and the shell that wants to be seen through. Those two carry the fractions.
-    bandalpha: 1,
-    whitebase: false,
+    // The stack, bottom first. The base opens solid Kowalewski and solid; the bands
+    // print at full strength and narrow, so the five-coloring is what the eye gets
+    // first and a ribbon is a line across it rather than a wash of its own; the shell
+    // is the one layer meant to be seen through, since what is under it is the reading.
+    basesat: 1,
     faceopacity: 1,
-    shellalpha: 0.55,
+    bands: true,
+    ribbon: 0.15,
+    bandalpha: 1,
+    shellalpha: 0.4,
     cellmode: "shell",
     shading: false,
     // Ball and stick by default, which is not the Cage's default: this surface is a
@@ -79,7 +78,6 @@ const PREF_DEFAULTS = {
     // depth before any of the coloring does.
     balls: "on",
     sticks: "parallel",
-    ribbon: 0.5,
     // Off: the cap hides the inner rhombi, and those are the paths.
     cap: false,
     spin: false,
@@ -923,14 +921,11 @@ function build(reframe: boolean): void {
     // live on a layer that is off.
     ribbonInput.disabled = !bands;
     bandInput.disabled = !bands;
-    tintInput.disabled = !tintChk.checked;
 
     const ribbon = Number(ribbonInput.value);
     gv.draw(drawList, {
-        tint: tintChk.checked,
-        tintAlpha: Number(tintInput.value),
+        baseSat: Number(baseInput.value),
         bands,
-        whiteBase: whiteChk.checked,
         faceOpacity: Number(faceInput.value),
         bandAlpha: Number(bandInput.value),
         shellAlpha: Number(shellInput.value),
@@ -988,10 +983,8 @@ function build(reframe: boolean): void {
 
 // ── controls ──────────────────────────────────────────────────────
 
-tintChk.checked = prefs.tint ?? PREF_DEFAULTS.tint;
-tintInput.value = String(prefs.tintalpha ?? PREF_DEFAULTS.tintalpha);
+baseInput.value = String(prefs.basesat ?? PREF_DEFAULTS.basesat);
 bandsChk.checked = prefs.bands ?? PREF_DEFAULTS.bands;
-whiteChk.checked = prefs.whitebase ?? PREF_DEFAULTS.whitebase;
 faceInput.value = String(prefs.faceopacity ?? PREF_DEFAULTS.faceopacity);
 bandInput.value = String(prefs.bandalpha ?? PREF_DEFAULTS.bandalpha);
 shellInput.value = String(prefs.shellalpha ?? PREF_DEFAULTS.shellalpha);
@@ -1031,7 +1024,7 @@ gv.setLighting(eyeChk.checked);
 function rebuild(reframe: boolean): void {
     const pct = (x: HTMLInputElement): string => `${(100 * Number(x.value)).toFixed(0)}%`;
     ribbonOut.textContent = pct(ribbonInput);
-    tintOut.textContent = pct(tintInput);
+    baseOut.textContent = pct(baseInput);
     faceOut.textContent = pct(faceInput);
     bandOut.textContent = pct(bandInput);
     shellOut.textContent = pct(shellInput);
@@ -1040,19 +1033,17 @@ function rebuild(reframe: boolean): void {
     // bottom of the stack first, the same order as the rows
     const bits: string[] = [];
     const fo = Number(faceInput.value);
-    bits.push((whiteChk.checked ? "white base " : "base ")
-        + (fo === 0 ? "off" : fo >= 1 ? "solid" : pct(faceInput)));
-    if (tintChk.checked) bits.push(`tint ${pct(tintInput)}`);
+    bits.push(`base ${pct(baseInput)} · ${fo === 0 ? "off" : fo >= 1 ? "solid" : pct(faceInput)}`);
     if (bandsChk.checked) bits.push(`bands ${pct(ribbonInput)} at ${pct(bandInput)}`);
-    bits.push(`shell ${pct(shellInput)}`);
+    bits.push(`shells ${pct(shellInput)}`);
     colorState.textContent = `· ${bits.join(" · ")}`;
     build(reframe);
 }
 
-for (const c of [tintChk, bandsChk, whiteChk, ballsSel, sticksSel, capChk, shadeChk, cellSel]) {
+for (const c of [bandsChk, ballsSel, sticksSel, capChk, shadeChk, cellSel]) {
     c.addEventListener("change", () => rebuild(false));
 }
-for (const r of [ribbonInput, tintInput, faceInput, bandInput, shellInput]) {
+for (const r of [ribbonInput, baseInput, faceInput, bandInput, shellInput]) {
     r.addEventListener("input", () => rebuild(false));
 }
 ribbonInput.addEventListener(
@@ -1072,8 +1063,8 @@ orthoChk.addEventListener("change", () => gv.setProjection(orthoChk.checked));
 
 function persist(): void {
     savePrefs(PREFS_KEY, {
-        tint: tintChk.checked, tintalpha: Number(tintInput.value),
-        bands: bandsChk.checked, whitebase: whiteChk.checked,
+        basesat: Number(baseInput.value),
+        bands: bandsChk.checked,
         faceopacity: Number(faceInput.value),
         bandalpha: Number(bandInput.value), shellalpha: Number(shellInput.value),
         balls: ballsSel.value, sticks: sticksSel.value,

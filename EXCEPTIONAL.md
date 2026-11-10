@@ -728,12 +728,24 @@ the paint goes on.
 
 | layer | what it is | strength | default |
 |---|---|---|---|
-| **base** | white, or the page's own background, or nothing at all | `opacity` — the faces themselves, invisible to solid | 100% |
-| **tint** | the Kowalewski five, a face per generator pair | `opacity` — a wash over the base | 55% |
-| **bands** | the ribbons, one color per axis | `width`, and `opacity` over the tint | 50% wide at 100% |
-| **shell** | the singularity: **purple** on the 2k-gon, **pink** on the hexagons | `shell` — over everything | 55% |
+| **white base** | white carrying the Kowalewski five, a face per generator pair | `saturation`, 0 solid white → 1 solid Kowalewski, and `opacity`, the faces themselves | 100% · 100% |
+| **bands** | the ribbons, one color per axis | `width`, and `opacity` over the base | 15% wide at 100% |
+| **shells** | the singularity: **purple** on the 2k-gon, **pink** on the hexagons | `opacity` — over everything | 40% |
 
-Two of these were corrections rather than additions.
+**Three controls were one.** The base row opened as a `tint` checkbox, a tint strength
+and a `white base` checkbox, and all three were asking how much of the five-coloring is
+in the white. A checkbox is that question answered at one end of its own range, so the
+range says it and the ticks are gone — `baseSat` alone, white at 0 and Kowalewski at 1.
+What "no base at all" was reaching for is `opacity` at 0, in the same row, where it
+belongs: it is the bottom of the stack and carries everything printed on it.
+
+The defaults say what the page is about. The base opens **solid Kowalewski and solid**,
+the bands **narrow and at full strength** — never washed by the base, so a ribbon is a
+line across the five-coloring rather than a second wash competing with it — and the
+shells at **40%**, the one layer meant to be seen through, since what is under a shell
+is the reading.
+
+Two more were corrections rather than additions.
 
 **The shell is the top layer, not the ground.** It was `Cap.ground`, painted only where
 the ribbons were *not*, which made the figure a layer *underneath* the thing it was

@@ -98,15 +98,16 @@ export interface Cap {
 
 export interface DrawOptions {
     /**
-     * **The two colorings are independent and stack.** Kowalewski is the *tint* — the
-     * background a face is washed in — and the bands are overprinted on it. They used
-     * to be one either/or `scheme`, which meant the ribbons could only ever be seen on
-     * bare ground and the five-coloring could never be seen under them at all.
+     * **The base**: white, saturated toward the face's Kowalewski color.
+     *
+     * 0 is solid white and 1 solid Kowalewski, and it is one number because there was
+     * never anything else in that row. It was three controls — a `tint` checkbox, its
+     * strength, and a `white base` checkbox — and all three were asking the same
+     * question: how much of the five-coloring is in the white. A checkbox is that
+     * question answered at one end of the range.
      */
-    tint: boolean;
-    /** how strongly the tint shows against the base, 0 to 1 */
-    tintAlpha: number;
-    /** the ribbons, drawn over whatever the tint left */
+    baseSat: number;
+    /** the ribbons, laid over the base */
     bands: boolean;
     /** ribbon width as a fraction of the face */
     ribbon: number;
@@ -114,9 +115,8 @@ export interface DrawOptions {
      * How strongly the ribbons print on what is under them, 0 to 1.
      *
      * The bands are a *layer*, not a replacement: each is laid over the backdrop the
-     * base and the tint left, so at 1 a ribbon is its own color and at 0 it is gone.
-     * Where nothing at all is painted beneath, the page's own background stands in as
-     * the backdrop, since that is what the eye has there anyway.
+     * base left, so at 1 a ribbon is its own full color — never washed by the base —
+     * and at 0 it is gone.
      */
     bandAlpha: number;
     /**
@@ -129,14 +129,12 @@ export interface DrawOptions {
      */
     shellAlpha: number;
     /**
-     * A white base under the tint, in place of the page's own background.
+     * The faces, from 0 — invisible, the scene showing through — to 1, solid.
      *
-     * This is what the old `ground` checkbox became. It asked whether to paint the part
-     * of a face outside its ribbons; the honest question is what colour lies *under*
-     * everything, and "none" — letting the scene show through — is one of the answers.
+     * This is the bottom of the stack and carries everything printed on it, which is
+     * why it sits in the base row. 0 is what the old `clear ground` checkbox was
+     * reaching for: nothing painted at all.
      */
-    whiteBase: boolean;
-    /** faces from 0, invisible, to 1, solid. The old "transparent" sat at 0.34 */
     faceOpacity: number;
     /** beads at the corners, their own choice now rather than half of a frame mode */
     balls: boolean;
@@ -430,11 +428,11 @@ export function createGoldenView(
      * `v` along `dirs[1]`. The ribbon of the first joins the two edges that run along
      * it, which sit at `t = ±1`, so it spans `t` entirely and is narrow in `s`; the
      * other is the same the other way about. Cut both at width `w` and the rhombus falls
-     * into nine patches: two per band, one crossing, and four corners of ground — or, if
-     * no ground is wanted, four that are not drawn at all.
+     * into nine patches: two per band, one crossing, and four corners of base. The base
+     * is always painted, so all nine are always drawn.
      */
     function emitBands(
-        f: GoldenFace, w: number, ground: THREE.Color | null, alpha: number,
+        f: GoldenFace, w: number, ground: THREE.Color, alpha: number,
         axes: AxisSet, emit: (p: V3, c: THREE.Color) => void,
     ): void {
         const cut = cutsAt(w);
@@ -442,10 +440,9 @@ export function createGoldenView(
         const ctr = [0, 1, 2].map((d) => (c[0][d] + c[1][d] + c[2][d] + c[3][d]) / 4);
         const u = [0, 1, 2].map((d) => (c[1][d] - c[0][d]) / 2);
         const v = [0, 1, 2].map((d) => (c[3][d] - c[0][d]) / 2);
-        // the ribbons are laid on the backdrop rather than put in place of it
-        const back = ground ?? BAND_GROUND;
+        // the ribbons are laid on the base rather than put in place of it
         const lay = (k: THREE.Color): THREE.Color =>
-            alpha >= 1 ? k : back.clone().lerp(k, alpha);
+            alpha >= 1 ? k : ground.clone().lerp(k, alpha);
         const cu = lay(bandColor(f.dirs[0], axes));
         const cv = lay(bandColor(f.dirs[1], axes));
         const at = (s: number, t: number): V3 =>
@@ -454,7 +451,6 @@ export function createGoldenView(
             for (let b = 0; b < 3; b++) {
                 const onU = a === 1, onV = b === 1;
                 const col = onU && onV ? crossColor(cu, cv) : onU ? cu : onV ? cv : ground;
-                if (!col) continue;
                 const s0 = cut[a], s1 = cut[a + 1], t0 = cut[b], t1 = cut[b + 1];
                 if (Math.abs(s1 - s0) < 1e-9 || Math.abs(t1 - t0) < 1e-9) continue;
                 const p00 = at(s0, t0), p10 = at(s1, t0), p11 = at(s1, t1), p01 = at(s0, t1);
@@ -490,29 +486,19 @@ export function createGoldenView(
         triFace = [];
         const bands = o.bands;
         const showFaces = o.faceOpacity > 0;
-        // **The tint is the ground.** A face is washed in its Kowalewski color at
-        // `tintAlpha` over the base, and the ribbons are laid on top of that — so the
-        // two schemes stack instead of excluding one another. With the tint off the
-        // base shows alone, and with no white base either there is nothing there at all,
-        // which is what the old clear-ground checkbox meant.
+        // **Base, then bands, then shell**, each laid on what is already there. The
+        // base is white carrying the face's Kowalewski color at `baseSat` — solid white
+        // at one end, solid Kowalewski at the other — and it is always painted, so
+        // every layer above it has something to print on. Whether the faces are there
+        // at all is `faceOpacity`, which is the same row.
         const WHITE = new THREE.Color(0xffffff);
-        const baseCol = o.whiteBase ? WHITE : BAND_GROUND;
-        const tintOf = (f: GoldenFace): THREE.Color | null => {
-            if (!o.tint) return o.whiteBase ? WHITE.clone() : null;
+        const baseOf = (f: GoldenFace): THREE.Color => {
             const k = FIVE[pairColorOn(f.dirs[0], f.dirs[1], o.axes)] ?? FIVE[0];
-            return baseCol.clone().lerp(k, o.tintAlpha);
+            return WHITE.clone().lerp(k, o.baseSat);
         };
-        // base, then tint, then bands, then shell — each laid on what is already there.
         const shellAlpha = o.shellAlpha;
         const overprint = (c: THREE.Color, shell: THREE.Color | undefined): THREE.Color =>
             !shell || shellAlpha <= 0 ? c : c.clone().lerp(shell, shellAlpha);
-        /**
-         * The backdrop a shell prints on. A shell is a layer of its own and has to show
-         * even when nothing is painted beneath it, so with no base and no tint the
-         * page's own background stands in — which is what is behind the face anyway.
-         */
-        const shellBack = (f: GoldenFace, shell: THREE.Color | undefined): THREE.Color | null =>
-            tintOf(f) ?? (shell ? BAND_GROUND.clone() : null);
 
         const pos: number[] = [];
         const cols: number[] = [];
@@ -566,20 +552,18 @@ export function createGoldenView(
                     // the scheme paints it; only the outline is ours. Beads and sticks
                     // still want it, so fall through rather than return.
                     if (showFaces) {
-                        const gnd = shellBack(f, cap.shell);
+                        const gnd = baseOf(f);
                         const put = (p: V3, k: THREE.Color): void =>
                             emit(p, overprint(k, cap.shell));
                         if (bands) emitBands(f, o.ribbon, gnd, o.bandAlpha, o.axes, put);
-                        else if (gnd) for (const pt of [c[0], c[1], c[2], c[0], c[2], c[3]]) put(pt, gnd);
+                        else for (const pt of [c[0], c[1], c[2], c[0], c[2], c[3]]) put(pt, gnd);
                     }
                     if (o.balls || o.sticks !== "none") addSticks(f, beads, rods, seen, vkey, o);
                     return;
                 }
                 if (showFaces) {
                     // `fill` takes the face over outright, so its own color is the shell
-                    const flatCol = overprint(
-                        shellBack(f, cap.color) ?? BAND_GROUND.clone(), cap.color,
-                    );
+                    const flatCol = overprint(baseOf(f), cap.color);
                     if (cap.band !== undefined && f.dirs.includes(cap.band)) {
                         // one band only: the face is cut across the generator the
                         // ribbon runs on, the rest left as ground
@@ -607,10 +591,10 @@ export function createGoldenView(
                 if (o.balls || o.sticks !== "none") addSticks(f, beads, rods, seen, vkey, o);
                 return;
             }
-            const gnd = tintOf(f);
+            const gnd = baseOf(f);
             if (showFaces) {
                 if (bands) emitBands(f, o.ribbon, gnd, o.bandAlpha, o.axes, emit);
-                else if (gnd) {
+                else {
                     const c = f.corners;
                     for (const p of [c[0], c[1], c[2], c[0], c[2], c[3]]) emit(p, gnd);
                 }
