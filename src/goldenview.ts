@@ -183,6 +183,40 @@ export const BAND_GROUND = new THREE.Color(0xf4f1e8);
 const bandColor = (axis: number, axes: AxisSet): THREE.Color =>
     BAND[axes.indexOf(axis)] ?? BAND_GROUND;
 
+/**
+ * The sky the metal reflects.
+ *
+ * A metallic surface with nothing to reflect renders **black** — metalness is a
+ * statement about *reflection*, and an empty scene reflects nothing. So the beads and
+ * the black rods get a small gradient to work against, applied to those materials alone
+ * rather than to `scene.environment`, which would relight the faces and the rims too.
+ *
+ * The Cage carries the same texture at the top of `rhombohedra3d.ts`; the two must
+ * agree, since this is the material that page's ball-and-stick is made of. Built on
+ * first use rather than at module load: a module that touches `document` while being
+ * imported cannot be loaded by a checker under node.
+ */
+let METAL_SKY: THREE.Texture | null = null;
+function metalSky(): THREE.Texture {
+    if (METAL_SKY) return METAL_SKY;
+    const c = document.createElement("canvas");
+    c.width = 8;
+    c.height = 64;
+    const g = c.getContext("2d")!;
+    const grad = g.createLinearGradient(0, 0, 0, 64);
+    grad.addColorStop(0, "#ffffff");
+    grad.addColorStop(0.45, "#cdd2da");
+    grad.addColorStop(0.62, "#8d939d");
+    grad.addColorStop(1, "#3f434b");
+    g.fillStyle = grad;
+    g.fillRect(0, 0, 8, 64);
+    const tex = new THREE.CanvasTexture(c);
+    tex.mapping = THREE.EquirectangularReflectionMapping;
+    tex.colorSpace = THREE.SRGBColorSpace;
+    METAL_SKY = tex;
+    return tex;
+}
+
 const CROSS = new Map<string, THREE.Color>();
 function crossColor(a: THREE.Color, b: THREE.Color): THREE.Color {
     const k = `${a.getHex()},${b.getHex()}`;
@@ -663,10 +697,14 @@ export function createGoldenView(
 
         if (beads.length) {
             const m4 = new THREE.Matrix4();
+            // The Cage's ball-and-stick metal, down to the radius: this module exists
+            // so the two pages do not come to disagree, and a bead is as much a part of
+            // that as a color is.
             const mat = new THREE.MeshStandardMaterial({
                 color: 0xd8dae0, metalness: 0.92, roughness: 0.24,
+                envMap: metalSky(), envMapIntensity: 1.0,
             });
-            const bg = new THREE.SphereGeometry(0.055, 14, 10);
+            const bg = new THREE.IcosahedronGeometry(0.062, 2);
             const bm = new THREE.InstancedMesh(bg, mat, beads.length);
             const v3 = new THREE.Vector3();
             const q0 = new THREE.Quaternion();
@@ -679,20 +717,23 @@ export function createGoldenView(
             scene.add(bm);
             drawn.push(bm);
 
-            // Under bands the sticks carry the colors, and a metal at 0.92 would put
-            // them into the reflection rather than show them. So they get their own
-            // near-dielectric material, white, for the per-instance color to pass
-            // through as itself.
-            // The sticks carry the generator under **either** scheme. A stick is an
-            // edge, an edge runs along one generator, and that is true whether the faces
-            // are wearing the Kowalewski five or their ribbons — so the frame says the
-            // same thing in both. Their own near-dielectric material, white, since a
-            // metal at 0.92 tints what it reflects rather than showing a color as
-            // diffuse. The beads stay metal, being vertices and not edges.
-            const rmat = new THREE.MeshStandardMaterial({
-                color: 0xffffff, roughness: 0.42, metalness: 0.12,
+            // **A black stick is the beads' own metal**, which is the material the
+            // Cage gives its rods whenever they are not carrying the five colors — the
+            // ball-and-stick it wears under Kowalewski. Sharing the material is the
+            // point: a frame asked to say nothing should at least match the beads it
+            // runs between, and two materials that merely look alike are two materials
+            // that will drift.
+            //
+            // A *colored* stick cannot have it. A metal's base color tints what it
+            // reflects rather than showing as diffuse, so a band at metalness 0.92 goes
+            // into the reflection instead of being seen; those keep the near-dielectric
+            // white, for the per-instance color to pass through as itself. So the choice
+            // of material is the choice of what the stick is being asked to say.
+            const blackSticks = o.sticks === "black";
+            const rmat = blackSticks ? mat : new THREE.MeshStandardMaterial({
+                color: 0xffffff, roughness: 0.42, metalness: 0.12, envMap: metalSky(),
             });
-            const rg = new THREE.CylinderGeometry(0.022, 0.022, 1, 10, 1);
+            const rg = new THREE.CylinderGeometry(0.026, 0.026, 1, 10, 1);
             const rm = new THREE.InstancedMesh(rg, rmat, rods.length);
             const up = new THREE.Vector3(0, 1, 0);
             const dir = new THREE.Vector3();
@@ -708,9 +749,12 @@ export function createGoldenView(
                 rm.setMatrixAt(i, m4.compose(pos3, quat, scl));
             });
             rm.instanceMatrix.needsUpdate = true;
-            const BLACK = new THREE.Color(0x1a1a1a);
-            rods.forEach(([, , axis], i) => rm.setColorAt(i, o.sticks === "black" ? BLACK : bandColor(axis, o.axes)));
-            if (rm.instanceColor) rm.instanceColor.needsUpdate = true;
+            // No instance color on the shared metal: it would multiply the bead color
+            // and tint the reflection, which is the one thing that material is for.
+            if (!blackSticks) {
+                rods.forEach(([, , axis], i) => rm.setColorAt(i, bandColor(axis, o.axes)));
+                if (rm.instanceColor) rm.instanceColor.needsUpdate = true;
+            }
             scene.add(rm);
             drawn.push(rm);
         }
