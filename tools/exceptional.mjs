@@ -290,7 +290,7 @@ console.log(`F20: 20 golden rhombi on the five lifted generators · ΣE purely v
 // The F₂₀ menu offers ten views, and every count behind them was Jake's, written into
 // a comment and nowhere asserted. They are asserted here, from the readings alone:
 //
-//   * four proper hexagons in a reading, two long and two short;
+//   * four proper hexagons in a reading, two A6 and two O6;
 //   * the four overlap — together they use nine of the decagon's ten rhombi, which is
 //     why only **two** of the four pairings are couples at all;
 //   * a couple's two triples **cover all five generators and meet in exactly one** —
@@ -338,18 +338,18 @@ console.log(`F20: 20 golden rhombi on the five lifted generators · ΣE purely v
             if (l.length !== 3) continue;
             const tri = [...new Set(l.flatMap((i) => [T[i].a, T[i].b]))].sort((a, b) => a - b);
             if (tri.length !== 3) continue;
-            hex.push({ tri, rh: l, long: !consecutive(tri), at: k });
+            hex.push({ tri, rh: l, acute: !consecutive(tri), at: k });
         }
         hexes += hex.length;
-        const L = hex.filter((h) => h.long).length;
+        const L = hex.filter((h) => h.acute).length;
         if (hex.length !== 4 || L !== 2)
-            fail(`reading ${rn}: ${hex.length} hexagons, ${L} long — expected 4, two of each`);
+            fail(`reading ${rn}: ${hex.length} hexagons, ${L} acute — expected 4, two of each`);
         const used = new Set(hex.flatMap((h) => h.rh)).size;
         if (used !== 9) fail(`reading ${rn}: the four hexagons use ${used} rhombi, expected 9`);
 
         let n = 0;
         for (const a of hex) for (const b of hex) {
-            if (!a.long || b.long) continue;
+            if (!a.acute || b.acute) continue;
             if (a.rh.some((i) => b.rh.includes(i))) continue;
             n++;
             const shared = a.tri.filter((g) => b.tri.includes(g));
@@ -363,7 +363,7 @@ console.log(`F20: 20 golden rhombi on the five lifted generators · ΣE purely v
             const proj = (cb[0] - ca[0]) * E5[dir][0] + (cb[1] - ca[1]) * E5[dir][1];
             views.add(`${dir}|${proj > 0 ? 1 : 0}`);
         }
-        if (n !== 2) fail(`reading ${rn}: ${n} long/short couples sharing no rhombus, expected 2`);
+        if (n !== 2) fail(`reading ${rn}: ${n} A6/O6 couples sharing no rhombus, expected 2`);
         couples += n;
     });
 
@@ -377,7 +377,7 @@ console.log(`F20: 20 golden rhombi on the five lifted generators · ΣE purely v
         fail(`views per direction ${[...perDir.values()].join(",")} over ${perDir.size} directions, expected 2 over 5`);
 
     console.log(`the decagon's views: ${readings.length} readings · ${hexes} hexagons, four per reading ` +
-        `(two long, two short) using 9 of 10 rhombi · ${couples} couples, two per reading, ` +
+        `(two A6, two O6) using 9 of 10 rhombi · ${couples} couples, two per reading, ` +
         `each covering all five generators and meeting in one · ${views.size} views, two per direction`);
 }
 

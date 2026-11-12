@@ -1036,6 +1036,111 @@ one oblate family of skewbs and one acute. `verticalSymmetry` was written off in
 pentagrid-lib.md §2 as the cause of a wrong commit; it is in fact the setting that
 makes a figure stand up straight, and the page should offer it.
 
+### 7.4g The panel, as specified — 2026-11-11
+
+Jake's own sketch, verbatim:
+
+```
+    RHOMB
+    Base saturation [White->Kowalewsi] [100%] Opacity [100%]
+    Bands width [15%] Opacity[100%]
+
+    SINGULARITY
+    A_6
+    O_6
+    F_20
+    Phase up](down)
+
+    Exceptional
+    Rotation -(.)(.)(.)(.)(.)+
+    Direction (r)(l)
+    Phase (up)(down)
+
+0 red: 1 blue: 2 green: 3 amber: 4 purple
+choose one or more
+```
+
+Three groups. **RHOMB** is §7.3a, already standing. **SINGULARITY** turns the figures on
+and off by kind — A₆, O₆, F₂₀ — and carries the phase. **Exceptional** is the F₂₀
+control §7.4 called for, and it is three fields rather than a list of ten:
+
+| field | what it is |
+|---|---|
+| **Rotation** | five **bits**, one per axis, with `−` and `+` rolling the pattern right and left. *"not radio buttons but normally only one is set"* — several may be overlaid |
+| **Direction** | `(r) (l)`. **One** control, serving the resolved and the unresolved F₂₀ alike |
+| **Phase** | `(up) (down)`. **One** control, serving the spokes and the unresolved internal O₆/A₆ alike |
+
+And the thing the old dropdown could not say at all: there are **two** families of ten.
+
+* A **resolved** F₂₀ has ten settings, and direction forces the A₆ and O₆ **on the
+  spokes**.
+* An **unresolved** F₂₀ has ten more, each forcing an **unresolved spoke**, and the
+  decagon then *shows an O₆ and an A₆ within it* — the couple, standing inside the shell
+  instead of the shell being replaced by a reading.
+
+That is the distinction the page has been drawing one half of: `cellmode` showed the
+unresolved family (the shell with its couple outlined) and a click collapsed to the
+resolved one, with no way to say which of the ten either was.
+
+#### The objects, in Jake's words
+
+> O₆ is the thick hex/Long/L. It projects 2 thicks and a thin on each side. It is filled
+> with **pink** gas.
+> A₆ is the thin hex/Short/S. It projects a thick and two thins on each side. It is
+> filled with **green** gas.
+> F₂₀ is filled with **Lavender (purple)** gas.
+> The polyhedron has shiny glass facets with barely visible edges.
+
+**The gases are in** — `SKEWB_PINK` for the oblate, a new `SKEWB_GREEN` for the acute,
+`DECA_PURPLE` for F₂₀, and a three-swatch key beside the slider. The two skewbs had been
+one color, which was a real loss: the whole question on a spoke is which figure is
+which, and a reader had to count rhombi to find out when the fill can simply say it.
+
+#### `long` and `short` come off the skewbs — `tools/probes/longshort.mjs`
+
+Jake's note puts **Long** on O₆; the code had `long: isAcute(tri)`, which puts it on A₆.
+Both are right, about different questions, and the probe measures all three readings:
+
+| reading | A₆ (acute) | O₆ (oblate) | ratio |
+|---|---|---|---|
+| **volume** | 0.760845 | 0.470228 | φ — **A₆ is bigger** |
+| **flat diagonal** | S/φ = 0.552786 | φ·S = 1.447214 | φ² — **O₆ is longer** |
+| **step along its own generator** | 0.552786 | 1.447214 | φ² — **O₆ advances further** |
+
+The musical sequence lives on a **spoke**, and a spoke is a line in the plane, so Jake's
+L and S are the planar ones and the code's was the volume. This is the project's own
+recurring error wearing a third face — hexagon-vs-ribbon, cell-vs-view, couple-vs-spoke,
+and now volume-vs-step. *The unit is the line.*
+
+So neither name gets to stay: `Hex2.long` → `acute`, `DecaView.longFirst/long/short` →
+`acuteFirst/acute/oblate`, and the view labels read `dir 3 · A₆ 013 then O₆ 012`. **A₆**
+and **O₆** need no frame. If L and S are wanted in the UI they belong on the *spoke*,
+where they measure something, and there O₆ is L.
+
+What was never in dispute is which solid is which, because the projection says it with
+no frame at all, and Jake's two sentences are measured exact:
+
+> **O₆ projects 2 thick rhombs and a thin; A₆ projects a thick and two thins.**
+
+(O₆ is the cyclically consecutive triple, A₆ any other. So "thick hex" for O₆ counts its
+*thick rhombs* — the opposite of the pentagrid library's `1 thick` preset, which is
+de Bruijn's K122 and is the A₆. Two naming systems, both in use; A₆/O₆ is the one that
+cannot be read two ways.)
+
+#### Open, before the controls go in
+
+1. **The glass.** A shell is currently an *overprint on the roof's own rhombi* — the
+   figure's shadow, tinted. Glass facets with gas behind them want the shell to be its
+   own object with its own material, and then the question is what happens where its
+   faces coincide with the roof's: does the shell replace those rhombi, or lie on them?
+   A superposed skewb is drawn as its **three back faces only** today, the roof itself
+   closing the other three, so this decides whether a skewb becomes six glass facets or
+   stays three.
+2. **The five colors.** The sketch reads `0 red: 1 blue: 2 green: 3 amber: 4 purple`;
+   `FIVE` in the code is `0 red: 1 amber: 2 green: 3 blue: 4 purple` — 1 and 3 the other
+   way about. Since the rotation bits are to be labeled by these, which order wins
+   decides what a bit is called.
+
 ### 7.5 Order of work — revised after §7.4a
 
 1. **Draw from a jiggle.** It is a legal tiling with indices 1…4 and nothing has to be

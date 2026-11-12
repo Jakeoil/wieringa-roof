@@ -45,7 +45,8 @@ const bandOut = el<HTMLElement>("bandOut");
 const shellInput = el<HTMLInputElement>("shellalpha");
 const shellOut = el<HTMLElement>("shellOut");
 const swDeca = el<HTMLElement>("swdeca");
-const swSkewb = el<HTMLElement>("swskewb");
+const swObl = el<HTMLElement>("swoblate");
+const swAcu = el<HTMLElement>("swacute");
 const faceInput = el<HTMLInputElement>("faceopacity");
 const faceOut = el<HTMLElement>("faceOut");
 const ballsSel = el<HTMLSelectElement>("balls");
@@ -110,8 +111,22 @@ const GEN = 3;
 // disappeared, which is no use at all for the thing the page is about.
 const DECA_PURPLE = 0x7b63c8;
 const DECA_RIM = 0x3b3270;
-/** The skewbs, in the reference drawing's pink, taken up to where it reads. */
+/**
+ * **The gases.** Jake: *"O_6 ... is filled with pink gas. A_6 ... is filled with green
+ * gas. F_20 is filled with Lavendar (purple) gas."*
+ *
+ * So the two skewbs are no longer one color. They were, and that was a real loss: the
+ * whole question on a spoke is which figure is which, and a reader had to count rhombi
+ * to find out — two thick and a thin is the O₆, a thick and two thins the A₆ — when the
+ * fill could simply say it.
+ *
+ * The green is the pink's own channels rotated, `d4 5f c4` → `5f d4 5f`, so the two
+ * read as one pair at one strength rather than as two colors that happen to be near
+ * each other. Both stay clear of the Kowalewski five beneath them, whose green is the
+ * darker 0x4f9d4a.
+ */
 const SKEWB_PINK = 0xd45fc4;
+const SKEWB_GREEN = 0x5fd45f;
 /** What the figure under the pointer wears, so a click has something to aim at. */
 const HOVER_RIM = 0xfff07a;
 
@@ -129,8 +144,8 @@ let decaFaces = new Set<number>();
  * wrong picture. Jake means the hexagons of the decagon's **own reading**: three rhombi
  * round a three-valent vertex, which is a rhombohedron seen from above.
  *
- * Measured on the reading the patch holds: there are **four** proper hexagons, two long
- * A₆ and two short O₆, and exactly **two** ways to pick a long and a short that do not
+ * Measured on the reading the patch holds: there are **four** proper hexagons, two A₆
+ * and two O₆, and exactly **two** ways to pick one of each that do not
  * share a rhombus. Each such couple uses six of the decagon's ten, leaving **four** —
  * two above and two below, as Jake has it. The couples' own ribbons run out left and
  * right, joining the musical spokes either side.
@@ -139,23 +154,41 @@ let decaFaces = new Set<number>();
  * nine of the ten rhombi, so most pairings of them collide.
  */
 /**
- * Is a triple of generators the long rhombohedron or the short one?
+ * Is a triple of generators the acute rhombohedron or the oblate one?
  *
  * **Oblate exactly when the three are cyclically consecutive**, acute otherwise, with no
  * exceptions over all ten triples — measured from the volumes themselves, 0.470228
  * against 0.760845, rather than taken on trust. It was written out as a list of five
  * strings in two separate places before, which is two chances to mistype the same fact.
+ *
+ * **Not `long` and `short`.** Those two names were on this distinction and had to come
+ * off it, because they do not mean the same thing in the two places the figure is
+ * looked at:
+ *
+ *   * by VOLUME the acute is the bigger, 0.760845 against 0.470228, ratio φ;
+ *   * in the PLANE the oblate is the longer, its flat diagonal φ·S against the acute's
+ *     S/φ, ratio **φ²** — so a spoke built of oblates advances φ² further per figure
+ *     than one built of acutes.
+ *
+ * The musical sequence lives on a spoke, and a spoke is a line in the plane, so Jake's
+ * L and S are the planar ones and the old `long: isAcute` was the volume. Both readings
+ * are right about their own question, which is exactly why neither gets the name.
+ * `tools/probes/longshort.mjs` measures all three.
+ *
+ * What is NOT in dispute is which solid is which, since the projection says it without
+ * reference to any frame: **O₆ projects two thick rhombs and a thin, A₆ a thick and two
+ * thins**, and that is Jake's own sentence, measured exact.
  */
 const consecutive = (T: number[]): boolean =>
     [0, 1, 2, 3, 4].some((s) => [s, (s + 1) % 5, (s + 2) % 5].every((g) => T.includes(g)));
 const isAcute = (T: number[]): boolean => !consecutive(T);
 
-interface Hex2 { tri: number[]; anchor: V3; long: boolean }
+interface Hex2 { tri: number[]; anchor: V3; acute: boolean }
 
 /**
  * **The ten views of the decagon.** Measured, and every count is Jake's:
  *
- *   * a reading's hexagons pair into **long + short couples that share no rhombus**, and
+ *   * a reading's hexagons pair into **A₆ + O₆ couples that share no rhombus**, and
  *     each couple's two triples **cover all five generators and meet in exactly one** —
  *     that one is the **direction**, so there are five couples, one apiece;
  *   * each couple occurs in **two arrangements**, at angles 180° apart in pairs, so
@@ -171,8 +204,8 @@ interface Hex2 { tri: number[]; anchor: V3; long: boolean }
 interface DecaView {
     dir: number;
     /**
-     * Which comes first along the direction — the **order**, long-then-short or
-     * short-then-long, read off the sign of the couple's displacement projected on its
+     * Which comes first along the direction — the **order**, acute-then-oblate or
+     * oblate-then-acute, read off the sign of the couple's displacement projected on its
      * own generator.
      *
      * Keying on the axis modulo 180° instead was wrong and looked nearly right: it folds
@@ -180,10 +213,10 @@ interface DecaView {
      * the same order and none of the other. Every direction has two placements each way,
      * so the sign is what separates them.
      */
-    longFirst: boolean;
+    acuteFirst: boolean;
     reading: number;
-    long: Hex2;
-    short: Hex2;
+    acute: Hex2;
+    oblate: Hex2;
 }
 let DECA_VIEWS: DecaView[] = [];
 
@@ -618,7 +651,7 @@ function makeFaces(): void {
     figures.forEach((fg, n) => { for (const i of fg.roof) ownerOf.set(i, n); });
     roofMids = new Set(out.slice(0, capFrom).map(midKey));
 
-    // the ten views: for each reading, its long/short couples, keyed by direction and
+    // the ten views: for each reading, its A₆/O₆ couples, keyed by direction and
     // arrangement so each (direction, arrangement) is listed once
     DECA_VIEWS = [];
     if (figures.length && found.anchor) {
@@ -654,25 +687,25 @@ function makeFaces(): void {
                 let least = ~0;
                 for (const i of l) for (const K of maskCorners(T[i])) least &= K;
                 hexes.push({
-                    tri, anchor: place(least & 31), long: isAcute(tri), rh: l, at: k,
+                    tri, anchor: place(least & 31), acute: isAcute(tri), rh: l, at: k,
                 });
             }
             for (const a of hexes) for (const b of hexes) {
-                if (!a.long || b.long) continue;
+                if (!a.acute || b.acute) continue;
                 if (a.rh.some((i) => b.rh.includes(i))) continue;
                 const S = new Set(b.tri);
                 const dir = a.tri.find((g) => S.has(g));
                 if (dir === undefined) continue;
                 const ca = a.at.split(",").map(Number), cb = b.at.split(",").map(Number);
                 const proj = (cb[0] - ca[0]) * E[dir][0] + (cb[1] - ca[1]) * E[dir][1];
-                const longFirst = proj > 0;
-                const key = `${dir}|${longFirst ? 1 : 0}`;
+                const acuteFirst = proj > 0;
+                const key = `${dir}|${acuteFirst ? 1 : 0}`;
                 if (seenView.has(key)) continue;
                 seenView.add(key);
-                DECA_VIEWS.push({ dir, longFirst, reading: rn, long: a, short: b });
+                DECA_VIEWS.push({ dir, acuteFirst, reading: rn, acute: a, oblate: b });
             }
         });
-        DECA_VIEWS.sort((x, y) => x.dir - y.dir || Number(y.longFirst) - Number(x.longFirst));
+        DECA_VIEWS.sort((x, y) => x.dir - y.dir || Number(y.acuteFirst) - Number(x.acuteFirst));
     }
 
     // Frame on the patch's own extent, which `point` has already centered.
@@ -694,6 +727,7 @@ function makeFaces(): void {
  */
 const DECA_CAP = new THREE.Color(DECA_PURPLE);
 const SKEWB_CAP = new THREE.Color(SKEWB_PINK);
+const ACUTE_CAP = new THREE.Color(SKEWB_GREEN);
 const HOVER_CAP = new THREE.Color(HOVER_RIM);
 /** the figure under the pointer, outlined so a valid click point is visible */
 let hoverFig: number | null = null;
@@ -882,7 +916,7 @@ function build(reframe: boolean): void {
         // superposed: the solid, all its readings at once
         const whole = zonohedron(gens5, fg.gens, fg.anchor);
         if (fg.kind === "deca" && showingView) {
-            // one of the ten views: the reading it lives in, and the long/short couple
+            // one of the ten views: the reading it lives in, and the A₆/O₆ couple
             // that direction admits, each skewb outlined on its own
             // A saved `cellmode` naming no view — the old "all", or an index from a
             // shorter list — must not leave a hole. The patch's own ten are already
@@ -899,7 +933,7 @@ function build(reframe: boolean): void {
                 role.push(null);
             }
             // and its two skewbs, each outlined on its own
-            [view.long, view.short].forEach((h, k) => {
+            [view.acute, view.oblate].forEach((h, k) => {
                 for (const f of zonohedron(gens5, h.tri, h.anchor)) {
                     drawList.push(f);
                     role.push(n);
@@ -946,7 +980,8 @@ function build(reframe: boolean): void {
             const n = role[i];
             if (n === null || n === undefined) return null;
             const fg = figures[n];
-            const col = fg.kind === "deca" ? DECA_CAP : SKEWB_CAP;
+            const col = fg.kind === "deca" ? DECA_CAP
+                : isAcute(fg.gens) ? ACUTE_CAP : SKEWB_CAP;
             // `clear ground` means no ground anywhere, the figures included — their
             // own color is a ground, so leaving it in place made the control look
             // broken on exactly the faces it was most wanted on.
@@ -989,8 +1024,10 @@ faceInput.value = String(prefs.faceopacity ?? PREF_DEFAULTS.faceopacity);
 bandInput.value = String(prefs.bandalpha ?? PREF_DEFAULTS.bandalpha);
 shellInput.value = String(prefs.shellalpha ?? PREF_DEFAULTS.shellalpha);
 // The key is drawn from the colors themselves, so the swatch cannot drift from the shell.
-swDeca.style.background = `#${DECA_PURPLE.toString(16).padStart(6, "0")}`;
-swSkewb.style.background = `#${SKEWB_PINK.toString(16).padStart(6, "0")}`;
+const hex = (n: number): string => `#${n.toString(16).padStart(6, "0")}`;
+swDeca.style.background = hex(DECA_PURPLE);
+swObl.style.background = hex(SKEWB_PINK);
+swAcu.style.background = hex(SKEWB_GREEN);
 ballsSel.value = prefs.balls || PREF_DEFAULTS.balls;
 sticksSel.value = prefs.sticks || PREF_DEFAULTS.sticks;
 // Listed from the reading itself rather than written into the markup, so a label
@@ -1000,9 +1037,9 @@ prepare();
 DECA_VIEWS.forEach((v, n) => {
     const opt = document.createElement("option");
     opt.value = String(n);
-    opt.textContent = v.longFirst
-        ? `dir ${v.dir} · long ${v.long.tri.join("")} then short ${v.short.tri.join("")}`
-        : `dir ${v.dir} · short ${v.short.tri.join("")} then long ${v.long.tri.join("")}`;
+    opt.textContent = v.acuteFirst
+        ? `dir ${v.dir} · A₆ ${v.acute.tri.join("")} then O₆ ${v.oblate.tri.join("")}`
+        : `dir ${v.dir} · O₆ ${v.oblate.tri.join("")} then A₆ ${v.acute.tri.join("")}`;
     cellSel.appendChild(opt);
 });
 cellSel.value = prefs.cellmode || PREF_DEFAULTS.cellmode;
