@@ -91,6 +91,12 @@ serving question — sibling checkout or Pages URL — is still undecided in pra
 
 ## 4. Deficiencies, from here
 
+**Filed separately.** The ones that need a fix *in that project* are written up as
+fileable entries in [`PENTAGRID-ISSUES.md`](./PENTAGRID-ISSUES.md), which is the list
+Jake asked for so the fix can be coordinated there. This section stays as the consumer's
+account of the cost.
+
+
 1. **No consumer, so nothing is pinned from this side.** pentagrid's
    `tools/surface.test.mjs` guards the facade from within that repo. Nothing in
    wieringa-roof would notice if a published name vanished — there is no check here

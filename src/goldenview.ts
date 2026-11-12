@@ -129,11 +129,18 @@ export interface DrawOptions {
      */
     shellAlpha: number;
     /**
-     * The faces, from 0 — invisible, the scene showing through — to 1, solid.
+     * **The base's own opacity**, 0 — invisible, the scene showing through — to 1.
      *
-     * This is the bottom of the stack and carries everything printed on it, which is
-     * why it sits in the base row. 0 is what the old `clear ground` checkbox was
-     * reaching for: nothing painted at all.
+     * It governs the base *alone*. The bands keep their own strength and a shell keeps
+     * its gas, so turning the base down leaves the ribbons standing over the scene as a
+     * lattice with the figures still in it, which is the picture it is for. It was the
+     * whole mesh's opacity, which made it a master fader with the layers above it along
+     * for the ride.
+     *
+     * It is carried as **per-vertex alpha** rather than on the material, since one mesh
+     * has one opacity and this needs two. three.js reads a four-component `color`
+     * attribute as RGBA (`USE_COLOR_ALPHA`), so a base patch goes in at this and a band
+     * patch at 1.
      */
     faceOpacity: number;
     /** beads at the corners, their own choice now rather than half of a frame mode */
@@ -433,7 +440,8 @@ export function createGoldenView(
      */
     function emitBands(
         f: GoldenFace, w: number, ground: THREE.Color, alpha: number,
-        axes: AxisSet, emit: (p: V3, c: THREE.Color) => void,
+        groundAlpha: number,
+        axes: AxisSet, emit: (p: V3, c: THREE.Color, a: number) => void,
     ): void {
         const cut = cutsAt(w);
         const c = f.corners;
@@ -454,7 +462,9 @@ export function createGoldenView(
                 const s0 = cut[a], s1 = cut[a + 1], t0 = cut[b], t1 = cut[b + 1];
                 if (Math.abs(s1 - s0) < 1e-9 || Math.abs(t1 - t0) < 1e-9) continue;
                 const p00 = at(s0, t0), p10 = at(s1, t0), p11 = at(s1, t1), p01 = at(s0, t1);
-                for (const p of [p00, p10, p11, p00, p11, p01]) emit(p, col);
+                // the ribbons keep their own strength; only the base carries the fade
+                const pa = onU || onV ? 1 : groundAlpha;
+                for (const p of [p00, p10, p11, p00, p11, p01]) emit(p, col, pa);
             }
         }
     }
@@ -486,6 +496,12 @@ export function createGoldenView(
         triFace = [];
         const bands = o.bands;
         const showFaces = o.faceOpacity > 0;
+        /**
+         * What a patch of bare base goes in at. A patch with anything printed on it —
+         * a ribbon, or a shell that is actually showing — goes in at 1 instead: those
+         * layers are above the base and are not the base's to fade.
+         */
+        const baseAlpha = Math.min(1, Math.max(0, o.faceOpacity));
         // **Base, then bands, then shell**, each laid on what is already there. The
         // base is white carrying the face's Kowalewski color at `baseSat` — solid white
         // at one end, solid Kowalewski at the other — and it is always painted, so
@@ -520,10 +536,10 @@ export function createGoldenView(
         // at every emission: the body has three branches and several early returns, and
         // one push missed would mis-identify a click without ever looking wrong.
         /** every drawn vertex goes through here, so shading is per vertex everywhere */
-        const emit = (p: V3, c: THREE.Color): void => {
+        const emit = (p: V3, c: THREE.Color, a = 1): void => {
             pos.push(p[0], p[1], p[2]);
             const [r, g, b] = shadeRGB(c, p, o);
-            cols.push(r, g, b);
+            cols.push(r, g, b, a);
             verts++;
         };
         let prev = -1;
@@ -553,9 +569,12 @@ export function createGoldenView(
                     // still want it, so fall through rather than return.
                     if (showFaces) {
                         const gnd = baseOf(f);
-                        const put = (p: V3, k: THREE.Color): void =>
-                            emit(p, overprint(k, cap.shell));
-                        if (bands) emitBands(f, o.ribbon, gnd, o.bandAlpha, o.axes, put);
+                        // a shell showing is a layer of its own, so it does not fade
+                        // with the base either — it has the gas slider for that
+                        const op = cap.shell && shellAlpha > 0 ? 1 : baseAlpha;
+                        const put = (p: V3, k: THREE.Color, a = op): void =>
+                            emit(p, overprint(k, cap.shell), a);
+                        if (bands) emitBands(f, o.ribbon, gnd, o.bandAlpha, op, o.axes, put);
                         else for (const pt of [c[0], c[1], c[2], c[0], c[2], c[3]]) put(pt, gnd);
                     }
                     if (o.balls || o.sticks !== "none") addSticks(f, beads, rods, seen, vkey, o);
@@ -582,10 +601,10 @@ export function createGoldenView(
                             const s0 = which === 0 ? cut[a] : -1, s1 = which === 0 ? cut[a + 1] : 1;
                             const t0 = which === 0 ? -1 : cut[a], t1 = which === 0 ? 1 : cut[a + 1];
                             if (Math.abs(s1 - s0) < 1e-9 || Math.abs(t1 - t0) < 1e-9) continue;
-                            for (const pt of [at(s0, t0), at(s1, t0), at(s1, t1), at(s0, t0), at(s1, t1), at(s0, t1)]) emit(pt, col2);
+                            for (const pt of [at(s0, t0), at(s1, t0), at(s1, t1), at(s0, t0), at(s1, t1), at(s0, t1)]) emit(pt, col2, onBand ? 1 : 1);
                         }
                     } else {
-                        for (const pt of [c[0], c[1], c[2], c[0], c[2], c[3]]) emit(pt, flatCol);
+                        for (const pt of [c[0], c[1], c[2], c[0], c[2], c[3]]) emit(pt, flatCol, 1);
                     }
                 }
                 if (o.balls || o.sticks !== "none") addSticks(f, beads, rods, seen, vkey, o);
@@ -593,10 +612,10 @@ export function createGoldenView(
             }
             const gnd = baseOf(f);
             if (showFaces) {
-                if (bands) emitBands(f, o.ribbon, gnd, o.bandAlpha, o.axes, emit);
+                if (bands) emitBands(f, o.ribbon, gnd, o.bandAlpha, baseAlpha, o.axes, emit);
                 else {
                     const c = f.corners;
-                    for (const p of [c[0], c[1], c[2], c[0], c[2], c[3]]) emit(p, gnd);
+                    for (const p of [c[0], c[1], c[2], c[0], c[2], c[3]]) emit(p, gnd, baseAlpha);
                 }
             }
             if (o.sticks !== "none" && !o.balls) {
@@ -619,7 +638,9 @@ export function createGoldenView(
         if (pos.length) {
             const g = new THREE.BufferGeometry();
             g.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
-            g.setAttribute("color", new THREE.Float32BufferAttribute(cols, 3));
+            // four components, not three: the alpha is per vertex because the base
+            // fades and the layers over it do not
+            g.setAttribute("color", new THREE.Float32BufferAttribute(cols, 4));
             g.computeVertexNormals();
             const mesh = new THREE.Mesh(g, new THREE.MeshStandardMaterial({
                 vertexColors: true,
@@ -627,9 +648,10 @@ export function createGoldenView(
                 metalness: 0.02,
                 flatShading: true,
                 side: THREE.DoubleSide,
-                transparent: o.faceOpacity < 1,
-                opacity: o.faceOpacity,
-                depthWrite: o.faceOpacity >= 1,
+                // the opacity lives in the vertex alpha, so the material stays at 1
+                transparent: baseAlpha < 1,
+                opacity: 1,
+                depthWrite: baseAlpha >= 1,
                 polygonOffset: true,
                 polygonOffsetFactor: 1,
                 polygonOffsetUnits: 1,

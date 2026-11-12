@@ -728,7 +728,7 @@ the paint goes on.
 
 | layer | what it is | strength | default |
 |---|---|---|---|
-| **white base** | white carrying the Kowalewski five, a face per generator pair | `saturation`, 0 solid white → 1 solid Kowalewski, and `opacity`, the faces themselves | 100% · 100% |
+| **white base** | white carrying the Kowalewski five, a face per generator pair | `saturation`, 0 solid white → 1 solid Kowalewski, and `opacity`, **the base alone** | 100% · 100% |
 | **bands** | the ribbons, one color per axis | `width`, and `opacity` over the base | 15% wide at 100% |
 | **shells** | the singularity: **purple** on the 2k-gon, **pink** on the hexagons | `opacity` — over everything | 40% |
 
@@ -744,6 +744,15 @@ the bands **narrow and at full strength** — never washed by the base, so a rib
 line across the five-coloring rather than a second wash competing with it — and the
 shells at **40%**, the one layer meant to be seen through, since what is under a shell
 is the reading.
+
+**The base's opacity governs the base alone** (2026-11-12). Jake: *"The white base
+opacity should only control the base, not the bands."* It had been the whole mesh's
+opacity, which made it a master fader with the layers above it along for the ride. It is
+now carried as **per-vertex alpha** — three.js reads a four-component `color` attribute
+as RGBA — so a base patch goes in at the slider and a band patch at 1, and a shell that
+is actually showing goes in at 1 too, since it is a layer of its own with its own gas.
+Turn the base down now and the ribbons stand over the scene as a lattice with the figures
+still in it, which is the picture the control is for.
 
 Two more were corrections rather than additions.
 
@@ -1122,24 +1131,118 @@ no frame at all, and Jake's two sentences are measured exact:
 
 > **O₆ projects 2 thick rhombs and a thin; A₆ projects a thick and two thins.**
 
-(O₆ is the cyclically consecutive triple, A₆ any other. So "thick hex" for O₆ counts its
-*thick rhombs* — the opposite of the pentagrid library's `1 thick` preset, which is
-de Bruijn's K122 and is the A₆. Two naming systems, both in use; A₆/O₆ is the one that
-cannot be read two ways.)
+(O₆ is the cyclically consecutive triple, A₆ any other, and "thick hex" for O₆ counts
+its *thick rhombs*. **This agrees with the pentagrid library**, whose `1 thick` preset
+is the K122 and resolves to the O₆ — see §7.4h, where the first draft of this paragraph
+said the opposite and was wrong.)
 
-#### Open, before the controls go in
+#### Both questions, answered — 2026-11-12
 
-1. **The glass.** A shell is currently an *overprint on the roof's own rhombi* — the
-   figure's shadow, tinted. Glass facets with gas behind them want the shell to be its
-   own object with its own material, and then the question is what happens where its
-   faces coincide with the roof's: does the shell replace those rhombi, or lie on them?
-   A superposed skewb is drawn as its **three back faces only** today, the roof itself
-   closing the other three, so this decides whether a skewb becomes six glass facets or
-   stays three.
-2. **The five colors.** The sketch reads `0 red: 1 blue: 2 green: 3 amber: 4 purple`;
-   `FIVE` in the code is `0 red: 1 amber: 2 green: 3 blue: 4 purple` — 1 and 3 the other
-   way about. Since the rotation bits are to be labeled by these, which order wins
-   decides what a bit is called.
+1. **The glass is on the OUTSIDE.** Jake: *"The clear glass texture is outside the
+   skewbs/hexahedra. And also the F_20. By default the glass encases the full F_20 which
+   is full of lavender gas/fog. skewbs which [are] inside the F_20 will be colored
+   according to the rules for the other skewbs."* So a shell is a closed glass solid
+   with its gas inside, the **full** F₂₀ rather than the pole-cut one, and the figures
+   inside it keep their own pink and green. That settles the coincident-face question by
+   making it moot: the glass is the outer boundary and the roof's own rhombi are *inside*
+   it, so a skewb gets all six facets and nothing has to be suppressed.
+2. **The five colors are the code's.** `0 red · 1 yellow · 2 green · 3 blue · 4 purple`,
+   confirmed by Jake's own decagon walk — see §7.4h. The earlier sketch line
+   `0 red: 1 blue: 2 green: 3 amber: 4 purple` was the counter-clockwise *positions* read
+   as indices, which is the one thing they are not.
+
+### 7.4h The canonical facts, checked — 2026-11-12 · `tools/probes/canon.mjs`
+
+Jake set down a page of facts and asked for them to be checked and the documentation
+made to agree. Every sentence is now a check in `tools/probes/canon.mjs`. **Seven stand
+as written; two do not, and one of the two is mine.**
+
+#### Confirmed
+
+**The index counts counter-clockwise, and 0 is on top under vertical symmetry.** The
+library's `makeDirections(vertical, n)` is `angle = 2πj/n + (vertical ? π/2 : 0)`, so
+both halves hold as stated.
+
+**Counter-clockwise on the decagon:** `red+ blue− yellow+ purple− green+ red− blue+
+yellow− purple+ green−` — **exact**, and it carries a fact worth having in writing. A
+36° step lands on the *other end* of a family, 180° being an odd number of 36s, so the
+families do not come round in index order: they come in **steps of three**, the
+pentagram order **0 3 1 4 2**. Mistaking those five positions for the five indices is
+what produced the bad color line in §7.4g.
+
+**Counter-clockwise on the pentagon:** `red+ yellow+ green+ blue+ purple+` — exact, and
+in index order, because a pentagon visits only the `+` ends.
+
+So the color assignment is **0 red · 1 yellow (the code's amber) · 2 green · 3 blue ·
+4 purple**, which is `FIVE` in `goldenview.ts` unchanged.
+
+**`+`/`−` sets the order of S and L along the worm.** That is what the code already
+computes and calls `acuteFirst`, read off the sign of the couple's displacement
+projected on its own generator.
+
+**L/S = φ on the worm.** Measured where the worm actually is: a grid line of family j is
+perpendicular to v_j, so the ribbon dual to it runs along that line, and the step a
+rhomb contributes is the other generator's component across v_j. Thick rhomb
+(generators 72° apart) **0.951057**; thin (144°) **0.587785**; ratio **1.618034 = φ**.
+So on the worm **L is the thick rhomb and S the thin**.
+
+**The slab inverts the correspondence, exactly as warned.** A slab hexahedron is a
+Penrose rhomb plus the vertical generator, and the vertical turns the determinant into
+the rhomb's own area: a **thick** rhomb extruded gives |det| 0.760845 = **A₆**, a thin
+one 0.470228 = **O₆**. The opposite way round from the roof's hexagons, where the O₆
+*contains* two thick rhombs. Two true statements about the same two solids, which is why
+it is worth the warning.
+
+**The musical sequence, and L/S = φ.** `S → L, L → SL` gives
+`L · SL · LSL · SLLSL · LSLSLLSL · …`, and the letter ratio runs 21/13 → φ.
+
+#### Two that do not stand
+
+**The quicker rule is `S → SL`, `L → LSL`** — not `S → SLL, L → SL`. The square of
+`S → L, L → SL` is forced: σ²(S) = σ(L) = SL, and σ²(L) = σ(S)σ(L) = L·SL = LSL. The
+length test catches the other one on its own: with L = φ and S = 1, `S → SLL` scales
+length by 4.236 while `L → SL` scales it by 1.618, two different factors, so it is not
+self-similar at all. Its growth rate is **1 + √2 = 2.414214**, the silver ratio — it
+generates a **Pell** sequence, not a Fibonacci one. The real square scales both letters
+by **φ² = 2.618034**, which is what "two steps at once" has to mean.
+
+**"The placement of the O₆ (L) and A₆ (S) show the planar extent to be in those
+proportions"** — the proportions are φ for the worm's rhombs but **φ²** for the
+hexagons' own flat diagonals: O₆ **1.447214 = φ·S**, A₆ **0.552786 = S/φ**, ratio
+**2.618034**. Both numbers are real and they are not the same number, so the sentence
+depends on which length "planar extent" means:
+
+| length | O₆ | A₆ | ratio |
+|---|---|---|---|
+| the worm's step, per rhomb | 0.951057 | 0.587785 | **φ** |
+| the hexagon's flat diagonal | 1.447214 | 0.552786 | **φ²** |
+
+If the hexahedra are one per worm *rhomb*, the φ is right and it is the rhomb's step
+being measured, not the hexagon's diagonal. **This is the one open question left in the
+note** — and it is the same shape as every other mistake this page has made, a length
+measured on the wrong object.
+
+#### And the one that was mine
+
+§7.4g said the library's `1 thick` preset "is de Bruijn's K122 and is the A₆". **Both
+halves are wrong.**
+
+* The code is not de Bruijn's. It is the library's own `angleCode` in `resolve.ts`: the
+  gaps between the generator **directions** taken modulo a half turn, in units of 180/n,
+  sorted — a partition of n, so the same scheme names shapes at every n. Jake went
+  looking for K122 in de Bruijn and could not find it, which is the right outcome of
+  looking.
+* **K122 is the O₆**, the thick hexagon. Direction gaps for {0,1,2} are 72°, 72°, 36° →
+  `122`; for {0,1,3} they are 36°, 36°, 108° → `113`. I had read the code off the
+  **index** gaps mod 5 instead, which gives the opposite answer — 113 for the oblate,
+  122 for the acute — and so invented a disagreement between Jake and the library where
+  there was none.
+
+So everything agrees, and has all along: **O₆ = oblate = consecutive = K122 = thick
+hexagon = 108+108+144 = 2 thick rhombs + 1 thin**, and **A₆ = acute = K113 = thin
+hexagon = 72+144+144 = 1 thick + 2 thin**. `EXCEPTIONAL.md` line 387 had it right, the
+library's `FAMILIAR` table has it right, `hunt.ts` has it right, and `canon.mjs` now
+checks it both ways round so the slip cannot come back.
 
 ### 7.5 Order of work — revised after §7.4a
 
